@@ -202,5 +202,6 @@ export const navLinks = [
   { label: "Events", href: "/events" },
   { label: "Community", href: "/community" },
   { label: "Tickets", href: "/tickets" },
+  { label: "Pricing", href: "/pricing" },
   { label: "About", href: "/about" },
 ];
