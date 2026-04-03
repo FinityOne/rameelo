@@ -1,0 +1,35 @@
+@import "tailwindcss";
+
+@theme {
+  /* ── Surfaces ── */
+  --color-cream: #faf3e0;
+  --color-cream-dark: #e8d9b8;
+  --color-cream-surface: #f5ecce;
+
+  /* ── Brand · Burgundy ── */
+  --color-brand: #6e1a2e;
+  --color-brand-hover: #892240;
+  --color-brand-faint: #fdf0f3;
+  --color-brand-soft: #f0c5cf;
+
+  /* ── Accent · Aubergine ── */
+  --color-accent: #2e1a47;
+  --color-accent-hover: #3d2460;
+  --color-accent-faint: #f0eaf8;
+
+  /* ── Gold ── */
+  --color-gold: #c29f5d;
+  --color-gold-dark: #a68040;
+  --color-gold-faint: #fdf6e8;
+
+  /* ── Ink ── */
+  --color-ink: #1a1a1a;
+  --color-ink-secondary: #4a3a2a;
+  --color-ink-muted: #8a7a6a;
+}
+
+body {
+  background-color: #faf3e0;
+  color: #1a1a1a;
+  font-family: inherit;
+}
