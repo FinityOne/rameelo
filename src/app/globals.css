@@ -1,35 +1,90 @@
 @import "tailwindcss";
 
 @theme {
-  /* ── Surfaces ── */
-  --color-cream: #faf3e0;
-  --color-cream-dark: #e8d9b8;
-  --color-cream-surface: #f5ecce;
+  /* ── Brand: Primary ── */
+  --color-marigold: #F5A623;
+  --color-marigold-dark: #D4891B;
+  --color-marigold-faint: #FEF6E4;
 
-  /* ── Brand · Burgundy ── */
-  --color-brand: #6e1a2e;
-  --color-brand-hover: #892240;
-  --color-brand-faint: #fdf0f3;
-  --color-brand-soft: #f0c5cf;
+  /* ── Brand: Aubergine ── */
+  --color-aubergine: #2E1B30;
+  --color-aubergine-light: #3D2543;
+  --color-aubergine-faint: #F5F0F7;
 
-  /* ── Accent · Aubergine ── */
-  --color-accent: #2e1a47;
-  --color-accent-hover: #3d2460;
-  --color-accent-faint: #f0eaf8;
+  /* ── Brand: Ivory ── */
+  --color-ivory: #FCF9F2;
+  --color-ivory-200: #ECE3CC;
 
-  /* ── Gold ── */
-  --color-gold: #c29f5d;
-  --color-gold-dark: #a68040;
-  --color-gold-faint: #fdf6e8;
+  /* ── Brand: Peacock ── */
+  --color-peacock: #0E8C7A;
+  --color-peacock-faint: #E0F5F2;
+
+  /* ── Brand: Durga ── */
+  --color-durga: #7C1F2C;
 
   /* ── Ink ── */
-  --color-ink: #1a1a1a;
-  --color-ink-secondary: #4a3a2a;
-  --color-ink-muted: #8a7a6a;
+  --color-ink: #3B2F3E;
+  --color-ink-muted: #6B5E6E;
+
+  /* ── Fonts ── */
+  --font-display: var(--font-bricolage), "Bricolage Grotesque", sans-serif;
+  --font-ui: var(--font-inter), "Inter", sans-serif;
+  --font-editorial: var(--font-fraunces), "Fraunces", serif;
+  --font-mono: var(--font-jetbrains), "JetBrains Mono", monospace;
+
+  /* ── Radius ── */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  --radius-pill: 9999px;
+
+  /* ── Animations ── */
+  --animate-float-a: float-a 5s ease-in-out infinite;
+  --animate-float-b: float-b 6s ease-in-out infinite;
+  --animate-float-c: float-c 4.5s ease-in-out infinite;
+  --animate-float-d: float-d 7s ease-in-out infinite;
+  --animate-slide-up: slide-up 0.6s ease-out forwards;
+  --animate-fade-in: fade-in 0.5s ease-out forwards;
+  --animate-ticker: ticker 28s linear infinite;
+}
+
+@keyframes float-a {
+  0%, 100% { transform: translateY(0px) rotate(-0.5deg); }
+  50% { transform: translateY(-10px) rotate(0.5deg); }
+}
+@keyframes float-b {
+  0%, 100% { transform: translateY(-6px) rotate(0.5deg); }
+  50% { transform: translateY(6px) rotate(-0.5deg); }
+}
+@keyframes float-c {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-14px); }
+}
+@keyframes float-d {
+  0%, 100% { transform: translateY(-4px) rotate(-1deg); }
+  50% { transform: translateY(8px) rotate(0deg); }
+}
+@keyframes slide-up {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+html {
+  scroll-behavior: smooth;
 }
 
 body {
-  background-color: #faf3e0;
-  color: #1a1a1a;
-  font-family: inherit;
+  background-color: #FCF9F2;
+  color: #3B2F3E;
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
 }
