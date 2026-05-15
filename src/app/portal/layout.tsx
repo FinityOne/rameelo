@@ -25,7 +25,6 @@ const MEMBER_NAV: NavItem[] = [
     href: "/portal/tickets",
     label: "My Tickets",
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>,
-    badge: "3",
   },
   {
     href: "/portal/feed",
@@ -178,6 +177,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [user, setUser] = useState<RameeloUser | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [ticketCount, setTicketCount] = useState<number>(0);
 
   useEffect(() => {
     const supabase = createClient();
@@ -187,12 +187,20 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         return;
       }
 
-      // Fetch full profile including role from DB
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("first_name, last_name, email, phone, city, state, role, avatar_url")
-        .eq("id", authUser.id)
-        .single();
+      // Fetch profile + ticket count in parallel
+      const [{ data: profile }, { count }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("first_name, last_name, email, phone, city, state, role, avatar_url")
+          .eq("id", authUser.id)
+          .single(),
+        supabase
+          .from("orders")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", authUser.id)
+          .eq("status", "confirmed"),
+      ]);
+      setTicketCount(count ?? 0);
 
       const meta = authUser.user_metadata ?? {};
       const firstName = profile?.first_name || meta.firstName || authUser.email?.split("@")[0] || "Member";
@@ -260,9 +268,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
           {/* Member section — everyone */}
           <NavDivider label="Member" />
-          {MEMBER_NAV.map((item) => (
-            <NavLink key={item.href} item={item} pathname={pathname} onClick={() => setSidebarOpen(false)} />
-          ))}
+          {MEMBER_NAV.map((item) => {
+            const navItem = item.href === "/portal/tickets" && ticketCount > 0
+              ? { ...item, badge: String(ticketCount) }
+              : item;
+            return <NavLink key={item.href} item={navItem} pathname={pathname} onClick={() => setSidebarOpen(false)} />;
+          })}
 
           {/* Organizer section */}
           {(role === 'organizer' || role === 'admin') && (
