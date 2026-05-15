@@ -122,11 +122,7 @@ function LockedField({ label, value }: { label: string; value: string }) {
       <div className="w-full rounded-xl border border-ivory-200 bg-ivory/60 px-3.5 py-2.5 font-ui text-sm text-ink-muted cursor-not-allowed select-none">
         {value || "—"}
       </div>
-      <a href="mailto:admin@rameelo.com"
-        className="mt-1 inline-flex items-center gap-1 font-mono text-[9px] text-aubergine/70 hover:text-aubergine transition-colors">
-        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-        Email admin@rameelo.com to update
-      </a>
+      <p className="mt-1 font-mono text-[9px] text-ink-muted/60">Contact your account manager to update</p>
     </div>
   );
 }

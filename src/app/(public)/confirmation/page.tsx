@@ -225,7 +225,7 @@ export default function ConfirmationPage() {
         {/* Footer */}
         <div className="text-center py-6 space-y-4">
           <p className="font-ui text-ink-muted text-sm">
-            Questions about your order? <Link href="/portal/tickets" className="text-marigold-dark hover:underline">View your tickets</Link> or contact support.
+            Questions about your order? <Link href="/portal/tickets" className="text-marigold-dark hover:underline">View your tickets</Link>.
           </p>
           <Link
             href="/events"

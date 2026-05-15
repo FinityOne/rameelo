@@ -357,7 +357,6 @@ export default function OrganizerTicketsPage() {
                 <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className={selectCls}>
                   <option value="all">All statuses</option>
                   <option value="confirmed">Confirmed</option>
-                  <option value="refunded">Refunded</option>
                   <option value="cancelled">Cancelled</option>
                 </select>
                 <svg className="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-ink-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">

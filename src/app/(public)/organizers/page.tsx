@@ -886,17 +886,6 @@ export default function OrganizersPage() {
             </p>
           </div>
 
-          <div className="text-center mt-8">
-            <p className="font-ui text-white/40 text-sm">
-              Running a large-scale festival?{" "}
-              <a
-                href="mailto:organizers@rameelo.com"
-                className="text-marigold hover:text-marigold-dark underline underline-offset-2 transition-colors"
-              >
-                Talk to our team directly
-              </a>
-            </p>
-          </div>
         </div>
       </section>
     </div>

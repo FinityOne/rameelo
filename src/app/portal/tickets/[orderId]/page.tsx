@@ -277,7 +277,7 @@ export default function ReceiptPage() {
               <div className="grid grid-cols-[1fr_auto] gap-4 px-4 py-2.5 border-b border-ivory-200">
                 <div>
                   <p className="font-ui text-xs text-ink-muted">Platform service fee</p>
-                  <p className="font-mono text-[9px] text-ink-muted/60">Applied by Rameelo · Non-refundable</p>
+                  <p className="font-mono text-[9px] text-ink-muted/60">Applied by Rameelo</p>
                 </div>
                 <p className="font-ui text-xs text-ink-muted text-right self-center">${Number(order.service_fee).toFixed(2)}</p>
               </div>
@@ -322,8 +322,7 @@ export default function ReceiptPage() {
                   Rameelo is a ticketing platform. Sales tax, if applicable, is collected and remitted by the event organizer in accordance with applicable state law. The platform service fee shown above is charged by Rameelo, Inc. for processing and platform access. This document serves as your official purchase receipt. Please retain for your records.
                 </p>
                 <p className="font-ui text-xs text-ink-muted">
-                  For refunds or disputes, contact the event organizer directly or email{" "}
-                  <span className="font-medium text-ink">support@rameelo.com</span>.
+                  For questions about your order, contact the event organizer directly.
                 </p>
               </div>
             </div>
@@ -332,7 +331,7 @@ export default function ReceiptPage() {
           {/* Footer */}
           <div className="px-8 py-4 border-t border-ivory-200 flex flex-col sm:flex-row items-center justify-between gap-2">
             <p className="font-mono text-[9px] text-ink-muted uppercase tracking-widest">
-              Rameelo, Inc. · rameelo.com · support@rameelo.com
+              Rameelo, Inc. · rameelo.com
             </p>
             <p className="font-mono text-[9px] text-ink-muted">
               Generated {new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}

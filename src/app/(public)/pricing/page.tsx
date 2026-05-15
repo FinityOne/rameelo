@@ -160,8 +160,8 @@ const faqs = [
     a: "Payouts are deposited to your bank account within 2 business days after your event ends. For multi-day events, you can request a mid-event payout at no additional charge.",
   },
   {
-    q: "What happens if I need to cancel or postpone?",
-    a: "You can issue full or partial refunds from your dashboard. For postponements, attendees are automatically notified and can transfer their ticket to the new date.",
+    q: "What happens if I need to postpone my event?",
+    a: "For postponements, attendees are automatically notified and can transfer their ticket to the new date.",
   },
   {
     q: "Can I use my own payment processor?",
