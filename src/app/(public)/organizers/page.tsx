@@ -1,5 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { Eyebrow, Button, Badge, Avatar } from "@/components/ui";
+
+export const metadata: Metadata = {
+  title: "Garba Event Organizers — List Your Navratri Event on Rameelo",
+  description: "Rameelo is the dedicated ticketing platform for raas garba and Navratri events in the USA. Group discounts, real-time analytics, ticket transfers, and a community that actually shows up. Built for garba organizers.",
+  keywords: ["garba event organizer", "navratri ticketing platform", "sell garba tickets online", "raas garba events usa", "navratri event management"],
+  openGraph: {
+    title: "Garba Event Organizers — List Your Navratri Event on Rameelo",
+    description: "The dedicated ticketing platform for raas garba and Navratri events. Group discounts, analytics, and a community built for garba.",
+    type: "website",
+  },
+};
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 

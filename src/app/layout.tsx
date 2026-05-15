@@ -38,27 +38,71 @@ const jetbrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   metadataBase: new URL("https://rameelo.com"),
   title: {
-    default: "Rameelo — The home for Raas Garba in America",
+    default: "Rameelo — The Home for Raas Garba & Navratri Events in America",
     template: "%s | Rameelo",
   },
   description:
-    "Find Garba, Dandiya, and Navratri events near you. Group tickets, exclusive discounts, and the best artists — all on Rameelo.",
-  keywords: ["garba", "navratri", "dandiya", "raas garba", "Indian dance", "South Asian events", "gujarati events", "navratri tickets"],
+    "America's dedicated platform for raas garba, dandiya, and Navratri events. Find events near you in New Jersey, Houston, Chicago, Atlanta, and the Bay Area. Group tickets with up to 15% off.",
+  keywords: [
+    "garba events usa", "navratri 2025", "raas garba tickets", "dandiya events near me",
+    "navratri near me", "garba new jersey", "garba houston", "garba chicago",
+    "gujarati events usa", "navratri tickets online", "group garba tickets", "rameelo",
+  ],
+  authors: [{ name: "Rameelo", url: "https://rameelo.com" }],
+  creator: "Rameelo",
+  publisher: "Rameelo",
   openGraph: {
     type: "website",
     siteName: "Rameelo",
-    title: "Rameelo — The home for Raas Garba in America",
+    locale: "en_US",
+    title: "Rameelo — The Home for Raas Garba & Navratri Events in America",
     description:
-      "Find Garba, Dandiya, and Navratri events near you. Group tickets, exclusive discounts, and the best artists — all on Rameelo.",
-    images: [{ url: "/og-default.jpg", width: 1200, height: 630, alt: "Rameelo — Raas Garba ticketing" }],
+      "America's dedicated platform for raas garba, dandiya, and Navratri events. Group tickets with up to 15% off.",
+    images: [{ url: "/og-default.jpg", width: 1200, height: 630, alt: "Rameelo — America's home for Raas Garba" }],
+    url: "https://rameelo.com",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Rameelo — The home for Raas Garba in America",
-    description: "Find Garba, Dandiya, and Navratri events near you. Group tickets, exclusive discounts, and the best artists.",
+    site: "@rameelo",
+    title: "Rameelo — Raas Garba & Navratri Events in America",
+    description: "Find garba, dandiya, and Navratri events near you. Group discounts up to 15% off.",
     images: ["/og-default.jpg"],
   },
-  robots: { index: true, follow: true },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-video-preview": -1, "max-image-preview": "large", "max-snippet": -1 },
+  },
+  alternates: { canonical: "https://rameelo.com" },
+};
+
+const JSON_LD_ORG = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": "https://rameelo.com/#organization",
+      name: "Rameelo",
+      url: "https://rameelo.com",
+      description: "America's dedicated ticketing platform for raas garba, dandiya, and Navratri events.",
+      foundingDate: "2024",
+      areaServed: "US",
+      knowsAbout: ["Raas Garba", "Dandiya Raas", "Navratri", "Gujarati Culture", "South Asian Events"],
+      sameAs: ["https://instagram.com/rameelo", "https://twitter.com/rameelo"],
+    },
+    {
+      "@type": "WebSite",
+      "@id": "https://rameelo.com/#website",
+      url: "https://rameelo.com",
+      name: "Rameelo",
+      publisher: { "@id": "https://rameelo.com/#organization" },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: { "@type": "EntryPoint", urlTemplate: "https://rameelo.com/events?q={search_term_string}" },
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -68,6 +112,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${bricolage.variable} ${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen flex flex-col antialiased">
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_ORG) }}
+        />
         {children}
       </body>
     </html>

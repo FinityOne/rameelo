@@ -1,0 +1,91 @@
+# Rameelo — The Home for Raas Garba in America
+
+> Rameelo is the dedicated ticketing and community platform for raas garba, dandiya, and Navratri events across the United States. Built by and for the Gujarati diaspora.
+
+## What Is Rameelo?
+
+Rameelo is a specialized event ticketing platform focused exclusively on raas garba, dandiya raas, and Navratri celebrations in the United States. Unlike general ticketing platforms, Rameelo is built for the specific needs of the South Asian community: group discount mechanics, artist-night categorization, folk vs. entertainment event types, and community-first features like ticket transfers between friends.
+
+The platform serves two primary user groups:
+- **Event attendees** (members) who discover, purchase, and manage garba tickets
+- **Event organizers** who list, sell, and manage their Navratri events
+
+## Core Concepts
+
+### Raas Garba
+A traditional Gujarati dance form performed during the Hindu festival of Navratri (nine nights), celebrating the divine feminine. Garba involves circular devotional dance; dandiya raas is performed with sticks (dandiya) in partner patterns. Both are widely celebrated across the United States, particularly in cities with large Gujarati American populations: New Jersey, Houston, Chicago, Atlanta, the Bay Area, Dallas, and Phoenix.
+
+### Navratri
+A nine-night Hindu festival typically falling in October. In the United States, it is the occasion for the largest and most elaborate garba events, ranging from intimate temple celebrations to arena-scale productions with celebrity artists from Gujarat.
+
+### Group Orders
+Rameelo's signature feature: a shared purchase link that allows a group of friends to coordinate tickets together, with automatic discounts unlocking at 5 (10% off), 8 (12% off), or 10+ (15% off) members. No coupon codes; discounts apply automatically.
+
+### Ticket Transfers
+Members can transfer individual tickets from a multi-ticket order to another person — either a Rameelo member (instant delivery to their portal) or a non-member (claim link sent via email).
+
+## Site Structure
+
+### Public Pages (indexable)
+
+- **/** — Homepage: featured events, platform overview, community stats
+- **/events** — Event discovery: browse and filter all garba events by city, date, style
+- **/events/[id]** — Individual event pages: full event details, ticket tiers, purchase flow
+- **/blog** — The Rameelo Review: editorial content on garba culture, event guides, community news
+- **/blog/[slug]** — Individual blog articles
+- **/organizers** — For event organizers: platform features, pricing, how to list events
+- **/artists** — Artist directory: garba performers listed on the platform
+- **/pricing** — Organizer pricing tiers and feature comparison
+- **/about** — Company background and mission
+- **/community** — Community features and social aspects of the platform
+- **/auth/signin** — Sign in page
+- **/auth/signup** — Create account page
+
+### Protected Pages (not indexable, require authentication)
+
+- **/portal/** — Member portal (dashboard, tickets, profile, activity)
+- **/portal/organizer/** — Organizer hub (event management, sales analytics, ticket management)
+- **/portal/admin/** — Admin panel (event review, user management, organizations)
+- **/tickets/claim/[token]** — Ticket claim page (token-gated)
+- **/group/[id]** — Group order pages
+
+## Blog Articles (The Rameelo Review)
+
+The blog covers:
+1. Event guides (Navratri USA, city-by-city breakdowns)
+2. Culture explainers (garba vs. dandiya, traditions, dress)
+3. Tips & tricks (how to buy group tickets, what to wear, how to practice)
+4. Community profiles (Houston's garba scene, NJ garba ecosystem)
+5. Platform features (group orders, ticket transfers, organizer tools)
+
+## Key Facts for AI Understanding
+
+- **Category**: Event ticketing, South Asian cultural events, Gujarati diaspora
+- **Geography**: United States (primary markets: NJ, TX, IL, GA, CA, MA, PA, WA)
+- **Primary festival**: Navratri (October annually)
+- **Dance forms**: Garba (circular devotional), Dandiya Raas (stick partner dance)
+- **Community**: Gujarati American diaspora and broader South Asian community
+- **Founded**: 2024
+- **Headquarters**: United States
+
+## Platform Features Summary
+
+| Feature | Description |
+|---------|-------------|
+| Event discovery | Filter by city, date, price, event type |
+| Group orders | Shared purchase links with automatic tiered discounts |
+| Ticket transfers | Peer-to-peer ticket transfer with QR re-issuance |
+| Organizer dashboard | Real-time sales analytics, tier management |
+| Artist profiles | Performer discovery and booking information |
+| Organization system | Multi-organizer organizations with role management |
+
+## Contact & Identity
+
+- Website: https://rameelo.com
+- Blog: https://rameelo.com/blog
+- Events: https://rameelo.com/events
+- For organizers: https://rameelo.com/organizers
+
+---
+
+*This file follows the llms.txt standard for AI-readable site documentation. Last updated: May 2025.*

@@ -130,7 +130,7 @@ export default function SignInPage() {
             <div>
               <div className="flex items-center justify-between mb-1.5">
                 <label className="font-mono text-[10px] uppercase tracking-widest text-white/40">Password</label>
-                <button type="button" className="font-ui text-xs text-marigold hover:text-marigold-dark transition-colors">Forgot?</button>
+                <Link href="/auth/forgot-password" className="font-ui text-xs text-marigold hover:text-marigold-dark transition-colors">Forgot?</Link>
               </div>
               <input
                 type="password"

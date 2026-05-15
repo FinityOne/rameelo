@@ -1,5 +1,17 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { stats } from "@/lib/data";
+
+export const metadata: Metadata = {
+  title: "About Rameelo — Built for Raas Garba in America",
+  description: "Rameelo was built by and for the Gujarati diaspora — a ticketing platform that finally understands garba, dandiya raas, and Navratri. Learn about our mission and team.",
+  keywords: ["rameelo about", "garba ticketing company", "gujarati diaspora platform", "navratri app usa"],
+  openGraph: {
+    title: "About Rameelo — Built for Raas Garba in America",
+    description: "A ticketing platform built by the garba community, for the garba community. Learn about our mission.",
+    type: "website",
+  },
+};
 
 const team = [
   {

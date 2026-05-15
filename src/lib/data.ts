@@ -200,6 +200,7 @@ export const testimonials = [
 export const navLinks = [
   { label: "Home", href: "/" },
   { label: "Events", href: "/events" },
+  { label: "Blog", href: "/blog" },
   { label: "Artists", href: "/artists" },
   { label: "Organizers", href: "/organizers" },
   { label: "Pricing", href: "/pricing" },
