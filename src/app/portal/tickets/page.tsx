@@ -249,11 +249,22 @@ function OrderCard({ order }: { order: PortalOrderRow }) {
               <GroupMembersPanel members={order.groupMembers} groupId={order.groupId} />
             )}
 
-            {/* Price summary */}
+            {/* Price summary + receipt link */}
             <div className="flex items-center justify-between pt-2 border-t border-ivory-200">
-              <p className="font-mono text-[10px] text-ink-muted">
-                Total paid · #{order.orderId.slice(-6).toUpperCase()}
-              </p>
+              <div>
+                <p className="font-mono text-[10px] text-ink-muted">
+                  Total paid · #{order.orderId.slice(-6).toUpperCase()}
+                </p>
+                <Link
+                  href={`/portal/tickets/${order.orderId}`}
+                  className="font-mono text-[10px] text-aubergine hover:underline flex items-center gap-1 mt-0.5"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  View receipt
+                </Link>
+              </div>
               <p className="font-display font-bold text-ink">${order.grandTotal.toLocaleString()}</p>
             </div>
           </div>
