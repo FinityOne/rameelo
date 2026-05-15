@@ -62,6 +62,7 @@ export default function CreateEventPage() {
         .from('events')
         .insert({
           organizer_id:      organizerId,
+          org_id:            form.orgId || null,
           title:             form.title,
           category:          form.category,
           artist:            form.artist || null,

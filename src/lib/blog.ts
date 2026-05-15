@@ -16,27 +16,27 @@ export interface BlogArticle {
 
 export const BLOG_ARTICLES: BlogArticle[] = [
   {
-    slug: "navratri-2025-usa-ultimate-guide",
-    title: "Navratri 2025: The Ultimate Guide to Garba & Raas Events Across the USA",
-    excerpt: "Nine nights. Thousands of dancers. Hundreds of events coast to coast. Here's everything you need to know to experience Navratri 2025 in America — from the best cities to the insider tips that make the difference.",
+    slug: "navratri-2026-usa-ultimate-guide",
+    title: "Navratri 2026: The Ultimate Guide to Garba & Raas Events Across the USA",
+    excerpt: "Nine nights. Thousands of dancers. Hundreds of events coast to coast. Here's everything you need to know to experience Navratri 2026 in America — from the best cities to the insider tips that make the difference.",
     category: "Event Guide",
     author: "Rameelo Editorial",
     authorTitle: "Culture Desk",
-    publishedAt: "2025-05-10",
+    publishedAt: "2026-05-10",
     readMinutes: 8,
     featured: true,
     coverGradient: "from-aubergine via-aubergine/80 to-[#7C1F2C]",
     coverEmoji: "🎶",
-    tags: ["navratri 2025", "garba usa", "dandiya events", "navratri guide"],
+    tags: ["navratri 2026", "garba usa", "dandiya events", "navratri guide"],
     body: `
 <p class="lead">Every October, something extraordinary happens across the United States. In convention centers in New Jersey, arenas in Houston, and ballrooms in Chicago, tens of thousands of people come together for <strong>Navratri</strong> — nine nights of music, dance, color, and community that represent one of Hinduism's most joyful celebrations.</p>
 
 <p>For the Gujarati diaspora — and the growing number of South Asians and non-Indians who've fallen in love with the tradition — Navratri in America has evolved into something uniquely its own: bigger productions, world-class artists flown in from Gujarat, group tickets saving families hundreds of dollars, and a sense that <em>this</em> is where the global garba scene is setting new standards.</p>
 
-<p>This is your complete guide to Navratri 2025 in the USA.</p>
+<p>This is your complete guide to Navratri 2026 in the USA.</p>
 
-<h2>When Is Navratri 2025?</h2>
-<p>Navratri 2025 falls on <strong>October 2–11</strong>, with the most celebrated night being the final night (Navami) on October 10. Most major events run across the full nine nights, though many organizers hold their biggest single-night events on October 3, 4, 9, and 10.</p>
+<h2>When Is Navratri 2026?</h2>
+<p>Navratri 2026 falls on <strong>October 21–30</strong>, with the most celebrated night being the final night (Navami) on October 29. Most major events run across the full nine nights, though many organizers hold their biggest single-night events on October 22, 23, 28, and 29.</p>
 <p>Mark your calendar early. The top events in cities like Edison, Houston, Chicago, and Atlanta sell out weeks — sometimes months — in advance.</p>
 
 <h2>The Best Cities for Garba in the USA</h2>
@@ -107,7 +107,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     category: "Culture",
     author: "Priya Mehta",
     authorTitle: "Cultural Correspondent",
-    publishedAt: "2025-05-05",
+    publishedAt: "2026-05-05",
     readMinutes: 6,
     featured: false,
     coverGradient: "from-[#0E8C7A] via-[#0a7066] to-[#065e55]",
@@ -171,13 +171,13 @@ export const BLOG_ARTICLES: BlogArticle[] = [
   },
 
   {
-    slug: "best-garba-events-new-jersey-2025",
-    title: "The Best Garba Events in New Jersey for Navratri 2025",
+    slug: "best-garba-events-new-jersey-2026",
+    title: "The Best Garba Events in New Jersey for Navratri 2026",
     excerpt: "New Jersey is the garba capital of America — and if you haven't experienced Navratri in Edison or Iselin at least once, you haven't truly experienced Navratri in the USA. Here's your insider guide to the best NJ events this season.",
     category: "City Guide",
     author: "Rameelo Editorial",
     authorTitle: "Events Desk",
-    publishedAt: "2025-05-01",
+    publishedAt: "2026-05-01",
     readMinutes: 5,
     featured: false,
     coverGradient: "from-[#7C1F2C] via-[#892240] to-[#2E1B30]",
@@ -211,7 +211,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <h2>How to Navigate the NJ Scene</h2>
 
 <h3>Book Early — Seriously</h3>
-<p>For the best NJ events, "early" means August or September. Popular artist nights for Navratri 2025 (October 2–11) will begin selling tickets this summer. Waiting until October to buy is gambling with your Navratri.</p>
+<p>For the best NJ events, "early" means August or September. Popular artist nights for Navratri 2026 (October 21–30) will begin selling tickets this summer. Waiting until October to buy is gambling with your Navratri.</p>
 
 <h3>Come as a Group</h3>
 <p>Everything about NJ garba is better in a group. The social dynamics of dandiya raas require a group. The pre- and post-event dinners at the countless Gujarati restaurants in the area are better with 10 people. And with group ticket pricing on Rameelo, larger groups unlock automatic discounts of 10–15%.</p>
@@ -239,7 +239,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     category: "Community",
     author: "Arjun Patel",
     authorTitle: "Community Writer",
-    publishedAt: "2025-04-28",
+    publishedAt: "2026-04-28",
     readMinutes: 6,
     featured: false,
     coverGradient: "from-[#D4891B] via-[#c47a10] to-[#2E1B30]",
@@ -252,7 +252,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 
 <h2>The Demographic Foundation</h2>
 <p>Houston has long had a substantial South Asian population, but the Gujarati community specifically has grown dramatically over the past decade. The energy sector, the Texas Medical Center, and the tech industry have all drawn Gujarati professionals to Houston in large numbers.</p>
-<p>By 2025, the Houston metro area is home to an estimated 150,000–200,000 Gujarati Americans — a number that rivals or exceeds New Jersey when you account for the broader Texas metro area including Dallas-Fort Worth, Austin, and San Antonio (all within driving distance for a major Navratri event).</p>
+<p>By 2026, the Houston metro area is home to an estimated 150,000–200,000 Gujarati Americans — a number that rivals or exceeds New Jersey when you account for the broader Texas metro area including Dallas-Fort Worth, Austin, and San Antonio (all within driving distance for a major Navratri event).</p>
 
 <h2>The Organizer Revolution</h2>
 <p>The real story of Houston garba's rise is the story of a generation of second-generation Gujarati Americans deciding to take ownership of how their cultural celebration was presented to the world.</p>
@@ -277,8 +277,8 @@ export const BLOG_ARTICLES: BlogArticle[] = [
   <li><strong>Make group attendance easy.</strong> Houston's scene benefits from the Texas culture of "everything is bigger" — people show up in large groups. Tools that make group booking easy (like Rameelo's group discount system) directly translate to more bodies on the floor.</li>
 </ol>
 
-<h2>Looking at Navratri 2025 in Houston</h2>
-<p>Navratri 2025 is shaping up to be Houston's biggest season yet. Events are planned across multiple venues, with multiple production groups competing for audiences. If you're in Texas, or close enough to make the drive, Houston's Navratri events are now legitimately worth planning a trip around.</p>
+<h2>Looking at Navratri 2026 in Houston</h2>
+<p>Navratri 2026 is shaping up to be Houston's biggest season yet. Events are planned across multiple venues, with multiple production groups competing for audiences. If you're in Texas, or close enough to make the drive, Houston's Navratri events are now legitimately worth planning a trip around.</p>
 <p>Find Houston garba events on Rameelo — filter by city and browse by date to plan your Houston Navratri.</p>
     `,
   },
@@ -290,7 +290,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     category: "Tips & Tricks",
     author: "Rameelo Editorial",
     authorTitle: "Member Experience",
-    publishedAt: "2025-04-22",
+    publishedAt: "2026-04-22",
     readMinutes: 4,
     featured: false,
     coverGradient: "from-[#2E1B30] via-[#3D2543] to-[#0E8C7A]",
@@ -360,7 +360,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
   <li>Anyone coordinating tickets across a WhatsApp group right now</li>
 </ul>
 
-<p>Start your group order on Rameelo and share the link with your people today. Navratri 2025 is coming fast.</p>
+<p>Start your group order on Rameelo and share the link with your people today. Navratri 2026 is coming fast.</p>
     `,
   },
 
@@ -371,7 +371,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     category: "For Organizers",
     author: "Rameelo Editorial",
     authorTitle: "Organizer Success",
-    publishedAt: "2025-04-15",
+    publishedAt: "2026-04-15",
     readMinutes: 7,
     featured: false,
     coverGradient: "from-[#0E8C7A] via-[#0a7066] to-[#2E1B30]",
@@ -435,7 +435,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     category: "Platform",
     author: "Kavya Shah",
     authorTitle: "Product Writer",
-    publishedAt: "2025-04-08",
+    publishedAt: "2026-04-08",
     readMinutes: 5,
     featured: false,
     coverGradient: "from-[#2E1B30] via-[#5a1e7a] to-[#7C1F2C]",

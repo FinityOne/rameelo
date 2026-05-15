@@ -3,6 +3,7 @@ import { events, stats, testimonials, communityGroups } from "@/lib/data";
 import { Eyebrow, Button, Badge, EventCard, Avatar } from "@/components/ui";
 import { HeroCountdown } from "@/components/ui/HeroCountdown";
 import { createClient } from "@/lib/supabase/server";
+import USAEventMap from "@/components/USAEventMap";
 
 
 /* ─────────────────────────────────────────────
@@ -172,6 +173,11 @@ export default async function HomePage() {
 
         </div>
       </section>
+
+      {/* ══════════════════════════════════════════
+          USA EVENT MAP
+      ══════════════════════════════════════════ */}
+      <USAEventMap />
 
       {/* ══════════════════════════════════════════
           CITY TICKER

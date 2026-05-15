@@ -4,6 +4,8 @@ import { useEffect, useState, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { EventFormData, EventCategory } from "./types";
 
+type OrgOption = { id: string; name: string; city: string | null; state: string | null };
+
 type ArtistOption = { id: string; name: string; tagline: string | null; profile_image_url: string | null; is_featured: boolean; genres: string[] };
 
 function ArtistPicker({ value, valueId, onChange }: {
@@ -173,6 +175,31 @@ export default function Step1Basics({ data, onChange }: Props) {
   const inputCls = "w-full rounded-xl border border-ivory-200 bg-white px-4 py-3 font-ui text-sm text-ink placeholder-ink-muted/50 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all";
   const labelCls = "block font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2";
 
+  const [myOrgs, setMyOrgs] = useState<OrgOption[]>([]);
+
+  useEffect(() => {
+    async function loadOrgs() {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from('organization_members')
+        .select('org_id, organizations(id, name, city, state)')
+        .eq('user_id', user.id)
+        .in('role', ['owner', 'admin', 'member']);
+      if (!data) return;
+      const orgs = data
+        .map((m: unknown) => {
+          const row = m as { organizations: OrgOption | OrgOption[] | null };
+          const o = Array.isArray(row.organizations) ? row.organizations[0] : row.organizations;
+          return o ?? null;
+        })
+        .filter((o): o is OrgOption => o !== null);
+      setMyOrgs(orgs);
+    }
+    loadOrgs();
+  }, []);
+
   function toggleNight(n: number) {
     const nights = data.navratriNights.includes(n)
       ? data.navratriNights.filter(x => x !== n)
@@ -231,6 +258,38 @@ export default function Step1Basics({ data, onChange }: Props) {
         />
         <p className="mt-1.5 font-mono text-[9px] text-ink-muted/60">Select from the Rameelo artist roster or type a custom name</p>
       </div>
+
+      {/* Organization */}
+      {myOrgs.length > 0 && (
+        <div>
+          <label className={labelCls}>Presenting Organization</label>
+          <select
+            value={data.orgId}
+            onChange={e => onChange({ orgId: e.target.value })}
+            className={inputCls}
+          >
+            <option value="">No organization (individual)</option>
+            {myOrgs.map(o => (
+              <option key={o.id} value={o.id}>
+                {o.name}{o.city ? ` — ${o.city}${o.state ? `, ${o.state}` : ''}` : ''}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1.5 font-mono text-[9px] text-ink-muted/60">
+            Linking an organization shows your org&apos;s profile on the event page
+          </p>
+          {data.orgId && myOrgs.find(o => o.id === data.orgId) && (
+            <div className="mt-2 flex items-center gap-2 px-3 py-2 rounded-xl bg-aubergine/5 border border-aubergine/15">
+              <div className="w-6 h-6 rounded-full bg-aubergine flex items-center justify-center text-white font-bold text-[10px] shrink-0">
+                {myOrgs.find(o => o.id === data.orgId)!.name.charAt(0)}
+              </div>
+              <p className="font-ui text-xs font-semibold text-aubergine">
+                {myOrgs.find(o => o.id === data.orgId)!.name}
+              </p>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Description */}
       <div>

@@ -23,6 +23,7 @@ export type EventFormData = {
   // Step 1
   title: string;
   category: EventCategory;
+  orgId: string;         // uuid from organizations table (optional)
   artist: string;        // display name (free-text fallback)
   artistId: string;      // uuid from artists table (preferred)
   description: string;
@@ -76,7 +77,7 @@ export const EMPTY_TIER = (): TicketTier => ({
 });
 
 export const DEFAULT_FORM: EventFormData = {
-  title: '', category: 'garba', artist: '', artistId: '', description: '', navratriNights: [],
+  title: '', category: 'garba', orgId: '', artist: '', artistId: '', description: '', navratriNights: [],
   isMultiDay: false, startDate: '', endDate: '', startTime: '', endTime: '', doorsOpenTime: '',
   venueName: '', addressLine1: '', addressLine2: '', city: '', state: '', zip: '',
   parking: 'none', parkingNotes: '', websiteUrl: '',
