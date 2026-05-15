@@ -1,12 +1,25 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { createUser, saveUser } from "@/lib/auth";
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
+
+const STATE_NAME_TO_ABBR: Record<string, string> = {
+  "Alabama":"AL","Alaska":"AK","Arizona":"AZ","Arkansas":"AR","California":"CA",
+  "Colorado":"CO","Connecticut":"CT","Delaware":"DE","Florida":"FL","Georgia":"GA",
+  "Hawaii":"HI","Idaho":"ID","Illinois":"IL","Indiana":"IN","Iowa":"IA","Kansas":"KS",
+  "Kentucky":"KY","Louisiana":"LA","Maine":"ME","Maryland":"MD","Massachusetts":"MA",
+  "Michigan":"MI","Minnesota":"MN","Mississippi":"MS","Missouri":"MO","Montana":"MT",
+  "Nebraska":"NE","Nevada":"NV","New Hampshire":"NH","New Jersey":"NJ","New Mexico":"NM",
+  "New York":"NY","North Carolina":"NC","North Dakota":"ND","Ohio":"OH","Oklahoma":"OK",
+  "Oregon":"OR","Pennsylvania":"PA","Rhode Island":"RI","South Carolina":"SC",
+  "South Dakota":"SD","Tennessee":"TN","Texas":"TX","Utah":"UT","Vermont":"VT",
+  "Virginia":"VA","Washington":"WA","West Virginia":"WV","Wisconsin":"WI","Wyoming":"WY",
+};
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -17,10 +30,31 @@ export default function SignUpPage() {
   const [phone, setPhone] = useState("");
   const [city, setCity] = useState("");
   const [state, setState] = useState("NJ");
+  const stateEditedByUser = useRef(false);
+  const cityEditedByUser = useRef(false);
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [emailSent, setEmailSent] = useState(false);
+
+  useEffect(() => {
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`,
+          { headers: { "User-Agent": "Rameelo/1.0 (heran@finityone.com)" } }
+        );
+        const data = await res.json();
+        const addr = data.address ?? {};
+        const stateName: string = addr.state ?? "";
+        const cityName: string = addr.city || addr.town || addr.village || addr.suburb || "";
+        const abbr = STATE_NAME_TO_ABBR[stateName];
+        if (abbr && !stateEditedByUser.current) setState(abbr);
+        if (cityName && !cityEditedByUser.current) setCity(cityName);
+      } catch { /* silent — user can set manually */ }
+    });
+  }, []);
 
   function formatPhone(digits: string): string {
     const d = digits.replace(/\D/g, "").slice(0, 10);
@@ -210,11 +244,11 @@ export default function SignUpPage() {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={labelCls}>City</label>
-                    <input type="text" autoComplete="address-level2" value={city} onChange={(e) => setCity(e.target.value)} placeholder="Edison" className={inputCls} />
+                    <input type="text" autoComplete="address-level2" value={city} onChange={(e) => { cityEditedByUser.current = true; setCity(e.target.value); }} placeholder="Edison" className={inputCls} />
                   </div>
                   <div>
                     <label className={labelCls}>State</label>
-                    <select value={state} onChange={(e) => setState(e.target.value)} className={`${inputCls} cursor-pointer`}>
+                    <select value={state} onChange={(e) => { stateEditedByUser.current = true; setState(e.target.value); }} className={`${inputCls} cursor-pointer`}>
                       {US_STATES.map((s) => <option key={s} value={s} style={{ backgroundColor: "#2E1B30" }}>{s}</option>)}
                     </select>
                   </div>
