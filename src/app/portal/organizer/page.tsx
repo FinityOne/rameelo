@@ -11,7 +11,7 @@ type RawTier = {
   name: string;
   price: number;
   quantity: number;
-  quantity_sold: number;
+  quantity_sold?: number; // not fetched from DB — computed from orders
   sort_order: number;
 };
 
@@ -251,8 +251,9 @@ function EventCard({ ev }: { ev: EventStat }) {
         <div className="px-5 pb-5 space-y-2 border-t border-ivory-200 pt-4">
           <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted mb-3">Ticket tiers</p>
           {ev.tiers.slice().sort((a, b) => a.sort_order - b.sort_order).map(tier => {
-            const tierFill = tier.quantity > 0 ? (tier.quantity_sold / tier.quantity) * 100 : 0;
-            const tierEarned = tier.quantity_sold * tier.price;
+            const sold = tier.quantity_sold ?? 0;
+            const tierFill = tier.quantity > 0 ? (sold / tier.quantity) * 100 : 0;
+            const tierEarned = sold * tier.price;
             const tierMax = tier.quantity * tier.price;
             const barColor = tierFill >= 90 ? "#7C1F2C" : tierFill >= 50 ? "#0E8C7A" : "#2E1B30";
             return (
@@ -264,7 +265,7 @@ function EventCard({ ev }: { ev: EventStat }) {
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
                     <span className="font-mono text-[9px] text-ink-muted">
-                      {tier.quantity_sold}/{tier.quantity}
+                      {sold}/{tier.quantity}
                     </span>
                     <span className="font-display font-bold text-xs" style={{ color: barColor, minWidth: 32, textAlign: "right" }}>
                       {Math.round(tierFill)}%
@@ -335,22 +336,41 @@ export default function OrganizerHubPage() {
         .single();
       setFirstName(profile?.first_name ?? user.email?.split("@")[0] ?? "");
 
-      // Events with tiers
+      // Events with tiers (no quantity_sold — we compute from orders)
       const { data: eventsRaw } = await supabase
         .from("events")
-        .select("id, title, start_date, status, capacity, created_at, ticket_tiers (id, name, price, quantity, quantity_sold, sort_order)")
+        .select("id, title, start_date, status, capacity, created_at, ticket_tiers (id, name, price, quantity, sort_order)")
         .eq("organizer_id", user.id)
         .order("start_date", { ascending: true });
 
       const raw = (eventsRaw ?? []) as RawEvent[];
       setHasAnyEvent(raw.length > 0);
 
+      // Fetch confirmed orders to get real sold counts per tier
+      const tierSold: Record<string, number> = {};
+      const tierRevenue: Record<string, number> = {};
+      if (raw.length > 0) {
+        const eventIds = raw.map(e => e.id);
+        const { data: ordersRaw } = await supabase
+          .from("orders")
+          .select("tier_id, qty, unit_price")
+          .in("event_id", eventIds)
+          .eq("status", "confirmed");
+        for (const o of (ordersRaw ?? []) as { tier_id: string; qty: number; unit_price: number }[]) {
+          tierSold[o.tier_id] = (tierSold[o.tier_id] ?? 0) + o.qty;
+          tierRevenue[o.tier_id] = (tierRevenue[o.tier_id] ?? 0) + o.qty * o.unit_price;
+        }
+      }
+
       const computed: EventStat[] = raw.map(ev => {
-        const tiers = ev.ticket_tiers ?? [];
+        const tiers = (ev.ticket_tiers ?? []).map(t => ({
+          ...t,
+          quantity_sold: tierSold[t.id] ?? 0,
+        }));
         const totalSold = tiers.reduce((s, t) => s + t.quantity_sold, 0);
         const totalCapacity = tiers.reduce((s, t) => s + t.quantity, 0);
         const maxRevenue = tiers.reduce((s, t) => s + t.quantity * t.price, 0);
-        const earnedRevenue = tiers.reduce((s, t) => s + t.quantity_sold * t.price, 0);
+        const earnedRevenue = tiers.reduce((s, t) => s + (tierRevenue[t.id] ?? 0), 0);
         const fillPct = totalCapacity > 0 ? (totalSold / totalCapacity) * 100 : 0;
         return {
           id: ev.id, title: ev.title, start_date: ev.start_date, status: ev.status,
