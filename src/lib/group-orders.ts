@@ -260,24 +260,49 @@ export async function saveOrder(params: {
 export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
   const supabase = createClient();
 
-  const { data, error } = await supabase
-    .from("orders")
-    .select(`
-      id, group_id, qty, unit_price, discount_pct,
-      discount_amount, service_fee, grand_total,
-      status, created_at, buyer_name, buyer_email, buyer_phone,
-      events (
-        id, title, start_date, start_time,
-        city, state, venue_name, category, cover_gradient,
-        artists (name, profile_image_url)
-      ),
-      ticket_tiers (id, name, price)
-    `)
-    .eq("user_id", userId)
-    .eq("status", "confirmed")
-    .order("created_at", { ascending: false });
+  const [{ data, error }, { data: transfersData }] = await Promise.all([
+    supabase
+      .from("orders")
+      .select(`
+        id, group_id, qty, unit_price, discount_pct,
+        discount_amount, service_fee, grand_total,
+        status, created_at, buyer_name, buyer_email, buyer_phone,
+        events (
+          id, title, start_date, start_time,
+          city, state, venue_name, category, cover_gradient,
+          artists (name, profile_image_url)
+        ),
+        ticket_tiers (id, name, price)
+      `)
+      .eq("user_id", userId)
+      .eq("status", "confirmed")
+      .order("created_at", { ascending: false }),
+
+    supabase
+      .from("ticket_transfers")
+      .select("id, order_id, to_email, to_name, status, token, created_at, accepted_at")
+      .eq("from_user_id", userId)
+      .neq("status", "cancelled"),
+  ]);
 
   if (error || !data) return [];
+
+  // Build a map of order_id → transfer for quick lookup
+  const transferMap = new Map<string, {
+    id: string; token: string; status: "pending" | "accepted";
+    toEmail: string; toName: string | null; createdAt: string; acceptedAt: string | null;
+  }>();
+  for (const t of (transfersData ?? []) as {
+    id: string; order_id: string; to_email: string; to_name: string | null;
+    status: string; token: string; created_at: string; accepted_at: string | null;
+  }[]) {
+    if (t.status === "pending" || t.status === "accepted") {
+      transferMap.set(t.order_id, {
+        id: t.id, token: t.token, status: t.status as "pending" | "accepted",
+        toEmail: t.to_email, toName: t.to_name, createdAt: t.created_at, acceptedAt: t.accepted_at,
+      });
+    }
+  }
 
   const orders = data as unknown as RawOrderRow[];
 
@@ -317,6 +342,7 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
         grandTotal: o.grand_total,
         purchasedAt: o.created_at,
         groupMembers,
+        transfer: transferMap.get(o.id),
       };
     })
   );
@@ -423,6 +449,15 @@ export interface PortalOrderRow {
   grandTotal: number;
   purchasedAt: string;
   groupMembers?: GroupMember[];
+  transfer?: {
+    id: string;
+    token: string;
+    status: "pending" | "accepted";
+    toEmail: string;
+    toName: string | null;
+    createdAt: string;
+    acceptedAt: string | null;
+  };
 }
 
 export interface PendingGroup {
