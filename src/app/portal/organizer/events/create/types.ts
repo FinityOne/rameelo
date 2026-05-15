@@ -13,6 +13,7 @@ export type TicketTier = {
   saleStartDate: string;
   saleEndDate: string;
   groupDiscountEnabled: boolean;
+  groupDiscountMode: 'simple' | 'scaling';
   groupDiscountMinQty: string;
   groupDiscountType: 'percentage' | 'fixed';
   groupDiscountValue: string;
@@ -68,6 +69,7 @@ export const EMPTY_TIER = (): TicketTier => ({
   saleStartDate: '',
   saleEndDate: '',
   groupDiscountEnabled: false,
+  groupDiscountMode: 'simple',
   groupDiscountMinQty: '',
   groupDiscountType: 'percentage',
   groupDiscountValue: '',

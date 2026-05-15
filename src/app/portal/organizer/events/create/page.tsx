@@ -106,9 +106,10 @@ export default function CreateEventPage() {
         quantity:               parseInt(t.quantity),
         sale_start_date:        t.saleStartDate || null,
         sale_end_date:          t.saleEndDate || null,
-        group_discount_min_qty: t.groupDiscountEnabled && t.groupDiscountMinQty ? parseInt(t.groupDiscountMinQty) : null,
-        group_discount_type:    t.groupDiscountEnabled && t.groupDiscountValue ? t.groupDiscountType : null,
-        group_discount_value:   t.groupDiscountEnabled && t.groupDiscountValue ? parseFloat(t.groupDiscountValue) : null,
+        group_discount_mode:    t.groupDiscountEnabled ? t.groupDiscountMode : null,
+        group_discount_min_qty: t.groupDiscountEnabled && t.groupDiscountMode === 'simple' && t.groupDiscountMinQty ? parseInt(t.groupDiscountMinQty) : null,
+        group_discount_type:    t.groupDiscountEnabled && t.groupDiscountMode === 'simple' && t.groupDiscountValue ? t.groupDiscountType : null,
+        group_discount_value:   t.groupDiscountEnabled && t.groupDiscountMode === 'simple' && t.groupDiscountValue ? parseFloat(t.groupDiscountValue) : null,
         sort_order:             i,
       }));
 

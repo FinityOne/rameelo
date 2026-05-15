@@ -28,6 +28,10 @@ type Tier = {
   sale_end_date: string | null;
   is_visible: boolean;
   sort_order: number;
+  group_discount_mode: 'simple' | 'scaling' | null;
+  group_discount_min_qty: number | null;
+  group_discount_type: 'percentage' | 'fixed' | null;
+  group_discount_value: number | null;
 };
 
 type Event = {
@@ -62,20 +66,48 @@ type Event = {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
-const GROUP_TIERS = [
+const SCALING_TIERS = [
   { min: 10, label: "10+ tickets", discount: 15, tag: "Best Value" },
   { min: 8,  label: "8–9 tickets",  discount: 12, tag: "Great Deal" },
   { min: 5,  label: "5–7 tickets",  discount: 10, tag: "Group Rate" },
 ];
 
-function getDiscount(qty: number): number {
-  for (const t of GROUP_TIERS) if (qty >= t.min) return t.discount;
+function getScalingDiscount(qty: number): number {
+  for (const t of SCALING_TIERS) if (qty >= t.min) return t.discount;
   return 0;
 }
-function getNextTier(qty: number) {
-  for (let i = GROUP_TIERS.length - 1; i >= 0; i--)
-    if (qty < GROUP_TIERS[i].min) return GROUP_TIERS[i];
+function getNextScalingTier(qty: number) {
+  for (let i = SCALING_TIERS.length - 1; i >= 0; i--)
+    if (qty < SCALING_TIERS[i].min) return SCALING_TIERS[i];
   return null;
+}
+
+function getTierDiscount(tier: Tier | null, qty: number): number {
+  if (!tier || !tier.group_discount_mode) return 0;
+  if (tier.group_discount_mode === 'scaling') return getScalingDiscount(qty);
+  if (tier.group_discount_mode === 'simple') {
+    const min = tier.group_discount_min_qty ?? 0;
+    if (qty < min || !tier.group_discount_value) return 0;
+    if (tier.group_discount_type === 'percentage') return tier.group_discount_value;
+    // fixed: convert $ off to effective pct for downstream math
+    return tier.price > 0 ? (tier.group_discount_value / tier.price) * 100 : 0;
+  }
+  return 0;
+}
+
+function getTierDiscountAmount(tier: Tier | null, qty: number, subtotal: number): number {
+  if (!tier || !tier.group_discount_mode) return 0;
+  if (tier.group_discount_mode === 'scaling') {
+    const pct = getScalingDiscount(qty);
+    return Math.round(subtotal * (pct / 100));
+  }
+  if (tier.group_discount_mode === 'simple') {
+    const min = tier.group_discount_min_qty ?? 0;
+    if (qty < min || !tier.group_discount_value) return 0;
+    if (tier.group_discount_type === 'percentage') return Math.round(subtotal * (tier.group_discount_value / 100));
+    return Math.round(tier.group_discount_value * qty);
+  }
+  return 0;
 }
 
 function fmtDate(d: string) {
@@ -452,7 +484,8 @@ export default function EventDetailClient({ id }: { id: string }) {
         ),
         ticket_tiers (
           id, name, description, price, quantity, quantity_sold,
-          sale_start_date, sale_end_date, is_visible, sort_order
+          sale_start_date, sale_end_date, is_visible, sort_order,
+          group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value
         )
       `)
       .eq("id", id)
@@ -475,13 +508,13 @@ export default function EventDetailClient({ id }: { id: string }) {
   const soldOut = selectedTier ? remaining <= 0 : false;
 
   const unitPrice = selectedTier?.price ?? 0;
-  const discount = getDiscount(qty);
   const subtotal = unitPrice * qty;
-  const discountAmount = Math.round(subtotal * (discount / 100));
+  const discountAmount = getTierDiscountAmount(selectedTier, qty, subtotal);
+  const discountPct = getTierDiscount(selectedTier, qty);
   const afterDiscount = subtotal - discountAmount;
   const serviceFee = Math.round(afterDiscount * 0.049);
   const grandTotal = afterDiscount + serviceFee;
-  const nextTier = getNextTier(qty);
+  const nextScalingTier = selectedTier?.group_discount_mode === 'scaling' ? getNextScalingTier(qty) : null;
 
   const maxQty = Math.min(20, selectedTier ? Math.max(0, remaining) : 0);
 
@@ -514,14 +547,14 @@ export default function EventDetailClient({ id }: { id: string }) {
       artistName: event.artist?.name ?? null,
       qty,
       unitPrice,
-      discount,
+      discount: discountPct,
       discountAmount,
       serviceFee,
       grandTotal,
     };
     localStorage.setItem("rameelo_checkout", JSON.stringify(payload));
     router.push("/checkout");
-  }, [event, selectedTier, qty, unitPrice, discount, discountAmount, serviceFee, grandTotal, router]);
+  }, [event, selectedTier, qty, unitPrice, discountPct, discountAmount, serviceFee, grandTotal, router]);
 
   const gradient = event ? (GRADIENTS.find(g => g.id === event.cover_gradient) ?? GRADIENTS[0]) : null;
 
@@ -794,48 +827,59 @@ export default function EventDetailClient({ id }: { id: string }) {
                           <span className="font-mono text-[10px] text-marigold-dark">{remaining} remaining</span>
                         )}
                       </div>
-                      {/* Nudge to add 1 more to unlock next group discount */}
-                      {nextTier && qty >= nextTier.min - 3 && qty < nextTier.min && (
+                      {/* Scaling mode: nudge to next tier */}
+                      {selectedTier?.group_discount_mode === 'scaling' && nextScalingTier && qty >= nextScalingTier.min - 3 && qty < nextScalingTier.min && (
                         <button
-                          onClick={() => setQty(nextTier.min)}
+                          onClick={() => setQty(nextScalingTier.min)}
                           className="mt-2 w-full text-left px-3 py-2 rounded-lg bg-peacock/8 border border-peacock/20 hover:bg-peacock/12 transition-colors"
                         >
                           <p className="font-ui text-xs text-peacock">
-                            <strong>Add {nextTier.min - qty} more</strong> → unlock {nextTier.discount}% group discount
+                            <strong>Add {nextScalingTier.min - qty} more</strong> → unlock {nextScalingTier.discount}% group discount
+                          </p>
+                        </button>
+                      )}
+                      {/* Simple mode: nudge to hit minimum */}
+                      {selectedTier?.group_discount_mode === 'simple' && selectedTier.group_discount_min_qty && qty < selectedTier.group_discount_min_qty && qty >= selectedTier.group_discount_min_qty - 3 && (
+                        <button
+                          onClick={() => setQty(selectedTier.group_discount_min_qty!)}
+                          className="mt-2 w-full text-left px-3 py-2 rounded-lg bg-peacock/8 border border-peacock/20 hover:bg-peacock/12 transition-colors"
+                        >
+                          <p className="font-ui text-xs text-peacock">
+                            <strong>Add {selectedTier.group_discount_min_qty - qty} more</strong> → unlock group pricing
                           </p>
                         </button>
                       )}
                     </div>
 
-                    {/* Group discount tiers */}
-                    {unitPrice > 0 && (
+                    {/* ── Scaling group discount table ── */}
+                    {unitPrice > 0 && selectedTier?.group_discount_mode === 'scaling' && (
                       <div className="rounded-xl border border-ivory-200 overflow-hidden">
                         <div className="bg-aubergine/5 px-3 py-2 border-b border-ivory-200">
                           <p className="font-mono text-[10px] uppercase tracking-widest text-aubergine font-bold">Group Discounts</p>
                         </div>
                         <div className="divide-y divide-ivory-200">
-                          {GROUP_TIERS.slice().reverse().map(tier => {
-                            const active = qty >= tier.min;
-                            const isNext = nextTier?.min === tier.min;
+                          {SCALING_TIERS.slice().reverse().map(st => {
+                            const active = qty >= st.min;
+                            const isNext = nextScalingTier?.min === st.min;
                             return (
-                              <div key={tier.min} className={`flex items-center justify-between px-3 py-2.5 ${active ? "bg-peacock/5" : isNext ? "bg-marigold/5" : ""}`}>
+                              <div key={st.min} className={`flex items-center justify-between px-3 py-2.5 ${active ? "bg-peacock/5" : isNext ? "bg-marigold/5" : ""}`}>
                                 <div className="flex items-center gap-2">
                                   <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${active ? "bg-peacock text-white" : "bg-ivory-200 text-ink-muted"}`}>
                                     {active ? "✓" : "·"}
                                   </span>
-                                  <span className={`font-ui text-xs ${active ? "text-ink font-semibold" : "text-ink-muted"}`}>{tier.label}</span>
+                                  <span className={`font-ui text-xs ${active ? "text-ink font-semibold" : "text-ink-muted"}`}>{st.label}</span>
                                   {isNext && (
                                     <span className="font-mono text-[9px] uppercase tracking-wide text-marigold-dark bg-marigold/15 px-1.5 py-0.5 rounded-full">
-                                      Add {tier.min - qty}
+                                      Add {st.min - qty}
                                     </span>
                                   )}
                                 </div>
-                                <span className={`font-display font-bold text-sm ${active ? "text-peacock" : "text-ink-muted"}`}>{tier.discount}% off</span>
+                                <span className={`font-display font-bold text-sm ${active ? "text-peacock" : "text-ink-muted"}`}>{st.discount}% off</span>
                               </div>
                             );
                           })}
                         </div>
-                        {discount > 0 && (
+                        {discountAmount > 0 && (
                           <div className="bg-peacock px-3 py-2">
                             <p className="font-ui text-xs text-white font-semibold text-center">
                               Saving ${discountAmount.toLocaleString()} with group pricing!
@@ -845,6 +889,53 @@ export default function EventDetailClient({ id }: { id: string }) {
                       </div>
                     )}
 
+                    {/* ── Simple group discount banner ── */}
+                    {unitPrice > 0 && selectedTier?.group_discount_mode === 'simple' && selectedTier.group_discount_min_qty && (
+                      (() => {
+                        const minQty = selectedTier.group_discount_min_qty!;
+                        const val = selectedTier.group_discount_value ?? 0;
+                        const type = selectedTier.group_discount_type ?? 'percentage';
+                        const unlocked = qty >= minQty;
+                        const discLabel = type === 'percentage' ? `${val}% off each` : `$${val} off each`;
+                        const discPrice = type === 'percentage'
+                          ? (unitPrice * (1 - val / 100)).toFixed(2)
+                          : Math.max(0, unitPrice - val).toFixed(2);
+                        return (
+                          <div className={`rounded-xl border-2 overflow-hidden transition-all ${unlocked ? "border-peacock/40" : "border-ivory-200"}`}>
+                            <div className={`flex items-center justify-between px-4 py-3 ${unlocked ? "bg-peacock/8" : "bg-ivory"}`}>
+                              <div className="flex items-center gap-2.5">
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${unlocked ? "bg-peacock" : "bg-ivory-200"}`}>
+                                  <svg className={`w-4 h-4 ${unlocked ? "text-white" : "text-ink-muted"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                  </svg>
+                                </div>
+                                <div>
+                                  <p className={`font-ui text-sm font-semibold ${unlocked ? "text-peacock" : "text-ink"}`}>
+                                    Group rate — {discLabel}
+                                  </p>
+                                  <p className="font-mono text-[10px] text-ink-muted">
+                                    {unlocked ? `Applied! $${discPrice}/ticket` : `Buy ${minQty}+ tickets to unlock`}
+                                  </p>
+                                </div>
+                              </div>
+                              {unlocked ? (
+                                <span className="font-mono text-[10px] font-bold text-white bg-peacock px-2 py-1 rounded-full">Active</span>
+                              ) : (
+                                <span className="font-mono text-[10px] text-ink-muted bg-ivory-200 px-2 py-1 rounded-full">{minQty - qty} more</span>
+                              )}
+                            </div>
+                            {unlocked && (
+                              <div className="bg-peacock px-3 py-2">
+                                <p className="font-ui text-xs text-white font-semibold text-center">
+                                  Saving ${discountAmount.toLocaleString()} with group pricing!
+                                </p>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })()
+                    )}
+
                     {/* Price breakdown */}
                     {unitPrice > 0 && (
                       <div className="rounded-xl bg-ivory p-4 space-y-2">
@@ -852,9 +943,9 @@ export default function EventDetailClient({ id }: { id: string }) {
                           <span className="font-ui text-ink-muted">{qty} × ${unitPrice}</span>
                           <span className="font-ui text-ink">${subtotal.toLocaleString()}</span>
                         </div>
-                        {discount > 0 && (
+                        {discountAmount > 0 && (
                           <div className="flex justify-between text-sm">
-                            <span className="font-ui text-peacock">Group discount ({discount}%)</span>
+                            <span className="font-ui text-peacock">Group discount</span>
                             <span className="font-ui text-peacock">−${discountAmount.toLocaleString()}</span>
                           </div>
                         )}
@@ -883,7 +974,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                       className="w-full py-3 rounded-2xl border border-aubergine/25 text-aubergine font-ui font-semibold text-sm hover:bg-aubergine/5 transition-all flex items-center justify-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                      Start a Group Order — Save up to 15%
+                      {selectedTier?.group_discount_mode === 'scaling' ? "Start a Group Order — Save up to 15%" : "Start a Group Order"}
                     </Link>
 
                     <p className="text-center font-mono text-[10px] text-ink-muted">

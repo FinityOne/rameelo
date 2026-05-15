@@ -30,8 +30,9 @@ function TierCard({ tier, idx, total, onChange, onRemove }: {
 }) {
   const price = parseFloat(tier.price) || 0;
   const fees = feeBreakdown(price);
-  const hasGroupDiscount = tier.groupDiscountEnabled && tier.groupDiscountValue && tier.groupDiscountMinQty;
-  const discountedPrice = hasGroupDiscount
+  const hasSimpleDiscount = tier.groupDiscountEnabled && tier.groupDiscountMode === 'simple' && tier.groupDiscountValue && tier.groupDiscountMinQty;
+  const hasScalingDiscount = tier.groupDiscountEnabled && tier.groupDiscountMode === 'scaling';
+  const discountedPrice = hasSimpleDiscount
     ? groupPrice(price, tier.groupDiscountType, parseFloat(tier.groupDiscountValue) || 0)
     : null;
   const discountedFees = discountedPrice !== null ? feeBreakdown(discountedPrice) : null;
@@ -116,29 +117,71 @@ function TierCard({ tier, idx, total, onChange, onRemove }: {
           </div>
 
           {tier.groupDiscountEnabled && (
-            <div className="grid sm:grid-cols-3 gap-3 pt-1">
-              <div>
-                <label className={labelCls}>Min tickets</label>
-                <input type="number" min="2" placeholder="4" value={tier.groupDiscountMinQty} onChange={e => onChange({ groupDiscountMinQty: e.target.value })} className={inputCls} />
+            <div className="space-y-4 pt-1">
+              {/* Mode selector */}
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: 'simple', label: 'Flat group rate', desc: 'Buy N+ tickets → flat % or $ off each' },
+                  { value: 'scaling', label: 'Scaling tiers', desc: '5–7: 10% · 8–9: 12% · 10+: 15%' },
+                ] as const).map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => onChange({ groupDiscountMode: opt.value })}
+                    className={`text-left px-3 py-2.5 rounded-xl border-2 transition-all ${tier.groupDiscountMode === opt.value ? 'border-aubergine bg-aubergine/5' : 'border-ivory-200 bg-white hover:border-aubergine/30'}`}
+                  >
+                    <p className={`font-ui text-xs font-semibold ${tier.groupDiscountMode === opt.value ? 'text-aubergine' : 'text-ink'}`}>{opt.label}</p>
+                    <p className="font-mono text-[9px] text-ink-muted mt-0.5 leading-tight">{opt.desc}</p>
+                  </button>
+                ))}
               </div>
-              <div>
-                <label className={labelCls}>Discount type</label>
-                <select value={tier.groupDiscountType} onChange={e => onChange({ groupDiscountType: e.target.value as 'percentage' | 'fixed' })}
-                  className={`${inputCls} cursor-pointer`}>
-                  <option value="percentage">% off</option>
-                  <option value="fixed">$ off per ticket</option>
-                </select>
-              </div>
-              <div>
-                <label className={labelCls}>{tier.groupDiscountType === 'percentage' ? 'Percent off' : 'Dollars off'}</label>
-                <div className="relative">
-                  <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-ui text-sm text-ink-muted">
-                    {tier.groupDiscountType === 'percentage' ? '%' : '$'}
-                  </span>
-                  <input type="number" min="0" step="0.01" placeholder="10" value={tier.groupDiscountValue}
-                    onChange={e => onChange({ groupDiscountValue: e.target.value })} className={`${inputCls} pl-7`} />
+
+              {/* Simple mode fields */}
+              {tier.groupDiscountMode === 'simple' && (
+                <div className="grid sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className={labelCls}>Min tickets</label>
+                    <input type="number" min="2" placeholder="5" value={tier.groupDiscountMinQty} onChange={e => onChange({ groupDiscountMinQty: e.target.value })} className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Discount type</label>
+                    <select value={tier.groupDiscountType} onChange={e => onChange({ groupDiscountType: e.target.value as 'percentage' | 'fixed' })}
+                      className={`${inputCls} cursor-pointer`}>
+                      <option value="percentage">% off</option>
+                      <option value="fixed">$ off per ticket</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className={labelCls}>{tier.groupDiscountType === 'percentage' ? 'Percent off' : 'Dollars off'}</label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-ui text-sm text-ink-muted">
+                        {tier.groupDiscountType === 'percentage' ? '%' : '$'}
+                      </span>
+                      <input type="number" min="0" step="0.01" placeholder="10" value={tier.groupDiscountValue}
+                        onChange={e => onChange({ groupDiscountValue: e.target.value })} className={`${inputCls} pl-7`} />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {/* Scaling mode info */}
+              {tier.groupDiscountMode === 'scaling' && (
+                <div className="rounded-lg bg-white border border-ivory-200 divide-y divide-ivory-200 text-xs overflow-hidden">
+                  {[
+                    { range: '5–7 tickets', pct: '10% off', tag: 'Group Rate' },
+                    { range: '8–9 tickets', pct: '12% off', tag: 'Great Deal' },
+                    { range: '10+ tickets', pct: '15% off', tag: 'Best Value' },
+                  ].map(row => (
+                    <div key={row.range} className="flex items-center justify-between px-3 py-2">
+                      <span className="font-ui text-ink">{row.range}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-mono text-[9px] text-ink-muted bg-ivory px-1.5 py-0.5 rounded-full">{row.tag}</span>
+                        <span className="font-display font-bold text-peacock">{row.pct}</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -166,20 +209,33 @@ function TierCard({ tier, idx, total, onChange, onRemove }: {
               </div>
 
               {discountedPrice !== null && discountedFees && (
-                <>
-                  <div className="border-t border-aubergine/15 pt-2 mt-1">
-                    <p className="font-mono text-[9px] text-marigold-dark uppercase tracking-widest mb-1.5">
-                      With group discount ({tier.groupDiscountMinQty}+ tickets)
-                    </p>
-                    <div className="flex justify-between font-ui text-sm font-semibold">
-                      <span className="text-ink">Discounted total</span>
-                      <div className="flex items-center gap-2">
-                        <span className="line-through text-ink-muted text-xs font-normal">${fees.buyerPays}</span>
-                        <span className="text-peacock">${discountedFees.buyerPays}</span>
-                      </div>
+                <div className="border-t border-aubergine/15 pt-2 mt-1">
+                  <p className="font-mono text-[9px] text-marigold-dark uppercase tracking-widest mb-1.5">
+                    With group discount ({tier.groupDiscountMinQty}+ tickets)
+                  </p>
+                  <div className="flex justify-between font-ui text-sm font-semibold">
+                    <span className="text-ink">Discounted total</span>
+                    <div className="flex items-center gap-2">
+                      <span className="line-through text-ink-muted text-xs font-normal">${fees.buyerPays}</span>
+                      <span className="text-peacock">${discountedFees.buyerPays}</span>
                     </div>
                   </div>
-                </>
+                </div>
+              )}
+              {hasScalingDiscount && (
+                <div className="border-t border-aubergine/15 pt-2 mt-1">
+                  <p className="font-mono text-[9px] text-marigold-dark uppercase tracking-widest mb-1.5">Scaling group discount</p>
+                  {[{ min: 5, pct: 10 }, { min: 8, pct: 12 }, { min: 10, pct: 15 }].map(({ min, pct }) => {
+                    const dp = groupPrice(price, 'percentage', pct);
+                    const df = feeBreakdown(dp);
+                    return (
+                      <div key={min} className="flex justify-between font-ui text-xs text-ink-muted">
+                        <span>{min}+ tickets</span>
+                        <span className="text-peacock font-semibold">${df.buyerPays}/ea</span>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
           </div>
