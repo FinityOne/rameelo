@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { getUser, type RameeloUser } from "@/lib/auth";
 import { loadMyOrders, loadMyPendingGroups, type PortalOrderRow, type PendingGroup } from "@/lib/group-orders";
+import { loadIncomingTransfers, type IncomingTransfer } from "@/lib/transfers";
 
 // ── Sponsor ads (kept as curated content) ────────────────────────────────────
 
@@ -173,6 +174,7 @@ export default function PortalDashboard() {
   const [orders, setOrders] = useState<PortalOrderRow[]>([]);
   const [pendingGroups, setPendingGroups] = useState<PendingGroup[]>([]);
   const [recommended, setRecommended] = useState<RecommendedEvent[]>([]);
+  const [incomingTransfers, setIncomingTransfers] = useState<IncomingTransfer[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -183,11 +185,13 @@ export default function PortalDashboard() {
       if (!authUser) return;
 
       const today = new Date().toISOString().slice(0, 10);
+      const email = authUser.email ?? "";
 
-      // Load orders, pending groups, and recommended events in parallel
-      const [myOrders, myPending, { data: eventsRaw }] = await Promise.all([
+      // Load orders, pending groups, incoming transfers, and recommended events in parallel
+      const [myOrders, myPending, incoming, { data: eventsRaw }] = await Promise.all([
         loadMyOrders(authUser.id),
         loadMyPendingGroups(authUser.id),
+        email ? loadIncomingTransfers(email) : Promise.resolve([]),
         supabase
           .from("events")
           .select(`id, title, start_date, city, state, cover_gradient, ticket_tiers (price, quantity, quantity_sold)`)
@@ -199,6 +203,7 @@ export default function PortalDashboard() {
 
       setOrders(myOrders);
       setPendingGroups(myPending);
+      setIncomingTransfers(incoming);
 
       // Build recommended events, excluding ones the user already bought
       const myEventIds = new Set(myOrders.map(o => o.eventId));
@@ -309,6 +314,28 @@ export default function PortalDashboard() {
           </div>
         )}
       </div>
+
+      {/* ── Pending transfer alert ── */}
+      {!loading && incomingTransfers.length > 0 && (
+        <Link
+          href="/portal/tickets"
+          className="flex items-center gap-4 px-5 py-4 rounded-2xl border-2 border-marigold/40 bg-marigold/8 hover:bg-marigold/12 transition-all group"
+        >
+          <div className="w-10 h-10 rounded-xl bg-marigold flex items-center justify-center shrink-0 text-xl">🎟️</div>
+          <div className="flex-1 min-w-0">
+            <p className="font-display font-bold text-ink text-sm" style={{ letterSpacing: "-0.01em" }}>
+              You have {incomingTransfers.length} ticket{incomingTransfers.length !== 1 ? "s" : ""} waiting for you
+            </p>
+            <p className="font-ui text-xs text-ink-muted">
+              {incomingTransfers[0].fromName || "Someone"} sent you ticket{incomingTransfers.length !== 1 ? "s" : ""} to {incomingTransfers[0].eventTitle}. Accept them now.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="w-6 h-6 rounded-full bg-marigold flex items-center justify-center font-bold text-aubergine text-xs">{incomingTransfers.length}</span>
+            <svg className="w-4 h-4 text-marigold-dark group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+          </div>
+        </Link>
+      )}
 
       {/* ── Upcoming tickets or explore CTA ── */}
       {loading ? (

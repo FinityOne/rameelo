@@ -515,15 +515,25 @@ function GroupMembersPanel({ members, groupId }: { members: GroupMember[]; group
 }
 
 // ── Individual Ticket Card (per seat, with per-seat transfer state) ─────────────
-function TicketCard({ orderId, seat, total, eventTitle, tierName, transfer, onTransfer }: {
+function TicketCard({ orderId, seat, total, eventTitle, tierName, transfer, onTransfer, onCancelTransfer }: {
   orderId: string; seat: number; total: number; eventTitle: string; tierName: string;
   transfer?: SeatTransfer;
   onTransfer?: (seat: number) => void;
+  onCancelTransfer?: () => void;
 }) {
   const [expanded, setExpanded] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
   const ticketId = `${orderId}-T${seat}`;
   const isPending = transfer?.status === "pending";
   const isTransferred = transfer?.status === "accepted";
+
+  async function handleCancel() {
+    if (!transfer) return;
+    setCancelling(true);
+    await cancelTransfer(transfer.id);
+    setCancelling(false);
+    onCancelTransfer?.();
+  }
 
   return (
     <div className={`rounded-2xl border overflow-hidden transition-all ${
@@ -579,10 +589,28 @@ function TicketCard({ orderId, seat, total, eventTitle, tierName, transfer, onTr
 
       {/* Transferred/pending indicator (collapsed) */}
       {(isPending || isTransferred) && (
-        <div className={`mx-4 mb-3 px-3 py-2 rounded-xl text-xs font-ui ${isPending ? "bg-marigold/8 text-marigold-dark" : "bg-ivory text-ink-muted"}`}>
-          {isPending
-            ? `Waiting for ${transfer!.toName || transfer!.toEmail} to accept · ${fmtDateTime(transfer!.createdAt)}`
-            : `Accepted by ${transfer!.toName || transfer!.toEmail} · ${transfer!.acceptedAt ? fmtDateTime(transfer!.acceptedAt) : ""}`}
+        <div className={`mx-4 mb-3 rounded-xl overflow-hidden ${isPending ? "bg-marigold/8 border border-marigold/15" : "bg-ivory border border-ivory-200"}`}>
+          <p className={`px-3 pt-2 text-xs font-ui ${isPending ? "text-marigold-dark" : "text-ink-muted"}`}>
+            {isPending
+              ? `Waiting for ${transfer!.toName || transfer!.toEmail} to accept · Sent ${fmtDateTime(transfer!.createdAt)}`
+              : `Accepted by ${transfer!.toName || transfer!.toEmail} · ${transfer!.acceptedAt ? fmtDateTime(transfer!.acceptedAt) : ""}`}
+          </p>
+          {isPending && (
+            <div className="px-3 pb-2 mt-1.5">
+              <button
+                disabled={cancelling}
+                onClick={handleCancel}
+                className="flex items-center gap-1 font-mono text-[10px] text-durga/70 hover:text-durga transition-colors"
+              >
+                {cancelling
+                  ? <><div className="w-3 h-3 rounded-full border border-durga/40 border-t-durga animate-spin" />Cancelling…</>
+                  : <>
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      Cancel transfer
+                    </>}
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -734,6 +762,7 @@ function OrderCard({ order, userId, userEmail, onRefresh }: {
                     tierName={order.tierName}
                     transfer={getTransferForSeat(seat, transfers)}
                     onTransfer={isUpcoming ? (s) => setTransferModal({ seats: [s] }) : undefined}
+                    onCancelTransfer={onRefresh}
                   />
                 ))}
               </div>
@@ -788,7 +817,21 @@ export default function TicketsPage() {
       email ? loadIncomingTransfers(email) : Promise.resolve([]),
       loadReceivedTickets(uid),
     ]);
-    setOrders(ordersData);
+
+    // Auto-expire pending transfers older than 24 hours (checked from sender's view)
+    const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+    const stale = ordersData.flatMap(o =>
+      (o.transfers ?? []).filter(t => t.status === "pending" && new Date(t.createdAt).getTime() < cutoff)
+    );
+    if (stale.length > 0) {
+      await Promise.all(stale.map(t => cancelTransfer(t.id)));
+      // Reload orders after auto-cancellation
+      const refreshed = await loadMyOrders(uid);
+      setOrders(refreshed);
+    } else {
+      setOrders(ordersData);
+    }
+
     setIncomingTransfers(incoming);
     setReceivedTickets(received);
   }
