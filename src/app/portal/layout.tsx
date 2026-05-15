@@ -3,9 +3,19 @@
 import { useState, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { getUser, signOut, type RameeloUser } from "@/lib/auth";
+import { createClient } from "@/lib/supabase/client";
+import { createUser, saveUser, signOut as clearLocalUser, type RameeloUser, type UserRole } from "@/lib/auth";
 
-const NAV_ITEMS = [
+type NavItem = {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  badge?: string;
+  highlight?: boolean;
+  external?: boolean;
+};
+
+const MEMBER_NAV: NavItem[] = [
   {
     href: "/portal",
     label: "Dashboard",
@@ -26,7 +36,7 @@ const NAV_ITEMS = [
   {
     href: "/portal/group-chat/RM-GROUP01",
     label: "Group Chat",
-    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"/></svg>,
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
     badge: "🔴",
   },
   {
@@ -48,6 +58,120 @@ const NAV_ITEMS = [
   },
 ];
 
+const ORGANIZER_NAV: NavItem[] = [
+  {
+    href: "/portal/organizer",
+    label: "Organizer Hub",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>,
+  },
+  {
+    href: "/portal/organizer/events",
+    label: "My Events",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>,
+  },
+  {
+    href: "/portal/organizer/sales",
+    label: "Sales & Analytics",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>,
+  },
+  {
+    href: "/portal/organizer/tickets",
+    label: "Ticket Management",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>,
+  },
+];
+
+const ADMIN_NAV: NavItem[] = [
+  {
+    href: "/portal/admin",
+    label: "Admin Panel",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+  },
+  {
+    href: "/portal/admin/events",
+    label: "Event Review",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>,
+  },
+  {
+    href: "/portal/admin/users",
+    label: "User Management",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+  },
+  {
+    href: "/portal/admin/artists",
+    label: "Artists",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19V6l12-3v13M9 19c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zm12-3c0 1.105-1.343 2-3 2s-3-.895-3-2 1.343-2 3-2 3 .895 3 2zM9 10l12-3" /></svg>,
+  },
+  {
+    href: "/portal/admin/platform",
+    label: "Platform Settings",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>,
+  },
+];
+
+function NavLink({ item, pathname, onClick }: { item: NavItem; pathname: string; onClick?: () => void }) {
+  const active = !item.external && (item.href === "/portal" ? pathname === "/portal" : pathname.startsWith(item.href));
+  const isHighlight = !!item.highlight;
+
+  return (
+    <Link
+      href={item.href}
+      onClick={onClick}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${
+        active ? "bg-marigold/15 text-marigold"
+        : isHighlight ? "bg-marigold/10 text-marigold hover:bg-marigold/20"
+        : "text-white/50 hover:text-white hover:bg-white/5"
+      }`}
+    >
+      <span className={`shrink-0 ${active || isHighlight ? "text-marigold" : "text-white/40 group-hover:text-white/70"}`}>
+        {item.icon}
+      </span>
+      <span className={`font-ui font-medium text-sm ${isHighlight ? "text-marigold" : ""}`}>{item.label}</span>
+      {item.badge === "🔴" && <span className="ml-auto w-2 h-2 bg-durga rounded-full animate-pulse" />}
+      {item.badge && item.badge !== "🔴" && (
+        <span className="ml-auto bg-marigold text-aubergine text-[10px] font-bold px-1.5 py-0.5 rounded-full">{item.badge}</span>
+      )}
+      {item.external && (
+        <svg className="w-3 h-3 ml-auto text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+        </svg>
+      )}
+    </Link>
+  );
+}
+
+const ROLE_META: Record<UserRole, { label: string; sublabel: string; cls: string; dot: string }> = {
+  user:      { label: 'Khelaiya',  sublabel: 'Community Member', cls: 'bg-marigold/20 text-aubergine',         dot: 'bg-marigold' },
+  organizer: { label: 'Aayojak',   sublabel: 'Event Organizer',  cls: 'bg-peacock/15 text-peacock',             dot: 'bg-peacock' },
+  admin:     { label: 'Mukhiya',   sublabel: 'Platform Admin',   cls: 'bg-durga/15 text-durga',                 dot: 'bg-durga' },
+};
+
+function RoleBadge({ role, size = 'sm' }: { role: UserRole; size?: 'sm' | 'lg' }) {
+  const meta = ROLE_META[role];
+  if (size === 'lg') {
+    return (
+      <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full ${meta.cls}`}>
+        <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${meta.dot}`} />
+        <span className="font-mono text-[10px] font-bold uppercase tracking-widest">{meta.label}</span>
+      </div>
+    );
+  }
+  return (
+    <span className={`ml-auto text-[9px] font-bold font-mono tracking-widest uppercase px-1.5 py-0.5 rounded-full ${meta.cls}`}>
+      {meta.label}
+    </span>
+  );
+}
+
+function NavDivider({ label }: { label: string }) {
+  return (
+    <div className="px-3 pt-4 pb-1 flex items-center gap-2">
+      <span className="font-mono text-[9px] uppercase tracking-widest text-white/20">{label}</span>
+      <div className="flex-1 h-px bg-white/8" />
+    </div>
+  );
+}
+
 export default function PortalLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -56,18 +180,48 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [profileOpen, setProfileOpen] = useState(false);
 
   useEffect(() => {
-    const u = getUser();
-    if (!u) {
-      router.replace("/auth/signin");
-    } else {
-      setUser(u);
-    }
+    const supabase = createClient();
+    supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
+      if (!authUser) {
+        router.replace("/auth/signin");
+        return;
+      }
+
+      // Fetch full profile including role from DB
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("first_name, last_name, email, phone, city, state, role, avatar_url")
+        .eq("id", authUser.id)
+        .single();
+
+      const meta = authUser.user_metadata ?? {};
+      const firstName = profile?.first_name || meta.firstName || authUser.email?.split("@")[0] || "Member";
+      const lastName  = profile?.last_name  || meta.lastName  || "";
+      const role = (profile?.role ?? 'user') as UserRole;
+
+      const rameeloUser = createUser({
+        firstName,
+        lastName,
+        email: profile?.email || authUser.email || "",
+        phone: profile?.phone || meta.phone || "",
+        city:  profile?.city  || meta.city  || "",
+        state: profile?.state || meta.state || "",
+        role,
+        avatarUrl: profile?.avatar_url || undefined,
+      });
+      saveUser(rameeloUser);
+      setUser(rameeloUser);
+    });
   }, [router]);
 
-  function handleSignOut() {
-    signOut();
+  async function handleSignOut() {
+    const supabase = createClient();
+    await supabase.auth.signOut();
+    clearLocalUser();
     router.push("/auth/signin");
   }
+
+  const role = user?.role ?? 'user';
 
   if (!user) {
     return (
@@ -79,7 +233,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: "#FCF9F2" }}>
-      {/* Sidebar overlay (mobile) */}
       {sidebarOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
       )}
@@ -103,53 +256,51 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         </div>
 
         {/* Nav */}
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
-            const active = !item.external && (item.href === "/portal" ? pathname === "/portal" : pathname.startsWith(item.href));
-            const isHighlight = (item as { highlight?: boolean }).highlight;
-            const badge = (item as { badge?: string }).badge;
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all group ${active ? "bg-marigold/15 text-marigold" : isHighlight ? "bg-marigold/10 text-marigold hover:bg-marigold/20" : "text-white/50 hover:text-white hover:bg-white/5"}`}
-              >
-                <span className={`shrink-0 transition-colors ${active || isHighlight ? "text-marigold" : "text-white/40 group-hover:text-white/70"}`}>
-                  {item.icon}
-                </span>
-                <span className={`font-ui font-medium text-sm ${isHighlight ? "text-marigold" : ""}`}>{item.label}</span>
-                {badge === "🔴" && (
-                  <span className="ml-auto w-2 h-2 bg-durga rounded-full animate-pulse" />
-                )}
-                {badge && badge !== "🔴" && (
-                  <span className="ml-auto bg-marigold text-aubergine text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                    {badge}
-                  </span>
-                )}
-                {item.external && (
-                  <svg className="w-3 h-3 ml-auto text-white/20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                  </svg>
-                )}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-0.5">
+
+          {/* Member section — everyone */}
+          <NavDivider label="Member" />
+          {MEMBER_NAV.map((item) => (
+            <NavLink key={item.href} item={item} pathname={pathname} onClick={() => setSidebarOpen(false)} />
+          ))}
+
+          {/* Organizer section */}
+          {(role === 'organizer' || role === 'admin') && (
+            <>
+              <NavDivider label="Organizer" />
+              {ORGANIZER_NAV.map((item) => (
+                <NavLink key={item.href} item={item} pathname={pathname} onClick={() => setSidebarOpen(false)} />
+              ))}
+            </>
+          )}
+
+          {/* Admin section */}
+          {role === 'admin' && (
+            <>
+              <NavDivider label="Admin" />
+              {ADMIN_NAV.map((item) => (
+                <NavLink key={item.href} item={item} pathname={pathname} onClick={() => setSidebarOpen(false)} />
+              ))}
+            </>
+          )}
         </nav>
 
-        {/* Bottom: user profile */}
+        {/* User */}
         <div className="px-3 py-4 border-t border-white/8">
           <Link
             href="/portal/profile"
             onClick={() => setSidebarOpen(false)}
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/5 transition-all"
           >
-            <div className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: user.avatarColor }}>
-              {user.avatarInitials}
+            <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-white text-xs font-bold" style={{ backgroundColor: user.avatarColor }}>
+              {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" /> : user.avatarInitials}
             </div>
             <div className="flex-1 min-w-0">
               <p className="font-ui font-semibold text-white text-sm truncate">{user.firstName} {user.lastName}</p>
-              <p className="font-mono text-[10px] text-white/30 truncate">{user.email}</p>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                <span className={`w-1 h-1 rounded-full shrink-0 ${ROLE_META[role].dot}`} />
+                <p className="font-mono text-[9px] text-white/40 truncate">{ROLE_META[role].label}</p>
+              </div>
             </div>
           </Link>
           <button
@@ -164,10 +315,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
       {/* Main area */}
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* Top bar */}
         <header className="sticky top-0 z-30 bg-white/95 border-b border-ivory-200" style={{ backdropFilter: "blur(12px)" }}>
           <div className="flex items-center gap-4 px-4 sm:px-6 py-3.5">
-            {/* Hamburger (mobile) */}
             <button
               onClick={() => setSidebarOpen(true)}
               className="lg:hidden w-8 h-8 rounded-lg border border-ivory-200 flex items-center justify-center text-ink-muted hover:text-ink transition-colors"
@@ -175,7 +324,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
 
-            {/* Page title area */}
             <div className="flex-1">
               <p className="font-display font-bold text-ink text-sm">
                 {pathname === "/portal" && `Good evening, ${user.firstName} 👋`}
@@ -183,27 +331,40 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 {pathname === "/portal/feed" && "Activity Feed"}
                 {pathname === "/portal/refer" && "Refer & Earn"}
                 {pathname === "/portal/profile" && "Profile"}
+                {pathname === "/portal/organizer" && "Organizer Hub"}
+                {pathname === "/portal/organizer/events" && "My Events"}
+                {/^\/portal\/organizer\/events\/[^/]+$/.test(pathname) && "Event Details"}
+                {pathname === "/portal/organizer/sales" && "Sales & Analytics"}
+                {pathname === "/portal/organizer/tickets" && "Ticket Management"}
+                {pathname === "/portal/admin" && "Admin Panel"}
+                {pathname === "/portal/admin/events" && "Event Review"}
+                {/^\/portal\/admin\/events\/[^/]+$/.test(pathname) && "Review Event"}
+                {pathname === "/portal/admin/users" && "User Management"}
+                {pathname === "/portal/admin/artists" && "Artists"}
+                {pathname === "/portal/admin/platform" && "Platform Settings"}
                 {pathname.startsWith("/portal/events/") && "Event Details"}
                 {pathname.startsWith("/portal/group-chat/") && "Group Chat"}
               </p>
             </div>
 
-            {/* Right actions */}
             <div className="flex items-center gap-2">
-              {/* Notification */}
+              {/* Role chip — top right */}
+              <div className="hidden sm:block">
+                <RoleBadge role={role} size="lg" />
+              </div>
+
               <button className="relative w-9 h-9 rounded-xl border border-ivory-200 flex items-center justify-center text-ink-muted hover:text-ink hover:border-aubergine/30 transition-all">
-                <svg className="w-4.5 h-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{width:18,height:18}}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                <svg style={{ width: 18, height: 18 }} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
                 <span className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-durga rounded-full" />
               </button>
 
-              {/* Profile dropdown */}
               <div className="relative">
                 <button
                   onClick={() => setProfileOpen(!profileOpen)}
                   className="flex items-center gap-2 pl-1 pr-3 py-1 rounded-xl border border-ivory-200 hover:border-aubergine/30 transition-all"
                 >
-                  <div className="w-7 h-7 rounded-lg flex items-center justify-center text-white text-[10px] font-bold" style={{ backgroundColor: user.avatarColor }}>
-                    {user.avatarInitials}
+                  <div className="w-7 h-7 rounded-lg overflow-hidden flex items-center justify-center text-white text-[10px] font-bold" style={{ backgroundColor: user.avatarColor }}>
+                    {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" /> : user.avatarInitials}
                   </div>
                   <span className="font-ui text-sm font-medium text-ink hidden sm:block">{user.firstName}</span>
                   <svg className="w-3.5 h-3.5 text-ink-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -215,7 +376,12 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                     <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl border border-ivory-200 shadow-lg overflow-hidden z-50">
                       <div className="px-4 py-3 border-b border-ivory-200">
                         <p className="font-ui font-semibold text-ink text-sm">{user.firstName} {user.lastName}</p>
-                        <p className="font-mono text-[10px] text-ink-muted truncate">{user.email}</p>
+                        <p className="font-mono text-[10px] text-ink-muted truncate mb-2">{user.email}</p>
+                        <div className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full ${ROLE_META[role].cls}`}>
+                          <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${ROLE_META[role].dot}`} />
+                          <span className="font-mono text-[9px] font-bold uppercase tracking-widest">{ROLE_META[role].label}</span>
+                          <span className="font-ui text-[9px] text-current opacity-60">· {ROLE_META[role].sublabel}</span>
+                        </div>
                       </div>
                       <div className="py-1">
                         {[
@@ -241,7 +407,6 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           </div>
         </header>
 
-        {/* Page content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8">
           {children}
         </main>

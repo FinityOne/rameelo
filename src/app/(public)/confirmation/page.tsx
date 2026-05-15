@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { garbaEvents } from "@/lib/events-data";
 
 interface StoredOrder {
   orderId: string;
@@ -50,9 +49,6 @@ export default function ConfirmationPage() {
     }
   }
 
-  const relatedEvents = order?.event1
-    ? garbaEvents.filter((e) => e.id !== (order as StoredOrder & { payload?: { event1Id: string } })?.payload?.event1Id).slice(0, 3)
-    : garbaEvents.slice(0, 3);
 
   if (!order) {
     return (
@@ -226,55 +222,16 @@ export default function ConfirmationPage() {
         </div>
 
         {/* More events */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="font-display font-bold text-ink text-lg">More events you&rsquo;ll love</h2>
-            <Link href="/events" className="font-ui text-sm text-marigold-dark hover:text-marigold transition-colors">
-              See all →
-            </Link>
-          </div>
-          <div className="space-y-3">
-            {relatedEvents.map((ev) => {
-              const pct = Math.round((ev.soldTickets / ev.totalTickets) * 100);
-              const almostGone = pct >= 85;
-              return (
-                <Link
-                  key={ev.id}
-                  href={`/events/${ev.id}`}
-                  className="flex items-center gap-4 p-4 rounded-2xl bg-white border border-ivory-200 hover:border-marigold/30 hover:shadow-sm transition-all group"
-                >
-                  <div
-                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0"
-                    style={{ backgroundColor: "#2E1B30" }}
-                  >
-                    {ev.artist.split(" ").map((w) => w[0]).join("").slice(0, 2)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display font-bold text-ink text-sm truncate group-hover:text-aubergine transition-colors">{ev.title}</p>
-                    <p className="font-mono text-[10px] text-ink-muted">{ev.date} · {ev.city}, {ev.state}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="font-display font-bold text-ink text-sm">${ev.price}</p>
-                    {almostGone && (
-                      <p className="font-mono text-[9px] text-marigold-dark uppercase tracking-wide">Almost gone</p>
-                    )}
-                  </div>
-                </Link>
-              );
-            })}
-          </div>
-        </div>
-
         {/* Footer */}
-        <div className="text-center py-6">
-          <p className="font-ui text-ink-muted text-sm mb-4">
-            Questions about your order? <Link href="/tickets" className="text-marigold-dark hover:underline">Visit your tickets</Link> or contact support.
+        <div className="text-center py-6 space-y-4">
+          <p className="font-ui text-ink-muted text-sm">
+            Questions about your order? <Link href="/portal/tickets" className="text-marigold-dark hover:underline">View your tickets</Link> or contact support.
           </p>
           <Link
             href="/events"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl border border-aubergine/20 text-aubergine font-ui font-semibold text-sm hover:bg-aubergine hover:text-white transition-all"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark transition-all"
           >
-            ← Discover more events
+            Discover More Events →
           </Link>
         </div>
       </div>

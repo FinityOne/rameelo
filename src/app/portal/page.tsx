@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import { getUser, SEEDED_TICKETS, type RameeloUser, type PortalTicket } from "@/lib/auth";
+import { loadMyPendingGroups, type PendingGroup } from "@/lib/group-orders";
 
 const SPONSOR_ADS = [
   {
@@ -59,13 +61,61 @@ function QRMini({ value }: { value: string }) {
   );
 }
 
+function fmtDate(d: string) {
+  return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+function PendingGroupCard({ group }: { group: PendingGroup }) {
+  const discountedPrice = Math.round(group.tierPrice * (1 - group.discountPct / 100));
+  const deadlineDate = new Date(group.deadline);
+  const hoursLeft = Math.max(0, Math.round((deadlineDate.getTime() - Date.now()) / 3600000));
+  const daysLeft  = Math.floor(hoursLeft / 24);
+  const timeLabel = daysLeft > 0 ? `${daysLeft}d left` : `${hoursLeft}h left`;
+  const urgent = hoursLeft < 48;
+
+  return (
+    <div className={`rounded-2xl border-2 p-5 ${urgent ? "border-durga/30 bg-durga/4" : "border-marigold/25 bg-marigold/4"}`}>
+      <div className="flex items-start justify-between gap-3 mb-4">
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
+            <span className="font-mono text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full bg-marigold/20 text-marigold-dark">
+              {group.isOrganizer ? "You started this" : "You were invited"}
+            </span>
+            <span className={`font-mono text-[9px] font-bold ${urgent ? "text-durga" : "text-ink-muted"}`}>{timeLabel}</span>
+          </div>
+          <p className="font-display font-bold text-ink text-sm">{group.eventTitle}</p>
+          <p className="font-mono text-[10px] text-ink-muted">{fmtDate(group.eventDate)} · {group.city}, {group.state}</p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="font-display font-bold text-ink text-lg">${discountedPrice}</p>
+          <p className="font-mono text-[10px] text-ink-muted line-through">${group.tierPrice}</p>
+          <p className="font-mono text-[10px] text-peacock">{group.discountPct}% off</p>
+        </div>
+      </div>
+      <Link
+        href={`/group/${group.groupId}`}
+        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark transition-all"
+      >
+        Complete Your Ticket →
+      </Link>
+    </div>
+  );
+}
+
 export default function PortalDashboard() {
   const [user, setUser] = useState<RameeloUser | null>(null);
   const [tickets, setTickets] = useState<PortalTicket[]>([]);
+  const [pendingGroups, setPendingGroups] = useState<PendingGroup[]>([]);
 
   useEffect(() => {
     setUser(getUser());
     setTickets(SEEDED_TICKETS);
+
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user: authUser } }) => {
+      if (!authUser) return;
+      loadMyPendingGroups(authUser.id).then(setPendingGroups);
+    });
   }, []);
 
   if (!user) return null;
@@ -159,6 +209,24 @@ export default function PortalDashboard() {
           ))}
         </div>
       </div>
+
+      {/* ── Unfinished Group Orders ── */}
+      {pendingGroups.length > 0 && (
+        <div>
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-8 h-8 rounded-xl bg-marigold/15 flex items-center justify-center">
+              <span className="text-base">👥</span>
+            </div>
+            <div>
+              <h3 className="font-display font-bold text-ink text-lg">Finish Your Group Orders</h3>
+              <p className="font-ui text-xs text-ink-muted">You have unpaid group tickets — complete checkout to secure your spot.</p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {pendingGroups.map(g => <PendingGroupCard key={g.groupId} group={g} />)}
+          </div>
+        </div>
+      )}
 
       {/* ── Sponsor Hero ── */}
       <div className="rounded-2xl overflow-hidden border border-ivory-200">

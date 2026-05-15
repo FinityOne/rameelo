@@ -201,8 +201,6 @@ export const navLinks = [
   { label: "Home", href: "/" },
   { label: "Events", href: "/events" },
   { label: "Artists", href: "/artists" },
-  { label: "Community", href: "/community" },
-  { label: "Tickets", href: "/tickets" },
   { label: "Organizers", href: "/organizers" },
   { label: "Pricing", href: "/pricing" },
   { label: "About", href: "/about" },

@@ -1,162 +1,9 @@
 import Link from "next/link";
 import { events, stats, testimonials, communityGroups } from "@/lib/data";
 import { Eyebrow, Button, Badge, EventCard, Avatar } from "@/components/ui";
+import { HeroCountdown } from "@/components/ui/HeroCountdown";
+import { createClient } from "@/lib/supabase/server";
 
-/* ─────────────────────────────────────────────
-   Hero: Animated activity panel (right side)
-───────────────────────────────────────────── */
-function HeroActivityPanel() {
-  const activityItems = [
-    { initials: "PP", name: "Priya Patel", action: "joined", event: "Edison Garba", color: "marigold" as const },
-    { initials: "RS", name: "Rohan Shah", action: "going to", event: "Chicago Utsav", color: "peacock" as const },
-    { initials: "AM", name: "Aanya Mehta", action: "invited 4 to", event: "NYC Garba Night", color: "aubergine" as const },
-    { initials: "DM", name: "Dev Modi", action: "joined", event: "Dallas Dandiya", color: "durga" as const },
-  ];
-
-  return (
-    <div className="relative w-full h-[520px] hidden lg:block select-none">
-      {/* Ambient glow behind cards */}
-      <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full"
-        style={{ background: "radial-gradient(circle, rgba(245,166,35,0.12) 0%, transparent 70%)" }}
-      />
-
-      {/* Main featured event card — top center */}
-      <div
-        className="absolute top-0 left-1/2 -translate-x-[45%] w-[260px] animate-float-a"
-        style={{ animationDelay: "0s" }}
-      >
-        <div
-          className="rounded-[16px] overflow-hidden shadow-2xl"
-          style={{ background: "linear-gradient(145deg, #2E1B30 0%, #7C1F2C 55%, #F5A623 130%)" }}
-        >
-          <div className="p-4 pb-5">
-            <div className="flex items-center justify-between mb-3">
-              <Badge variant="peacock" dot>Live now</Badge>
-              <span className="font-mono text-[10px] text-white/50 tracking-widest">SAT · OCT 03</span>
-            </div>
-            <p className="font-mono text-[10px] text-white/50 tracking-widest uppercase mb-1">
-              NAVRATRI · NIGHT 04
-            </p>
-            <h4
-              className="font-display font-semibold text-white text-xl leading-tight"
-              style={{ letterSpacing: "-0.02em" }}
-            >
-              The Edison Garba
-            </h4>
-            <p className="font-ui text-white/50 text-xs mt-1.5">Edison, NJ · 7:30pm</p>
-            <div className="mt-3 flex items-center gap-2">
-              <div className="flex -space-x-1.5">
-                {["PP", "RS", "AM"].map((i, idx) => (
-                  <div
-                    key={idx}
-                    className="w-5 h-5 rounded-full border border-white/20 flex items-center justify-center text-[8px] font-bold text-white"
-                    style={{ background: idx === 0 ? "#F5A623" : idx === 1 ? "#0E8C7A" : "#3D2543" }}
-                  >
-                    {i}
-                  </div>
-                ))}
-              </div>
-              <span className="font-ui text-[11px] text-white/60">12 friends going</span>
-            </div>
-          </div>
-          <div className="border-t border-dashed border-white/10 mx-4" />
-          <div className="px-4 py-3 flex items-center justify-between">
-            <div>
-              <span className="font-display font-bold text-white text-lg" style={{ letterSpacing: "-0.02em" }}>$42</span>
-              <span className="text-white/40 text-xs font-ui"> /ea</span>
-            </div>
-            <span className="bg-marigold text-aubergine font-ui text-xs font-semibold px-3 py-1.5 rounded-[8px]">
-              Buy tickets
-            </span>
-          </div>
-        </div>
-      </div>
-
-      {/* Activity feed card — left mid */}
-      <div
-        className="absolute top-[200px] left-0 w-[220px] animate-float-b"
-        style={{ animationDelay: "1s" }}
-      >
-        <div className="bg-ivory/10 backdrop-blur-sm border border-white/10 rounded-[16px] p-3 shadow-xl space-y-2.5">
-          {activityItems.slice(0, 3).map((item) => (
-            <div key={item.name} className="flex items-center gap-2.5">
-              <Avatar initials={item.initials} size="sm" color={item.color} />
-              <div className="min-w-0">
-                <p className="font-ui text-[11px] text-white/80 font-medium leading-tight truncate">
-                  <span className="font-semibold">{item.name}</span>
-                </p>
-                <p className="font-ui text-[10px] text-white/40 leading-tight truncate">
-                  {item.action} · {item.event}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Mini live card — right mid */}
-      <div
-        className="absolute top-[230px] right-0 w-[200px] animate-float-c"
-        style={{ animationDelay: "2s" }}
-      >
-        <div
-          className="rounded-[16px] overflow-hidden shadow-xl"
-          style={{ background: "linear-gradient(145deg, #0E8C7A 0%, #0a4f46 100%)" }}
-        >
-          <div className="p-3.5">
-            <div className="flex items-center justify-between mb-2">
-              <Badge variant="ivory">Tonight</Badge>
-              <Badge variant="peacock" dot>Live</Badge>
-            </div>
-            <p className="font-mono text-[10px] text-white/50 uppercase tracking-widest mb-0.5">
-              DISCO DANDIYA · DC
-            </p>
-            <p className="font-display font-semibold text-white text-sm leading-tight" style={{ letterSpacing: "-0.015em" }}>
-              Sangat Garba
-            </p>
-            <p className="font-ui text-white/50 text-[10px] mt-1">Reston Convention · 8:00pm</p>
-            <p className="font-display font-bold text-white mt-2 text-base">$35</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Group order badge — bottom left */}
-      <div
-        className="absolute bottom-8 left-8 animate-float-d"
-        style={{ animationDelay: "0.5s" }}
-      >
-        <div className="bg-marigold rounded-[12px] px-4 py-2.5 shadow-lg flex items-center gap-2.5">
-          <div className="flex -space-x-1">
-            {["RS", "DM"].map((i, idx) => (
-              <div
-                key={idx}
-                className="w-5 h-5 rounded-full bg-aubergine border border-marigold flex items-center justify-center text-[8px] text-white font-bold"
-              >
-                {i}
-              </div>
-            ))}
-          </div>
-          <div>
-            <p className="font-ui text-aubergine text-xs font-bold leading-tight">Group order open</p>
-            <p className="font-mono text-[9px] text-aubergine/60 tracking-wider uppercase">Chicago Utsav</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Ticket sold stat — bottom right */}
-      <div
-        className="absolute bottom-12 right-8 animate-float-b"
-        style={{ animationDelay: "3s" }}
-      >
-        <div className="bg-aubergine-light/80 backdrop-blur-sm border border-white/10 rounded-[12px] px-4 py-3 shadow-lg text-center">
-          <p className="font-display font-bold text-white text-2xl" style={{ letterSpacing: "-0.03em" }}>88%</p>
-          <p className="font-mono text-[9px] text-white/50 tracking-widest uppercase">Sold · Bay Area</p>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 /* ─────────────────────────────────────────────
    Scrolling city ticker
@@ -188,8 +35,16 @@ function CityTicker() {
 /* ─────────────────────────────────────────────
    Page
 ───────────────────────────────────────────── */
-export default function HomePage() {
+export default async function HomePage() {
   const featuredEvents = events.slice(0, 3);
+
+  // Real member count from DB
+  const supabase = await createClient();
+  const { count } = await supabase.from("profiles").select("*", { count: "exact", head: true });
+  const memberCount = count ?? 0;
+  const memberDisplay = memberCount >= 1000
+    ? `${(memberCount / 1000).toFixed(1).replace(".0", "")}k`
+    : String(memberCount);
 
   return (
     <div className="bg-ivory">
@@ -197,109 +52,124 @@ export default function HomePage() {
       {/* ══════════════════════════════════════════
           HERO
       ══════════════════════════════════════════ */}
-      <section
-        className="relative overflow-hidden"
-        style={{ background: "#2E1B30" }}
-      >
-        {/* Warm glow — lower right, festival atmosphere */}
-        <div
-          className="absolute bottom-0 right-0 w-[700px] h-[500px] pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse at 80% 100%, rgba(124,31,44,0.5) 0%, rgba(245,166,35,0.15) 40%, transparent 70%)",
-          }}
-        />
-        {/* Cool glow — upper left */}
-        <div
-          className="absolute top-0 left-0 w-[500px] h-[400px] pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse at 20% 0%, rgba(61,37,67,0.8) 0%, transparent 60%)",
-          }}
-        />
+      <section className="relative overflow-hidden" style={{ background: "#2E1B30" }}>
+        {/* Glows */}
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 70% 110%, rgba(124,31,44,0.6) 0%, rgba(245,166,35,0.08) 45%, transparent 65%)" }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 20% -10%, rgba(61,37,67,0.9) 0%, transparent 55%)" }} />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(212,137,27,0.04) 0%, transparent 60%)" }} />
 
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-28 lg:pb-32">
-          <div className="grid lg:grid-cols-[1fr_440px] gap-12 xl:gap-20 items-center">
+        <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-24 pb-20 sm:pb-28 text-center">
 
-            {/* ── Left: Headline ── */}
-            <div className="max-w-2xl">
-              <Eyebrow className="mb-6">
-                RML — 001 / FALL &apos;26 · NAVRATRI · 27 CITIES
-              </Eyebrow>
-
-              <h1
-                className="font-display font-bold text-white mb-2"
-                style={{
-                  fontSize: "clamp(52px, 7vw, 88px)",
-                  lineHeight: 1.04,
-                  letterSpacing: "-0.025em",
-                }}
-              >
-                Nine nights.
-              </h1>
-              <h1
-                className="font-editorial italic mb-8"
-                style={{
-                  fontSize: "clamp(52px, 7vw, 88px)",
-                  lineHeight: 1.04,
-                  color: "#F5A623",
-                  fontWeight: 500,
-                }}
-              >
-                Infinite circles.
-              </h1>
-
-              <p className="font-ui text-white/60 text-lg leading-relaxed mb-10 max-w-lg">
-                Rameelo is the modern home for raas garba ticketing — from your friend
-                group&apos;s chai-fueled chat to the nine-night Navratri marathon. Every flow
-                is built for the way our community actually shows up: together, in circles,
-                and on time.
-              </p>
-
-              <div className="flex flex-wrap gap-3">
-                <Button href="/events" size="lg">
-                  Get tickets
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                  </svg>
-                </Button>
-                <Button href="/events" variant="ghost" size="lg">
-                  Explore events
-                </Button>
-              </div>
-
-              {/* Trust signals */}
-              <div className="mt-10 flex flex-wrap items-center gap-x-6 gap-y-3">
-                <div className="flex items-center gap-2">
-                  <div className="flex -space-x-1.5">
-                    {["PP", "RS", "AM", "DM"].map((i, idx) => (
-                      <div
-                        key={idx}
-                        className="w-6 h-6 rounded-full border-2 border-aubergine flex items-center justify-center text-[8px] font-bold text-white"
-                        style={{
-                          background:
-                            idx === 0 ? "#F5A623" : idx === 1 ? "#0E8C7A" : idx === 2 ? "#7C1F2C" : "#3D2543",
-                        }}
-                      >
-                        {i[0]}
-                      </div>
-                    ))}
-                  </div>
-                  <span className="font-ui text-white/50 text-sm">80K+ community members</span>
-                </div>
-                <span className="w-px h-4 bg-white/15 hidden sm:block" />
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-peacock" />
-                  <span className="font-mono text-[11px] text-white/50 tracking-widest uppercase">
-                    Group orders open
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* ── Right: Animated Activity Panel ── */}
-            <HeroActivityPanel />
+          {/* Launch pill */}
+          <div className="inline-flex items-center gap-2.5 mb-8 bg-white/5 border border-white/10 rounded-full px-4 py-2">
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-marigold opacity-60" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-marigold" />
+            </span>
+            <span className="font-mono text-[10px] text-white/60 tracking-widest uppercase">Something big · Launches June 1</span>
           </div>
+
+          {/* Headline */}
+          <h1
+            className="font-display font-bold text-white mb-2"
+            style={{ fontSize: "clamp(44px, 9vw, 88px)", lineHeight: 1.0, letterSpacing: "-0.032em" }}
+          >
+            Garba season
+          </h1>
+          <h1
+            className="font-editorial italic mb-6"
+            style={{ fontSize: "clamp(44px, 9vw, 88px)", lineHeight: 1.0, color: "#F5A623", fontWeight: 500 }}
+          >
+            is about to change.
+          </h1>
+
+          <p className="font-ui text-white/50 text-base sm:text-lg leading-relaxed mb-3 max-w-md mx-auto">
+            The first platform built by and for the US garba community.
+          </p>
+          <p className="font-ui text-white/30 text-sm mb-12 max-w-xs mx-auto">
+            Not just tickets. Not another app. Something the community has never had.
+          </p>
+
+          {/* ── COUNTDOWN ── */}
+          <div className="mb-3">
+            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/30 mb-5">
+              Until launch
+            </p>
+            <HeroCountdown />
+          </div>
+
+          {/* Divider */}
+          <div className="flex items-center gap-4 my-10 max-w-sm mx-auto">
+            <div className="flex-1 h-px bg-white/10" />
+            <span className="font-mono text-[9px] uppercase tracking-widest text-white/25">What founding members unlock</span>
+            <div className="flex-1 h-px bg-white/10" />
+          </div>
+
+          {/* Teaser items — create curiosity without full reveal */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10 text-left max-w-2xl mx-auto">
+            {[
+              {
+                icon: "🎟️",
+                title: "Navratri tickets — before anyone else",
+                body: "Members get access 48 hours before public sale. Every city. Every artist.",
+              },
+              {
+                icon: "👥",
+                title: "Group pricing, built in",
+                body: "Bring your crew. Discounts unlock automatically the more people join.",
+              },
+              {
+                icon: "🔒",
+                title: "One more thing.",
+                body: "We're not saying yet. Founding members find out first on June 1st.",
+                mystery: true,
+              },
+            ].map((item) => (
+              <div
+                key={item.title}
+                className={`rounded-2xl p-4 border ${item.mystery ? "border-marigold/20 bg-marigold/5" : "border-white/8 bg-white/5"}`}
+              >
+                <span className="text-xl mb-2.5 block">{item.icon}</span>
+                <p className={`font-ui text-sm font-semibold mb-1 ${item.mystery ? "text-marigold" : "text-white/90"}`}>{item.title}</p>
+                <p className="font-ui text-xs text-white/40 leading-relaxed">{item.body}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* ── PRIMARY CTA ── */}
+          <Link
+            href="/auth/signup"
+            className="inline-flex items-center gap-2.5 bg-marigold text-aubergine font-display font-bold text-base sm:text-lg px-8 py-4 rounded-2xl hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-2xl shadow-marigold/25 w-full sm:w-auto justify-center"
+          >
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-aubergine/60 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-aubergine/80" />
+            </span>
+            Join as a Founding Member — Free
+          </Link>
+
+          <p className="font-mono text-[10px] text-white/25 tracking-widest uppercase mt-4">
+            Takes 30 seconds · No credit card
+          </p>
+
+          {/* Trust strip */}
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
+            <div className="flex items-center gap-2.5">
+              <div className="flex -space-x-1.5">
+                {[["PP","#F5A623"],["RS","#0E8C7A"],["AM","#7C1F2C"],["DM","#3D2543"],["KP","#892240"]].map(([initials, bg]) => (
+                  <div key={initials} className="w-6 h-6 rounded-full border-2 border-[#2E1B30] flex items-center justify-center text-[8px] font-bold text-white" style={{ background: bg }}>
+                    {initials[0]}
+                  </div>
+                ))}
+              </div>
+              <span className="font-ui text-white/40 text-sm">
+                <span className="text-white/70 font-semibold">{memberDisplay}</span> already in the circle
+              </span>
+            </div>
+            <span className="w-px h-4 bg-white/10 hidden sm:block" />
+            <span className="font-mono text-[11px] text-white/30 tracking-widest uppercase">27 cities · Navratri 2026</span>
+          </div>
+
         </div>
       </section>
 
@@ -580,59 +450,49 @@ export default function HomePage() {
       </section>
 
       {/* ══════════════════════════════════════════
-          CTA BANNER — Heritage festival style
+          CTA BANNER — Founding member
       ══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden py-24" style={{ background: "#7C1F2C" }}>
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse at 80% 50%, rgba(245,166,35,0.2) 0%, transparent 60%), radial-gradient(ellipse at 20% 50%, rgba(46,27,48,0.4) 0%, transparent 50%)",
-          }}
-        />
-        <div className="relative max-w-3xl mx-auto px-4 text-center">
-          <Eyebrow className="mb-6">Navratri &apos;26</Eyebrow>
-          <h2
-            className="font-display font-bold text-white mb-3"
-            style={{ fontSize: "clamp(36px, 5vw, 60px)", letterSpacing: "-0.025em", lineHeight: 1.05 }}
-          >
-            Where the dandiya
-          </h2>
-          <h2
-            className="font-editorial italic text-marigold mb-8"
-            style={{ fontSize: "clamp(36px, 5vw, 60px)", lineHeight: 1.05, fontWeight: 500 }}
-          >
-            finds its beat.
-          </h2>
-          <p className="font-ui text-white/60 text-base leading-relaxed mb-10 max-w-lg mx-auto">
-            Join thousands of South Asians celebrating culture, community, and connection
-            across 27 cities — 9 nights at a time.
-          </p>
-          <div className="flex flex-wrap gap-3 justify-center">
-            <Button href="/events" size="lg">
-              Get tickets
-            </Button>
-            <Button href="/pricing" variant="ghost" size="lg">
-              For organizers
-            </Button>
+      <section className="relative overflow-hidden py-24" style={{ background: "#2E1B30" }}>
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 60% 50%, rgba(124,31,44,0.5) 0%, transparent 60%), radial-gradient(ellipse at 20% 50%, rgba(245,166,35,0.08) 0%, transparent 50%)" }} />
+        <div className="relative max-w-2xl mx-auto px-4 text-center">
+          <div className="inline-flex items-center gap-2 mb-8 bg-marigold/10 border border-marigold/20 rounded-full px-4 py-2">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-marigold opacity-60" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-marigold" />
+            </span>
+            <span className="font-mono text-[10px] text-marigold/80 tracking-widest uppercase">Founding Members Open</span>
           </div>
 
-          {/* Navratri nights indicator */}
-          <div className="mt-12 flex items-center justify-center gap-1.5">
-            {Array.from({ length: 9 }).map((_, i) => (
-              <div
-                key={i}
-                className="rounded-full transition-all"
-                style={{
-                  width: i < 4 ? "28px" : "8px",
-                  height: "8px",
-                  background: i < 4 ? "#F5A623" : "rgba(255,255,255,0.2)",
-                }}
-              />
-            ))}
-            <span className="font-mono text-[10px] text-white/40 tracking-widest uppercase ml-3">
-              Night 04 of 09
+          <h2 className="font-display font-bold text-white mb-3" style={{ fontSize: "clamp(40px, 5.5vw, 68px)", letterSpacing: "-0.025em", lineHeight: 1.04 }}>
+            Be inside
+          </h2>
+          <h2 className="font-editorial italic text-marigold mb-8" style={{ fontSize: "clamp(40px, 5.5vw, 68px)", lineHeight: 1.04, fontWeight: 500 }}>
+            when it drops.
+          </h2>
+
+          <p className="font-ui text-white/50 text-base mb-3 max-w-sm mx-auto">
+            June 1st. Something the US garba community has never had before.
+          </p>
+          <p className="font-ui text-white/30 text-sm mb-10 max-w-xs mx-auto">
+            {memberDisplay} founding members already registered. They find out first.
+          </p>
+
+          <Link
+            href="/auth/signup"
+            className="inline-flex items-center gap-2.5 bg-marigold text-aubergine font-display font-bold text-lg px-8 py-4 rounded-2xl hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-xl shadow-marigold/20 w-full sm:w-auto justify-center"
+          >
+            <span className="relative flex h-2.5 w-2.5 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-aubergine/60 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-aubergine/80" />
             </span>
+            Join free — takes 30 seconds
+          </Link>
+
+          <div className="mt-10 flex items-center justify-center gap-1.5">
+            {Array.from({ length: 9 }).map((_, i) => (
+              <div key={i} className="rounded-full" style={{ width: 8, height: 8, background: i < 5 ? "#F5A623" : "rgba(255,255,255,0.15)" }} />
+            ))}
+            <span className="font-mono text-[10px] text-white/30 tracking-widest uppercase ml-3">Navratri · Oct 2–10, 2026</span>
           </div>
         </div>
       </section>

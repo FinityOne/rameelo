@@ -6,8 +6,6 @@ import {
   JetBrains_Mono,
 } from "next/font/google";
 import "./globals.css";
-import Nav from "@/components/Nav";
-import Footer from "@/components/Footer";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -38,9 +36,29 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Rameelo — The home for Raas Garba ticketing",
+  metadataBase: new URL("https://rameelo.com"),
+  title: {
+    default: "Rameelo — The home for Raas Garba in America",
+    template: "%s | Rameelo",
+  },
   description:
-    "One-stop shop for Garba tickets, group orders, sponsors & community. Built for the Gujarati diaspora and every dance-loving collegiate stage.",
+    "Find Garba, Dandiya, and Navratri events near you. Group tickets, exclusive discounts, and the best artists — all on Rameelo.",
+  keywords: ["garba", "navratri", "dandiya", "raas garba", "Indian dance", "South Asian events", "gujarati events", "navratri tickets"],
+  openGraph: {
+    type: "website",
+    siteName: "Rameelo",
+    title: "Rameelo — The home for Raas Garba in America",
+    description:
+      "Find Garba, Dandiya, and Navratri events near you. Group tickets, exclusive discounts, and the best artists — all on Rameelo.",
+    images: [{ url: "/og-default.jpg", width: 1200, height: 630, alt: "Rameelo — Raas Garba ticketing" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Rameelo — The home for Raas Garba in America",
+    description: "Find Garba, Dandiya, and Navratri events near you. Group tickets, exclusive discounts, and the best artists.",
+    images: ["/og-default.jpg"],
+  },
+  robots: { index: true, follow: true },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -50,9 +68,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${bricolage.variable} ${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen flex flex-col antialiased">
-        <Nav />
-        <main className="flex-1">{children}</main>
-        <Footer />
+        {children}
       </body>
     </html>
   );

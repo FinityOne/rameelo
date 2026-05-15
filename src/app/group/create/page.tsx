@@ -3,108 +3,209 @@
 import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { garbaEvents, artists } from "@/lib/events-data";
+import { createClient } from "@/lib/supabase/client";
 import {
   GROUP_TIERS,
   discountForTarget,
   generateGroupId,
-  saveGroup,
-  type GroupOrder,
+  createGroupOrder,
 } from "@/lib/group-orders";
 
 const TARGET_OPTIONS = [
-  { value: 5,  label: "5 people",  sub: "10% off unlocked" },
-  { value: 8,  label: "8 people",  sub: "12% off unlocked" },
-  { value: 10, label: "10 people", sub: "15% off — best deal" },
+  { value: 5,  label: "5 people",   sub: "10% off unlocked" },
+  { value: 8,  label: "8 people",   sub: "12% off unlocked" },
+  { value: 10, label: "10 people",  sub: "15% off — best deal" },
   { value: 15, label: "15+ people", sub: "15% off — max savings" },
 ];
+
+function formatPhone(digits: string): string {
+  const d = digits.replace(/\D/g, "").slice(0, 10);
+  if (d.length <= 3) return d;
+  if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+  return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+}
+
+function fmtDate(d: string) {
+  return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+
+type EventSummary = {
+  id: string;
+  title: string;
+  start_date: string;
+  city: string;
+  state: string;
+  ticket_tiers: { id: string; name: string; price: number; quantity: number; quantity_sold: number; is_visible: boolean; sort_order: number }[];
+  artists: { name: string; profile_image_url: string | null } | null;
+};
+
+function AvatarCircle({ name, imgUrl, size = 10 }: { name: string; imgUrl?: string | null; size?: number }) {
+  const initials = name.split(" ").map(w => w[0]).join("").slice(0, 2).toUpperCase();
+  return (
+    <div className={`w-${size} h-${size} rounded-full overflow-hidden flex items-center justify-center text-white font-bold text-xs shrink-0`} style={{ backgroundColor: "#2E1B30" }}>
+      {imgUrl ? <img src={imgUrl} alt={name} className="w-full h-full object-cover" /> : initials}
+    </div>
+  );
+}
 
 function CreateGroupInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const eventId = searchParams.get("eventId") ?? "";
 
-  const event = garbaEvents.find((e) => e.id === eventId);
-  const artist = event ? artists.find((a) => a.slug === event.artistSlug) : null;
+  const [event, setEvent]    = useState<EventSummary | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving]   = useState(false);
+  const [saveError, setSaveError] = useState("");
 
-  const [step, setStep] = useState<1 | 2 | 3>(1);
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [phone, setPhone] = useState("");
-  const [ticketType, setTicketType] = useState<"ga" | "vip">("ga");
+  const [step, setStep]             = useState<1 | 2 | 3>(1);
+  const [authedUserId, setAuthedUserId] = useState<string | null>(null);
+  const [firstName, setFirstName]   = useState("");
+  const [lastName, setLastName]     = useState("");
+  const [email, setEmail]           = useState("");
+  const [phoneDigits, setPhoneDigits] = useState("");
+  const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
   const [targetSize, setTargetSize] = useState(10);
-  const [groupId, setGroupId] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [groupId, setGroupId]       = useState("");
+  const [copied, setCopied]         = useState(false);
 
+  // Load event + check auth session
+  useEffect(() => {
+    if (!eventId) { setLoading(false); return; }
+    const supabase = createClient();
+
+    Promise.all([
+      supabase
+        .from("events")
+        .select(`
+          id, title, start_date, city, state,
+          artists:artists!events_artist_id_fkey (name, profile_image_url),
+          ticket_tiers (id, name, price, quantity, quantity_sold, is_visible, sort_order)
+        `)
+        .eq("id", eventId)
+        .eq("status", "published")
+        .single(),
+      supabase.auth.getUser(),
+    ]).then(([{ data: evData }, { data: { user } }]) => {
+      if (evData) {
+        const ev = evData as unknown as EventSummary;
+        ev.ticket_tiers = ev.ticket_tiers
+          .filter(t => t.is_visible && t.quantity > t.quantity_sold)
+          .sort((a, b) => a.sort_order - b.sort_order || a.price - b.price);
+        setEvent(ev);
+        if (ev.ticket_tiers.length > 0) setSelectedTierId(ev.ticket_tiers[0].id);
+      }
+
+      if (user) {
+        setAuthedUserId(user.id);
+        // Auto-populate from profile
+        supabase
+          .from("profiles")
+          .select("first_name, last_name, email, phone")
+          .eq("id", user.id)
+          .single()
+          .then(({ data: profile }) => {
+            if (profile?.first_name) setFirstName(profile.first_name);
+            if (profile?.last_name)  setLastName(profile.last_name);
+            if (profile?.email || user.email) setEmail(profile?.email || user.email || "");
+            if (profile?.phone) setPhoneDigits(profile.phone.replace(/\D/g, "").slice(0, 10));
+          });
+      }
+
+      setLoading(false);
+    });
+  }, [eventId]);
+
+  const selectedTier = event?.ticket_tiers.find(t => t.id === selectedTierId) ?? null;
   const discount = discountForTarget(targetSize);
-  const unitPrice = event ? (ticketType === "vip" && event.priceVIP ? event.priceVIP : event.price) : 0;
+  const unitPrice = selectedTier?.price ?? 0;
   const discountedPrice = Math.round(unitPrice * (1 - discount / 100));
   const totalSavings = (unitPrice - discountedPrice) * targetSize;
-  const shareUrl = groupId ? `rameelo.com/group/${groupId}` : "";
+  const shareUrl = groupId ? `${typeof window !== "undefined" ? window.location.origin : "https://rameelo.com"}/group/${groupId}` : "";
 
-  function handleStep1(e: React.FormEvent) {
-    e.preventDefault();
-    setStep(2);
-  }
+  const inputCls = "w-full rounded-xl border border-ivory-200 bg-white px-4 py-3 font-ui text-sm text-ink placeholder-ink-muted/50 focus:outline-none focus:ring-2 focus:ring-aubergine/25 focus:border-aubergine transition-all";
+  const labelCls = "font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1.5 block";
 
-  function handleStep2(e: React.FormEvent) {
+  async function handleStep2(e: React.FormEvent) {
     e.preventDefault();
+    setSaving(true);
+    setSaveError("");
+
     const id = generateGroupId();
-    setGroupId(id);
-
     const deadline = new Date();
     deadline.setDate(deadline.getDate() + 7);
 
-    const group: GroupOrder = {
+    const { error } = await createGroupOrder({
       groupId: id,
       eventId,
-      organizerFirstName: firstName,
-      organizerLastName: lastName,
-      organizerPhone: phone,
-      ticketType,
+      tierId: selectedTierId!,
+      organizerName: `${firstName} ${lastName}`,
+      organizerEmail: email,
+      organizerPhone: phoneDigits,
+      organizerUserId: authedUserId,
       targetSize,
       discountPct: discount,
-      members: [
-        {
-          name: firstName,
-          initial: firstName[0]?.toUpperCase() ?? "?",
-          joinedAt: new Date().toISOString(),
-          paid: false,
-        },
-      ],
-      createdAt: new Date().toISOString(),
       deadline: deadline.toISOString(),
-    };
-    saveGroup(group);
+    });
+
+    setSaving(false);
+    if (error) {
+      setSaveError("Couldn't create your group. Try again.");
+      return;
+    }
+
+    setGroupId(id);
     setStep(3);
   }
 
   function copyLink() {
-    navigator.clipboard.writeText(`${window.location.origin}/group/${groupId}`).catch(() => {});
+    navigator.clipboard.writeText(shareUrl).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2500);
   }
 
   function goToMyTicket() {
-    if (!event) return;
+    if (!event || !selectedTier) return;
     const payload = {
-      type: ticketType,
-      event1Id: event.id,
+      eventId: event.id,
+      tierId: selectedTier.id,
+      tierName: selectedTier.name,
+      eventTitle: event.title,
+      eventDate: fmtDate(event.start_date),
+      eventVenue: event.city,
+      eventCity: event.city,
+      eventState: event.state,
+      artistName: event.artists?.name ?? null,
       qty: 1,
       unitPrice: discountedPrice,
       discount,
+      discountAmount: unitPrice - discountedPrice,
+      serviceFee: Math.round(discountedPrice * 0.049),
       grandTotal: discountedPrice + Math.round(discountedPrice * 0.049),
       groupId,
+      groupEmail: email,
     };
     localStorage.setItem("rameelo_checkout", JSON.stringify(payload));
     router.push("/checkout");
   }
 
-  const inputCls =
-    "w-full rounded-xl border border-ivory-200 bg-white px-4 py-3 font-ui text-sm text-ink placeholder-ink-muted/50 focus:outline-none focus:ring-2 focus:ring-aubergine/25 focus:border-aubergine transition-all";
-  const labelCls = "font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1.5 block";
+  const shareVia = (channel: string) => {
+    const text = `Join my group for ${event?.title ?? "this event"} and save ${discount}% on tickets! 🎉`;
+    const url = shareUrl;
+    if (channel === "whatsapp") window.open(`https://wa.me/?text=${encodeURIComponent(text + "\n" + url)}`);
+    else if (channel === "sms") window.open(`sms:?body=${encodeURIComponent(text + "\n" + url)}`);
+    else copyLink();
+  };
 
-  if (!event || !artist) {
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FCF9F2" }}>
+        <div className="w-10 h-10 rounded-full border-4 border-ivory-200 border-t-marigold animate-spin" />
+      </div>
+    );
+  }
+
+  if (!event) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FCF9F2" }}>
         <div className="text-center">
@@ -126,9 +227,8 @@ function CreateGroupInner() {
             </div>
             <span className="font-display font-bold text-aubergine">Rameelo</span>
           </Link>
-          {/* Step indicator */}
           <div className="flex items-center gap-1.5">
-            {[1, 2, 3].map((s) => (
+            {[1, 2, 3].map(s => (
               <div key={s} className="flex items-center gap-1.5">
                 {s > 1 && <div className="w-5 h-px bg-ivory-200" />}
                 <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${step > s ? "bg-peacock text-white" : step === s ? "bg-aubergine text-white" : "bg-ivory-200 text-ink-muted"}`}>
@@ -140,37 +240,39 @@ function CreateGroupInner() {
         </div>
       </div>
 
-      <div className="max-w-xl mx-auto px-4 sm:px-6 py-8">
+      <div className="max-w-xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         {/* Event pill */}
         <div className="flex items-center gap-3 p-4 rounded-2xl bg-white border border-ivory-200 mb-6">
-          <div className="w-10 h-10 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: artist.color }}>
-            {artist.initials}
-          </div>
+          {event.artists && <AvatarCircle name={event.artists.name} imgUrl={event.artists.profile_image_url} />}
           <div className="flex-1 min-w-0">
             <p className="font-display font-bold text-ink text-sm truncate">{event.title}</p>
-            <p className="font-mono text-[10px] text-ink-muted">{event.date} · {event.city}, {event.state}</p>
+            <p className="font-mono text-[10px] text-ink-muted">{fmtDate(event.start_date)} · {event.city}, {event.state}</p>
           </div>
-          <Link href={`/events/${event.id}`} className="font-mono text-[10px] text-marigold-dark hover:text-marigold shrink-0">
-            View →
-          </Link>
+          <Link href={`/events/${event.id}`} className="font-mono text-[10px] text-marigold-dark hover:text-marigold shrink-0">View →</Link>
         </div>
 
-        {/* ── STEP 1: Organizer info ── */}
+        {/* ── STEP 1 ── */}
         {step === 1 && (
-          <form onSubmit={handleStep1} className="space-y-5">
+          <form onSubmit={e => { e.preventDefault(); setStep(2); }} className="space-y-5">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-widest text-marigold font-bold mb-1">Step 1 of 3 · Your info</p>
               <h1 className="font-display font-bold text-ink text-2xl mb-1">Start a Group Order</h1>
               <p className="font-ui text-ink-muted text-sm leading-relaxed">
-                You&rsquo;re the organizer — you&rsquo;ll get a link to share with your crew. Everyone pays their own ticket and you all unlock the group discount together.
+                You&rsquo;re the organizer — share your link with your crew. Everyone pays their own ticket and you all unlock the group discount together.
               </p>
             </div>
 
-            {/* Group discount education */}
+            {authedUserId && (
+              <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-peacock/8 border border-peacock/20">
+                <svg className="w-4 h-4 text-peacock shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <p className="font-ui text-sm text-peacock font-semibold">Signed in — your info is pre-filled</p>
+              </div>
+            )}
+
             <div className="rounded-2xl border border-aubergine/15 bg-aubergine/4 p-4">
               <p className="font-mono text-[10px] uppercase tracking-widest text-aubergine font-bold mb-3">How Group Discounts Work</p>
               <div className="space-y-2">
-                {GROUP_TIERS.slice().reverse().map((tier) => (
+                {GROUP_TIERS.slice().reverse().map(tier => (
                   <div key={tier.min} className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="w-7 h-7 rounded-full bg-aubergine/10 flex items-center justify-center">
@@ -183,81 +285,92 @@ function CreateGroupInner() {
                 ))}
               </div>
               <p className="font-ui text-xs text-ink-muted mt-3 pt-3 border-t border-aubergine/10">
-                Everyone in your group pays their own ticket at the discounted rate — no one person foots the bill.
+                Everyone pays their own ticket at the discounted rate — no one person foots the bill.
               </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={labelCls}>First name</label>
-                <input type="text" autoComplete="given-name" value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Priya" className={inputCls} required />
+                <input type="text" autoComplete="given-name" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Priya" className={inputCls} required />
               </div>
               <div>
                 <label className={labelCls}>Last name</label>
-                <input type="text" autoComplete="family-name" value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Patel" className={inputCls} required />
+                <input type="text" autoComplete="family-name" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Patel" className={inputCls} required />
               </div>
             </div>
 
             <div>
-              <label className={labelCls}>Phone number</label>
-              <input
-                type="tel"
-                autoComplete="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                placeholder="4085551234"
-                className={inputCls}
-                required
-              />
+              <label className={labelCls}>Email address *</label>
+              <input type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="priya@example.com" className={inputCls} required />
+              <p className="font-mono text-[10px] text-ink-muted mt-1.5">Group members will see this is your order</p>
+            </div>
+
+            <div>
+              <label className={labelCls}>Phone number *</label>
+              <div className="flex items-center">
+                <div className="flex items-center gap-1.5 px-3 py-3 rounded-l-xl border border-r-0 border-ivory-200 bg-ivory shrink-0">
+                  <span className="text-base leading-none">🇺🇸</span>
+                  <span className="font-ui text-sm text-ink-muted font-medium">+1</span>
+                </div>
+                <input
+                  type="tel"
+                  autoComplete="tel-national"
+                  value={formatPhone(phoneDigits)}
+                  onChange={e => setPhoneDigits(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                  placeholder="(555) 867-5309"
+                  maxLength={14}
+                  className="flex-1 rounded-r-xl rounded-l-none border border-ivory-200 bg-white px-4 py-3 font-ui text-sm text-ink placeholder-ink-muted/50 focus:outline-none focus:ring-2 focus:ring-aubergine/25 focus:border-aubergine transition-all"
+                  required
+                />
+              </div>
               <p className="font-mono text-[10px] text-ink-muted mt-1.5">So we can help you fill up your group — no spam</p>
             </div>
 
             <button
               type="submit"
-              disabled={!firstName || !lastName || phone.length < 10}
-              className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all ${firstName && lastName && phone.length >= 10 ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-sm" : "bg-ivory-200 text-ink-muted cursor-not-allowed"}`}
+              disabled={!firstName || !lastName || !email.includes("@") || phoneDigits.length < 10}
+              className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all ${firstName && lastName && email.includes("@") && phoneDigits.length === 10 ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-sm" : "bg-ivory-200 text-ink-muted cursor-not-allowed"}`}
             >
               Continue →
             </button>
           </form>
         )}
 
-        {/* ── STEP 2: Ticket type + group size ── */}
+        {/* ── STEP 2 ── */}
         {step === 2 && (
           <form onSubmit={handleStep2} className="space-y-5">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-widest text-marigold font-bold mb-1">Step 2 of 3 · Your tickets</p>
               <h2 className="font-display font-bold text-ink text-2xl mb-1">Set up your group</h2>
-              <p className="font-ui text-ink-muted text-sm">Choose ticket type and how many people you&rsquo;re planning to bring.</p>
+              <p className="font-ui text-ink-muted text-sm">Choose ticket type and how many people you&rsquo;re bringing.</p>
             </div>
 
-            {/* Ticket type */}
-            <div>
-              <label className={labelCls}>Ticket type</label>
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { key: "ga" as const, label: "General Admission", price: event.price },
-                  { key: "vip" as const, label: "VIP", price: event.priceVIP, disabled: !event.priceVIP },
-                ].map((t) => (
-                  <button
-                    key={t.key}
-                    type="button"
-                    disabled={t.disabled}
-                    onClick={() => !t.disabled && setTicketType(t.key)}
-                    className={`p-4 rounded-xl border-2 text-left transition-all ${t.disabled ? "opacity-40 cursor-not-allowed border-ivory-200 bg-ivory" : ticketType === t.key ? "border-aubergine bg-aubergine/5" : "border-ivory-200 bg-white hover:border-aubergine/30"}`}
-                  >
-                    <p className={`font-display font-bold text-sm ${ticketType === t.key ? "text-aubergine" : "text-ink"}`}>{t.label}</p>
-                    <p className="font-mono text-xs text-ink-muted mt-0.5">${t.price ?? "N/A"} / person</p>
-                  </button>
-                ))}
+            {event.ticket_tiers.length > 0 && (
+              <div>
+                <label className={labelCls}>Ticket type</label>
+                <div className="space-y-2">
+                  {event.ticket_tiers.map(tier => (
+                    <button
+                      key={tier.id}
+                      type="button"
+                      onClick={() => setSelectedTierId(tier.id)}
+                      className={`w-full p-4 rounded-xl border-2 text-left transition-all ${selectedTierId === tier.id ? "border-aubergine bg-aubergine/5" : "border-ivory-200 bg-white hover:border-aubergine/30"}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <p className={`font-display font-bold text-sm ${selectedTierId === tier.id ? "text-aubergine" : "text-ink"}`}>{tier.name}</p>
+                        <p className="font-mono text-xs text-ink-muted">${tier.price} / person</p>
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
 
-            {/* Group size target */}
             <div>
               <label className={labelCls}>How many people are you bringing?</label>
               <div className="space-y-2">
-                {TARGET_OPTIONS.map((opt) => {
+                {TARGET_OPTIONS.map(opt => {
                   const disc = discountForTarget(opt.value);
                   const discPrice = Math.round(unitPrice * (1 - disc / 100));
                   const selected = targetSize === opt.value;
@@ -273,15 +386,13 @@ function CreateGroupInner() {
                           {selected && <div className="w-2.5 h-2.5 rounded-full bg-marigold" />}
                         </div>
                         <div className="text-left">
-                          <p className={`font-display font-bold text-sm ${selected ? "text-ink" : "text-ink"}`}>{opt.label}</p>
+                          <p className="font-display font-bold text-sm text-ink">{opt.label}</p>
                           <p className={`font-mono text-[10px] ${selected ? "text-marigold-dark" : "text-ink-muted"}`}>{opt.sub}</p>
                         </div>
                       </div>
                       <div className="text-right">
                         <p className={`font-display font-bold text-sm ${selected ? "text-peacock" : "text-ink-muted"}`}>${discPrice}</p>
-                        {disc > 0 && (
-                          <p className="font-mono text-[10px] text-ink-muted line-through">${unitPrice}</p>
-                        )}
+                        {disc > 0 && <p className="font-mono text-[10px] text-ink-muted line-through">${unitPrice}</p>}
                       </div>
                     </button>
                   );
@@ -289,44 +400,42 @@ function CreateGroupInner() {
               </div>
             </div>
 
-            {/* Savings summary */}
             {discount > 0 && (
               <div className="rounded-xl bg-peacock/8 border border-peacock/20 p-4">
                 <p className="font-display font-bold text-peacock text-base mb-1">
                   Your group saves ${totalSavings.toLocaleString()} total
                 </p>
                 <p className="font-ui text-xs text-ink-muted">
-                  {targetSize} people × ${unitPrice} → ${discountedPrice} each ({discount}% off). Everyone pays their own ticket at this rate.
+                  {targetSize} people × ${unitPrice} → ${discountedPrice} each ({discount}% off)
                 </p>
               </div>
             )}
 
+            {saveError && (
+              <div className="rounded-xl bg-durga/8 border border-durga/20 px-4 py-3">
+                <p className="font-ui text-sm text-durga">{saveError}</p>
+              </div>
+            )}
+
             <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={() => setStep(1)}
-                className="w-12 h-14 rounded-xl border border-ivory-200 flex items-center justify-center text-ink-muted hover:border-aubergine/30 hover:text-aubergine transition-all"
-              >
-                ←
-              </button>
+              <button type="button" onClick={() => setStep(1)} className="w-12 h-14 rounded-xl border border-ivory-200 flex items-center justify-center text-ink-muted hover:border-aubergine/30 hover:text-aubergine transition-all">←</button>
               <button
                 type="submit"
-                className="flex-1 py-4 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark active:scale-[0.98] shadow-sm transition-all"
+                disabled={saving || !selectedTierId}
+                className={`flex-1 py-4 rounded-2xl font-display font-bold text-base transition-all ${!saving && selectedTierId ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-sm" : "bg-ivory-200 text-ink-muted cursor-not-allowed"}`}
               >
-                Create My Group Link →
+                {saving ? "Creating…" : "Create My Group Link →"}
               </button>
             </div>
           </form>
         )}
 
-        {/* ── STEP 3: Share ── */}
+        {/* ── STEP 3 ── */}
         {step === 3 && (
           <div className="space-y-5">
             <div className="text-center">
               <div className="w-16 h-16 rounded-full bg-peacock mx-auto flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-                </svg>
+                <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
               </div>
               <p className="font-mono text-[10px] uppercase tracking-widest text-marigold font-bold mb-1">Group Created</p>
               <h2 className="font-display font-bold text-ink text-2xl mb-1">Your group link is ready!</h2>
@@ -335,11 +444,10 @@ function CreateGroupInner() {
               </p>
             </div>
 
-            {/* Link card */}
             <div className="rounded-2xl bg-white border-2 border-aubergine/20 p-5">
               <p className={labelCls}>Your shareable link</p>
               <div className="flex items-center gap-2">
-                <div className="flex-1 bg-ivory rounded-xl px-3 py-2.5 border border-ivory-200">
+                <div className="flex-1 bg-ivory rounded-xl px-3 py-2.5 border border-ivory-200 min-w-0">
                   <p className="font-mono text-sm text-ink truncate">{shareUrl}</p>
                 </div>
                 <button
@@ -351,20 +459,15 @@ function CreateGroupInner() {
               </div>
             </div>
 
-            {/* Share options */}
             <div>
               <p className={labelCls}>Share via</p>
               <div className="grid grid-cols-3 gap-2">
                 {[
-                  { label: "WhatsApp", icon: "💬", color: "#25D366" },
-                  { label: "iMessage", icon: "📱", color: "#0A84FF" },
-                  { label: "Instagram", icon: "📸", color: "#E1306C" },
-                ].map((ch) => (
-                  <button
-                    key={ch.label}
-                    onClick={copyLink}
-                    className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white border border-ivory-200 hover:border-aubergine/30 transition-all"
-                  >
+                  { label: "WhatsApp", icon: "💬", channel: "whatsapp" },
+                  { label: "iMessage", icon: "📱", channel: "sms" },
+                  { label: "Copy Link", icon: "🔗", channel: "copy" },
+                ].map(ch => (
+                  <button key={ch.label} onClick={() => shareVia(ch.channel)} className="flex flex-col items-center gap-2 p-4 rounded-xl bg-white border border-ivory-200 hover:border-aubergine/30 transition-all">
                     <span className="text-2xl">{ch.icon}</span>
                     <span className="font-mono text-[10px] uppercase tracking-wide text-ink-muted">{ch.label}</span>
                   </button>
@@ -372,17 +475,16 @@ function CreateGroupInner() {
               </div>
             </div>
 
-            {/* Group progress preview */}
             <div className="rounded-2xl bg-aubergine/5 border border-aubergine/15 p-4">
               <div className="flex items-center justify-between mb-3">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-aubergine font-bold">Group Progress</p>
                 <p className="font-mono text-[10px] text-ink-muted">1 / {targetSize} joined</p>
               </div>
-              <div className="h-2 bg-white rounded-full overflow-hidden mb-2">
+              <div className="h-2 bg-white rounded-full overflow-hidden mb-3">
                 <div className="h-full rounded-full bg-marigold" style={{ width: `${(1 / targetSize) * 100}%` }} />
               </div>
-              <div className="flex items-center gap-2 mt-3">
-                <div className="w-8 h-8 rounded-full bg-aubergine flex items-center justify-center text-white text-xs font-bold">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-full bg-aubergine flex items-center justify-center text-white text-xs font-bold shrink-0">
                   {firstName[0]?.toUpperCase()}
                 </div>
                 <p className="font-ui text-sm text-ink-muted">
@@ -391,18 +493,11 @@ function CreateGroupInner() {
               </div>
             </div>
 
-            {/* CTAs */}
             <div className="space-y-3">
-              <button
-                onClick={goToMyTicket}
-                className="w-full py-4 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark active:scale-[0.98] shadow-sm transition-all"
-              >
+              <button onClick={goToMyTicket} className="w-full py-4 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark active:scale-[0.98] shadow-sm transition-all">
                 Secure My Ticket Now →
               </button>
-              <Link
-                href={`/group/${groupId}`}
-                className="w-full py-3 rounded-2xl border border-aubergine/20 text-aubergine font-ui font-semibold text-sm hover:bg-aubergine/5 transition-all flex items-center justify-center"
-              >
+              <Link href={`/group/${groupId}`} className="w-full py-3 rounded-2xl border border-aubergine/20 text-aubergine font-ui font-semibold text-sm hover:bg-aubergine/5 transition-all flex items-center justify-center">
                 Preview group link
               </Link>
             </div>

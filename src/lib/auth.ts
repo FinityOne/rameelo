@@ -1,3 +1,5 @@
+export type UserRole = 'user' | 'organizer' | 'admin';
+
 export interface RameeloUser {
   id: string;
   firstName: string;
@@ -8,9 +10,11 @@ export interface RameeloUser {
   state: string;
   avatarInitials: string;
   avatarColor: string;
+  avatarUrl?: string;
   joinedAt: string;
   ticketsCount: number;
   eventsAttended: number;
+  role: UserRole;
 }
 
 const AVATAR_COLORS = ["#7C1F2C", "#0E8C7A", "#2E1B30", "#D4891B", "#5a1e7a", "#892240", "#1a4a5e"];
@@ -42,9 +46,11 @@ export function createUser(data: {
   phone: string;
   city?: string;
   state?: string;
+  role?: UserRole;
+  avatarUrl?: string;
 }): RameeloUser {
-  const initials = (data.firstName[0] + data.lastName[0]).toUpperCase();
-  const colorIndex = data.firstName.charCodeAt(0) % AVATAR_COLORS.length;
+  const initials = ((data.firstName[0] ?? '') + (data.lastName[0] ?? '')).toUpperCase() || '?';
+  const colorIndex = (data.firstName.charCodeAt(0) || 0) % AVATAR_COLORS.length;
   return {
     id: "u-" + Math.random().toString(36).slice(2, 10),
     firstName: data.firstName,
@@ -55,9 +61,11 @@ export function createUser(data: {
     state: data.state ?? "",
     avatarInitials: initials,
     avatarColor: AVATAR_COLORS[colorIndex],
+    avatarUrl: data.avatarUrl,
     joinedAt: new Date().toISOString(),
     ticketsCount: 3,
     eventsAttended: 1,
+    role: data.role ?? 'user',
   };
 }
 

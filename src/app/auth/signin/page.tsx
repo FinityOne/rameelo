@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import { createUser, saveUser } from "@/lib/auth";
 
 export default function SignInPage() {
@@ -16,23 +17,32 @@ export default function SignInPage() {
     e.preventDefault();
     setLoading(true);
     setError("");
-    await new Promise((r) => setTimeout(r, 900));
 
-    // Demo: any valid-looking email works
-    if (!email.includes("@")) {
-      setError("Please enter a valid email address.");
+    const supabase = createClient();
+    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (authError) {
+      setError(authError.message);
       setLoading(false);
       return;
     }
 
-    const name = email.split("@")[0].replace(/[._]/g, " ");
-    const parts = name.split(" ");
-    const firstName = parts[0].charAt(0).toUpperCase() + parts[0].slice(1);
-    const lastName = parts[1] ? parts[1].charAt(0).toUpperCase() + parts[1].slice(1) : "Member";
-
-    const user = createUser({ firstName, lastName, email, phone: "", city: "San Jose", state: "CA" });
+    // Populate localStorage so portal pages can read display data
+    const meta = data.user?.user_metadata ?? {};
+    const firstName = meta.firstName ?? email.split("@")[0];
+    const lastName = meta.lastName ?? "Member";
+    const user = createUser({
+      firstName,
+      lastName,
+      email: data.user?.email ?? email,
+      phone: meta.phone ?? "",
+      city: meta.city ?? "",
+      state: meta.state ?? "",
+    });
     saveUser(user);
+
     router.push("/portal");
+    router.refresh();
   }
 
   const inputCls = "w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3.5 font-ui text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-marigold/50 focus:border-marigold/50 transition-all";

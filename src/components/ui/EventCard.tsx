@@ -24,7 +24,7 @@ export function EventCard({
   soldPct,
   soldOut = false,
   isLive = false,
-  href = "/tickets",
+  href = "/events",
 }: EventCardProps) {
   return (
     <div className="bg-ivory rounded-[16px] overflow-hidden border border-ivory-200 hover:shadow-md transition-all group">

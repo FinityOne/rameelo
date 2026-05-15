@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 import { createUser, saveUser } from "@/lib/auth";
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
@@ -18,22 +19,79 @@ export default function SignUpPage() {
   const [state, setState] = useState("NJ");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [emailSent, setEmailSent] = useState(false);
 
-  const step1Valid = firstName && lastName && email.includes("@") && phone.length >= 10;
+  function formatPhone(digits: string): string {
+    const d = digits.replace(/\D/g, "").slice(0, 10);
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+    return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  }
+
+  const step1Valid = firstName && lastName && email.includes("@") && phone.length === 10;
   const step2Valid = password.length >= 8;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (step === 1) { setStep(2); return; }
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 1100));
+    setError("");
+
+    const supabase = createClient();
+    const { data, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { firstName, lastName, phone, city, state },
+        emailRedirectTo: `${location.origin}/auth/callback`,
+      },
+    });
+
+    if (authError) {
+      setError(authError.message);
+      setLoading(false);
+      return;
+    }
+
+    // Build and save local user for portal pages
     const user = createUser({ firstName, lastName, email, phone, city, state });
     saveUser(user);
-    router.push("/portal");
+
+    if (data.session) {
+      // Email confirmation disabled — go straight to portal
+      router.push("/portal");
+      router.refresh();
+    } else {
+      // Email confirmation enabled — show check-email screen
+      setEmailSent(true);
+      setLoading(false);
+    }
   }
 
   const inputCls = "w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3.5 font-ui text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-marigold/50 focus:border-marigold/50 transition-all";
   const labelCls = "font-mono text-[10px] uppercase tracking-widest text-white/40 mb-1.5 block";
+
+  if (emailSent) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-6" style={{ backgroundColor: "#2E1B30" }}>
+        <div className="w-full max-w-sm text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-marigold/15 border border-marigold/30 flex items-center justify-center mx-auto text-3xl">
+            📬
+          </div>
+          <div>
+            <h1 className="font-display font-bold text-white text-2xl mb-2">Check your email</h1>
+            <p className="font-ui text-white/50 text-sm">
+              We sent a confirmation link to <span className="text-marigold font-medium">{email}</span>. Click it to activate your account.
+            </p>
+          </div>
+          <Link href="/auth/signin" className="block font-ui text-sm text-white/40 hover:text-white/60 transition-colors">
+            ← Back to sign in
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: "#2E1B30" }}>
@@ -129,7 +187,25 @@ export default function SignUpPage() {
                 </div>
                 <div>
                   <label className={labelCls}>Phone</label>
-                  <input type="tel" autoComplete="tel" value={phone} onChange={(e) => setPhone(e.target.value.replace(/\D/g,"").slice(0,10))} placeholder="4085551234" className={inputCls} required />
+                  <div className="flex items-center">
+                    <div className="flex items-center gap-1.5 px-3 py-3.5 rounded-l-xl border border-r-0 border-white/15 bg-white/8 shrink-0">
+                      <span className="text-base leading-none">🇺🇸</span>
+                      <span className="font-ui text-sm text-white/60 font-medium">+1</span>
+                    </div>
+                    <input
+                      type="tel"
+                      autoComplete="tel-national"
+                      value={formatPhone(phone)}
+                      onChange={(e) => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                      placeholder="(555) 867-5309"
+                      maxLength={14}
+                      className="flex-1 rounded-r-xl rounded-l-none border border-white/15 bg-white/10 px-4 py-3.5 font-ui text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-marigold/50 focus:border-marigold/50 transition-all"
+                      required
+                    />
+                  </div>
+                  {phone.length > 0 && phone.length < 10 && (
+                    <p className="font-mono text-[9px] text-marigold/70 mt-1">{10 - phone.length} more digits needed</p>
+                  )}
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -168,6 +244,12 @@ export default function SignUpPage() {
                   <p className="font-ui text-xs text-white/50">{email}</p>
                   {city && <p className="font-ui text-xs text-white/50">{city}, {state}</p>}
                 </div>
+
+                {error && (
+                  <div className="rounded-xl bg-durga/20 border border-durga/30 px-4 py-3">
+                    <p className="font-ui text-sm text-white/80">{error}</p>
+                  </div>
+                )}
 
                 <button type="submit" disabled={loading || !step2Valid} className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all flex items-center justify-center gap-2 ${step2Valid && !loading ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-lg" : "bg-white/10 text-white/30 cursor-not-allowed"}`}>
                   {loading ? (<><div className="w-4 h-4 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" />Creating account…</>) : "Create My Account →"}
