@@ -124,7 +124,6 @@ export default function AdminOrgDetailPage() {
         .from("profiles")
         .select("id, first_name, last_name, email, role")
         .or(`first_name.ilike.%${memberSearch}%,last_name.ilike.%${memberSearch}%,email.ilike.%${memberSearch}%`)
-        .in("role", ["organizer", "admin"])
         .limit(8);
       const alreadyIn = new Set(members.map(m => m.user_id));
       setSearchResults(((data ?? []) as UserResult[]).filter(u => !alreadyIn.has(u.id)));
@@ -141,6 +140,10 @@ export default function AdminOrgDetailPage() {
       org_id: id, user_id: addingUser.id, role: addingRole, invited_by: user?.id ?? null,
     });
     if (error) { setAddError(error.message); return; }
+    // Promote to organizer if they're a plain user so they can access the organizer portal
+    if (addingUser.role === "user") {
+      await supabase.from("profiles").update({ role: "organizer" }).eq("id", addingUser.id);
+    }
     setMemberSearch(""); setSearchResults([]); setAddingUser(null);
     await fetchAll();
   }
@@ -374,7 +377,7 @@ export default function AdminOrgDetailPage() {
               )}
 
               {memberSearch.length >= 2 && searchResults.length === 0 && !searching && !addingUser && (
-                <p className="font-ui text-xs text-ink-muted">No organizers found. Only users with organizer or admin role can be added.</p>
+                <p className="font-ui text-xs text-ink-muted">No users found matching that name or email.</p>
               )}
             </div>
 
