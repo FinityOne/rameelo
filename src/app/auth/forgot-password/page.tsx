@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import Logo from "@/components/Logo";
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("");
@@ -40,12 +41,9 @@ export default function ForgotPasswordPage() {
 
       <div className="relative w-full max-w-sm">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2.5 justify-center mb-10">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#F5A623" }}>
-            <span className="font-display font-bold text-aubergine text-lg">R</span>
-          </div>
-          <span className="font-display font-bold text-white text-xl">Rameelo</span>
-        </Link>
+        <div className="flex justify-center mb-10">
+          <Logo variant="white" height={32} />
+        </div>
 
         {sent ? (
           /* ── Success state ── */

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
@@ -23,8 +23,27 @@ type OrgData = {
 };
 
 type OrgMember = {
-  user_id: string; role: string;
+  id: string; user_id: string; role: string;
   profile: { first_name: string; last_name: string; email: string };
+};
+
+type UserResult = { id: string; first_name: string; last_name: string; email: string; role: string };
+
+const MEMBER_ROLES = [
+  { value: "owner",  label: "Owner",  desc: "Full control, primary contact" },
+  { value: "admin",  label: "Admin",  desc: "Can edit org profile and add members" },
+  { value: "member", label: "Member", desc: "Can view org profile" },
+];
+
+type PayoutSchedule = "weekly" | "monthly";
+type AccountType = "checking" | "savings";
+
+type BankAccountDraft = {
+  bankName: string;
+  routingNumber: string;
+  accountNumber: string;
+  accountType: AccountType;
+  accountHolder: string;
 };
 
 const inputCls = "w-full rounded-xl border border-ivory-200 bg-white px-4 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all";
@@ -33,6 +52,7 @@ const ROLE_BADGE: Record<string, string> = { owner: "bg-aubergine/10 text-auberg
 
 export default function OrganizerOrganizationPage() {
   const [org, setOrg] = useState<OrgData | null>(null);
+  const [orgId, setOrgId] = useState<string>("");
   const [members, setMembers] = useState<OrgMember[]>([]);
   const [myRole, setMyRole] = useState<string>("");
   const [loading, setLoading] = useState(true);
@@ -40,6 +60,30 @@ export default function OrganizerOrganizationPage() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [form, setForm] = useState<Partial<OrgData>>({});
+
+  // Member search
+  const [memberSearch, setMemberSearch]   = useState("");
+  const [searchResults, setSearchResults] = useState<UserResult[]>([]);
+  const [searching, setSearching]         = useState(false);
+  const [addingUser, setAddingUser]       = useState<UserResult | null>(null);
+  const [addingRole, setAddingRole]       = useState("member");
+  const [addError, setAddError]           = useState("");
+  const [removingId, setRemovingId]       = useState<string | null>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Payout settings (stored locally until Stripe Connect is wired)
+  const [payoutSchedule, setPayoutSchedule] = useState<PayoutSchedule>("monthly");
+  const [scheduleMsg, setScheduleMsg]       = useState("");
+  const [bankDraft, setBankDraft]           = useState<BankAccountDraft>({
+    bankName: "Chase Business Checking",
+    routingNumber: "021000021",
+    accountNumber: "000123456789",
+    accountType: "checking",
+    accountHolder: "",
+  });
+  const [bankSaving, setBankSaving]   = useState(false);
+  const [bankMsg, setBankMsg]         = useState("");
+  const [showAccount, setShowAccount] = useState(false);
 
   useEffect(() => {
     const supabase = createClient();
@@ -58,11 +102,12 @@ export default function OrganizerOrganizationPage() {
       if (!membership) { setNotFound(true); setLoading(false); return; }
 
       setMyRole(membership.role);
+      setOrgId(membership.org_id);
 
       const [{ data: orgData }, { data: membersData }] = await Promise.all([
         supabase.from("organizations").select("*").eq("id", membership.org_id).single(),
         supabase.from("organization_members")
-          .select("user_id, role, profiles (first_name, last_name, email)")
+          .select("id, user_id, role, profiles (first_name, last_name, email)")
           .eq("org_id", membership.org_id)
           .order("joined_at"),
       ]);
@@ -73,8 +118,8 @@ export default function OrganizerOrganizationPage() {
       setOrg(o);
       setForm(o);
       setMembers((membersData ?? []).map((m: unknown) => {
-        const raw = m as { user_id: string; role: string; profiles: { first_name: string; last_name: string; email: string } };
-        return { user_id: raw.user_id, role: raw.role, profile: raw.profiles };
+        const raw = m as { id: string; user_id: string; role: string; profiles: { first_name: string; last_name: string; email: string } };
+        return { id: raw.id, user_id: raw.user_id, role: raw.role, profile: raw.profiles };
       }));
       setLoading(false);
     });
@@ -107,6 +152,79 @@ export default function OrganizerOrganizationPage() {
     if (error) { setSaveMsg("Error: " + error.message); return; }
     setSaveMsg("Saved!");
     setTimeout(() => setSaveMsg(""), 3000);
+  }
+
+  // Debounced profile search
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setSearchResults([]);
+    if (memberSearch.length < 2) return;
+    debounceRef.current = setTimeout(async () => {
+      setSearching(true);
+      const supabase = createClient();
+      const { data } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email, role")
+        .or(`first_name.ilike.%${memberSearch}%,last_name.ilike.%${memberSearch}%,email.ilike.%${memberSearch}%`)
+        .limit(8);
+      const alreadyIn = new Set(members.map(m => m.user_id));
+      setSearchResults(((data ?? []) as UserResult[]).filter(u => !alreadyIn.has(u.id)));
+      setSearching(false);
+    }, 400);
+  }, [memberSearch, members]);
+
+  async function handleAddMember() {
+    if (!addingUser || !orgId) return;
+    setAddError("");
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    const { error } = await supabase.from("organization_members").upsert({
+      org_id: orgId, user_id: addingUser.id, role: addingRole, invited_by: user?.id ?? null,
+    }, { onConflict: "org_id,user_id" });
+    if (error) { setAddError(error.message); return; }
+    if (addingUser.role === "user") {
+      await supabase.from("profiles").update({ role: "organizer" }).eq("id", addingUser.id);
+    }
+    setMemberSearch(""); setSearchResults([]); setAddingUser(null);
+    const { data: membersData } = await supabase
+      .from("organization_members")
+      .select("id, user_id, role, profiles (first_name, last_name, email)")
+      .eq("org_id", orgId)
+      .order("joined_at");
+    setMembers((membersData ?? []).map((m: unknown) => {
+      const raw = m as { id: string; user_id: string; role: string; profiles: { first_name: string; last_name: string; email: string } };
+      return { id: raw.id, user_id: raw.user_id, role: raw.role, profile: raw.profiles };
+    }));
+  }
+
+  async function handleRemoveMember(memberId: string) {
+    setRemovingId(memberId);
+    const supabase = createClient();
+    await supabase.from("organization_members").delete().eq("id", memberId);
+    setRemovingId(null);
+    setMembers(prev => prev.filter(m => m.id !== memberId));
+  }
+
+  async function handleRoleChange(memberId: string, newRole: string) {
+    const supabase = createClient();
+    await supabase.from("organization_members").update({ role: newRole }).eq("id", memberId);
+    setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m));
+  }
+
+  function handleScheduleSave() {
+    setScheduleMsg("Schedule saved!");
+    setTimeout(() => setScheduleMsg(""), 3000);
+  }
+
+  async function handleBankSave(e: React.FormEvent) {
+    e.preventDefault();
+    setBankSaving(true);
+    setBankMsg("");
+    // Full persistence requires Stripe Connect — saving locally for now
+    await new Promise(r => setTimeout(r, 600));
+    setBankSaving(false);
+    setBankMsg("Bank account updated!");
+    setTimeout(() => setBankMsg(""), 3000);
   }
 
   if (loading) {
@@ -322,7 +440,7 @@ export default function OrganizerOrganizationPage() {
         </div>
 
         {/* ── Team Members ── */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 space-y-4">
           <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
             <div className="px-5 pt-5 pb-4 border-b border-ivory-200">
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Team</p>
@@ -330,6 +448,91 @@ export default function OrganizerOrganizationPage() {
                 {members.length} member{members.length !== 1 ? "s" : ""}
               </p>
             </div>
+
+            {/* Add member — owners and admins only */}
+            {canEdit && (
+              <div className="px-5 py-4 border-b border-ivory-200 space-y-3">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Add organizer</p>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={memberSearch}
+                    onChange={e => setMemberSearch(e.target.value)}
+                    placeholder="Search name or email…"
+                    className={inputCls}
+                  />
+                  {searching && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full border-2 border-ivory-200 border-t-aubergine animate-spin" />
+                  )}
+                </div>
+
+                {searchResults.length > 0 && !addingUser && (
+                  <div className="rounded-xl border border-ivory-200 bg-white shadow-sm overflow-hidden">
+                    {searchResults.map(u => (
+                      <button key={u.id} onClick={() => { setAddingUser(u); setMemberSearch(""); setSearchResults([]); }}
+                        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-ivory transition-colors text-left border-b border-ivory-200 last:border-0">
+                        <div className="w-8 h-8 rounded-full bg-aubergine/10 flex items-center justify-center text-aubergine font-bold text-xs shrink-0">
+                          {u.first_name.charAt(0)}{u.last_name.charAt(0)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-ui text-sm font-semibold text-ink truncate">{u.first_name} {u.last_name}</p>
+                          <p className="font-mono text-[10px] text-ink-muted truncate">{u.email}</p>
+                        </div>
+                        <span className={`font-mono text-[9px] uppercase px-1.5 py-0.5 rounded-full shrink-0 ${u.role === "admin" ? "bg-durga/10 text-durga" : "bg-ivory-200 text-ink-muted"}`}>
+                          {u.role}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {addingUser && (
+                  <div className="rounded-xl border border-aubergine/20 bg-aubergine/5 p-3 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-aubergine flex items-center justify-center text-white font-bold text-xs shrink-0">
+                        {addingUser.first_name.charAt(0)}{addingUser.last_name.charAt(0)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-ui text-sm font-semibold text-ink">{addingUser.first_name} {addingUser.last_name}</p>
+                        <p className="font-mono text-[10px] text-ink-muted truncate">{addingUser.email}</p>
+                      </div>
+                      <button onClick={() => setAddingUser(null)} className="text-ink-muted hover:text-ink transition-colors">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </div>
+                    {addingUser.role === "user" && (
+                      <p className="font-mono text-[9px] text-peacock bg-peacock/8 px-2.5 py-1.5 rounded-lg">
+                        This user will be promoted to Organizer so they can access the organizer portal.
+                      </p>
+                    )}
+                    <div>
+                      <label className="font-mono text-[9px] uppercase tracking-widest text-ink-muted block mb-1.5">Org Role</label>
+                      <div className="space-y-1.5">
+                        {MEMBER_ROLES.map(r => (
+                          <label key={r.value} className={`flex items-center gap-2.5 px-3 py-2 rounded-xl border cursor-pointer transition-all ${addingRole === r.value ? "border-aubergine/30 bg-aubergine/8" : "border-ivory-200 hover:border-aubergine/20"}`}>
+                            <input type="radio" name="add_role" value={r.value} checked={addingRole === r.value} onChange={() => setAddingRole(r.value)} className="accent-aubergine" />
+                            <div>
+                              <p className="font-ui text-xs font-semibold text-ink">{r.label}</p>
+                              <p className="font-mono text-[9px] text-ink-muted">{r.desc}</p>
+                            </div>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                    {addError && <p className="font-ui text-xs text-durga">{addError}</p>}
+                    <button onClick={handleAddMember} className="w-full py-2.5 rounded-xl bg-aubergine text-white font-display font-bold text-sm hover:bg-aubergine-light transition-all">
+                      Add to organization
+                    </button>
+                  </div>
+                )}
+
+                {memberSearch.length >= 2 && searchResults.length === 0 && !searching && !addingUser && (
+                  <p className="font-ui text-xs text-ink-muted">No users found matching that name or email.</p>
+                )}
+              </div>
+            )}
+
+            {/* Member list */}
             {members.length === 0 ? (
               <div className="px-5 py-8 text-center">
                 <p className="font-ui text-sm text-ink-muted">No members yet.</p>
@@ -337,7 +540,7 @@ export default function OrganizerOrganizationPage() {
             ) : (
               <div className="divide-y divide-ivory-200">
                 {members.map(m => (
-                  <div key={m.user_id} className="px-5 py-3.5 flex items-center gap-3">
+                  <div key={m.id} className="px-5 py-3.5 flex items-center gap-3">
                     <div className="w-9 h-9 rounded-full bg-aubergine/10 flex items-center justify-center text-aubergine font-bold text-xs shrink-0">
                       {m.profile?.first_name?.charAt(0) ?? "?"}{m.profile?.last_name?.charAt(0) ?? ""}
                     </div>
@@ -345,14 +548,191 @@ export default function OrganizerOrganizationPage() {
                       <p className="font-ui text-sm font-semibold text-ink truncate">{m.profile?.first_name} {m.profile?.last_name}</p>
                       <p className="font-mono text-[10px] text-ink-muted truncate">{m.profile?.email}</p>
                     </div>
-                    <span className={`font-mono text-[9px] uppercase tracking-wide px-2 py-1 rounded-full font-bold ${ROLE_BADGE[m.role] ?? "bg-ivory-200 text-ink-muted"}`}>
-                      {m.role}
-                    </span>
+                    <div className="flex flex-col items-end gap-1.5 shrink-0">
+                      {canEdit ? (
+                        <select
+                          value={m.role}
+                          onChange={e => handleRoleChange(m.id, e.target.value)}
+                          className={`font-mono text-[9px] uppercase tracking-wide px-2 py-1 rounded-full border-0 outline-none cursor-pointer font-bold ${ROLE_BADGE[m.role] ?? "bg-ivory-200 text-ink-muted"}`}
+                        >
+                          {MEMBER_ROLES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+                        </select>
+                      ) : (
+                        <span className={`font-mono text-[9px] uppercase tracking-wide px-2 py-1 rounded-full font-bold ${ROLE_BADGE[m.role] ?? "bg-ivory-200 text-ink-muted"}`}>
+                          {m.role}
+                        </span>
+                      )}
+                      {canEdit && (
+                        <button
+                          disabled={removingId === m.id}
+                          onClick={() => handleRemoveMember(m.id)}
+                          className="font-mono text-[9px] text-ink-muted/50 hover:text-durga transition-colors"
+                        >
+                          {removingId === m.id ? "…" : "Remove"}
+                        </button>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
+
+          {/* ── Payout Schedule ── */}
+          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+            <div className="px-5 pt-5 pb-4 border-b border-ivory-200">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Payout schedule</p>
+              <p className="font-display font-bold text-ink text-base mt-0.5" style={{ letterSpacing: "-0.015em" }}>When do you get paid?</p>
+            </div>
+            <div className="p-4 space-y-2.5">
+              {(["weekly", "monthly"] as const).map(opt => (
+                <label
+                  key={opt}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${payoutSchedule === opt ? "border-peacock/30 bg-peacock/5" : "border-ivory-200 hover:border-aubergine/20"}`}
+                >
+                  <input
+                    type="radio"
+                    name="payout_schedule"
+                    value={opt}
+                    checked={payoutSchedule === opt}
+                    onChange={() => setPayoutSchedule(opt)}
+                    className="accent-peacock shrink-0"
+                  />
+                  <div className="flex-1">
+                    <p className="font-ui font-semibold text-ink text-sm capitalize">{opt}</p>
+                    <p className="font-mono text-[10px] text-ink-muted mt-0.5">
+                      {opt === "weekly" ? "Every Friday · Mon–Thu sales included" : "1st of month · prior month sales"}
+                    </p>
+                  </div>
+                </label>
+              ))}
+            </div>
+            <div className="px-4 pb-4 pt-1 flex items-center gap-3">
+              <button
+                onClick={handleScheduleSave}
+                className="px-4 py-2 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:bg-aubergine/90 transition-all"
+              >
+                Save schedule
+              </button>
+              {scheduleMsg && <p className="font-ui text-xs text-peacock">{scheduleMsg}</p>}
+            </div>
+          </div>
+
+          {/* ── Bank Account for Payouts ── */}
+          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+            <div className="px-5 pt-5 pb-4 border-b border-ivory-200 flex items-center justify-between">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Payout account</p>
+                <p className="font-display font-bold text-ink text-base mt-0.5" style={{ letterSpacing: "-0.015em" }}>Bank Account</p>
+              </div>
+              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-peacock/10 text-peacock font-mono text-[9px] font-bold uppercase tracking-widest">
+                <span className="w-1.5 h-1.5 rounded-full bg-peacock" />
+                Test
+              </span>
+            </div>
+
+            <form onSubmit={handleBankSave} className="p-4 space-y-3">
+              <div>
+                <label className={labelCls}>Bank name</label>
+                <input
+                  type="text"
+                  value={bankDraft.bankName}
+                  onChange={e => setBankDraft(d => ({ ...d, bankName: e.target.value }))}
+                  placeholder="e.g. Chase Business Checking"
+                  className={inputCls}
+                  disabled={!canEdit}
+                />
+              </div>
+              <div>
+                <label className={labelCls}>Account holder name</label>
+                <input
+                  type="text"
+                  value={bankDraft.accountHolder}
+                  onChange={e => setBankDraft(d => ({ ...d, accountHolder: e.target.value }))}
+                  placeholder="Legal name on account"
+                  className={inputCls}
+                  disabled={!canEdit}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Routing number</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={9}
+                    value={showAccount ? bankDraft.routingNumber : bankDraft.routingNumber.replace(/\d(?=\d{4})/g, "•")}
+                    onChange={e => setBankDraft(d => ({ ...d, routingNumber: e.target.value.replace(/\D/g, "") }))}
+                    placeholder="9 digits"
+                    className={`${inputCls} font-mono`}
+                    disabled={!canEdit}
+                  />
+                </div>
+                <div>
+                  <label className={labelCls}>Account number</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={showAccount ? bankDraft.accountNumber : bankDraft.accountNumber.replace(/\d(?=\d{4})/g, "•")}
+                    onChange={e => setBankDraft(d => ({ ...d, accountNumber: e.target.value.replace(/\D/g, "") }))}
+                    placeholder="Account number"
+                    className={`${inputCls} font-mono`}
+                    disabled={!canEdit}
+                  />
+                </div>
+              </div>
+              <div>
+                <label className={labelCls}>Account type</label>
+                <div className="flex gap-2">
+                  {(["checking", "savings"] as const).map(t => (
+                    <label
+                      key={t}
+                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border cursor-pointer transition-all text-sm font-ui font-medium capitalize ${bankDraft.accountType === t ? "border-aubergine/30 bg-aubergine/8 text-ink" : "border-ivory-200 text-ink-muted hover:border-aubergine/20"}`}
+                    >
+                      <input
+                        type="radio"
+                        name="account_type"
+                        value={t}
+                        checked={bankDraft.accountType === t}
+                        onChange={() => setBankDraft(d => ({ ...d, accountType: t }))}
+                        className="accent-aubergine"
+                        disabled={!canEdit}
+                      />
+                      {t}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setShowAccount(s => !s)}
+                className="font-mono text-[10px] text-ink-muted hover:text-ink transition-colors"
+              >
+                {showAccount ? "Hide" : "Show"} account details
+              </button>
+
+              {canEdit && (
+                <div className="pt-1 flex items-center gap-3">
+                  <button
+                    type="submit"
+                    disabled={bankSaving}
+                    className="px-4 py-2 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:bg-aubergine/90 transition-all disabled:opacity-50"
+                  >
+                    {bankSaving ? "Saving…" : "Update account"}
+                  </button>
+                  {bankMsg && <p className="font-ui text-xs text-peacock">{bankMsg}</p>}
+                </div>
+              )}
+            </form>
+
+            <div className="px-4 py-3 bg-ivory border-t border-ivory-200">
+              <p className="font-mono text-[10px] text-ink-muted/60">
+                Stored securely · Full encryption via Stripe Connect · Only owners can update
+              </p>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>

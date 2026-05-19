@@ -115,7 +115,6 @@ export default function AdminOrgDetailPage() {
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     setSearchResults([]);
-    setAddingUser(null);
     if (memberSearch.length < 2) return;
     debounceRef.current = setTimeout(async () => {
       setSearching(true);
@@ -136,9 +135,9 @@ export default function AdminOrgDetailPage() {
     setAddError("");
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase.from("organization_members").insert({
+    const { error } = await supabase.from("organization_members").upsert({
       org_id: id, user_id: addingUser.id, role: addingRole, invited_by: user?.id ?? null,
-    });
+    }, { onConflict: "org_id,user_id" });
     if (error) { setAddError(error.message); return; }
     // Promote to organizer if they're a plain user so they can access the organizer portal
     if (addingUser.role === "user") {

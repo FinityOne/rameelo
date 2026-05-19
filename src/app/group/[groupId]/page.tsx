@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import Logo from "@/components/Logo";
 import { loadGroupOrder, joinGroupOrder, type GroupOrder } from "@/lib/group-orders";
 import { GRADIENTS } from "@/app/portal/organizer/events/create/types";
 
@@ -168,12 +169,7 @@ export default function GroupLandingPage() {
       {/* Header */}
       <div className="bg-white border-b border-ivory-200">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ backgroundColor: "#F5A623" }}>
-              <span className="font-display font-bold text-aubergine text-xs">R</span>
-            </div>
-            <span className="font-display font-bold text-aubergine text-sm">Rameelo</span>
-          </Link>
+          <Logo variant="red" height={22} />
           <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Group Order · {groupId}</span>
         </div>
       </div>

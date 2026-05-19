@@ -4,6 +4,7 @@ import { useState, useEffect, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import Logo from "@/components/Logo";
 import {
   GROUP_TIERS,
   discountForTarget,
@@ -221,12 +222,7 @@ function CreateGroupInner() {
       {/* Top bar */}
       <div className="bg-white border-b border-ivory-200">
         <div className="max-w-xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#F5A623" }}>
-              <span className="font-display font-bold text-aubergine text-sm">R</span>
-            </div>
-            <span className="font-display font-bold text-aubergine">Rameelo</span>
-          </Link>
+          <Logo variant="red" height={24} />
           <div className="flex items-center gap-1.5">
             {[1, 2, 3].map(s => (
               <div key={s} className="flex items-center gap-1.5">

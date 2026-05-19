@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import EventDetailClient from "./EventDetailClient";
+import { eventSchema, breadcrumbSchema, ld } from "@/lib/jsonld";
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -37,12 +38,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title,
     description,
+    alternates: { canonical: `https://rameelo.com/events/${id}` },
     openGraph: {
       title: event.title,
       description,
       images,
       type: "website",
       siteName: "Rameelo",
+      url: `https://rameelo.com/events/${id}`,
     },
     twitter: {
       card: event.cover_image_url ? "summary_large_image" : "summary",
@@ -55,5 +58,48 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function EventDetailPage({ params }: Props) {
   const { id } = await params;
-  return <EventDetailClient id={id} />;
+  const supabase = await createClient();
+  const { data: event } = await supabase
+    .from("events")
+    .select("title, description, category, start_date, city, state, venue_name, venue_address, cover_image_url, artist:artists!events_artist_id_fkey(name), ticket_tiers(price)")
+    .eq("id", id)
+    .eq("status", "published")
+    .single();
+
+  const artistRaw = event?.artist as { name: string } | { name: string }[] | null | undefined;
+  const artistName = artistRaw ? (Array.isArray(artistRaw) ? artistRaw[0]?.name : artistRaw.name) : undefined;
+  const prices = ((event?.ticket_tiers ?? []) as { price: number }[]).map(t => t.price).filter(p => p > 0);
+
+  const evSchema = event
+    ? eventSchema({
+        id,
+        name: event.title,
+        description: event.description ?? `${event.category} event at ${event.venue_name}, ${event.city}`,
+        startDate: event.start_date,
+        city: event.city,
+        state: event.state,
+        venueName: event.venue_name,
+        venueAddress: event.venue_address ?? undefined,
+        performerName: artistName,
+        imageUrl: event.cover_image_url ?? undefined,
+        lowestPrice: prices.length > 0 ? Math.min(...prices) : 0,
+        highestPrice: prices.length > 0 ? Math.max(...prices) : undefined,
+      })
+    : null;
+
+  const crumbs = breadcrumbSchema([
+    { name: "Home", url: "https://rameelo.com" },
+    { name: "Events", url: "https://rameelo.com/events" },
+    { name: event?.title ?? "Event", url: `https://rameelo.com/events/${id}` },
+  ]);
+
+  return (
+    <>
+      {evSchema && (
+        <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(evSchema) }} />
+      )}
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(crumbs) }} />
+      <EventDetailClient id={id} />
+    </>
+  );
 }

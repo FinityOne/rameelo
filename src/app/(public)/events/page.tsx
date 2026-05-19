@@ -241,6 +241,15 @@ export default function EventsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Read hero search params (?city=Atlanta&vibe=Garba) on first mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const cityParam = params.get("city");
+    const vibeParam = params.get("vibe");
+    if (cityParam) setActiveCity(cityParam);
+    if (vibeParam && vibeParam !== "All") setActiveCategory(vibeParam);
+  }, []); // eslint-disable-line
+
   // IP-based geolocation — no permission dialog needed
   useEffect(() => {
     fetch('https://ipapi.co/json/')

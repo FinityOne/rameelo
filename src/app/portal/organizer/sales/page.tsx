@@ -353,14 +353,14 @@ function RevenueBreakdown({ events }: { events: EventStat[] }) {
   const totalEarned = events.reduce((s, e) => s + e.earnedRevenue, 0);
   const totalMax = events.reduce((s, e) => s + e.maxRevenue, 0);
   const totalRemaining = totalMax - totalEarned;
-  const platformFee = Math.round(totalEarned * 0.05);
+  const platformFee = Math.round(totalEarned * 0.03);
   const payoutEstimate = totalEarned - platformFee;
 
   if (totalMax === 0) return null;
 
   const sections = [
     { label: "Gross revenue", value: totalEarned, color: "#0E8C7A", sub: "tickets sold × face value" },
-    { label: "Platform fee (5%)", value: -platformFee, color: "#7C1F2C", sub: "Rameelo service fee" },
+    { label: "Platform fee (3%)", value: -platformFee, color: "#7C1F2C", sub: "Rameelo service fee" },
     { label: "Est. payout", value: payoutEstimate, color: "#2E1B30", sub: "your take-home", bold: true },
     { label: "Remaining potential", value: totalRemaining, color: "#D4891B", sub: "if remaining seats fill" },
   ];
@@ -400,7 +400,7 @@ function RevenueBreakdown({ events }: { events: EventStat[] }) {
               <p className="font-mono text-[9px] text-ink-muted">if all remaining seats sell + fees</p>
             </div>
             <p className="font-display font-bold text-aubergine text-xl" style={{ letterSpacing: "-0.03em" }}>
-              {fmtCurrency(Math.round(totalMax * 0.95))}
+              {fmtCurrency(Math.round(totalMax * 0.97))}
             </p>
           </div>
         </div>

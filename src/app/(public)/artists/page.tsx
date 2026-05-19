@@ -1,5 +1,28 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { breadcrumbSchema, ld } from "@/lib/jsonld";
+
+export const metadata: Metadata = {
+  title: "Garba & Navratri Artists — Performers on Rameelo",
+  description: "Discover garba, dandiya, and Navratri performers across the USA. Browse artist profiles, see upcoming events, and buy tickets to see your favourite raas garba artists live on Rameelo.",
+  keywords: ["garba artists usa", "navratri performers", "raas garba singer", "dandiya artist", "garba musician america", "navratri entertainment"],
+  alternates: { canonical: "https://rameelo.com/artists" },
+  openGraph: {
+    title: "Garba & Navratri Artists — Rameelo",
+    description: "Discover garba, dandiya, and Navratri performers across the USA. Browse profiles and buy tickets.",
+    type: "website",
+    url: "https://rameelo.com/artists",
+    siteName: "Rameelo",
+    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Garba Artists on Rameelo" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Garba & Navratri Artists — Rameelo",
+    description: "Discover garba, dandiya, and Navratri performers across the USA.",
+    images: ["https://rameelo.com/og-default.jpg"],
+  },
+};
 
 type Artist = {
   id: string;
@@ -60,8 +83,14 @@ export default async function ArtistsPage() {
 
   const featuredCount = artists.filter((a) => a.is_featured).length;
 
+  const crumbs = breadcrumbSchema([
+    { name: "Home", url: "https://rameelo.com" },
+    { name: "Artists", url: "https://rameelo.com/artists" },
+  ]);
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FCF9F2" }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(crumbs) }} />
       {/* Hero */}
       <section className="relative overflow-hidden py-20 sm:py-28">
         <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #2E1B30 0%, #4a1040 40%, #7C1F2C 100%)" }} />

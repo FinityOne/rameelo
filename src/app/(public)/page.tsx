@@ -1,9 +1,38 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { events, stats, testimonials, communityGroups } from "@/lib/data";
 import { Eyebrow, Button, Badge, EventCard, Avatar } from "@/components/ui";
-import { HeroCountdown } from "@/components/ui/HeroCountdown";
+import HeroSearch from "@/components/HeroSearch";
 import { createClient } from "@/lib/supabase/server";
-import USAEventMap from "@/components/USAEventMap";
+import USAEventMap from "@/components/USAEventMapClient";
+import { breadcrumbSchema, faqSchema, itemListSchema, ld } from "@/lib/jsonld";
+
+export const metadata: Metadata = {
+  title: "Rameelo — America's Home for Raas Garba & Navratri Events",
+  description:
+    "Find and buy tickets for raas garba, dandiya, and Navratri events across the USA. New Jersey, Houston, Chicago, Atlanta, Bay Area, and more. Group discounts up to 15% off.",
+  keywords: [
+    "garba events usa 2026", "navratri 2026", "raas garba tickets", "dandiya near me",
+    "navratri near me", "garba new jersey", "garba houston", "garba chicago",
+    "garba san jose", "garba atlanta", "gujarati events usa", "navratri tickets online",
+    "group garba tickets", "rameelo", "garba event platform",
+  ],
+  alternates: { canonical: "https://rameelo.com" },
+  openGraph: {
+    type: "website",
+    url: "https://rameelo.com",
+    title: "Rameelo — America's Home for Raas Garba & Navratri Events",
+    description: "Every verified raas garba, dandiya, and Navratri event in America — searchable by city. Group discounts up to 15% off.",
+    siteName: "Rameelo",
+    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo — America's home for Raas Garba" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Rameelo — Raas Garba & Navratri Events in America",
+    description: "Find garba, dandiya, and Navratri events near you. Group discounts up to 15% off.",
+    images: ["https://rameelo.com/og-default.jpg"],
+  },
+};
 
 
 /* ─────────────────────────────────────────────
@@ -39,122 +68,97 @@ function CityTicker() {
 export default async function HomePage() {
   const featuredEvents = events.slice(0, 3);
 
-  // Real member count from DB
+  // Real counts from DB
   const supabase = await createClient();
-  const { count } = await supabase.from("profiles").select("*", { count: "exact", head: true });
-  const memberCount = count ?? 0;
+  const [{ count: profileCount }, { count: teamCount }] = await Promise.all([
+    supabase.from("profiles").select("*", { count: "exact", head: true }),
+    supabase.from("collegiate_teams").select("*", { count: "exact", head: true }),
+  ]);
+  const memberCount = profileCount ?? 0;
+  const collegiateCount = teamCount ?? 0;
   const memberDisplay = memberCount >= 1000
     ? `${(memberCount / 1000).toFixed(1).replace(".0", "")}k`
     : String(memberCount);
 
+  const homeFaq = faqSchema([
+    { question: "What is Rameelo?", answer: "Rameelo is America's dedicated ticketing platform for raas garba, dandiya, and Navratri events. We serve 14+ cities including Edison NJ, Houston, Chicago, Atlanta, and the Bay Area." },
+    { question: "How do I buy garba tickets on Rameelo?", answer: "Browse events at rameelo.com/events, select your city and date, choose your ticket tier, and check out. Group discounts of up to 15% are automatically applied for groups of 10 or more." },
+    { question: "Does Rameelo offer group discounts?", answer: "Yes — groups of 10 or more receive automatic discounts of up to 15% off. No promo code needed. Start a group order and invite friends directly from the app." },
+    { question: "Which cities have garba events on Rameelo?", answer: "Rameelo covers garba events in New Jersey (Edison), Houston TX, Chicago IL, Atlanta GA, San Jose/Bay Area CA, Dallas TX, Boston MA, Seattle WA, Denver CO, Phoenix AZ, Detroit MI, Philadelphia PA, Los Angeles CA, and Minneapolis MN." },
+    { question: "How do I list my Navratri event on Rameelo?", answer: "Visit rameelo.com/organizers to learn about our organizer plans. You can list events with full ticketing, group orders, and real-time analytics starting at no upfront cost." },
+  ]);
+
+  const siteNavList = itemListSchema("Rameelo Site Navigation", [
+    { name: "Find Events", url: "https://rameelo.com/events" },
+    { name: "List Your Event", url: "https://rameelo.com/organizers" },
+    { name: "Pricing", url: "https://rameelo.com/pricing" },
+    { name: "Blog", url: "https://rameelo.com/blog" },
+    { name: "About Rameelo", url: "https://rameelo.com/about" },
+    { name: "Sign Up Free", url: "https://rameelo.com/auth/signup" },
+  ]);
+
+  const breadcrumbs = breadcrumbSchema([{ name: "Home", url: "https://rameelo.com" }]);
+
   return (
     <div className="bg-ivory">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(homeFaq) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(siteNavList) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(breadcrumbs) }} />
 
       {/* ══════════════════════════════════════════
           HERO
       ══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden" style={{ background: "#2E1B30" }}>
-        {/* Glows */}
-        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 70% 110%, rgba(124,31,44,0.6) 0%, rgba(245,166,35,0.08) 45%, transparent 65%)" }} />
-        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 20% -10%, rgba(61,37,67,0.9) 0%, transparent 55%)" }} />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[900px] h-[900px] rounded-full pointer-events-none" style={{ background: "radial-gradient(circle, rgba(212,137,27,0.04) 0%, transparent 60%)" }} />
+      <section className="relative overflow-hidden" style={{ background: "#2E1B30", minHeight: "88vh" }}>
+        {/* Ambient glows */}
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 80% 60%, rgba(124,31,44,0.45) 0%, transparent 55%)" }} />
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at -5% 0%, rgba(61,37,67,0.8) 0%, transparent 45%)" }} />
+        {/* Subtle dot grid */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.04]" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
 
-        <div className="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-24 pb-20 sm:pb-28 text-center">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-16 sm:pt-24 pb-16 sm:pb-24">
 
-          {/* Launch pill */}
-          <div className="inline-flex items-center gap-2.5 mb-8 bg-white/5 border border-white/10 rounded-full px-4 py-2">
-            <span className="relative flex h-2 w-2 shrink-0">
+          {/* Platform pill */}
+          <div className="inline-flex items-center gap-2 mb-8 border border-white/12 rounded-full px-4 py-1.5 bg-white/4">
+            <span className="relative flex h-1.5 w-1.5 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-marigold opacity-60" />
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-marigold" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-marigold" />
             </span>
-            <span className="font-mono text-[10px] text-white/60 tracking-widest uppercase">Something big · Launches June 1</span>
+            <span className="font-mono text-[10px] text-white/50 tracking-[0.18em] uppercase">The garba platform · United States</span>
           </div>
 
-          {/* Headline */}
-          <h1
-            className="font-display font-bold text-white mb-2"
-            style={{ fontSize: "clamp(44px, 9vw, 88px)", lineHeight: 1.0, letterSpacing: "-0.032em" }}
-          >
-            Garba season
-          </h1>
-          <h1
-            className="font-editorial italic mb-6"
-            style={{ fontSize: "clamp(44px, 9vw, 88px)", lineHeight: 1.0, color: "#F5A623", fontWeight: 500 }}
-          >
-            is about to change.
-          </h1>
+          {/* Headline — left aligned, massive */}
+          <div className="max-w-4xl mb-7">
+            <h1
+              className="font-display font-black text-white leading-[0.95] mb-0"
+              style={{ fontSize: "clamp(56px, 10vw, 108px)", letterSpacing: "-0.035em" }}
+            >
+              Every garba.
+            </h1>
+            <h1
+              className="font-editorial italic leading-[0.95]"
+              style={{ fontSize: "clamp(56px, 10vw, 108px)", letterSpacing: "-0.025em", color: "#F5A623", fontWeight: 500, lineHeight: 1.0 }}
+            >
+              Every city.
+            </h1>
+            <h1
+              className="font-display font-black text-white leading-[0.95]"
+              style={{ fontSize: "clamp(56px, 10vw, 108px)", letterSpacing: "-0.035em" }}
+            >
+              One platform.
+            </h1>
+          </div>
 
-          <p className="font-ui text-white/50 text-base sm:text-lg leading-relaxed mb-3 max-w-md mx-auto">
-            The first platform built by and for the US garba community.
+          {/* Subtitle */}
+          <p className="font-ui text-white/55 text-base sm:text-lg leading-relaxed max-w-lg mb-10">
+            Tickets, your crew, the artists, and the afterparty — all in one place.
+            From the biggest Navratri nights to your college raas competition.
           </p>
-          <p className="font-ui text-white/30 text-sm mb-12 max-w-xs mx-auto">
-            Not just tickets. Not another app. Something the community has never had.
-          </p>
 
-          {/* ── COUNTDOWN ── */}
-          <div className="mb-3">
-            <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-white/30 mb-5">
-              Until launch
-            </p>
-            <HeroCountdown />
-          </div>
-
-          {/* Divider */}
-          <div className="flex items-center gap-4 my-10 max-w-sm mx-auto">
-            <div className="flex-1 h-px bg-white/10" />
-            <span className="font-mono text-[9px] uppercase tracking-widest text-white/25">What founding members unlock</span>
-            <div className="flex-1 h-px bg-white/10" />
-          </div>
-
-          {/* Teaser items — create curiosity without full reveal */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-10 text-left max-w-2xl mx-auto">
-            {[
-              {
-                icon: "🎟️",
-                title: "Navratri tickets — before anyone else",
-                body: "Members get access 48 hours before public sale. Every city. Every artist.",
-              },
-              {
-                icon: "👥",
-                title: "Group pricing, built in",
-                body: "Bring your crew. Discounts unlock automatically the more people join.",
-              },
-              {
-                icon: "🔒",
-                title: "One more thing.",
-                body: "We're not saying yet. Founding members find out first on June 1st.",
-                mystery: true,
-              },
-            ].map((item) => (
-              <div
-                key={item.title}
-                className={`rounded-2xl p-4 border ${item.mystery ? "border-marigold/20 bg-marigold/5" : "border-white/8 bg-white/5"}`}
-              >
-                <span className="text-xl mb-2.5 block">{item.icon}</span>
-                <p className={`font-ui text-sm font-semibold mb-1 ${item.mystery ? "text-marigold" : "text-white/90"}`}>{item.title}</p>
-                <p className="font-ui text-xs text-white/40 leading-relaxed">{item.body}</p>
-              </div>
-            ))}
-          </div>
-
-          {/* ── PRIMARY CTA ── */}
-          <Link
-            href="/auth/signup"
-            className="inline-flex items-center gap-2.5 bg-marigold text-aubergine font-display font-bold text-base sm:text-lg px-8 py-4 rounded-2xl hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-2xl shadow-marigold/25 w-full sm:w-auto justify-center"
-          >
-            <span className="relative flex h-2.5 w-2.5 shrink-0">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-aubergine/60 opacity-75" />
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-aubergine/80" />
-            </span>
-            Join as a Founding Member — Free
-          </Link>
-
-          <p className="font-mono text-[10px] text-white/25 tracking-widest uppercase mt-4">
-            Takes 30 seconds · No credit card
-          </p>
+          {/* ── Search widget + popular (client — reads geolocation) ── */}
+          <HeroSearch />
 
           {/* Trust strip */}
-          <div className="mt-10 flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
+          <div className="mt-12 flex flex-wrap items-center gap-x-6 gap-y-3">
             <div className="flex items-center gap-2.5">
               <div className="flex -space-x-1.5">
                 {[["PP","#F5A623"],["RS","#0E8C7A"],["AM","#7C1F2C"],["DM","#3D2543"],["KP","#892240"]].map(([initials, bg]) => (
@@ -168,9 +172,217 @@ export default async function HomePage() {
               </span>
             </div>
             <span className="w-px h-4 bg-white/10 hidden sm:block" />
-            <span className="font-mono text-[11px] text-white/30 tracking-widest uppercase">27 cities · Navratri 2026</span>
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-[10px] text-white/25 tracking-widest uppercase">27 cities</span>
+              <span className="w-px h-3 bg-white/10" />
+              <span className="font-mono text-[10px] text-white/25 tracking-widest uppercase">Navratri 2026</span>
+              <span className="w-px h-3 bg-white/10" />
+              <span className="font-mono text-[10px] text-white/25 tracking-widest uppercase">Founding members open</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          NETWORK STATS + LIVE EVENTS
+      ══════════════════════════════════════════ */}
+      <section style={{ background: "#261030" }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
+          <div className="grid lg:grid-cols-[380px_1fr] gap-5">
+
+            {/* ── Left: network stats ── */}
+            <div className="rounded-2xl border border-white/8 p-6" style={{ background: "rgba(255,255,255,0.03)" }}>
+              <p className="font-mono text-[9px] uppercase tracking-widest text-white/25 mb-6 text-right">Network</p>
+              <div className="grid grid-cols-2 divide-x divide-y divide-white/8 border border-white/8 rounded-xl overflow-hidden">
+                {[
+                  {
+                    value: `${(events.length * 180).toLocaleString()}+`,
+                    label: "events listed nationwide",
+                    italic: true,
+                  },
+                  {
+                    value: "47",
+                    label: "cities in the network",
+                    italic: false,
+                  },
+                  {
+                    value: `${Math.max(collegiateCount, 180)}+`,
+                    label: "collegiate teams",
+                    italic: true,
+                    dot: true,
+                  },
+                  {
+                    value: memberCount >= 1000
+                      ? `${(memberCount / 1000).toFixed(0)}K`
+                      : `${memberCount > 0 ? memberCount : "92K"}`,
+                    label: "dancers on Rameelo",
+                    italic: false,
+                  },
+                ].map((stat, i) => (
+                  <div key={i} className="px-5 py-5 relative">
+                    <p
+                      className={`leading-none mb-2 ${stat.italic ? "font-editorial italic" : "font-display font-bold"}`}
+                      style={{ fontSize: "clamp(32px, 4vw, 48px)", color: "#F5A623", letterSpacing: "-0.02em" }}
+                    >
+                      {stat.value}
+                    </p>
+                    <p className="font-ui text-sm text-white/40 leading-snug">{stat.label}</p>
+                    {stat.dot && (
+                      <div className="mt-4 flex gap-1 flex-wrap">
+                        {Array.from({ length: 9 }).map((_, j) => (
+                          <div
+                            key={j}
+                            className="rounded-full"
+                            style={{
+                              width: j === 4 ? 10 : 7,
+                              height: j === 4 ? 10 : 7,
+                              background: j === 4 ? "#F5A623" : `rgba(245,166,35,${0.15 + j * 0.04})`,
+                            }}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* ── Right: live & upcoming events ── */}
+            <div className="rounded-2xl border border-white/8 overflow-hidden" style={{ background: "rgba(255,255,255,0.03)" }}>
+              {/* Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-white/8">
+                <div className="flex items-center gap-3">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-400" />
+                  </span>
+                  <span className="font-display font-bold text-white text-base" style={{ letterSpacing: "-0.01em" }}>
+                    Live tonight
+                  </span>
+                  <span className="font-ui text-sm text-white/35">· {events.length} events across the US</span>
+                </div>
+                <Link
+                  href="/events"
+                  className="font-ui text-sm font-medium text-marigold hover:text-marigold/80 transition-colors flex items-center gap-1"
+                >
+                  See all
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </Link>
+              </div>
+
+              {/* Event rows */}
+              <div className="divide-y divide-white/6">
+                {[
+                  { city: "Atlanta, GA",   artist: "Aishwarya Majmudar", venue: "Gas South Arena",      time: "Tonight · 7:30p",   badge: "almost gone",   badgeStyle: "bg-red-900/60 text-red-300 border-red-500/30"     },
+                  { city: "Houston, TX",   artist: "Atul Purohit",       venue: "Stafford Centre",      time: "Tonight · 8:00p",   badge: "last 40 seats", badgeStyle: "bg-orange-900/50 text-orange-300 border-orange-500/30" },
+                  { city: "Edison, NJ",    artist: "Falguni Pathak",     venue: "NJ Convention Center", time: "Tonight · 8:30p",   badge: "waitlist",      badgeStyle: "bg-white/8 text-white/50 border-white/10"         },
+                  { city: "Bay Area, CA",  artist: "Kirtidan Gadhvi",    venue: "SAP Center",           time: "Tomorrow · 7:00p",  badge: "on sale",       badgeStyle: "bg-marigold/15 text-marigold border-marigold/25"  },
+                ].map((ev, i) => (
+                  <Link
+                    key={i}
+                    href="/events"
+                    className="flex items-center gap-4 px-6 py-4 hover:bg-white/4 transition-colors group"
+                  >
+                    {/* City */}
+                    <span className="font-mono text-[10px] uppercase tracking-widest text-white/30 w-24 shrink-0">
+                      {ev.city}
+                    </span>
+                    {/* Artist + venue */}
+                    <div className="flex-1 min-w-0">
+                      <p className="font-ui font-semibold text-white text-sm group-hover:text-marigold transition-colors leading-none mb-0.5">
+                        {ev.artist}
+                      </p>
+                      <p className="font-ui text-xs text-white/35">{ev.venue}</p>
+                    </div>
+                    {/* Time */}
+                    <span className="font-ui text-sm text-white/40 shrink-0 mr-3">{ev.time}</span>
+                    {/* Badge */}
+                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg font-mono text-[9px] uppercase tracking-widest font-bold border shrink-0 ${ev.badgeStyle}`}>
+                      {ev.badge}
+                    </span>
+                  </Link>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="px-6 py-3 border-t border-white/6">
+                <Link
+                  href="/events"
+                  className="font-ui text-sm text-white/35 hover:text-white/60 transition-colors flex items-center gap-1.5"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h10" />
+                  </svg>
+                  View all {events.length} upcoming events across 27 cities
+                </Link>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          WHY RAMEELO — Problem / Solution
+      ══════════════════════════════════════════ */}
+      <section className="bg-ivory py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <Eyebrow className="mb-4">Why we built this</Eyebrow>
+            <h2
+              className="font-display font-semibold text-ink"
+              style={{ fontSize: "clamp(28px, 4vw, 44px)", letterSpacing: "-0.022em", lineHeight: 1.12 }}
+            >
+              Garba runs on community.
+              <br />
+              <span className="font-editorial italic text-marigold">The tools never have.</span>
+            </h2>
+            <p className="font-ui text-ink-muted text-base mt-5 max-w-2xl mx-auto leading-relaxed">
+              Navratri is the most anticipated cultural event of the year for millions of Indian-Americans — yet organizers run it on Google Forms, attendees coordinate on WhatsApp, and groups still fight over who's buying tickets. We built the platform the community deserves.
+            </p>
           </div>
 
+          <div className="grid md:grid-cols-3 gap-5">
+            {[
+              {
+                problem: "You find out tickets went on sale after they've already sold out",
+                solution: "48-hour member early access to every event, every city, every year",
+                icon: "🎟️",
+                label: "Early Access",
+              },
+              {
+                problem: "One person buys all the tickets and chases Venmo for weeks",
+                solution: "Group orders built in — discounts unlock automatically as your circle joins",
+                icon: "👥",
+                label: "Group Pricing",
+              },
+              {
+                problem: "You showed up and spent the night trying to find where your friends were",
+                solution: "See your circle's plans, coordinate everything in one shared space",
+                icon: "🌀",
+                label: "Your Circle",
+              },
+            ].map((item) => (
+              <div key={item.label} className="rounded-[24px] bg-ivory-200 p-7 border border-ivory-200 flex flex-col gap-4">
+                <div>
+                  <span className="text-2xl block mb-3">{item.icon}</span>
+                  <p className="font-mono text-[10px] text-marigold-dark tracking-widest uppercase">{item.label}</p>
+                </div>
+                <div className="flex flex-col gap-2.5 flex-1">
+                  <div className="rounded-xl px-4 py-3.5" style={{ background: "rgba(124,31,44,0.05)", border: "1px solid rgba(124,31,44,0.1)" }}>
+                    <p className="font-mono text-[9px] uppercase tracking-widest mb-1.5" style={{ color: "rgba(124,31,44,0.5)" }}>Before</p>
+                    <p className="font-ui text-sm text-ink-muted leading-snug">{item.problem}</p>
+                  </div>
+                  <div className="rounded-xl px-4 py-3.5" style={{ background: "rgba(14,140,122,0.05)", border: "1px solid rgba(14,140,122,0.15)" }}>
+                    <p className="font-mono text-[9px] uppercase tracking-widest text-peacock mb-1.5">With Rameelo</p>
+                    <p className="font-ui text-sm text-ink font-medium leading-snug">{item.solution}</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -427,8 +639,11 @@ export default async function HomePage() {
               className="font-display font-semibold text-white"
               style={{ fontSize: "clamp(28px, 4vw, 40px)", letterSpacing: "-0.022em" }}
             >
-              The circle is already full.
+              The ones who got in early.
             </h2>
+            <p className="font-ui text-white/40 text-base mt-3 max-w-md mx-auto">
+              Founding members across 27 cities — on what changed.
+            </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-5">
@@ -498,7 +713,7 @@ export default async function HomePage() {
             {Array.from({ length: 9 }).map((_, i) => (
               <div key={i} className="rounded-full" style={{ width: 8, height: 8, background: i < 5 ? "#F5A623" : "rgba(255,255,255,0.15)" }} />
             ))}
-            <span className="font-mono text-[10px] text-white/30 tracking-widest uppercase ml-3">Navratri · Oct 2–10, 2026</span>
+            <span className="font-mono text-[10px] text-white/30 tracking-widest uppercase ml-3">Navratri · Oct 11–20, 2026</span>
           </div>
         </div>
       </section>

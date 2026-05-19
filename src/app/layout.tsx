@@ -51,6 +51,15 @@ export const metadata: Metadata = {
   authors: [{ name: "Rameelo", url: "https://rameelo.com" }],
   creator: "Rameelo",
   publisher: "Rameelo",
+  icons: {
+    icon: [
+      { url: "/logo/rameelo-icon-goldred.png", type: "image/png" },
+    ],
+    apple: [
+      { url: "/logo/rameelo-icon-goldred.png", type: "image/png" },
+    ],
+    shortcut: "/logo/rameelo-icon-goldred.png",
+  },
   openGraph: {
     type: "website",
     siteName: "Rameelo",
@@ -84,21 +93,54 @@ const JSON_LD_ORG = {
       "@id": "https://rameelo.com/#organization",
       name: "Rameelo",
       url: "https://rameelo.com",
+      logo: {
+        "@type": "ImageObject",
+        url: "https://rameelo.com/og-default.jpg",
+        width: 1200,
+        height: 630,
+      },
       description: "America's dedicated ticketing platform for raas garba, dandiya, and Navratri events.",
       foundingDate: "2024",
       areaServed: "US",
       knowsAbout: ["Raas Garba", "Dandiya Raas", "Navratri", "Gujarati Culture", "South Asian Events"],
-      sameAs: ["https://instagram.com/rameelo", "https://twitter.com/rameelo"],
+      contactPoint: {
+        "@type": "ContactPoint",
+        contactType: "customer support",
+        url: "https://rameelo.com/about",
+        availableLanguage: "English",
+      },
+      sameAs: [
+        "https://instagram.com/rameelo",
+        "https://twitter.com/rameelo",
+      ],
     },
     {
       "@type": "WebSite",
       "@id": "https://rameelo.com/#website",
       url: "https://rameelo.com",
       name: "Rameelo",
+      description: "America's home for raas garba, dandiya, and Navratri events — find tickets, organize events, and join the community.",
       publisher: { "@id": "https://rameelo.com/#organization" },
+      potentialAction: [
+        {
+          "@type": "SearchAction",
+          target: {
+            "@type": "EntryPoint",
+            urlTemplate: "https://rameelo.com/events?q={search_term_string}",
+          },
+          "query-input": "required name=search_term_string",
+        },
+      ],
+    },
+    {
+      "@type": "SiteLinksSearchBox",
+      url: "https://rameelo.com",
       potentialAction: {
         "@type": "SearchAction",
-        target: { "@type": "EntryPoint", urlTemplate: "https://rameelo.com/events?q={search_term_string}" },
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: "https://rameelo.com/events?q={search_term_string}",
+        },
         "query-input": "required name=search_term_string",
       },
     },

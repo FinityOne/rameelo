@@ -6,6 +6,16 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/portal/organizer/events/create/types";
 
+type InterestSubmission = {
+  id: string;
+  name: string;
+  email: string;
+  phone: string | null;
+  city: string | null;
+  qty_interested: number;
+  created_at: string;
+};
+
 type TicketTier = {
   id: string;
   name: string;
@@ -49,6 +59,7 @@ type EventFull = {
   age_restriction: string;
   capacity: number | null;
   status: string;
+  selling_on_rameelo: boolean;
   review_note: string | null;
   reviewed_at: string | null;
   created_at: string;
@@ -113,6 +124,8 @@ export default function AdminEventReviewPage() {
   const [acting, setActing]   = useState(false);
   const [modal, setModal]     = useState<DecisionModal | null>(null);
   const [done, setDone]       = useState<'approved' | 'rejected' | null>(null);
+  const [togglingRameelo, setTogglingRameelo] = useState(false);
+  const [interests, setInterests] = useState<InterestSubmission[]>([]);
 
   useEffect(() => {
     async function load() {
@@ -126,7 +139,7 @@ export default function AdminEventReviewPage() {
           parking, parking_notes, website_url,
           cover_image_url, cover_gradient,
           dress_code, dress_code_details, dandiya_sticks, age_restriction,
-          capacity, status, review_note, reviewed_at, created_at,
+          capacity, status, selling_on_rameelo, review_note, reviewed_at, created_at,
           ticket_tiers (id, name, price, quantity, description, sale_start_date, sale_end_date, group_discount_min_qty, group_discount_type, group_discount_value),
           organizer:profiles!events_organizer_id_fkey (first_name, last_name, email, phone, city, state)
         `)
@@ -135,6 +148,14 @@ export default function AdminEventReviewPage() {
 
       if (!data) { router.replace('/portal/admin/events'); return; }
       setEvent(data as unknown as EventFull);
+
+      const { data: interestData } = await supabase
+        .from('event_interests')
+        .select('id, name, email, phone, city, qty_interested, created_at')
+        .eq('event_id', id)
+        .order('created_at', { ascending: false });
+      setInterests((interestData ?? []) as InterestSubmission[]);
+
       setLoading(false);
     }
     load();
@@ -183,6 +204,16 @@ export default function AdminEventReviewPage() {
     setModal(null);
     setActing(false);
     setEvent(prev => prev ? { ...prev, status: 'draft', review_note: modal.note.trim() || null } : prev);
+  }
+
+  async function toggleSellingOnRameelo() {
+    if (!event) return;
+    setTogglingRameelo(true);
+    const supabase = createClient();
+    const next = !event.selling_on_rameelo;
+    await supabase.from('events').update({ selling_on_rameelo: next }).eq('id', id);
+    setEvent(prev => prev ? { ...prev, selling_on_rameelo: next } : prev);
+    setTogglingRameelo(false);
   }
 
   if (loading) {
@@ -314,6 +345,36 @@ export default function AdminEventReviewPage() {
         </div>
       )}
 
+      {/* Ticketing mode toggle — only for published events */}
+      {isPublished && !done && (
+        <div className="rounded-2xl border border-ivory-200 bg-white p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${event.selling_on_rameelo ? 'bg-peacock/10' : 'bg-marigold/10'}`}>
+                {event.selling_on_rameelo ? '🎟️' : '👀'}
+              </div>
+              <div>
+                <p className="font-display font-bold text-ink text-sm" style={{ letterSpacing: '-0.01em' }}>
+                  {event.selling_on_rameelo ? 'Selling tickets on Rameelo' : 'Interest collection only'}
+                </p>
+                <p className="font-ui text-xs text-ink-muted mt-0.5">
+                  {event.selling_on_rameelo
+                    ? 'Attendees can purchase tickets directly. Toggle off if the organizer hasn\'t joined yet.'
+                    : 'Event is visible but shows an interest form instead of ticket purchase. Flip on when the organizer is ready.'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={toggleSellingOnRameelo}
+              disabled={togglingRameelo}
+              className={`relative shrink-0 w-12 h-6 rounded-full transition-all duration-200 ${event.selling_on_rameelo ? 'bg-peacock' : 'bg-ivory-200'} ${togglingRameelo ? 'opacity-50' : ''}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200 ${event.selling_on_rameelo ? 'translate-x-6' : 'translate-x-0'}`} />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Rejection note display */}
       {event.review_note && event.status === 'rejected' && (
         <div className="rounded-2xl bg-durga/8 border border-durga/20 px-5 py-4">
@@ -437,6 +498,98 @@ export default function AdminEventReviewPage() {
           </div>
         )}
       </div>
+
+      {/* Interest form submissions */}
+      {(interests.length > 0 || !event.selling_on_rameelo) && (
+        <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+          <div className="px-5 py-3.5 bg-ivory border-b border-ivory-200 flex items-center justify-between">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Interest Form Submissions</p>
+            {interests.length > 0 && (
+              <div className="flex items-center gap-4">
+                <span className="font-mono text-[10px] text-ink-muted">
+                  {interests.length} submission{interests.length !== 1 ? 's' : ''}
+                </span>
+                <span className="font-mono text-[10px] font-bold text-aubergine">
+                  {interests.reduce((s, i) => s + i.qty_interested, 0).toLocaleString()} tickets wanted
+                </span>
+              </div>
+            )}
+          </div>
+
+          {interests.length === 0 ? (
+            <div className="px-5 py-8 text-center">
+              <p className="text-2xl mb-2">📬</p>
+              <p className="font-ui text-sm text-ink-muted">No interest submissions yet.</p>
+              <p className="font-ui text-xs text-ink-muted/60 mt-1">Submissions will appear here once attendees fill out the interest form.</p>
+            </div>
+          ) : (
+            <>
+              {/* Summary stats */}
+              <div className="px-5 py-3.5 grid grid-cols-3 gap-4 border-b border-ivory-200 bg-ivory/50">
+                <div>
+                  <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Total submissions</p>
+                  <p className="font-display font-bold text-ink text-xl mt-0.5" style={{ letterSpacing: '-0.02em' }}>
+                    {interests.length}
+                  </p>
+                </div>
+                <div>
+                  <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Tickets wanted</p>
+                  <p className="font-display font-bold text-aubergine text-xl mt-0.5" style={{ letterSpacing: '-0.02em' }}>
+                    {interests.reduce((s, i) => s + i.qty_interested, 0).toLocaleString()}
+                  </p>
+                </div>
+                <div>
+                  <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Avg. per person</p>
+                  <p className="font-display font-bold text-ink text-xl mt-0.5" style={{ letterSpacing: '-0.02em' }}>
+                    {(interests.reduce((s, i) => s + i.qty_interested, 0) / interests.length).toFixed(1)}
+                  </p>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-ivory-200">
+                      <th className="px-5 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal">Name</th>
+                      <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal">Email</th>
+                      <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal hidden sm:table-cell">Phone</th>
+                      <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal hidden sm:table-cell">City</th>
+                      <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal text-right">Tickets</th>
+                      <th className="px-5 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal hidden md:table-cell">Submitted</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-ivory-200">
+                    {interests.map(row => (
+                      <tr key={row.id} className="hover:bg-ivory/50 transition-colors">
+                        <td className="px-5 py-3 font-ui text-sm text-ink font-medium">{row.name}</td>
+                        <td className="px-3 py-3 font-ui text-xs text-ink-muted">{row.email}</td>
+                        <td className="px-3 py-3 font-ui text-xs text-ink-muted hidden sm:table-cell">{row.phone ?? '—'}</td>
+                        <td className="px-3 py-3 font-ui text-xs text-ink-muted hidden sm:table-cell">{row.city ?? '—'}</td>
+                        <td className="px-3 py-3 text-right">
+                          <span className="font-mono text-sm font-bold text-aubergine">{row.qty_interested}</span>
+                        </td>
+                        <td className="px-5 py-3 font-mono text-[10px] text-ink-muted hidden md:table-cell">{fmtTS(row.created_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr className="border-t-2 border-ivory-200 bg-ivory">
+                      <td colSpan={4} className="px-5 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted">Total</td>
+                      <td className="px-3 py-3 text-right">
+                        <span className="font-mono text-sm font-bold text-aubergine">
+                          {interests.reduce((s, i) => s + i.qty_interested, 0)}
+                        </span>
+                      </td>
+                      <td className="hidden md:table-cell" />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Decision modal */}
       {modal && (

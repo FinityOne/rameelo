@@ -1,15 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Eyebrow, Button, Badge, Avatar } from "@/components/ui";
+import { faqSchema, webPageSchema, ld } from "@/lib/jsonld";
 
 export const metadata: Metadata = {
   title: "Garba Event Organizers — List Your Navratri Event on Rameelo",
   description: "Rameelo is the dedicated ticketing platform for raas garba and Navratri events in the USA. Group discounts, real-time analytics, ticket transfers, and a community that actually shows up. Built for garba organizers.",
-  keywords: ["garba event organizer", "navratri ticketing platform", "sell garba tickets online", "raas garba events usa", "navratri event management"],
+  keywords: ["garba event organizer", "navratri ticketing platform", "sell garba tickets online", "raas garba events usa", "navratri event management", "garba ticket platform", "list garba event"],
+  alternates: { canonical: "https://rameelo.com/organizers" },
   openGraph: {
     title: "Garba Event Organizers — List Your Navratri Event on Rameelo",
     description: "The dedicated ticketing platform for raas garba and Navratri events. Group discounts, analytics, and a community built for garba.",
     type: "website",
+    url: "https://rameelo.com/organizers",
+    siteName: "Rameelo",
+    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "List your Garba Event on Rameelo" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Garba Event Organizers — List on Rameelo",
+    description: "The dedicated ticketing platform for garba and Navratri events. Group discounts, analytics, and community.",
+    images: ["https://rameelo.com/og-default.jpg"],
   },
 };
 
@@ -211,9 +222,29 @@ function XCircle({ className }: { className?: string }) {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+const organizerPage = webPageSchema({
+  name: "Garba Event Organizers — List Your Navratri Event on Rameelo",
+  url: "https://rameelo.com/organizers",
+  description: "Rameelo is the dedicated ticketing platform for raas garba and Navratri events in the USA.",
+  breadcrumbs: [
+    { name: "Home", url: "https://rameelo.com" },
+    { name: "For Organizers", url: "https://rameelo.com/organizers" },
+  ],
+});
+
+const organizerFaq = faqSchema([
+  { question: "How do I list a garba event on Rameelo?", answer: "Sign up as an organizer at rameelo.com/organizers, create your event with ticket tiers, and publish. Your event goes live instantly and appears on our events page." },
+  { question: "What fees does Rameelo charge organizers?", answer: "Rameelo's Starter plan charges 5% per ticket with no upfront cost. The Pro plan charges 2% plus payment processing. See rameelo.com/pricing for details." },
+  { question: "Does Rameelo support group ticket discounts?", answer: "Yes. Rameelo's group order system lets attendees form groups of 10+ and unlock automatic discounts of up to 15%. Organizers can customize the discount tiers." },
+  { question: "Can I track ticket sales in real time?", answer: "Yes. All Rameelo organizers get a real-time analytics dashboard with sales charts, attendee maps, group order breakdowns, and daily payout summaries." },
+  { question: "Does Rameelo handle ticket transfers?", answer: "Yes. Attendees can transfer tickets directly to other Rameelo members. Organizers control transfer permissions per event." },
+]);
+
 export default function OrganizersPage() {
   return (
     <div className="bg-ivory">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(organizerPage) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(organizerFaq) }} />
 
       {/* ══════════════════════════════════════════
           HERO

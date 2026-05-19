@@ -228,6 +228,9 @@ export async function saveOrder(params: {
   discountPct: number;
   discountAmount: number;
   serviceFee: number;
+  rameeloFee: number;
+  processingFee: number;
+  paymentMethod: "card" | "ach";
   grandTotal: number;
 }): Promise<{ orderId: string | null; error: string | null }> {
   const supabase = createClient();
@@ -247,6 +250,9 @@ export async function saveOrder(params: {
       discount_pct: params.discountPct,
       discount_amount: params.discountAmount,
       service_fee: params.serviceFee,
+      rameelo_fee: params.rameeloFee,
+      processing_fee: params.processingFee,
+      payment_method: params.paymentMethod,
       grand_total: params.grandTotal,
       status: "confirmed",
     })

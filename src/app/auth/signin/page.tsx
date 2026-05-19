@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Logo from "@/components/Logo";
 import { createClient } from "@/lib/supabase/client";
 import { createUser, saveUser } from "@/lib/auth";
 
@@ -55,12 +56,7 @@ export default function SignInPage() {
           className="absolute inset-0 opacity-20"
           style={{ backgroundImage: "radial-gradient(circle at 30% 70%, #F5A623 0%, transparent 60%), radial-gradient(circle at 80% 20%, #7C1F2C 0%, transparent 50%)" }}
         />
-        <Link href="/" className="relative flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#F5A623" }}>
-            <span className="font-display font-bold text-aubergine text-lg">R</span>
-          </div>
-          <span className="font-display font-bold text-white text-xl">Rameelo</span>
-        </Link>
+        <Logo variant="white" height={32} />
 
         <div className="relative space-y-6">
           <p className="font-mono text-[10px] uppercase tracking-widest text-marigold">Welcome back</p>
@@ -97,12 +93,9 @@ export default function SignInPage() {
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
           {/* Mobile logo */}
-          <Link href="/" className="lg:hidden flex items-center gap-2 mb-10">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#F5A623" }}>
-              <span className="font-display font-bold text-aubergine">R</span>
-            </div>
-            <span className="font-display font-bold text-white text-lg">Rameelo</span>
-          </Link>
+          <div className="lg:hidden mb-10">
+            <Logo variant="white" height={28} />
+          </div>
 
           <div className="mb-8">
             <h1 className="font-display font-bold text-white text-3xl mb-2">Sign in</h1>

@@ -1,15 +1,26 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { BLOG_ARTICLES, getFeaturedArticle, type BlogArticle } from "@/lib/blog";
+import { breadcrumbSchema, itemListSchema, ld } from "@/lib/jsonld";
 
 export const metadata: Metadata = {
   title: "Rameelo Blog — Raas Garba News, Guides & Community",
   description: "The authoritative source for Raas Garba in America. Event guides, culture explainers, city-by-city breakdowns, and Navratri tips — all in one place.",
-  keywords: ["garba blog", "navratri news", "raas garba usa", "dandiya events guide", "navratri 2025"],
+  keywords: ["garba blog", "navratri news 2026", "raas garba usa", "dandiya events guide", "navratri 2026", "garba culture", "navratri guide"],
+  alternates: { canonical: "https://rameelo.com/blog" },
   openGraph: {
     title: "Rameelo Blog — Raas Garba News, Guides & Community",
     description: "The authoritative source for Raas Garba in America. Event guides, culture explainers, city-by-city breakdowns, and Navratri tips.",
     type: "website",
+    url: "https://rameelo.com/blog",
+    siteName: "Rameelo",
+    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo Blog" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Rameelo Blog — Raas Garba News, Guides & Community",
+    description: "Event guides, culture explainers, and Navratri tips for the garba community.",
+    images: ["https://rameelo.com/og-default.jpg"],
   },
 };
 
@@ -86,8 +97,19 @@ export default function BlogPage() {
   const rest = BLOG_ARTICLES.filter(a => !a.featured).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
   const allCategories = [...new Set(BLOG_ARTICLES.map(a => a.category))];
 
+  const blogList = itemListSchema(
+    "Rameelo Blog Articles",
+    BLOG_ARTICLES.map(a => ({ name: a.title, url: `https://rameelo.com/blog/${a.slug}` }))
+  );
+  const crumbs = breadcrumbSchema([
+    { name: "Home", url: "https://rameelo.com" },
+    { name: "Blog", url: "https://rameelo.com/blog" },
+  ]);
+
   return (
     <div className="bg-ivory min-h-screen">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(blogList) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(crumbs) }} />
       {/* ── Masthead ── */}
       <div style={{ backgroundColor: "#2E1B30" }} className="border-b-4 border-marigold">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">

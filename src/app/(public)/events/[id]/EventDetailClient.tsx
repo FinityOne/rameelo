@@ -72,6 +72,7 @@ type Event = {
   dandiya_sticks: string;
   age_restriction: string;
   capacity: number | null;
+  selling_on_rameelo: boolean;
   artist: Artist | null;
   organization: Organization | null;
   ticket_tiers: Tier[];
@@ -480,6 +481,20 @@ export default function EventDetailClient({ id }: { id: string }) {
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
   const [qty, setQty] = useState(2);
 
+  // Navigate-away popup
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [pendingNav, setPendingNav] = useState<string | null>(null);
+
+  // Interest form (for non-Rameelo events)
+  const [interestName, setInterestName]           = useState("");
+  const [interestEmail, setInterestEmail]         = useState("");
+  const [interestPhone, setInterestPhone]         = useState("");
+  const [interestQty, setInterestQty]             = useState(2);
+  const [interestCity, setInterestCity]           = useState("");
+  const [interestSubmitting, setInterestSubmitting] = useState(false);
+  const [interestSubmitted, setInterestSubmitted] = useState(false);
+  const [interestError, setInterestError]         = useState("");
+
   useEffect(() => {
     if (!id) return;
     const supabase = createClient();
@@ -491,7 +506,7 @@ export default function EventDetailClient({ id }: { id: string }) {
         venue_name, address_line1, city, state, zip,
         parking, parking_notes, website_url,
         cover_image_url, cover_gradient,
-        dress_code, dress_code_details, dandiya_sticks, age_restriction, capacity,
+        dress_code, dress_code_details, dandiya_sticks, age_restriction, capacity, selling_on_rameelo,
         artist:artists!events_artist_id_fkey (
           id, name, tagline, bio, profile_image_url, genres
         ),
@@ -519,6 +534,43 @@ export default function EventDetailClient({ id }: { id: string }) {
       });
   }, [id]);
 
+  // Browser-level navigate-away warning
+  useEffect(() => {
+    if (!event) return;
+    const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
+    window.addEventListener("beforeunload", handler);
+    return () => window.removeEventListener("beforeunload", handler);
+  }, [event]);
+
+  function handleNavAway(href: string) {
+    setPendingNav(href);
+    setShowLeaveModal(true);
+  }
+
+  function confirmLeave() {
+    setShowLeaveModal(false);
+    if (pendingNav) router.push(pendingNav);
+  }
+
+  async function handleInterestSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!event) return;
+    setInterestSubmitting(true);
+    setInterestError("");
+    const supabase = createClient();
+    const { error } = await supabase.from("event_interests").insert({
+      event_id: event.id,
+      name: interestName.trim(),
+      email: interestEmail.trim(),
+      phone: interestPhone.trim() || null,
+      qty_interested: interestQty,
+      city: interestCity.trim() || null,
+    });
+    if (error) { setInterestError("Something went wrong. Please try again."); setInterestSubmitting(false); return; }
+    setInterestSubmitted(true);
+    setInterestSubmitting(false);
+  }
+
   const selectedTier = event?.ticket_tiers.find(t => t.id === selectedTierId) ?? null;
   const remaining = selectedTier ? selectedTier.quantity - selectedTier.quantity_sold : 0;
   const soldOut = selectedTier ? remaining <= 0 : false;
@@ -528,8 +580,12 @@ export default function EventDetailClient({ id }: { id: string }) {
   const discountAmount = getTierDiscountAmount(selectedTier, qty, subtotal);
   const discountPct = getTierDiscount(selectedTier, qty);
   const afterDiscount = subtotal - discountAmount;
-  const serviceFee = Math.round(afterDiscount * 0.049);
-  const grandTotal = afterDiscount + serviceFee;
+  const RAMEELO_FEE_PCT = 0.03;
+  const CARD_FEE_PCT   = 0.035;
+  const rameeloFee   = Math.round(afterDiscount * RAMEELO_FEE_PCT * 100) / 100;
+  const processingFee = Math.round(afterDiscount * CARD_FEE_PCT * 100) / 100;
+  const serviceFee   = rameeloFee + processingFee; // kept for backward compat
+  const grandTotal   = afterDiscount + rameeloFee + processingFee;
   const nextScalingTier = selectedTier?.group_discount_mode === 'scaling' ? getNextScalingTier(qty) : null;
 
   const maxQty = Math.min(20, selectedTier ? Math.max(0, remaining) : 0);
@@ -565,6 +621,8 @@ export default function EventDetailClient({ id }: { id: string }) {
       unitPrice,
       discount: discountPct,
       discountAmount,
+      subtotalAfterDiscount: afterDiscount,
+      rameeloFee,
       serviceFee,
       grandTotal,
     };
@@ -613,7 +671,7 @@ export default function EventDetailClient({ id }: { id: string }) {
 
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-5">
           <div className="flex items-center gap-2 text-white/60 text-xs font-mono">
-            <Link href="/events" className="hover:text-white transition-colors">Events</Link>
+            <button onClick={() => handleNavAway("/events")} className="hover:text-white transition-colors">Events</button>
             <span>/</span>
             <span className="text-white/80 truncate max-w-xs">{event.title}</span>
           </div>
@@ -665,16 +723,25 @@ export default function EventDetailClient({ id }: { id: string }) {
           {/* ── Left: Event details ── */}
           <div className="w-full lg:flex-1 min-w-0 space-y-5">
 
-            {/* Mobile urgency — shown above everything on mobile */}
+            {/* Mobile urgency / interest — shown above everything on mobile */}
             <div className="lg:hidden">
-              <UrgencyBanner
-                event={event}
-                urgencyState={urgencyState}
-                viewingNow={viewingNow}
-                soldToday={soldToday}
-                lowestTier={lowestTier}
-                nextCheapestPrice={nextCheapestPrice}
-              />
+              {event.selling_on_rameelo ? (
+                <UrgencyBanner
+                  event={event}
+                  urgencyState={urgencyState}
+                  viewingNow={viewingNow}
+                  soldToday={soldToday}
+                  lowestTier={lowestTier}
+                  nextCheapestPrice={nextCheapestPrice}
+                />
+              ) : (
+                <div className="rounded-2xl border border-marigold/30 bg-marigold/5 p-4 flex items-start gap-3">
+                  <span className="w-1.5 h-1.5 mt-1.5 bg-marigold rounded-full animate-pulse shrink-0" />
+                  <p className="font-ui text-sm text-ink-muted leading-relaxed">
+                    <strong className="text-ink">{viewingNow} people</strong> are viewing this event — drop your info below to be first when tickets go live.
+                  </p>
+                </div>
+              )}
             </div>
 
             {/* Artist card */}
@@ -811,23 +878,127 @@ export default function EventDetailClient({ id }: { id: string }) {
             </div>
           </div>
 
-          {/* ── Right: Purchase widget ── */}
+          {/* ── Right: Purchase widget or Interest form ── */}
           <div className="w-full lg:w-96 shrink-0">
             <div className="lg:sticky lg:top-5 space-y-4">
 
-              {/* Urgency banner — desktop only */}
+              {/* Urgency / Interest banner — desktop only */}
               <div className="hidden lg:block">
-                <UrgencyBanner
-                  event={event}
-                  urgencyState={urgencyState}
-                  viewingNow={viewingNow}
-                  soldToday={soldToday}
-                  lowestTier={lowestTier}
-                  nextCheapestPrice={nextCheapestPrice}
-                />
+                {event.selling_on_rameelo ? (
+                  <UrgencyBanner
+                    event={event}
+                    urgencyState={urgencyState}
+                    viewingNow={viewingNow}
+                    soldToday={soldToday}
+                    lowestTier={lowestTier}
+                    nextCheapestPrice={nextCheapestPrice}
+                  />
+                ) : (
+                  <div className="rounded-2xl border border-marigold/30 bg-marigold/5 p-4 flex items-start gap-3">
+                    <span className="w-1.5 h-1.5 mt-1.5 bg-marigold rounded-full animate-pulse shrink-0" />
+                    <p className="font-ui text-sm text-ink-muted leading-relaxed">
+                      <strong className="text-ink">{viewingNow} people</strong> are viewing this event right now — and the organizer will see every inquiry we collect.
+                    </p>
+                  </div>
+                )}
               </div>
 
-              {/* Ticket purchase widget */}
+              {/* Interest form (when not selling on Rameelo) */}
+              {!event.selling_on_rameelo ? (
+                <div className="rounded-2xl bg-white border border-ivory-200 overflow-hidden shadow-sm">
+                  <div className="px-5 pt-5 pb-4 border-b border-ivory-200" style={{ background: "linear-gradient(135deg, rgba(46,27,48,0.04) 0%, rgba(245,166,35,0.06) 100%)" }}>
+                    <span className="inline-block font-mono text-[9px] uppercase tracking-widest bg-marigold/20 text-marigold-dark px-2.5 py-1 rounded-full font-bold mb-3">
+                      Tickets Coming to Rameelo
+                    </span>
+                    <p className="font-display font-bold text-ink text-lg leading-tight" style={{ letterSpacing: "-0.02em" }}>
+                      Be first in line when tickets drop
+                    </p>
+                    <p className="font-ui text-sm text-ink-muted mt-2 leading-relaxed">
+                      This organizer hasn&apos;t set up ticketing here yet — but your crew is already showing up. Drop your info and we&apos;ll reach out the moment tickets go live on Rameelo.
+                    </p>
+                  </div>
+
+                  {!interestSubmitted ? (
+                    <form onSubmit={handleInterestSubmit} className="p-5 space-y-3">
+                      <div>
+                        <label className="block font-mono text-[9px] uppercase tracking-widest text-ink-muted mb-1.5">Your Name *</label>
+                        <input
+                          required value={interestName} onChange={e => setInterestName(e.target.value)}
+                          placeholder="Priya Patel"
+                          className="w-full rounded-xl border border-ivory-200 bg-white px-3.5 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-mono text-[9px] uppercase tracking-widest text-ink-muted mb-1.5">Email *</label>
+                        <input
+                          required type="email" value={interestEmail} onChange={e => setInterestEmail(e.target.value)}
+                          placeholder="priya@example.com"
+                          className="w-full rounded-xl border border-ivory-200 bg-white px-3.5 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block font-mono text-[9px] uppercase tracking-widest text-ink-muted mb-1.5">Phone</label>
+                          <input
+                            type="tel" value={interestPhone} onChange={e => setInterestPhone(e.target.value)}
+                            placeholder="(555) 000-0000"
+                            className="w-full rounded-xl border border-ivory-200 bg-white px-3.5 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-mono text-[9px] uppercase tracking-widest text-ink-muted mb-1.5">Your City</label>
+                          <input
+                            value={interestCity} onChange={e => setInterestCity(e.target.value)}
+                            placeholder="Edison, NJ"
+                            className="w-full rounded-xl border border-ivory-200 bg-white px-3.5 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block font-mono text-[9px] uppercase tracking-widest text-ink-muted mb-1.5">How many tickets?</label>
+                        <div className="flex items-center gap-3">
+                          <button type="button" onClick={() => setInterestQty(Math.max(1, interestQty - 1))}
+                            className="w-10 h-10 rounded-xl border border-ivory-200 flex items-center justify-center font-bold text-lg hover:border-aubergine hover:text-aubergine transition-all">−</button>
+                          <span className="font-display font-bold text-2xl text-ink w-10 text-center">{interestQty}</span>
+                          <button type="button" onClick={() => setInterestQty(Math.min(20, interestQty + 1))}
+                            className="w-10 h-10 rounded-xl border border-ivory-200 flex items-center justify-center font-bold text-lg hover:border-aubergine hover:text-aubergine transition-all">+</button>
+                        </div>
+                      </div>
+                      {interestError && <p className="font-ui text-xs text-durga">{interestError}</p>}
+                      <button
+                        type="submit" disabled={interestSubmitting}
+                        className="w-full py-4 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark transition-all active:scale-[0.98] shadow-sm disabled:opacity-60 flex items-center justify-center gap-2"
+                      >
+                        {interestSubmitting
+                          ? <><div className="w-4 h-4 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" />Sending…</>
+                          : "Claim My Spot →"}
+                      </button>
+                      <p className="text-center font-mono text-[10px] text-ink-muted">
+                        No payment needed · We&apos;ll notify you when tickets go live
+                      </p>
+                    </form>
+                  ) : (
+                    <div className="p-6 text-center space-y-4">
+                      <div className="w-14 h-14 rounded-full bg-peacock/10 flex items-center justify-center mx-auto">
+                        <svg className="w-7 h-7 text-peacock" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                      <div>
+                        <p className="font-display font-bold text-ink text-xl mb-1" style={{ letterSpacing: "-0.02em" }}>You&apos;re on the list!</p>
+                        <p className="font-ui text-sm text-ink-muted leading-relaxed">
+                          We&apos;ll reach out the moment tickets go live. The organizer will see that their community is ready — that&apos;s real leverage.
+                        </p>
+                      </div>
+                      <div className="rounded-xl bg-ivory border border-ivory-200 px-4 py-3">
+                        <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-0.5">What happens next</p>
+                        <p className="font-ui text-xs text-ink-muted">We&apos;ll contact the organizer on your behalf, share demand numbers, and notify you first when tickets drop.</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+              /* Ticket purchase widget */
               <div className="rounded-2xl bg-white border border-ivory-200 overflow-hidden shadow-sm">
 
                 {/* Tier selector */}
@@ -1000,8 +1171,15 @@ export default function EventDetailClient({ id }: { id: string }) {
                           </div>
                         )}
                         <div className="flex justify-between text-sm">
-                          <span className="font-ui text-ink-muted">Service fee (4.9%)</span>
-                          <span className="font-ui text-ink-muted">${serviceFee.toLocaleString()}</span>
+                          <span className="font-ui text-ink-muted">Rameelo fee (3%)</span>
+                          <span className="font-ui text-ink-muted">${rameeloFee.toFixed(2)}</span>
+                        </div>
+                        <div className="flex items-start justify-between text-sm gap-2">
+                          <div>
+                            <span className="font-ui text-ink-muted">Card processing (3.5%)</span>
+                            <p className="font-mono text-[9px] text-peacock mt-0.5">Free with bank / ACH at checkout</p>
+                          </div>
+                          <span className="font-ui text-ink-muted shrink-0">${processingFee.toFixed(2)}</span>
                         </div>
                         <div className="border-t border-ivory-200 pt-2 flex justify-between">
                           <span className="font-display font-bold text-ink">Total</span>
@@ -1044,10 +1222,50 @@ export default function EventDetailClient({ id }: { id: string }) {
                   </div>
                 )}
               </div>
+              )} {/* end selling_on_rameelo conditional */}
             </div>
           </div>
         </div>
       </div>
+
+      {/* ── Leave confirmation modal ── */}
+      {showLeaveModal && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden">
+            {/* Visual hook */}
+            <div className="relative h-28 overflow-hidden" style={{ background: event?.cover_image_url ? undefined : (GRADIENTS.find(g => g.id === event?.cover_gradient) ?? GRADIENTS[0]).css }}>
+              {event?.cover_image_url && <img src={event.cover_image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />}
+              <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.75), transparent)" }} />
+              <div className="absolute bottom-3 left-4 right-4">
+                <p className="font-display font-bold text-white text-sm leading-tight truncate" style={{ letterSpacing: "-0.01em" }}>{event?.title}</p>
+                <p className="font-mono text-[10px] text-white/60">{event?.city}, {event?.state}</p>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="font-display font-bold text-ink text-xl mb-1.5" style={{ letterSpacing: "-0.02em" }}>
+                  Hold on — your spot isn&apos;t saved yet
+                </p>
+                <p className="font-ui text-sm text-ink-muted leading-relaxed">
+                  {viewingNow} people are looking at this right now. Navratri events in {event?.city} fill up fast — prices don&apos;t drop if you come back later.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowLeaveModal(false)}
+                className="w-full py-3.5 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark transition-all active:scale-[0.98]"
+              >
+                {event?.selling_on_rameelo ? "Stay and lock in my spot →" : "Stay and claim my spot →"}
+              </button>
+              <button
+                onClick={confirmLeave}
+                className="w-full py-2.5 font-ui text-sm text-ink-muted hover:text-ink transition-colors"
+              >
+                I&apos;ll take my chances and leave
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Logo from "@/components/Logo";
 import { createClient } from "@/lib/supabase/client";
 import { createUser, saveUser } from "@/lib/auth";
 
@@ -132,12 +133,7 @@ export default function SignUpPage() {
       {/* Left decorative panel */}
       <div className="hidden lg:flex lg:w-5/12 relative flex-col justify-between p-12 overflow-hidden">
         <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(circle at 40% 60%, #F5A623 0%, transparent 55%), radial-gradient(circle at 75% 25%, #0E8C7A 0%, transparent 50%)" }} />
-        <Link href="/" className="relative flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center" style={{ backgroundColor: "#F5A623" }}>
-            <span className="font-display font-bold text-aubergine text-lg">R</span>
-          </div>
-          <span className="font-display font-bold text-white text-xl">Rameelo</span>
-        </Link>
+        <Logo variant="white" height={32} />
 
         <div className="relative">
           <p className="font-mono text-[10px] uppercase tracking-widest text-marigold mb-4">Join the community</p>
@@ -167,12 +163,9 @@ export default function SignUpPage() {
       {/* Form panel */}
       <div className="flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
-          <Link href="/" className="lg:hidden flex items-center gap-2 mb-10">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: "#F5A623" }}>
-              <span className="font-display font-bold text-aubergine">R</span>
-            </div>
-            <span className="font-display font-bold text-white text-lg">Rameelo</span>
-          </Link>
+          <div className="lg:hidden mb-10">
+            <Logo variant="white" height={28} />
+          </div>
 
           {/* Step indicator */}
           <div className="flex items-center gap-2 mb-6">

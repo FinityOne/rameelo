@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { navLinks } from "@/lib/data";
+import Logo from "@/components/Logo";
 
 export default function Footer() {
   const socials = [
@@ -19,22 +20,8 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-4 gap-10 mb-12">
           {/* Brand */}
           <div className="md:col-span-2">
-            {/* Horizontal UI lockup */}
-            <div className="flex items-center gap-2.5 mb-5">
-              <div className="w-8 h-8 bg-marigold rounded-[8px] flex items-center justify-center">
-                <span
-                  className="font-display font-bold text-aubergine text-[18px] leading-none"
-                  style={{ letterSpacing: "-0.03em" }}
-                >
-                  R
-                </span>
-              </div>
-              <span
-                className="font-display font-bold text-white text-[17px] leading-none"
-                style={{ letterSpacing: "-0.02em" }}
-              >
-                Rameelo
-              </span>
+            <div className="mb-5">
+              <Logo variant="white" height={28} />
             </div>
 
             <p className="font-ui text-sm leading-relaxed max-w-xs text-white/40 mb-6">

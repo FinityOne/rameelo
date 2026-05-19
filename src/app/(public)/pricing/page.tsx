@@ -1,488 +1,300 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Eyebrow, Button, Badge } from "@/components/ui";
+import { Eyebrow } from "@/components/ui";
+import { faqSchema, webPageSchema, ld } from "@/lib/jsonld";
 
 export const metadata: Metadata = {
-  title: "Organizer Pricing — Rameelo Garba Ticketing Platform",
-  description: "Simple, transparent pricing for garba event organizers. No hidden fees. List your Navratri event on Rameelo and keep more of your revenue — with group discounts, analytics, and community tools included.",
-  keywords: ["garba ticketing pricing", "navratri event platform cost", "organizer fees garba", "rameelo pricing"],
+  title: "Pricing — Rameelo | Free for Organizers",
+  description: "Rameelo is completely free for organizers — keep 100% of your ticket revenue. Buyers pay a 3% platform fee on top of ticket prices. Zero fees on ACH bank transfers.",
+  keywords: ["garba ticketing pricing", "navratri event platform free", "organizer fees garba", "rameelo pricing", "free garba ticketing"],
+  alternates: { canonical: "https://rameelo.com/pricing" },
   openGraph: {
-    title: "Organizer Pricing — Rameelo Garba Ticketing Platform",
-    description: "Transparent pricing for garba event organizers. List your Navratri event and keep more of your revenue.",
+    title: "Pricing — Rameelo | Free for Organizers",
+    description: "Free for organizers. 3% platform fee. Zero fees for buyers who pay by bank transfer.",
     type: "website",
+    url: "https://rameelo.com/pricing",
+    siteName: "Rameelo",
+    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo Organizer Pricing" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Free for organizers — Rameelo Garba Platform",
+    description: "No monthly fee. 3% flat platform fee. Zero buyer fees on bank transfers.",
+    images: ["https://rameelo.com/og-default.jpg"],
   },
 };
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
-
-const plans = [
-  {
-    id: "starter",
-    name: "Starter",
-    tagline: "Free forever. No upfront cost.",
-    price: null,
-    priceNote: "Free to list",
-    fee: "5% per ticket",
-    highlight: false,
-    cta: "List your first event",
-    ctaHref: "/organizers#get-started",
-    features: [
-      "1 active event at a time",
-      "Up to 300 tickets per event",
-      "Standard event listing page",
-      "Rameelo checkout & payments",
-      "Basic sales dashboard",
-      "Email confirmation to attendees",
-      "Group orders (basic)",
-      "Community support",
-    ],
-    missing: [
-      "Custom branding",
-      "Waitlist management",
-      "Promo codes & discounts",
-      "Advanced analytics",
-      "Sponsor dashboard",
-      "Priority support",
-    ],
-  },
-  {
-    id: "pro",
-    name: "Pro",
-    tagline: "For organizers serious about growth.",
-    price: 79,
-    priceNote: "per month",
-    fee: "2% per ticket",
-    highlight: true,
-    badge: "Most popular",
-    cta: "Start 30-day free trial",
-    ctaHref: "/organizers#get-started",
-    features: [
-      "Unlimited active events",
-      "Unlimited tickets per event",
-      "Custom branded event page",
-      "Group orders with auto follow-ups",
-      "Group discount thresholds",
-      "Waitlist management",
-      "Promo codes & early-bird pricing",
-      "Real-time analytics & reporting",
-      "Sponsor dashboard & placement tools",
-      "Attendee check-in app (iOS & Android)",
-      "Community photo feeds for your events",
-      "Featured placement on Rameelo",
-      "Priority email & phone support",
-      "Dedicated onboarding call",
-    ],
-    missing: [
-      "White-label checkout",
-      "API access",
-      "Dedicated account manager",
-    ],
-  },
-  {
-    id: "enterprise",
-    name: "Enterprise",
-    tagline: "For large-scale productions & associations.",
-    price: null,
-    priceNote: "Custom pricing",
-    fee: "Negotiated flat fee",
-    highlight: false,
-    cta: "Talk to our team",
-    ctaHref: "/organizers#get-started",
-    features: [
-      "Everything in Pro",
-      "White-label checkout experience",
-      "API & webhook access",
-      "Multi-event bundle management",
-      "Custom contract & SLA",
-      "Dedicated account manager",
-      "On-site event support option",
-      "Co-marketing opportunities",
-      "Custom integrations",
-    ],
-    missing: [],
-  },
+const FEATURES = [
+  { icon: "🎟️", label: "Unlimited events",          desc: "List as many events as you want, any time of year." },
+  { icon: "🪙",  label: "Unlimited ticket tiers",     desc: "GA, VIP, couples, early-bird — you set the tiers and prices." },
+  { icon: "👥",  label: "Group orders built in",      desc: "Automatic group discounts as crew members join. No code needed." },
+  { icon: "📊",  label: "Real-time sales dashboard",  desc: "Watch ticket sales, revenue, and group orders update live." },
+  { icon: "🌙",  label: "Navratri night scheduling",  desc: "Assign tickets to specific nights and track per-night capacity." },
+  { icon: "🎤",  label: "Artist profile linking",     desc: "Connect your event to a verified artist page for discovery." },
+  { icon: "💸",  label: "Fast payouts",               desc: "Funds hit your bank within 2 business days after your event." },
+  { icon: "📧",  label: "Attendee confirmations",     desc: "Branded email tickets sent automatically to every buyer." },
+  { icon: "📱",  label: "Mobile check-in",            desc: "Scan QR tickets from your phone on event night." },
+  { icon: "🔍",  label: "Platform discovery",         desc: "Your event appears on Rameelo search, city pages, and the home feed." },
+  { icon: "📣",  label: "Group sharing tools",        desc: "Shareable group links and invite flows your crew can use instantly." },
+  { icon: "🏫",  label: "Collegiate team support",    desc: "Special flows for raas teams, competitions, and chapter orders." },
 ];
 
-const comparisonRows = [
+const FAQS = [
   {
-    category: "Events & Tickets",
-    rows: [
-      { feature: "Active events", starter: "1", pro: "Unlimited", enterprise: "Unlimited" },
-      { feature: "Tickets per event", starter: "Up to 300", pro: "Unlimited", enterprise: "Unlimited" },
-      { feature: "Ticket tiers (GA, VIP, etc.)", starter: false, pro: true, enterprise: true },
-      { feature: "Waitlist management", starter: false, pro: true, enterprise: true },
-      { feature: "Multi-day / multi-session", starter: false, pro: true, enterprise: true },
-    ],
+    q: "Is Rameelo really free for organizers?",
+    a: "Yes — completely. Rameelo never deducts anything from your ticket revenue. We charge a 3% platform fee directly to the buyer on top of your ticket price. You set the price, you keep the full amount.",
   },
   {
-    category: "Group Orders",
-    rows: [
-      { feature: "Group order creation", starter: true, pro: true, enterprise: true },
-      { feature: "Shareable group links", starter: true, pro: true, enterprise: true },
-      { feature: "Automatic follow-up nudges", starter: false, pro: true, enterprise: true },
-      { feature: "Discount threshold tiers", starter: false, pro: true, enterprise: true },
-      { feature: "Instagram story share card", starter: false, pro: true, enterprise: true },
-    ],
+    q: "What does the 3% platform fee cover?",
+    a: "The platform fee is charged to attendees and covers ticketing infrastructure, group order tools, payout processing, real-time analytics, and the full Rameelo checkout experience. Organizers pay nothing.",
   },
   {
-    category: "Marketing & Sales",
-    rows: [
-      { feature: "Promo codes & discounts", starter: false, pro: true, enterprise: true },
-      { feature: "Early-bird pricing", starter: false, pro: true, enterprise: true },
-      { feature: "Featured placement on Rameelo", starter: false, pro: true, enterprise: true },
-      { feature: "Co-marketing campaigns", starter: false, pro: false, enterprise: true },
-    ],
+    q: "How much do buyers pay on top of the ticket price?",
+    a: "Buyers pay a 3% Rameelo platform fee automatically added at checkout. If they pay by credit or debit card, an additional ~2% payment processing fee applies (totaling ~5%). Buyers who pay by bank account (ACH) pay only the ticket face price — no fees at all.",
   },
   {
-    category: "Community & Sponsors",
-    rows: [
-      { feature: "Event community photo feed", starter: false, pro: true, enterprise: true },
-      { feature: "Sponsor dashboard", starter: false, pro: true, enterprise: true },
-      { feature: "Sponsor placements (email, ticket, feed)", starter: false, pro: true, enterprise: true },
-      { feature: "Custom sponsor reporting", starter: false, pro: false, enterprise: true },
-    ],
+    q: "When do I receive my payout?",
+    a: "Funds are deposited to your connected bank account within 2 business days after your event ends. For multi-night events, we can arrange a mid-event settlement on request.",
   },
   {
-    category: "Analytics & Data",
-    rows: [
-      { feature: "Basic sales dashboard", starter: true, pro: true, enterprise: true },
-      { feature: "Real-time analytics", starter: false, pro: true, enterprise: true },
-      { feature: "Attendee data export (CSV)", starter: false, pro: true, enterprise: true },
-      { feature: "API & webhook access", starter: false, pro: false, enterprise: true },
-    ],
-  },
-  {
-    category: "Support & Operations",
-    rows: [
-      { feature: "Check-in app (iOS & Android)", starter: false, pro: true, enterprise: true },
-      { feature: "Priority support", starter: false, pro: true, enterprise: true },
-      { feature: "Dedicated account manager", starter: false, pro: false, enterprise: true },
-      { feature: "On-site event support", starter: false, pro: false, enterprise: "Optional" },
-    ],
-  },
-];
-
-const faqs = [
-  {
-    q: "Is there a contract or minimum commitment?",
-    a: "No. Starter is free forever. Pro is month-to-month — cancel any time. Enterprise contracts are typically annual but we work with your timeline.",
-  },
-  {
-    q: "When do I get paid after my event?",
-    a: "Payouts are deposited to your bank account within 2 business days after your event ends. For multi-day events, you can request a mid-event payout at no additional charge.",
-  },
-  {
-    q: "What happens if I need to postpone my event?",
-    a: "For postponements, attendees are automatically notified and can transfer their ticket to the new date.",
-  },
-  {
-    q: "Can I use my own payment processor?",
-    a: "Pro and Enterprise plans support custom Stripe Connect accounts so revenue flows directly to you. Starter events use Rameelo's managed payment system.",
-  },
-  {
-    q: "Do attendees pay a booking fee on top of my ticket price?",
-    a: "On Starter, a small convenience fee is passed to the buyer. On Pro and Enterprise, you choose whether to absorb the fee or pass it on — fully configurable.",
+    q: "Can I set group discount pricing?",
+    a: "Yes. Group orders are a core feature — completely free. You can set discount thresholds (e.g., 10% off for groups of 10+) and buyers self-organize into groups using a shared link.",
   },
   {
     q: "How quickly can I get my event live?",
-    a: "Most organizers have their event page live in under 20 minutes. Our setup wizard walks you through everything: ticket tiers, descriptions, payout info, and go-live.",
+    a: "Most organizers publish their first event in under 20 minutes. Our event creation wizard walks you through every detail, including ticket tiers, Navratri night assignments, and payout setup.",
+  },
+  {
+    q: "What happens if I need to cancel or postpone?",
+    a: "Rameelo handles automated attendee notifications and refund flows. For postponements, attendees can transfer their ticket to the new date directly. Our team is available to help with any edge cases.",
   },
 ];
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+const pricingPage = webPageSchema({
+  name: "Pricing — Rameelo | Free for Organizers",
+  url: "https://rameelo.com/pricing",
+  description: "Free for organizers. 3% flat platform fee. Zero buyer fees on bank transfers.",
+  breadcrumbs: [
+    { name: "Home", url: "https://rameelo.com" },
+    { name: "Pricing", url: "https://rameelo.com/pricing" },
+  ],
+});
+const pricingFaq = faqSchema(FAQS.map(f => ({ question: f.q, answer: f.a })));
 
-function Check() {
+function CheckIcon({ color = "text-peacock" }: { color?: string }) {
   return (
-    <svg className="w-4 h-4 text-peacock" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <svg className={`w-4 h-4 ${color} shrink-0`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
     </svg>
   );
 }
 
-function Dash() {
-  return <span className="font-ui text-ink-muted/40 text-sm">—</span>;
-}
-
-function Cell({ value }: { value: boolean | string }) {
-  if (value === true) return <td className="py-3.5 px-4 text-center"><Check /></td>;
-  if (value === false) return <td className="py-3.5 px-4 text-center"><Dash /></td>;
-  return (
-    <td className="py-3.5 px-4 text-center">
-      <span className="font-mono text-[10px] text-peacock tracking-widest uppercase">{value}</span>
-    </td>
-  );
-}
-
-// ─── Page ─────────────────────────────────────────────────────────────────────
-
 export default function PricingPage() {
   return (
     <div className="bg-ivory">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(pricingPage) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(pricingFaq) }} />
 
       {/* ══════════════════════════════════════════
           HERO
       ══════════════════════════════════════════ */}
       <section className="relative overflow-hidden" style={{ background: "#2E1B30" }}>
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background:
-              "radial-gradient(ellipse at 80% 30%, rgba(245,166,35,0.15) 0%, transparent 50%)",
-          }}
-        />
-        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-20 text-center">
-          <Eyebrow className="mb-6">Plans & Pricing</Eyebrow>
-          <h1
-            className="font-display font-bold text-white mb-4"
-            style={{ fontSize: "clamp(36px, 5vw, 60px)", letterSpacing: "-0.025em", lineHeight: 1.05 }}
-          >
-            Simple, transparent pricing.
-          </h1>
-          <p className="font-ui text-white/55 text-lg max-w-xl mx-auto leading-relaxed mb-8">
-            Start for free. Upgrade when you need more. No hidden fees, no surprise
-            charges on event night.
-          </p>
-          <div className="flex flex-wrap gap-3 justify-center">
-            <Button href="/organizers" variant="ghost" size="md">
-              ← Why Rameelo for organizers
-            </Button>
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 70% 40%, rgba(245,166,35,0.12) 0%, transparent 55%)" }} />
+        <div className="absolute inset-0 pointer-events-none opacity-[0.04]" style={{ backgroundImage: "radial-gradient(circle, rgba(255,255,255,0.6) 1px, transparent 1px)", backgroundSize: "28px 28px" }} />
+
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 pt-20 pb-24 text-center">
+          <div className="inline-flex items-center gap-2 mb-7 border border-white/12 rounded-full px-4 py-1.5 bg-white/5">
+            <span className="relative flex h-1.5 w-1.5 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-marigold opacity-60" />
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-marigold" />
+            </span>
+            <span className="font-mono text-[10px] text-white/50 tracking-[0.18em] uppercase">Transparent · No surprises</span>
           </div>
+
+          <h1 className="font-display font-black text-white mb-4" style={{ fontSize: "clamp(40px, 7vw, 80px)", letterSpacing: "-0.032em", lineHeight: 1.0 }}>
+            Free for organizers.
+          </h1>
+          <h1 className="font-editorial italic mb-8" style={{ fontSize: "clamp(40px, 7vw, 80px)", lineHeight: 1.0, color: "#F5A623", fontWeight: 500 }}>
+            Always.
+          </h1>
+
+          <p className="font-ui text-white/55 text-lg max-w-xl mx-auto leading-relaxed mb-4">
+            No monthly fee. No setup cost. No contracts. We add a simple 3% platform fee on top of ticket prices — charged directly to buyers. You keep every dollar you earn.
+          </p>
+          <p className="font-mono text-[11px] text-white/25 uppercase tracking-widest">
+            Navratri 2026 · Launch offer — lock in free forever
+          </p>
         </div>
       </section>
 
       {/* ══════════════════════════════════════════
-          PLAN CARDS
+          FEE BREAKDOWN
       ══════════════════════════════════════════ */}
-      <section className="bg-ivory-200 py-20" id="plans">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-3 gap-5 items-stretch">
-            {plans.map((plan) => (
-              <div
-                key={plan.id}
-                className={`relative flex flex-col rounded-[24px] overflow-hidden ${
-                  plan.highlight ? "shadow-xl shadow-aubergine/20" : "border border-ivory-200 bg-ivory"
-                }`}
-                style={plan.highlight ? { background: "#2E1B30" } : undefined}
+      <section className="bg-ivory-200 py-16" id="fees">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
+
+          {/* Top headline */}
+          <div className="text-center mb-10">
+            <Eyebrow className="mb-4">How the fees work</Eyebrow>
+            <h2 className="font-display font-semibold text-ink" style={{ fontSize: "clamp(26px, 3.5vw, 38px)", letterSpacing: "-0.022em" }}>
+              Zero fees for organizers. Transparent fees for buyers.
+            </h2>
+          </div>
+
+          <div className="grid md:grid-cols-2 gap-5">
+
+            {/* Organizer card */}
+            <div className="bg-aubergine rounded-3xl p-8 flex flex-col shadow-xl shadow-aubergine/20">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-marigold mb-6">For organizers</p>
+              <div className="flex items-end gap-3 mb-3">
+                <span className="font-display font-black text-white" style={{ fontSize: "72px", letterSpacing: "-0.04em", lineHeight: 1 }}>
+                  $0
+                </span>
+                <span className="font-ui text-white/50 text-base mb-3">/ month</span>
+              </div>
+              <p className="font-ui text-white/60 text-sm mb-6 leading-relaxed">
+                Free to list. Free to sell. Rameelo charges a <span className="text-marigold font-semibold">3% platform fee directly to buyers</span> on top of ticket prices. You keep 100% of your revenue.
+              </p>
+              <ul className="space-y-3 mt-auto">
+                {[
+                  "No monthly subscription",
+                  "No setup or onboarding fees",
+                  "No per-event charges",
+                  "Keep 100% of ticket revenue",
+                  "Payouts within 2 business days",
+                ].map(item => (
+                  <li key={item} className="flex items-center gap-2.5">
+                    <CheckIcon color="text-marigold" />
+                    <span className="font-ui text-sm text-white/75">{item}</span>
+                  </li>
+                ))}
+              </ul>
+              <Link
+                href="/organizers"
+                className="mt-8 flex items-center justify-center gap-2 bg-marigold text-aubergine font-display font-bold text-sm px-6 py-3.5 rounded-2xl hover:bg-marigold-dark transition-all shadow-lg"
               >
-                {plan.badge && (
-                  <div className="absolute top-0 left-0 right-0 flex justify-center -translate-y-1/2 z-10">
-                    <Badge variant="marigold">{plan.badge}</Badge>
-                  </div>
-                )}
+                Start listing for free
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+                </svg>
+              </Link>
+            </div>
 
-                <div className={`p-7 ${plan.badge ? "pt-10" : ""}`}>
-                  <p
-                    className={`font-mono text-[11px] tracking-[0.12em] uppercase mb-1.5 ${
-                      plan.highlight ? "text-marigold" : "text-ink-muted"
-                    }`}
-                  >
-                    {plan.name}
-                  </p>
-                  <p className={`font-ui text-sm mb-6 ${plan.highlight ? "text-white/50" : "text-ink-muted"}`}>
-                    {plan.tagline}
-                  </p>
+            {/* Buyer payment options */}
+            <div className="flex flex-col gap-4">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-1">For buyers — added on top of ticket price</p>
 
-                  {/* Price */}
-                  {plan.price ? (
-                    <div className="flex items-baseline gap-1.5 mb-1">
-                      <span
-                        className={`font-display font-bold ${plan.highlight ? "text-white" : "text-ink"}`}
-                        style={{ fontSize: "48px", letterSpacing: "-0.03em" }}
-                      >
-                        ${plan.price}
-                      </span>
-                      <span className={`font-ui text-sm ${plan.highlight ? "text-white/40" : "text-ink-muted"}`}>
-                        / mo
-                      </span>
-                    </div>
-                  ) : (
-                    <p
-                      className={`font-display font-bold mb-1 ${plan.highlight ? "text-white" : "text-ink"}`}
-                      style={{ fontSize: "32px", letterSpacing: "-0.025em" }}
-                    >
-                      {plan.priceNote}
-                    </p>
-                  )}
-
-                  <div
-                    className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full font-mono text-[10px] tracking-widest uppercase mb-6 ${
-                      plan.highlight ? "bg-white/8 text-marigold" : "bg-marigold/10 text-marigold-dark"
-                    }`}
-                  >
-                    {plan.fee}
-                  </div>
-
-                  <Link
-                    href={plan.ctaHref}
-                    className={`block w-full text-center font-ui text-sm font-semibold py-3 rounded-[10px] transition-colors ${
-                      plan.highlight
-                        ? "bg-marigold text-aubergine hover:bg-marigold-dark"
-                        : plan.id === "enterprise"
-                        ? "border border-aubergine/30 text-aubergine hover:bg-aubergine-faint"
-                        : "bg-aubergine text-white hover:bg-aubergine-light"
-                    }`}
-                  >
-                    {plan.cta}
-                  </Link>
-
-                  {plan.highlight && (
-                    <p className="font-mono text-[10px] text-white/25 tracking-widest uppercase text-center mt-3">
-                      30-day free trial · No credit card
-                    </p>
-                  )}
+              {/* Credit card */}
+              <div className="bg-ivory rounded-2xl border border-ivory-200 p-6 flex items-start gap-4 shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-ink/5 border border-ink/8 flex items-center justify-center shrink-0">
+                  <svg className="w-6 h-6 text-ink/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
+                  </svg>
                 </div>
-
-                <div className={`mx-7 h-px ${plan.highlight ? "bg-white/10" : "bg-ivory-200"}`} />
-
-                <div className="p-7 pt-6 flex-1">
-                  <p
-                    className={`font-mono text-[10px] tracking-widest uppercase mb-4 ${
-                      plan.highlight ? "text-white/30" : "text-ink-muted"
-                    }`}
-                  >
-                    Included
+                <div className="flex-1">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="font-ui font-semibold text-ink text-sm">Credit or debit card</p>
+                    <span className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>+5%</span>
+                  </div>
+                  <p className="font-ui text-sm text-ink-muted leading-snug">
+                    3% platform fee + ~2% card processing, added on top of the ticket price at checkout.
                   </p>
-                  <ul className="space-y-2.5">
-                    {plan.features.map((f) => (
-                      <li key={f} className="flex items-start gap-2.5">
-                        <span
-                          className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 mt-0.5 ${
-                            plan.highlight ? "bg-white/10" : "bg-peacock/10"
-                          }`}
-                        >
-                          <svg
-                            className={`w-2.5 h-2.5 ${plan.highlight ? "text-white" : "text-peacock"}`}
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
-                          >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
-                          </svg>
-                        </span>
-                        <span className={`font-ui text-sm ${plan.highlight ? "text-white/75" : "text-ink-muted"}`}>
-                          {f}
-                        </span>
-                      </li>
-                    ))}
-                  </ul>
-
-                  {plan.missing.length > 0 && (
-                    <>
-                      <p
-                        className={`font-mono text-[10px] tracking-widest uppercase mt-5 mb-3 ${
-                          plan.highlight ? "text-white/20" : "text-ink-muted/40"
-                        }`}
-                      >
-                        Not included
-                      </p>
-                      <ul className="space-y-2">
-                        {plan.missing.map((f) => (
-                          <li key={f} className="flex items-start gap-2.5">
-                            <span className={`font-ui text-sm ${plan.highlight ? "text-white/25" : "text-ink-muted/40"}`}>
-                              — {f}
-                            </span>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
                 </div>
               </div>
-            ))}
-          </div>
 
-          {/* Savings callout */}
-          <div className="mt-6 bg-aubergine rounded-[16px] px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-4 max-w-3xl mx-auto">
-            <div>
-              <p className="font-mono text-[10px] text-marigold tracking-widest uppercase mb-1">
-                Example · 1,000 tickets × $45
-              </p>
-              <p className="font-display font-semibold text-white" style={{ fontSize: "18px", letterSpacing: "-0.02em" }}>
-                Pro saves you <span className="text-marigold">$1,350</span> in fees vs. Starter on a single mid-size event.
-              </p>
+              {/* ACH bank */}
+              <div className="bg-ivory rounded-2xl border-2 border-peacock/20 p-6 flex items-start gap-4 shadow-sm relative overflow-hidden">
+                <div className="absolute top-3 right-3">
+                  <span className="inline-flex items-center px-2.5 py-1 rounded-full font-mono text-[9px] font-bold uppercase tracking-wide bg-peacock/10 text-peacock border border-peacock/20">
+                    Zero fees
+                  </span>
+                </div>
+                <div className="w-12 h-12 rounded-2xl bg-peacock/8 border border-peacock/15 flex items-center justify-center shrink-0">
+                  <svg className="w-6 h-6 text-peacock" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                  </svg>
+                </div>
+                <div className="flex-1 pr-16">
+                  <div className="flex items-center gap-2 mb-1">
+                    <p className="font-ui font-semibold text-ink text-sm">Bank account (ACH)</p>
+                  </div>
+                  <p className="font-ui text-sm text-ink-muted leading-snug">
+                    Pay directly from your bank — no fees added. Buyers pay exactly the ticket price.
+                  </p>
+                </div>
+              </div>
+
+              {/* Example callout */}
+              <div className="bg-white border border-ink/8 rounded-2xl p-5 shadow-sm">
+                <p className="font-mono text-[9px] uppercase tracking-widest text-ink/30 mb-3">Example · $50 ticket · organizer keeps $50 either way</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="text-center bg-ink/3 rounded-xl p-3">
+                    <p className="font-display font-black text-ink text-2xl mb-0.5" style={{ letterSpacing: "-0.03em" }}>$52.50</p>
+                    <p className="font-mono text-[9px] text-ink/40 uppercase tracking-wider">Buyer pays (card)</p>
+                    <p className="font-mono text-[9px] text-ink/25 mt-0.5">$50 + 5% fees</p>
+                  </div>
+                  <div className="text-center bg-peacock/5 border border-peacock/15 rounded-xl p-3">
+                    <p className="font-display font-black text-peacock text-2xl mb-0.5" style={{ letterSpacing: "-0.03em" }}>$50.00</p>
+                    <p className="font-mono text-[9px] text-peacock/70 uppercase tracking-wider">Buyer pays (ACH)</p>
+                    <p className="font-mono text-[9px] text-peacock/40 mt-0.5">No fees added</p>
+                  </div>
+                </div>
+              </div>
             </div>
-            <Button href="/organizers" size="sm" className="shrink-0 whitespace-nowrap">
-              Compare vs. others →
-            </Button>
           </div>
         </div>
       </section>
 
       {/* ══════════════════════════════════════════
-          FULL COMPARISON TABLE
+          WHAT'S INCLUDED
       ══════════════════════════════════════════ */}
       <section className="bg-ivory py-20">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <Eyebrow className="mb-4">Full breakdown</Eyebrow>
-            <h2
-              className="font-display font-semibold text-ink"
-              style={{ fontSize: "clamp(24px, 3.5vw, 36px)", letterSpacing: "-0.022em" }}
-            >
-              Every feature, every plan
+            <Eyebrow className="mb-4">Everything included</Eyebrow>
+            <h2 className="font-display font-semibold text-ink mb-3" style={{ fontSize: "clamp(26px, 3.5vw, 38px)", letterSpacing: "-0.022em" }}>
+              Every feature. Every organizer. No upsell.
             </h2>
+            <p className="font-ui text-ink-muted text-base max-w-md mx-auto">
+              There's one plan and it comes with everything we've built. No feature gating.
+            </p>
           </div>
 
-          <div className="rounded-[16px] overflow-hidden border border-ivory-200 bg-ivory shadow-sm">
-            {/* Header */}
-            <div className="grid grid-cols-4 bg-ivory-200 border-b border-ivory-200">
-              <div className="col-span-1 px-5 py-4" />
-              {plans.map((plan) => (
-                <div
-                  key={plan.id}
-                  className={`px-4 py-4 text-center border-l border-ivory-200 ${
-                    plan.highlight ? "bg-aubergine/5" : ""
-                  }`}
-                >
-                  <p
-                    className={`font-display font-semibold text-sm ${
-                      plan.highlight ? "text-aubergine" : "text-ink"
-                    }`}
-                    style={{ letterSpacing: "-0.01em" }}
-                  >
-                    {plan.name}
-                  </p>
-                  <p className="font-mono text-[10px] text-ink-muted tracking-widest mt-0.5">
-                    {plan.price ? `$${plan.price}/mo` : plan.priceNote}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            {comparisonRows.map((group) => (
-              <div key={group.category}>
-                <div className="bg-ivory-200/60 border-b border-ivory-200 px-5 py-2.5">
-                  <p className="font-mono text-[10px] text-ink-muted tracking-widest uppercase">
-                    {group.category}
-                  </p>
-                </div>
-                {group.rows.map((row, ri) => (
-                  <table
-                    key={row.feature}
-                    className={`w-full ${ri < group.rows.length - 1 ? "border-b border-ivory-200/60" : "border-b border-ivory-200"}`}
-                  >
-                    <tbody>
-                      <tr className="hover:bg-ivory-200/30 transition-colors">
-                        <td className="py-3 px-5 font-ui text-sm text-ink-muted w-2/5">{row.feature}</td>
-                        <Cell value={row.starter} />
-                        <td
-                          className="py-3 px-4 text-center bg-aubergine/[0.03] border-x border-aubergine/8"
-                        >
-                          {row.pro === true ? (
-                            <Check />
-                          ) : row.pro === false ? (
-                            <Dash />
-                          ) : (
-                            <span className="font-mono text-[10px] text-peacock tracking-widest uppercase">{row.pro}</span>
-                          )}
-                        </td>
-                        <Cell value={row.enterprise} />
-                      </tr>
-                    </tbody>
-                  </table>
-                ))}
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {FEATURES.map((f) => (
+              <div key={f.label} className="bg-ivory-200 border border-ivory-200 rounded-2xl p-5 hover:border-aubergine/20 hover:bg-white transition-all group">
+                <span className="text-2xl block mb-3">{f.icon}</span>
+                <p className="font-ui font-semibold text-ink text-sm mb-1 group-hover:text-aubergine transition-colors" style={{ letterSpacing: "-0.01em" }}>
+                  {f.label}
+                </p>
+                <p className="font-ui text-xs text-ink-muted leading-relaxed">{f.desc}</p>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          SAVINGS CALLOUT
+      ══════════════════════════════════════════ */}
+      <section className="bg-ivory-200 py-10">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="bg-aubergine rounded-3xl px-8 py-8 grid sm:grid-cols-3 gap-6 items-center shadow-xl shadow-aubergine/15">
+            <div className="sm:col-span-2">
+              <p className="font-mono text-[10px] text-marigold tracking-widest uppercase mb-2">
+                How it compares · 1,000 tickets at $45 each
+              </p>
+              <p className="font-display font-bold text-white mb-2" style={{ fontSize: "clamp(20px, 2.5vw, 26px)", letterSpacing: "-0.022em", lineHeight: 1.2 }}>
+                On $45,000 in ticket sales, Rameelo organizers keep <span className="text-marigold">100%</span>. Other platforms deduct 6–10% from your revenue.
+              </p>
+              <p className="font-ui text-white/45 text-sm">
+                That's up to <span className="text-white/70 font-medium">$4,500 more in your pocket</span> on a single mid-size Navratri compared to platforms that charge organizers.
+              </p>
+            </div>
+            <div className="text-center sm:text-right">
+              <p className="font-display font-black text-marigold" style={{ fontSize: "52px", letterSpacing: "-0.04em", lineHeight: 1 }}>3%</p>
+              <p className="font-mono text-[10px] text-white/30 uppercase tracking-widest mt-1">buyer fee. always.</p>
+            </div>
           </div>
         </div>
       </section>
@@ -490,35 +302,38 @@ export default function PricingPage() {
       {/* ══════════════════════════════════════════
           FAQ
       ══════════════════════════════════════════ */}
-      <section className="bg-ivory-200 py-20">
+      <section className="bg-ivory py-20">
         <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <Eyebrow className="mb-4">FAQ</Eyebrow>
-            <h2
-              className="font-display font-semibold text-ink"
-              style={{ fontSize: "clamp(24px, 3.5vw, 36px)", letterSpacing: "-0.022em" }}
-            >
+            <h2 className="font-display font-semibold text-ink" style={{ fontSize: "clamp(24px, 3.5vw, 36px)", letterSpacing: "-0.022em" }}>
               Common questions
             </h2>
           </div>
 
           <div className="space-y-3">
-            {faqs.map((faq, i) => (
-              <div
-                key={i}
-                className="bg-ivory rounded-[16px] p-6 border border-ivory-200 hover:border-aubergine/20 transition-colors"
-              >
-                <p className="font-display font-semibold text-ink text-sm mb-2" style={{ letterSpacing: "-0.01em" }}>
-                  {faq.q}
-                </p>
-                <p className="font-ui text-ink-muted text-sm leading-relaxed">{faq.a}</p>
+            {FAQS.map((faq, i) => (
+              <div key={i} className="bg-ivory-200 rounded-2xl p-6 border border-ivory-200 hover:border-aubergine/20 transition-colors group">
+                <div className="flex items-start gap-3">
+                  <div className="w-6 h-6 rounded-full bg-aubergine/10 flex items-center justify-center shrink-0 mt-0.5">
+                    <svg className="w-3 h-3 text-aubergine" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <p className="font-display font-semibold text-ink text-sm mb-2 group-hover:text-aubergine transition-colors" style={{ letterSpacing: "-0.01em" }}>
+                      {faq.q}
+                    </p>
+                    <p className="font-ui text-ink-muted text-sm leading-relaxed">{faq.a}</p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
 
           <p className="font-ui text-center text-ink-muted text-sm mt-8">
             More questions?{" "}
-            <Link href="/organizers#get-started" className="text-aubergine font-semibold hover:text-aubergine-light transition-colors">
+            <Link href="/organizers" className="text-aubergine font-semibold hover:underline transition-colors">
               Talk to our team
             </Link>
           </p>
@@ -528,31 +343,36 @@ export default function PricingPage() {
       {/* ══════════════════════════════════════════
           CTA
       ══════════════════════════════════════════ */}
-      <section className="relative overflow-hidden py-20" style={{ background: "#2E1B30" }}>
-        <div
-          className="absolute inset-0 pointer-events-none"
-          style={{
-            background: "radial-gradient(ellipse at 80% 50%, rgba(245,166,35,0.15) 0%, transparent 55%)",
-          }}
-        />
+      <section className="relative overflow-hidden py-24" style={{ background: "#2E1B30" }}>
+        <div className="absolute inset-0 pointer-events-none" style={{ background: "radial-gradient(ellipse at 60% 50%, rgba(124,31,44,0.5) 0%, transparent 55%), radial-gradient(ellipse at 20% 50%, rgba(245,166,35,0.07) 0%, transparent 50%)" }} />
         <div className="relative max-w-2xl mx-auto px-4 text-center">
-          <h2
-            className="font-display font-bold text-white mb-4"
-            style={{ fontSize: "clamp(28px, 4vw, 44px)", letterSpacing: "-0.025em" }}
-          >
-            Ready to list your event?
+          <h2 className="font-display font-black text-white mb-4" style={{ fontSize: "clamp(32px, 5vw, 56px)", letterSpacing: "-0.03em", lineHeight: 1.05 }}>
+            List your first event.<br />
+            <span className="font-editorial italic font-normal" style={{ color: "#F5A623" }}>Keep what you earn.</span>
           </h2>
-          <p className="font-ui text-white/55 text-base mb-8 leading-relaxed">
-            Free to start. No credit card needed. Your first event goes live in under 20 minutes.
+          <p className="font-ui text-white/50 text-base mb-10 max-w-sm mx-auto leading-relaxed">
+            Free to start. Your event goes live in under 20 minutes. We only make money when you do.
           </p>
-          <div className="flex flex-wrap gap-3 justify-center">
-            <Button href="/organizers#get-started" size="lg">
-              Get started free
-            </Button>
-            <Button href="/organizers" variant="ghost" size="lg">
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Link
+              href="/portal/organizer"
+              className="flex items-center justify-center gap-2 bg-marigold text-aubergine font-display font-bold text-base px-8 py-4 rounded-2xl hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-xl shadow-marigold/20"
+            >
+              Create your first event — free
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+            <Link
+              href="/organizers"
+              className="flex items-center justify-center gap-2 border border-white/15 text-white/70 font-ui font-medium text-base px-8 py-4 rounded-2xl hover:bg-white/8 hover:text-white transition-all"
+            >
               Learn about Rameelo for organizers
-            </Button>
+            </Link>
           </div>
+          <p className="font-mono text-[10px] text-white/20 uppercase tracking-widest mt-6">
+            No credit card · No contract · Cancel any time
+          </p>
         </div>
       </section>
     </div>

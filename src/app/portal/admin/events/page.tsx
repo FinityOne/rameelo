@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/portal/organizer/events/create/types";
 
@@ -100,11 +101,22 @@ export default function AdminEventsPage() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div>
-        <h2 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: '-0.02em' }}>Event Review</h2>
-        <p className="font-ui text-ink-muted text-sm mt-0.5">
-          {loading ? '—' : `${events.length} total · ${pendingCount} awaiting review`}
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h2 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: '-0.02em' }}>Event Review</h2>
+          <p className="font-ui text-ink-muted text-sm mt-0.5">
+            {loading ? '—' : `${events.length} total · ${pendingCount} awaiting review`}
+          </p>
+        </div>
+        <Link
+          href="/portal/admin/events/create"
+          className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:bg-aubergine/90 active:scale-[0.98] transition-all shadow-sm"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+          Create Event
+        </Link>
       </div>
 
       {/* Tabs */}

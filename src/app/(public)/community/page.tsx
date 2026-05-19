@@ -1,10 +1,44 @@
+import type { Metadata } from "next";
 import { communityGroups, testimonials } from "@/lib/data";
+import { webPageSchema, ld } from "@/lib/jsonld";
+
+export const metadata: Metadata = {
+  title: "Garba Community — Connect with Dancers Across the USA | Rameelo",
+  description: "Join the Rameelo garba community. Connect with raas garba dancers, share event photos, find dance groups, and join city-based garba communities across the USA.",
+  keywords: ["garba community usa", "navratri community", "raas garba dancers", "garba groups near me", "gujarati community usa", "dandiya community"],
+  alternates: { canonical: "https://rameelo.com/community" },
+  openGraph: {
+    title: "Garba Community — Connect with Dancers Across the USA | Rameelo",
+    description: "Connect with raas garba and dandiya dancers across America. Share moments, find groups, and celebrate Navratri together.",
+    type: "website",
+    url: "https://rameelo.com/community",
+    siteName: "Rameelo",
+    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo Garba Community" }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "Garba Community — Rameelo",
+    description: "Connect with raas garba and dandiya dancers across America.",
+    images: ["https://rameelo.com/og-default.jpg"],
+  },
+};
+
+const communityPage = webPageSchema({
+  name: "Garba Community — Rameelo",
+  url: "https://rameelo.com/community",
+  description: "Connect with raas garba dancers, share event photos, find dance groups, and join city-based garba communities across the USA.",
+  breadcrumbs: [
+    { name: "Home", url: "https://rameelo.com" },
+    { name: "Community", url: "https://rameelo.com/community" },
+  ],
+});
 
 const categories = ["All", "Regional", "Beginners", "Organizers", "Cultural"];
 
 export default function CommunityPage() {
   return (
     <div className="bg-cream min-h-screen">
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(communityPage) }} />
       {/* ── Header ── */}
       <section
         className="text-white py-16"

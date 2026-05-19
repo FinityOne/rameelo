@@ -1,6 +1,50 @@
+import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { personSchema, breadcrumbSchema, ld } from "@/lib/jsonld";
+
+type Props = { params: Promise<{ slug: string }> };
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug } = await params;
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("artists")
+    .select("name, tagline, bio, profile_image_url, genres, based_in, hometown_city, hometown_state, instagram_url, website_url")
+    .eq("slug", slug)
+    .eq("is_active", true)
+    .single();
+
+  if (!data) return { title: "Artist | Rameelo" };
+
+  const location = data.based_in || [data.hometown_city, data.hometown_state].filter(Boolean).join(", ");
+  const description = data.bio?.slice(0, 160) ??
+    `${data.name} — garba artist${location ? ` based in ${location}` : ""}. Book tickets to upcoming events on Rameelo.`;
+
+  return {
+    title: `${data.name} — Garba Artist | Rameelo`,
+    description,
+    keywords: [data.name, "garba artist", "raas garba performer", "navratri artist usa", ...(data.genres ?? [])],
+    alternates: { canonical: `https://rameelo.com/artists/${slug}` },
+    openGraph: {
+      title: `${data.name} — Garba Artist | Rameelo`,
+      description,
+      type: "profile",
+      url: `https://rameelo.com/artists/${slug}`,
+      siteName: "Rameelo",
+      images: data.profile_image_url
+        ? [{ url: data.profile_image_url, width: 800, height: 800, alt: data.name }]
+        : [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: data.name }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${data.name} — Garba Artist | Rameelo`,
+      description,
+      images: data.profile_image_url ? [data.profile_image_url] : ["https://rameelo.com/og-default.jpg"],
+    },
+  };
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -130,7 +174,7 @@ function ArtistAvatar({ artist, size = 64 }: { artist: ArtistFull | OtherArtist;
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
-export default async function ArtistDetailPage({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ArtistDetailPage({ params }: Props) {
   const { slug } = await params;
   const supabase = await createClient();
 
@@ -179,8 +223,25 @@ export default async function ArtistDetailPage({ params }: { params: Promise<{ s
   const videoUrls = artist.video_urls ?? [];
   const youtubeVideos = videoUrls.map((url) => ({ url, id: extractYouTubeId(url) })).filter((v) => v.id);
 
+  const sameAs = [artist.instagram_url, artist.website_url, artist.youtube_url, artist.spotify_url, artist.tiktok_url].filter(Boolean) as string[];
+  const artistLd = personSchema({
+    name: artist.name,
+    slug,
+    description: artist.bio ?? undefined,
+    imageUrl: artist.profile_image_url ?? undefined,
+    basedIn: location || undefined,
+    sameAs,
+  });
+  const crumbs = breadcrumbSchema([
+    { name: "Home", url: "https://rameelo.com" },
+    { name: "Artists", url: "https://rameelo.com/artists" },
+    { name: artist.name, url: `https://rameelo.com/artists/${slug}` },
+  ]);
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FCF9F2" }}>
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(artistLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(crumbs) }} />
 
       {/* ── HERO ─────────────────────────────────────────────────────────── */}
       <section className="relative overflow-hidden">

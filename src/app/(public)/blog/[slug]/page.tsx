@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getArticle, BLOG_ARTICLES, type BlogArticle } from "@/lib/blog";
+import { breadcrumbSchema, ld } from "@/lib/jsonld";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -18,6 +19,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description: article.excerpt,
     keywords: article.tags,
     authors: [{ name: article.author }],
+    alternates: { canonical: `https://rameelo.com/blog/${article.slug}` },
     openGraph: {
       title: article.title,
       description: article.excerpt,
@@ -25,6 +27,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       publishedTime: article.publishedAt,
       authors: [article.author],
       tags: article.tags,
+      url: `https://rameelo.com/blog/${article.slug}`,
+      siteName: "Rameelo",
     },
     twitter: {
       card: "summary_large_image",
@@ -81,6 +85,12 @@ export default async function BlogArticlePage({ params }: Props) {
     })
     .slice(0, 3);
 
+  const crumbs = breadcrumbSchema([
+    { name: "Home", url: "https://rameelo.com" },
+    { name: "Blog", url: "https://rameelo.com/blog" },
+    { name: article.title, url: `https://rameelo.com/blog/${article.slug}` },
+  ]);
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
@@ -107,10 +117,8 @@ export default async function BlogArticlePage({ params }: Props) {
 
   return (
     <div className="bg-ivory min-h-screen">
-      <script
-        type="application/ld+json"
-        dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-      />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(crumbs) }} />
 
       {/* ── Masthead strip ── */}
       <div style={{ backgroundColor: "#2E1B30" }} className="border-b border-white/10">
