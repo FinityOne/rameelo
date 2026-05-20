@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "../org-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -154,6 +155,7 @@ function PaymentMix({ orders }: { orders: RawOrder[] }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function OrganizerFinancialsPage() {
+  const { activeOrg } = useOrg();
   const [allEvents, setAllEvents]   = useState<EventMeta[]>([]);
   const [allOrders, setAllOrders]   = useState<RawOrder[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -165,15 +167,18 @@ export default function OrganizerFinancialsPage() {
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: eventsData } = await supabase
+      const evQuery = supabase
         .from("events")
         .select("id, title, start_date, status")
-        .eq("organizer_id", user.id)
         .order("start_date", { ascending: false });
+      const { data: eventsData } = await (activeOrg
+        ? evQuery.eq("org_id", activeOrg.id)
+        : evQuery.eq("organizer_id", user.id));
 
       const events = (eventsData ?? []) as EventMeta[];
       setAllEvents(events);
@@ -192,7 +197,7 @@ export default function OrganizerFinancialsPage() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [activeOrg]);
 
   // ── Derived: available years from order data ─────────────────────────────
   const availableYears = useMemo(() => {

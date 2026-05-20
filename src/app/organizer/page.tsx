@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "./org-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -110,24 +111,32 @@ function FillBar({ pct, color = "#F5A623" }: { pct: number; color?: string }) {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function OrganizerHubPage() {
+  const { activeOrg } = useOrg();
   const [events, setEvents] = useState<EventCard[]>([]);
   const [recentOrders, setRecentOrders] = useState<(OrderRow & { event_title: string })[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [orgId, setOrgId] = useState<string | null>(null);
 
   useEffect(() => {
+    setLoading(true);
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
 
-      const [{ data: orgMember }, { data: rawEvents }, { data: orders }] = await Promise.all([
-        supabase.from("org_members").select("org_id").eq("user_id", user.id).limit(1).maybeSingle(),
-        supabase.from("events").select("id, title, start_date, end_date, city, state, status, cover_image_url, capacity, created_at, ticket_tiers(id, price, quantity, sort_order, name)").eq("organizer_id", user.id).order("start_date", { ascending: true }),
-        supabase.from("orders").select("event_id, qty, unit_price, grand_total, created_at, status").eq("organizer_id", user.id).eq("status", "confirmed").order("created_at", { ascending: false }),
-      ]);
+      // Filter events by org_id when an org is active, otherwise by organizer_id
+      const evQuery = supabase
+        .from("events")
+        .select("id, title, start_date, end_date, city, state, status, cover_image_url, capacity, created_at, ticket_tiers(id, price, quantity, sort_order, name)")
+        .order("start_date", { ascending: true });
+      const { data: rawEvents } = await (activeOrg
+        ? evQuery.eq("org_id", activeOrg.id)
+        : evQuery.eq("organizer_id", user.id));
 
-      setOrgId(orgMember?.org_id ?? null);
+      const eventIds = (rawEvents ?? []).map((e: { id: string }) => e.id);
+      const { data: orders } = eventIds.length > 0
+        ? await supabase.from("orders").select("event_id, qty, unit_price, grand_total, created_at, status").in("event_id", eventIds).eq("status", "confirmed").order("created_at", { ascending: false })
+        : { data: [] };
+
       const allOrders: OrderRow[] = (orders ?? []) as OrderRow[];
 
       const cards: EventCard[] = ((rawEvents ?? []) as RawEvent[]).map((ev) => {
@@ -158,7 +167,7 @@ export default function OrganizerHubPage() {
       setEvents(cards);
       setLoading(false);
     });
-  }, []);
+  }, [activeOrg]);
 
   const upcomingEvents = events.filter((e) => !e.isPast && e.status === "published");
   const draftEvents    = events.filter((e) => e.status === "draft" || e.status === "pending_review");

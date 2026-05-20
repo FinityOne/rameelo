@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "../org-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -476,20 +477,24 @@ function VelocityInsight({ events }: { events: EventStat[] }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function OrganizerSalesPage() {
+  const { activeOrg } = useOrg();
   const [events, setEvents] = useState<EventStat[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data: eventsRaw } = await supabase
+      const evQuery = supabase
         .from("events")
         .select("id, title, start_date, status, capacity, created_at, ticket_tiers (id, name, price, quantity, quantity_sold, sort_order)")
-        .eq("organizer_id", user.id)
         .order("start_date", { ascending: true });
+      const { data: eventsRaw } = await (activeOrg
+        ? evQuery.eq("org_id", activeOrg.id)
+        : evQuery.eq("organizer_id", user.id));
 
       const raw = (eventsRaw ?? []) as RawEvent[];
       const computed: EventStat[] = raw.map(ev => {
@@ -509,7 +514,7 @@ export default function OrganizerSalesPage() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [activeOrg]);
 
   const hasEvents = events.length > 0;
   const totalEarned = events.reduce((s, e) => s + e.earnedRevenue, 0);

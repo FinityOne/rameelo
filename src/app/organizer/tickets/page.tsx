@@ -3,6 +3,7 @@
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "../org-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -163,6 +164,7 @@ function TableRow({ order }: { order: OrderRow }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function OrganizerTicketsPage() {
+  const { activeOrg } = useOrg();
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [events, setEvents] = useState<EventOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -175,16 +177,18 @@ export default function OrganizerTicketsPage() {
 
   useEffect(() => {
     async function load() {
+      setLoading(true);
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      // Fetch organizer's event IDs
-      const { data: myEvents } = await supabase
+      const evQuery = supabase
         .from("events")
         .select("id, title, start_date")
-        .eq("organizer_id", user.id)
         .order("start_date", { ascending: false });
+      const { data: myEvents } = await (activeOrg
+        ? evQuery.eq("org_id", activeOrg.id)
+        : evQuery.eq("organizer_id", user.id));
 
       const eventList = (myEvents ?? []) as { id: string; title: string; start_date: string }[];
       setEvents(eventList.map(e => ({ id: e.id, title: e.title })));
@@ -236,7 +240,7 @@ export default function OrganizerTicketsPage() {
       setLoading(false);
     }
     load();
-  }, []);
+  }, [activeOrg]);
 
   const filtered = useMemo(() => {
     let list = [...orders];
