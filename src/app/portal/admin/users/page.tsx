@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import type { UserRole } from "@/lib/auth";
 
@@ -98,9 +99,9 @@ export default function AdminUsersPage() {
               </thead>
               <tbody className="divide-y divide-ivory-200">
                 {filtered.map((profile) => (
-                  <tr key={profile.id} className="hover:bg-ivory/50 transition-colors">
+                  <tr key={profile.id} className="hover:bg-ivory/50 transition-colors group cursor-pointer">
                     <td className="px-5 py-4">
-                      <div className="flex items-center gap-3">
+                      <Link href={`/portal/admin/users/${profile.id}`} className="flex items-center gap-3">
                         <div
                           className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
                           style={{ backgroundColor: "#" + ((profile.first_name.charCodeAt(0) * 1234567) % 0xffffff).toString(16).padStart(6, "8") }}
@@ -108,12 +109,12 @@ export default function AdminUsersPage() {
                           {(profile.first_name[0] ?? "?")}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-ui font-semibold text-ink leading-tight truncate">
+                          <p className="font-ui font-semibold text-ink leading-tight truncate group-hover:text-aubergine transition-colors">
                             {profile.first_name} {profile.last_name}
                           </p>
                           <p className="font-mono text-[10px] text-ink-muted truncate">{profile.email}</p>
                         </div>
-                      </div>
+                      </Link>
                     </td>
                     <td className="px-5 py-4 hidden md:table-cell">
                       <p className="font-ui text-ink-muted text-sm">{[profile.city, profile.state].filter(Boolean).join(", ") || "—"}</p>

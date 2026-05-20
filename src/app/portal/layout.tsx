@@ -421,6 +421,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
                 {pathname === "/portal/admin/events" && "Event Review"}
                 {/^\/portal\/admin\/events\/[^/]+$/.test(pathname) && "Review Event"}
                 {pathname === "/portal/admin/users" && "User Management"}
+                {/^\/portal\/admin\/users\/[^/]+$/.test(pathname) && "User Details"}
                 {pathname === "/portal/admin/organizations" && "Organizations"}
                 {/^\/portal\/admin\/organizations\/[^/]+$/.test(pathname) && "Organization Details"}
                 {pathname === "/portal/admin/artists" && "Artists"}
