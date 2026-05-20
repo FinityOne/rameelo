@@ -32,17 +32,28 @@ export default function SignInPage() {
     const meta = data.user?.user_metadata ?? {};
     const firstName = meta.firstName ?? email.split("@")[0];
     const lastName = meta.lastName ?? "Member";
-    const user = createUser({
-      firstName,
-      lastName,
+
+    // Fetch role to decide which portal to land on
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("role, first_name, last_name")
+      .eq("id", data.user!.id)
+      .single();
+
+    const role = profile?.role ?? "user";
+    const rameeloUser = createUser({
+      firstName: profile?.first_name || firstName,
+      lastName:  profile?.last_name  || lastName,
       email: data.user?.email ?? email,
       phone: meta.phone ?? "",
       city: meta.city ?? "",
       state: meta.state ?? "",
+      role,
     });
-    saveUser(user);
+    saveUser(rameeloUser);
 
-    router.push("/portal");
+    const destination = role === "admin" ? "/admin" : role === "organizer" ? "/organizer" : "/portal";
+    router.push(destination);
     router.refresh();
   }
 
