@@ -303,6 +303,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               <NavDivider label="Admin" />
               <Link
                 href="/admin"
+                target="_blank"
+                rel="noopener noreferrer"
                 onClick={() => setSidebarOpen(false)}
                 className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/50 hover:text-white hover:bg-white/5 transition-all group"
               >
