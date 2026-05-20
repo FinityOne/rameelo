@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -20,6 +20,8 @@ type Order = {
   status: string;
   created_at: string;
   group_id: string | null;
+  cancellation_reason: string | null;
+  cancelled_at: string | null;
   ticket_tiers: { name: string } | null;
 };
 
@@ -37,8 +39,140 @@ const ORDER_STATUS: Record<string, { label: string; cls: string }> = {
   confirmed: { label: "Confirmed", cls: "bg-peacock/15 text-peacock" },
   pending:   { label: "Pending",   cls: "bg-marigold/20 text-[#a06b00]" },
   refunded:  { label: "Refunded",  cls: "bg-durga/15 text-durga" },
-  cancelled: { label: "Cancelled", cls: "bg-ivory-200 text-ink-muted" },
+  cancelled: { label: "Cancelled", cls: "bg-black/[0.06] text-ink-muted" },
 };
+
+const CANCEL_REASONS = [
+  "Buyer requested cancellation",
+  "Duplicate order",
+  "Payment issue",
+  "Event capacity issue",
+  "Attendee no longer attending",
+  "Other",
+];
+
+// ─── Cancel Modal ─────────────────────────────────────────────────────────────
+
+function CancelOrderModal({
+  order,
+  onConfirm,
+  onClose,
+  saving,
+}: {
+  order: Order;
+  onConfirm: (reason: string) => void;
+  onClose: () => void;
+  saving: boolean;
+}) {
+  const [preset, setPreset] = useState("");
+  const [custom, setCustom] = useState("");
+
+  const reason = preset === "Other" ? custom.trim() : preset;
+  const valid = reason.length > 0;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4">
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-md">
+        {/* Header */}
+        <div className="px-6 pt-6 pb-4 border-b border-ivory-200">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <h2 className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>
+                Cancel Order
+              </h2>
+              <p className="font-ui text-sm text-ink-muted mt-0.5">
+                This cannot be undone. The order will move to Cancelled.
+              </p>
+            </div>
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-ivory flex items-center justify-center text-ink-muted hover:bg-ivory-200 transition-colors shrink-0">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        {/* Order summary */}
+        <div className="mx-6 mt-4 rounded-2xl bg-ivory p-4 border border-ivory-200">
+          <p className="font-ui text-sm font-semibold text-ink">{order.buyer_name}</p>
+          <p className="font-mono text-[9px] text-ink-muted mt-0.5">{order.buyer_email}</p>
+          <div className="flex items-center justify-between mt-2 pt-2 border-t border-ivory-200">
+            <p className="font-ui text-xs text-ink-muted">
+              {order.ticket_tiers?.name ?? "Ticket"} × {order.qty}
+            </p>
+            <p className="font-display font-bold text-ink" style={{ letterSpacing: "-0.02em" }}>
+              ${order.grand_total.toFixed(2)}
+            </p>
+          </div>
+        </div>
+
+        {/* Reason picker */}
+        <div className="px-6 py-4 space-y-3">
+          <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Cancellation Reason *</p>
+          <div className="flex flex-wrap gap-2">
+            {CANCEL_REASONS.map(r => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => { setPreset(r); if (r !== "Other") setCustom(""); }}
+                className={`px-3 py-1.5 rounded-xl font-ui text-xs font-semibold border transition-all ${
+                  preset === r
+                    ? "bg-aubergine text-white border-aubergine"
+                    : "bg-white text-ink-muted border-ivory-200 hover:border-aubergine/30 hover:text-ink"
+                }`}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+
+          {preset === "Other" && (
+            <textarea
+              autoFocus
+              value={custom}
+              onChange={e => setCustom(e.target.value)}
+              placeholder="Describe the reason…"
+              rows={3}
+              className="w-full rounded-xl border border-ivory-200 bg-ivory px-3 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/30 focus:border-aubergine/40 resize-none transition-all"
+            />
+          )}
+        </div>
+
+        {/* Actions */}
+        <div className="px-6 pb-6 flex gap-3">
+          <button
+            onClick={onClose}
+            disabled={saving}
+            className="flex-1 py-3 rounded-2xl border border-ivory-200 font-ui text-sm font-semibold text-ink-muted hover:bg-ivory transition-all"
+          >
+            Keep Order
+          </button>
+          <button
+            onClick={() => valid && onConfirm(reason)}
+            disabled={!valid || saving}
+            className={`flex-1 py-3 rounded-2xl font-ui text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+              valid && !saving
+                ? "bg-durga text-white hover:bg-durga/90 shadow-sm"
+                : "bg-black/[0.06] text-ink-muted cursor-not-allowed"
+            }`}
+          >
+            {saving ? (
+              <>
+                <div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                Cancelling…
+              </>
+            ) : (
+              "Confirm Cancel"
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
@@ -46,37 +180,64 @@ export default function EventOrdersPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
 
-  const [orders, setOrders]       = useState<Order[]>([]);
+  const [orders, setOrders]         = useState<Order[]>([]);
   const [eventTitle, setEventTitle] = useState("");
-  const [loading, setLoading]     = useState(true);
-  const [filter, setFilter]       = useState<string>("all");
+  const [loading, setLoading]       = useState(true);
+  const [filter, setFilter]         = useState<string>("all");
+  const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
+  const [cancelSaving, setCancelSaving] = useState(false);
 
-  useEffect(() => {
-    async function load() {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+  const load = useCallback(async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
 
-      const [evRes, ordRes] = await Promise.all([
-        supabase.from("events").select("title").eq("id", id).eq("organizer_id", user.id).single(),
-        supabase.from("orders")
-          .select("id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_amount, service_fee, grand_total, status, created_at, group_id, ticket_tiers(name)")
-          .eq("event_id", id)
-          .order("created_at", { ascending: false }),
-      ]);
+    const [evRes, ordRes] = await Promise.all([
+      supabase.from("events").select("title").eq("id", id).eq("organizer_id", user.id).single(),
+      supabase.from("orders")
+        .select("id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_amount, service_fee, grand_total, status, created_at, group_id, cancellation_reason, cancelled_at, ticket_tiers(name)")
+        .eq("event_id", id)
+        .order("created_at", { ascending: false }),
+    ]);
 
-      if (!evRes.data) { router.replace("/organizer/events"); return; }
-      setEventTitle(evRes.data.title);
-      setOrders((ordRes.data ?? []) as unknown as Order[]);
-      setLoading(false);
-    }
-    load();
+    if (!evRes.data) { router.replace("/organizer/events"); return; }
+    setEventTitle(evRes.data.title);
+    setOrders((ordRes.data ?? []) as unknown as Order[]);
+    setLoading(false);
   }, [id, router]);
+
+  useEffect(() => { load(); }, [load]);
+
+  async function handleCancel(reason: string) {
+    if (!cancelTarget) return;
+    setCancelSaving(true);
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+
+    await supabase.from("orders").update({
+      status: "cancelled",
+      cancellation_reason: reason,
+      cancelled_at: new Date().toISOString(),
+      cancelled_by: user?.id ?? null,
+    }).eq("id", cancelTarget.id);
+
+    // Optimistically update local state
+    setOrders(prev => prev.map(o =>
+      o.id === cancelTarget.id
+        ? { ...o, status: "cancelled", cancellation_reason: reason, cancelled_at: new Date().toISOString() }
+        : o
+    ));
+
+    setCancelSaving(false);
+    setCancelTarget(null);
+  }
 
   const filtered = filter === "all" ? orders : orders.filter(o => o.status === filter);
 
   const totalRevenue = orders.filter(o => o.status === "confirmed").reduce((s, o) => s + o.grand_total, 0);
   const totalTickets = orders.filter(o => o.status === "confirmed").reduce((s, o) => s + o.qty, 0);
+  const cancelledCount = orders.filter(o => o.status === "cancelled").length;
+  const cancelledRevenue = orders.filter(o => o.status === "cancelled").reduce((s, o) => s + o.grand_total, 0);
 
   if (loading) {
     return (
@@ -87,168 +248,248 @@ export default function EventOrdersPage() {
   }
 
   return (
-    <div className="space-y-5">
+    <>
+      {cancelTarget && (
+        <CancelOrderModal
+          order={cancelTarget}
+          onConfirm={handleCancel}
+          onClose={() => setCancelTarget(null)}
+          saving={cancelSaving}
+        />
+      )}
 
-      {/* Header */}
-      <div>
-        <div className="flex items-center gap-2 mb-1.5">
-          <Link href="/organizer/events"
-            className="font-ui text-xs text-ink-muted hover:text-ink flex items-center gap-1 transition-colors">
-            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            My Events
-          </Link>
-          <span className="text-ink-muted/40 text-xs">/</span>
-          <Link href={`/organizer/events/${id}`}
-            className="font-ui text-xs text-ink-muted hover:text-ink transition-colors truncate max-w-[180px]">
-            {eventTitle}
-          </Link>
-          <span className="text-ink-muted/40 text-xs">/</span>
-          <span className="font-ui text-xs text-ink">Orders</span>
+      <div className="space-y-5">
+
+        {/* Header */}
+        <div>
+          <div className="flex items-center gap-2 mb-1.5">
+            <Link href="/organizer/events"
+              className="font-ui text-xs text-ink-muted hover:text-ink flex items-center gap-1 transition-colors">
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+              My Events
+            </Link>
+            <span className="text-ink-muted/40 text-xs">/</span>
+            <Link href={`/organizer/events/${id}`}
+              className="font-ui text-xs text-ink-muted hover:text-ink transition-colors truncate max-w-[180px]">
+              {eventTitle}
+            </Link>
+            <span className="text-ink-muted/40 text-xs">/</span>
+            <span className="font-ui text-xs text-ink">Orders</span>
+          </div>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div>
+              <h1 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: "-0.02em" }}>All Orders</h1>
+              <p className="font-ui text-sm text-ink-muted mt-0.5">
+                {orders.length} order{orders.length !== 1 ? "s" : ""} · {totalTickets} tickets · ${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} confirmed revenue
+              </p>
+            </div>
+            <Link href={`/organizer/events/${id}`}
+              className="font-ui text-sm font-semibold text-ink-muted hover:text-ink flex items-center gap-1 transition-colors">
+              ← Dashboard
+            </Link>
+          </div>
         </div>
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <div>
-            <h1 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: "-0.02em" }}>All Orders</h1>
-            <p className="font-ui text-sm text-ink-muted mt-0.5">
-              {orders.length} order{orders.length !== 1 ? "s" : ""} · {totalTickets} tickets · ${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} confirmed revenue
+
+        {/* Cancelled revenue banner */}
+        {cancelledCount > 0 && (
+          <div className="flex items-center gap-3 bg-black/[0.03] border border-black/[0.07] rounded-2xl px-4 py-3">
+            <div className="w-7 h-7 rounded-lg bg-black/[0.06] flex items-center justify-center shrink-0">
+              <svg className="w-3.5 h-3.5 text-ink-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" />
+              </svg>
+            </div>
+            <p className="font-ui text-sm text-ink-muted">
+              <span className="font-semibold text-ink">{cancelledCount} cancelled order{cancelledCount !== 1 ? "s" : ""}</span>
+              {" "}(${cancelledRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} removed from revenue) ·{" "}
+              <button onClick={() => setFilter("cancelled")} className="text-aubergine font-semibold hover:underline">
+                View
+              </button>
             </p>
           </div>
-          <Link href={`/organizer/events/${id}`}
-            className="font-ui text-sm font-semibold text-ink-muted hover:text-ink flex items-center gap-1 transition-colors">
-            ← Dashboard
-          </Link>
-        </div>
-      </div>
+        )}
 
-      {/* Summary tiles */}
-      {orders.length > 0 && (
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-          {[
-            { label: "Confirmed", count: orders.filter(o => o.status === "confirmed").length, cls: "text-peacock" },
-            { label: "Pending",   count: orders.filter(o => o.status === "pending").length,   cls: "text-[#a06b00]" },
-            { label: "Refunded",  count: orders.filter(o => o.status === "refunded").length,  cls: "text-durga" },
-            { label: "Cancelled", count: orders.filter(o => o.status === "cancelled").length, cls: "text-ink-muted" },
-          ].map(tile => (
-            <button
-              key={tile.label}
-              onClick={() => setFilter(filter === tile.label.toLowerCase() ? "all" : tile.label.toLowerCase())}
-              className={`bg-white rounded-2xl border px-4 py-3.5 text-left transition-all ${
-                filter === tile.label.toLowerCase() ? "border-aubergine shadow-sm" : "border-ivory-200 hover:border-aubergine/25"
-              }`}
-            >
-              <p className={`font-display font-bold text-2xl ${tile.cls}`} style={{ letterSpacing: "-0.03em" }}>{tile.count}</p>
-              <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted mt-1">{tile.label}</p>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Filter bar */}
-      {orders.length > 0 && (
-        <div className="flex items-center gap-1 bg-ivory-200 rounded-xl p-1 w-fit">
-          {["all", "confirmed", "pending", "refunded", "cancelled"].map(f => (
-            <button key={f} onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-lg font-ui text-xs font-semibold capitalize transition-all ${
-                filter === f ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
-              }`}>
-              {f === "all" ? `All (${orders.length})` : f}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Table */}
-      {filtered.length === 0 ? (
-        <div className="bg-white rounded-2xl border-2 border-dashed border-ivory-200 p-16 text-center">
-          <p className="text-4xl mb-3">🧾</p>
-          <p className="font-display font-semibold text-ink text-lg mb-1" style={{ letterSpacing: "-0.015em" }}>
-            {orders.length === 0 ? "No orders yet" : `No ${filter} orders`}
-          </p>
-          <p className="font-ui text-sm text-ink-muted">
-            {orders.length === 0 ? "Orders will appear here as attendees purchase tickets." : "Try a different filter."}
-          </p>
-        </div>
-      ) : (
-        <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
-          {/* Desktop table */}
-          <div className="hidden sm:block overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-ivory-200 bg-ivory">
-                  <th className="px-5 py-3 text-left font-mono text-[9px] uppercase tracking-widest text-ink-muted">Date</th>
-                  <th className="px-5 py-3 text-left font-mono text-[9px] uppercase tracking-widest text-ink-muted">Buyer</th>
-                  <th className="px-5 py-3 text-left font-mono text-[9px] uppercase tracking-widest text-ink-muted">Tier</th>
-                  <th className="px-5 py-3 text-center font-mono text-[9px] uppercase tracking-widest text-ink-muted">Qty</th>
-                  <th className="px-5 py-3 text-right font-mono text-[9px] uppercase tracking-widest text-ink-muted">Total</th>
-                  <th className="px-5 py-3 text-center font-mono text-[9px] uppercase tracking-widest text-ink-muted">Status</th>
-                  <th className="px-5 py-3 text-center font-mono text-[9px] uppercase tracking-widest text-ink-muted">Group</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-ivory-200">
-                {filtered.map(order => {
-                  const s = ORDER_STATUS[order.status] ?? ORDER_STATUS.confirmed;
-                  return (
-                    <tr key={order.id} className="hover:bg-ivory/40 transition-colors">
-                      <td className="px-5 py-3.5">
-                        <p className="font-ui text-xs text-ink">{fmtDate(order.created_at)}</p>
-                        <p className="font-mono text-[9px] text-ink-muted">{fmtTime(order.created_at)}</p>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <p className="font-ui text-sm font-semibold text-ink">{order.buyer_name}</p>
-                        <p className="font-mono text-[9px] text-ink-muted">{order.buyer_email}</p>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <p className="font-ui text-sm text-ink">{order.ticket_tiers?.name ?? "—"}</p>
-                        <p className="font-mono text-[9px] text-ink-muted">${order.unit_price}/ticket</p>
-                      </td>
-                      <td className="px-5 py-3.5 text-center">
-                        <p className="font-display font-bold text-ink" style={{ letterSpacing: "-0.02em" }}>{order.qty}</p>
-                      </td>
-                      <td className="px-5 py-3.5 text-right">
-                        <p className="font-display font-bold text-peacock" style={{ letterSpacing: "-0.02em" }}>${order.grand_total.toFixed(2)}</p>
-                        {order.discount_amount > 0 && (
-                          <p className="font-mono text-[9px] text-ink-muted">−${order.discount_amount.toFixed(2)} disc.</p>
-                        )}
-                      </td>
-                      <td className="px-5 py-3.5 text-center">
-                        <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-2 py-1 rounded-full ${s.cls}`}>{s.label}</span>
-                      </td>
-                      <td className="px-5 py-3.5 text-center">
-                        {order.group_id ? (
-                          <span className="font-mono text-[9px] text-aubergine bg-aubergine/8 px-2 py-0.5 rounded-full">Group</span>
-                        ) : (
-                          <span className="font-mono text-[9px] text-ink-muted">—</span>
-                        )}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        {/* Summary tiles */}
+        {orders.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: "Confirmed", count: orders.filter(o => o.status === "confirmed").length, cls: "text-peacock" },
+              { label: "Pending",   count: orders.filter(o => o.status === "pending").length,   cls: "text-[#a06b00]" },
+              { label: "Refunded",  count: orders.filter(o => o.status === "refunded").length,  cls: "text-durga" },
+              { label: "Cancelled", count: cancelledCount,                                       cls: "text-ink-muted" },
+            ].map(tile => (
+              <button
+                key={tile.label}
+                onClick={() => setFilter(filter === tile.label.toLowerCase() ? "all" : tile.label.toLowerCase())}
+                className={`bg-white rounded-2xl border px-4 py-3.5 text-left transition-all ${
+                  filter === tile.label.toLowerCase() ? "border-aubergine shadow-sm" : "border-ivory-200 hover:border-aubergine/25"
+                }`}
+              >
+                <p className={`font-display font-bold text-2xl ${tile.cls}`} style={{ letterSpacing: "-0.03em" }}>{tile.count}</p>
+                <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted mt-1">{tile.label}</p>
+              </button>
+            ))}
           </div>
+        )}
 
-          {/* Mobile cards */}
-          <div className="sm:hidden divide-y divide-ivory-200">
-            {filtered.map(order => {
-              const s = ORDER_STATUS[order.status] ?? ORDER_STATUS.confirmed;
-              return (
-                <div key={order.id} className="px-4 py-4">
-                  <div className="flex items-start justify-between gap-3 mb-1.5">
-                    <div className="min-w-0">
-                      <p className="font-ui text-sm font-semibold text-ink">{order.buyer_name}</p>
-                      <p className="font-mono text-[9px] text-ink-muted">{order.ticket_tiers?.name ?? "—"} · {order.qty} ticket{order.qty !== 1 ? "s" : ""}</p>
+        {/* Filter bar */}
+        {orders.length > 0 && (
+          <div className="flex items-center gap-1 bg-ivory-200 rounded-xl p-1 w-fit">
+            {["all", "confirmed", "pending", "refunded", "cancelled"].map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className={`px-3 py-1.5 rounded-lg font-ui text-xs font-semibold capitalize transition-all ${
+                  filter === f ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
+                }`}>
+                {f === "all" ? `All (${orders.length})` : f}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Table */}
+        {filtered.length === 0 ? (
+          <div className="bg-white rounded-2xl border-2 border-dashed border-ivory-200 p-16 text-center">
+            <p className="text-4xl mb-3">🧾</p>
+            <p className="font-display font-semibold text-ink text-lg mb-1" style={{ letterSpacing: "-0.015em" }}>
+              {orders.length === 0 ? "No orders yet" : `No ${filter} orders`}
+            </p>
+            <p className="font-ui text-sm text-ink-muted">
+              {orders.length === 0 ? "Orders will appear here as attendees purchase tickets." : "Try a different filter."}
+            </p>
+          </div>
+        ) : (
+          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+
+            {/* Desktop table */}
+            <div className="hidden sm:block overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-ivory-200 bg-ivory">
+                    <th className="px-5 py-3 text-left font-mono text-[9px] uppercase tracking-widest text-ink-muted">Date</th>
+                    <th className="px-5 py-3 text-left font-mono text-[9px] uppercase tracking-widest text-ink-muted">Buyer</th>
+                    <th className="px-5 py-3 text-left font-mono text-[9px] uppercase tracking-widest text-ink-muted">Tier</th>
+                    <th className="px-5 py-3 text-center font-mono text-[9px] uppercase tracking-widest text-ink-muted">Qty</th>
+                    <th className="px-5 py-3 text-right font-mono text-[9px] uppercase tracking-widest text-ink-muted">Total</th>
+                    <th className="px-5 py-3 text-center font-mono text-[9px] uppercase tracking-widest text-ink-muted">Status</th>
+                    <th className="px-5 py-3 text-center font-mono text-[9px] uppercase tracking-widest text-ink-muted">Group</th>
+                    <th className="px-5 py-3 text-center font-mono text-[9px] uppercase tracking-widest text-ink-muted">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-ivory-200">
+                  {filtered.map(order => {
+                    const s = ORDER_STATUS[order.status] ?? ORDER_STATUS.confirmed;
+                    const isCancelled = order.status === "cancelled";
+                    return (
+                      <>
+                        <tr key={order.id} className={`transition-colors ${isCancelled ? "bg-black/[0.015] opacity-70" : "hover:bg-ivory/40"}`}>
+                          <td className="px-5 py-3.5">
+                            <p className="font-ui text-xs text-ink">{fmtDate(order.created_at)}</p>
+                            <p className="font-mono text-[9px] text-ink-muted">{fmtTime(order.created_at)}</p>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <p className={`font-ui text-sm font-semibold ${isCancelled ? "line-through text-ink-muted" : "text-ink"}`}>{order.buyer_name}</p>
+                            <p className="font-mono text-[9px] text-ink-muted">{order.buyer_email}</p>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <p className="font-ui text-sm text-ink">{order.ticket_tiers?.name ?? "—"}</p>
+                            <p className="font-mono text-[9px] text-ink-muted">${order.unit_price}/ticket</p>
+                          </td>
+                          <td className="px-5 py-3.5 text-center">
+                            <p className="font-display font-bold text-ink" style={{ letterSpacing: "-0.02em" }}>{order.qty}</p>
+                          </td>
+                          <td className="px-5 py-3.5 text-right">
+                            <p className={`font-display font-bold ${isCancelled ? "line-through text-ink-muted" : "text-peacock"}`} style={{ letterSpacing: "-0.02em" }}>
+                              ${order.grand_total.toFixed(2)}
+                            </p>
+                            {order.discount_amount > 0 && (
+                              <p className="font-mono text-[9px] text-ink-muted">−${order.discount_amount.toFixed(2)} disc.</p>
+                            )}
+                          </td>
+                          <td className="px-5 py-3.5 text-center">
+                            <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-2 py-1 rounded-full ${s.cls}`}>{s.label}</span>
+                          </td>
+                          <td className="px-5 py-3.5 text-center">
+                            {order.group_id ? (
+                              <span className="font-mono text-[9px] text-aubergine bg-aubergine/8 px-2 py-0.5 rounded-full">Group</span>
+                            ) : (
+                              <span className="font-mono text-[9px] text-ink-muted">—</span>
+                            )}
+                          </td>
+                          <td className="px-5 py-3.5 text-center">
+                            {order.status === "confirmed" || order.status === "pending" ? (
+                              <button
+                                onClick={() => setCancelTarget(order)}
+                                className="font-mono text-[9px] font-bold uppercase tracking-widest text-durga/70 hover:text-durga border border-durga/20 hover:border-durga/50 px-2.5 py-1 rounded-lg transition-all"
+                              >
+                                Cancel
+                              </button>
+                            ) : (
+                              <span className="font-mono text-[9px] text-ink-muted/40">—</span>
+                            )}
+                          </td>
+                        </tr>
+                        {isCancelled && order.cancellation_reason && (
+                          <tr key={`${order.id}-reason`} className="bg-black/[0.015]">
+                            <td colSpan={8} className="px-5 pb-3 pt-0">
+                              <div className="flex items-center gap-2">
+                                <svg className="w-3 h-3 text-ink-muted/50 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                                <p className="font-mono text-[9px] text-ink-muted">
+                                  <span className="uppercase tracking-widest mr-1.5">Reason:</span>
+                                  {order.cancellation_reason}
+                                  {order.cancelled_at && (
+                                    <span className="ml-2 opacity-50">· {fmtDate(order.cancelled_at)}</span>
+                                  )}
+                                </p>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Mobile cards */}
+            <div className="sm:hidden divide-y divide-ivory-200">
+              {filtered.map(order => {
+                const s = ORDER_STATUS[order.status] ?? ORDER_STATUS.confirmed;
+                const isCancelled = order.status === "cancelled";
+                return (
+                  <div key={order.id} className={`px-4 py-4 ${isCancelled ? "opacity-60" : ""}`}>
+                    <div className="flex items-start justify-between gap-3 mb-1.5">
+                      <div className="min-w-0">
+                        <p className={`font-ui text-sm font-semibold ${isCancelled ? "line-through text-ink-muted" : "text-ink"}`}>{order.buyer_name}</p>
+                        <p className="font-mono text-[9px] text-ink-muted">{order.ticket_tiers?.name ?? "—"} · {order.qty} ticket{order.qty !== 1 ? "s" : ""}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className={`font-display font-bold ${isCancelled ? "line-through text-ink-muted" : "text-peacock"}`} style={{ letterSpacing: "-0.02em" }}>${order.grand_total.toFixed(2)}</p>
+                        <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
+                      </div>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="font-display font-bold text-peacock" style={{ letterSpacing: "-0.02em" }}>${order.grand_total.toFixed(2)}</p>
-                      <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
-                    </div>
+                    <p className="font-mono text-[9px] text-ink-muted">{fmtDate(order.created_at)} · {fmtTime(order.created_at)}</p>
+                    {isCancelled && order.cancellation_reason && (
+                      <p className="font-mono text-[9px] text-ink-muted/60 mt-1.5 italic">
+                        Reason: {order.cancellation_reason}
+                      </p>
+                    )}
+                    {(order.status === "confirmed" || order.status === "pending") && (
+                      <button
+                        onClick={() => setCancelTarget(order)}
+                        className="mt-2 font-mono text-[9px] font-bold uppercase tracking-widest text-durga/70 hover:text-durga border border-durga/20 hover:border-durga/50 px-2.5 py-1 rounded-lg transition-all"
+                      >
+                        Cancel Order
+                      </button>
+                    )}
                   </div>
-                  <p className="font-mono text-[9px] text-ink-muted">{fmtDate(order.created_at)} · {fmtTime(order.created_at)}</p>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   );
 }
