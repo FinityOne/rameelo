@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
 
 export type NotificationAudience = "user" | "admin";
@@ -30,6 +30,9 @@ type UseNotificationsOptions = {
 export function useNotifications({ audience, limit = 30 }: UseNotificationsOptions) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
+  // unique per mount so StrictMode double-invocation and multi-instance usage
+  // never collide on the same Supabase channel name
+  const channelName = useRef(`notifications:${audience}:${crypto.randomUUID()}`).current;
 
   const fetchNotifications = useCallback(async () => {
     const supabase = createClient();
@@ -50,7 +53,7 @@ export function useNotifications({ audience, limit = 30 }: UseNotificationsOptio
 
     const supabase = createClient();
     const channel = supabase
-      .channel(`notifications:${audience}`)
+      .channel(channelName)
       .on(
         "postgres_changes",
         {
@@ -80,7 +83,7 @@ export function useNotifications({ audience, limit = 30 }: UseNotificationsOptio
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, [fetchNotifications, audience, limit]);
+  }, [fetchNotifications, channelName]);
 
   const markRead = useCallback(async (id: string) => {
     const supabase = createClient();
