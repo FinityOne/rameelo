@@ -407,6 +407,10 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
   const pageTitle = getPageTitle(pathname);
   const isCreateEvent = pathname === "/organizer/events/create";
 
+  useEffect(() => {
+    document.title = `Organizer · ${pageTitle} | Rameelo`;
+  }, [pageTitle]);
+
   return (
     <OrgProvider orgs={orgs} activeOrg={activeOrg} setActiveOrg={setActiveOrg}>
       <div className="min-h-screen flex" style={{ backgroundColor: "#FAF8F5" }}>
@@ -506,9 +510,15 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
               </svg>
             </button>
 
-            <h1 className="font-display font-bold text-ink/75 shrink-0" style={{ fontSize: 14, letterSpacing: "-0.01em" }}>
-              {pageTitle}
-            </h1>
+            <div className="flex items-center gap-2 shrink-0">
+              <span className="hidden sm:inline-flex font-mono text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded"
+                style={{ backgroundColor: "rgba(245,166,35,0.12)", color: "#c97b00" }}>
+                Organizer
+              </span>
+              <h1 className="font-display font-bold text-ink/75" style={{ fontSize: 14, letterSpacing: "-0.01em" }}>
+                {pageTitle}
+              </h1>
+            </div>
 
             {/* Active org indicator — only when user has orgs */}
             {activeOrg && (

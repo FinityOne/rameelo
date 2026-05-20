@@ -207,6 +207,23 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   const role = user?.role ?? 'user';
 
+  // Dynamic browser tab title for clear portal identification
+  useEffect(() => {
+    const pageLabel =
+      pathname === "/portal"               ? "Home" :
+      pathname === "/portal/tickets"       ? "My Tickets" :
+      pathname === "/portal/feed"          ? "Activity Feed" :
+      pathname === "/portal/refer"         ? "Refer & Earn" :
+      pathname === "/portal/profile"       ? "Profile" :
+      pathname === "/portal/community"     ? "Community" :
+      pathname === "/portal/friends"       ? "Friends" :
+      pathname === "/portal/groups"        ? "My Groups" :
+      pathname.startsWith("/portal/events/")     ? "Event Details" :
+      pathname.startsWith("/portal/group-chat/") ? "Group Chat" :
+      "Member Portal";
+    document.title = `Member · ${pageLabel} | Rameelo`;
+  }, [pathname]);
+
   if (!user) {
     return (
       <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FCF9F2" }}>
@@ -335,9 +352,13 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
 
-            <div className="flex-1">
-              <p className="font-display font-bold text-ink text-sm">
-                {pathname === "/portal" && `Good evening, ${user.firstName} 👋`}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="hidden sm:inline-flex font-mono text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded shrink-0"
+                style={{ backgroundColor: "rgba(14,140,122,0.1)", color: "#0E8C7A" }}>
+                Member
+              </span>
+              <p className="font-display font-bold text-ink text-sm truncate">
+                {pathname === "/portal" && `Good ${new Date().getHours() < 12 ? "morning" : new Date().getHours() < 17 ? "afternoon" : "evening"}, ${user.firstName} 👋`}
                 {pathname === "/portal/tickets" && "My Tickets"}
                 {pathname === "/portal/feed" && "Activity Feed"}
                 {pathname === "/portal/refer" && "Refer & Earn"}

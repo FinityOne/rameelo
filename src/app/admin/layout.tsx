@@ -325,6 +325,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   const pageTitle = getPageTitle(pathname);
 
+  useEffect(() => {
+    document.title = `Admin · ${pageTitle} | Rameelo`;
+  }, [pageTitle]);
+
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: "#F5F3F0" }}>
       {/* Mobile backdrop */}
@@ -425,13 +429,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             </svg>
           </button>
 
-          {/* Page title */}
-          <h1
-            className="font-display font-bold text-ink/80 flex-1"
-            style={{ fontSize: 14, letterSpacing: "-0.01em" }}
-          >
-            {pageTitle}
-          </h1>
+          {/* Portal label + page title */}
+          <div className="flex items-center gap-2 flex-1 min-w-0">
+            <span className="hidden sm:inline-flex font-mono text-[9px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded shrink-0"
+              style={{ backgroundColor: "rgba(220,38,38,0.12)", color: "#EF4444" }}>
+              Admin
+            </span>
+            <h1 className="font-display font-bold text-ink/80 truncate" style={{ fontSize: 14, letterSpacing: "-0.01em" }}>
+              {pageTitle}
+            </h1>
+          </div>
 
           {/* Actions */}
           <div className="flex items-center gap-1.5">
