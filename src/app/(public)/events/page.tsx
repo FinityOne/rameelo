@@ -43,8 +43,8 @@ type EventVM = {
   time: string;
   coverImageUrl: string | null;
   gradient: typeof GRADIENTS[0];
-  minPrice: number;
-  maxPrice: number;
+  minPrice: number | null;
+  maxPrice: number | null;
   totalQty: number;
   dressCode: string;
   ageRestriction: string;
@@ -78,7 +78,6 @@ function ArtistAvatar({ name, photo, size = 28 }: { name: string; photo: string 
 
 function EventCard({ event }: { event: EventVM }) {
   const gradient = event.gradient;
-  const free = event.minPrice === 0;
 
   return (
     <div className="bg-white rounded-2xl overflow-hidden border border-ivory-200 hover:border-marigold/30 hover:shadow-lg transition-all group flex flex-col">
@@ -149,12 +148,12 @@ function EventCard({ event }: { event: EventVM }) {
 
         <div className="flex items-center justify-between pt-2 border-t border-ivory-200">
           <div>
-            {free ? (
+            {event.minPrice === null ? null : event.minPrice === 0 ? (
               <span className="font-display font-bold text-peacock text-base">Free</span>
             ) : (
               <>
                 <span className="font-display font-bold text-ink text-base">${event.minPrice}</span>
-                {event.maxPrice > event.minPrice && (
+                {event.maxPrice !== null && event.maxPrice > event.minPrice && (
                   <span className="text-ink-muted text-xs ml-1">– ${event.maxPrice}</span>
                 )}
               </>
@@ -219,8 +218,8 @@ export default function EventsPage() {
           time: ev.start_time,
           coverImageUrl: ev.cover_image_url,
           gradient,
-          minPrice: prices.length ? Math.min(...prices) : 0,
-          maxPrice: prices.length ? Math.max(...prices) : 0,
+          minPrice: prices.length ? Math.min(...prices) : null,
+          maxPrice: prices.length ? Math.max(...prices) : null,
           totalQty: ev.ticket_tiers.reduce((s, t) => s + t.quantity, 0),
           dressCode: ev.dress_code,
           ageRestriction: ev.age_restriction,
@@ -296,8 +295,8 @@ export default function EventsPage() {
     }
     result.sort((a, b) => {
       if (sort === 'Date: Soonest') return a.date.localeCompare(b.date);
-      if (sort === 'Price: Low to High') return a.minPrice - b.minPrice;
-      if (sort === 'Price: High to Low') return b.minPrice - a.minPrice;
+      if (sort === 'Price: Low to High') return (a.minPrice ?? 0) - (b.minPrice ?? 0);
+      if (sort === 'Price: High to Low') return (b.minPrice ?? 0) - (a.minPrice ?? 0);
       return 0;
     });
     return result;

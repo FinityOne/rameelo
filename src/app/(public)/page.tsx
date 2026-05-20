@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { events, stats, testimonials, communityGroups } from "@/lib/data";
+import { stats, testimonials, communityGroups } from "@/lib/data";
 import { Eyebrow, Button, Badge, EventCard, Avatar } from "@/components/ui";
 import HeroSearch from "@/components/HeroSearch";
 import { createClient } from "@/lib/supabase/server";
@@ -65,15 +65,41 @@ function CityTicker() {
 /* ─────────────────────────────────────────────
    Page
 ───────────────────────────────────────────── */
-export default async function HomePage() {
-  const featuredEvents = events.slice(0, 3);
+type LiveEvent = {
+  id: string; title: string; category: string;
+  city: string; state: string; start_date: string; start_time: string; venue_name: string;
+  artists: { name: string } | null;
+  ticket_tiers: { price: number; quantity: number; quantity_sold: number }[];
+};
 
-  // Real counts from DB
+function eventAvailability(tiers: { price: number; quantity: number; quantity_sold: number }[]) {
+  if (tiers.length === 0) return { badge: "tickets tba", style: "bg-white/8 text-white/50 border-white/10" };
+  const total = tiers.reduce((s, t) => s + t.quantity, 0);
+  const sold  = tiers.reduce((s, t) => s + t.quantity_sold, 0);
+  const pct   = total > 0 ? sold / total : 0;
+  if (pct >= 1)    return { badge: "sold out",      style: "bg-red-900/60 text-red-300 border-red-500/30" };
+  if (pct >= 0.9)  return { badge: "almost gone",   style: "bg-red-900/60 text-red-300 border-red-500/30" };
+  if (pct >= 0.75) return { badge: "filling fast",  style: "bg-orange-900/50 text-orange-300 border-orange-500/30" };
+  return { badge: "on sale", style: "bg-marigold/15 text-marigold border-marigold/25" };
+}
+
+export default async function HomePage() {
   const supabase = await createClient();
-  const [{ count: profileCount }, { count: teamCount }] = await Promise.all([
+  const today = new Date().toISOString().split("T")[0];
+
+  const [{ count: profileCount }, { count: teamCount }, { count: eventCount }, { data: rawEvents }] = await Promise.all([
     supabase.from("profiles").select("*", { count: "exact", head: true }),
     supabase.from("collegiate_teams").select("*", { count: "exact", head: true }),
+    supabase.from("events").select("*", { count: "exact", head: true }).eq("status", "published"),
+    supabase.from("events")
+      .select("id, title, category, city, state, start_date, start_time, venue_name, artists(name), ticket_tiers(price, quantity, quantity_sold)")
+      .eq("status", "published")
+      .gte("start_date", today)
+      .order("start_date")
+      .limit(6),
   ]);
+
+  const liveEvents = (rawEvents ?? []) as unknown as LiveEvent[];
   const memberCount = profileCount ?? 0;
   const collegiateCount = teamCount ?? 0;
   const memberDisplay = memberCount >= 1000
@@ -196,7 +222,7 @@ export default async function HomePage() {
               <div className="grid grid-cols-2 divide-x divide-y divide-white/8 border border-white/8 rounded-xl overflow-hidden">
                 {[
                   {
-                    value: `${(events.length * 180).toLocaleString()}+`,
+                    value: eventCount && eventCount > 0 ? `${eventCount}+` : "500+",
                     label: "events listed nationwide",
                     italic: true,
                   },
@@ -247,19 +273,21 @@ export default async function HomePage() {
               </div>
             </div>
 
-            {/* ── Right: live & upcoming events ── */}
+            {/* ── Right: upcoming events ── */}
             <div className="rounded-2xl border border-white/8 overflow-hidden" style={{ background: "rgba(255,255,255,0.03)" }}>
               {/* Header */}
               <div className="flex items-center justify-between px-6 py-4 border-b border-white/8">
                 <div className="flex items-center gap-3">
                   <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-red-400" />
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-marigold opacity-75" />
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-marigold" />
                   </span>
                   <span className="font-display font-bold text-white text-base" style={{ letterSpacing: "-0.01em" }}>
-                    Live tonight
+                    Upcoming events
                   </span>
-                  <span className="font-ui text-sm text-white/35">· {events.length} events across the US</span>
+                  {liveEvents.length > 0 && (
+                    <span className="font-ui text-sm text-white/35">· {liveEvents.length} on the calendar</span>
+                  )}
                 </div>
                 <Link
                   href="/events"
@@ -273,38 +301,50 @@ export default async function HomePage() {
               </div>
 
               {/* Event rows */}
-              <div className="divide-y divide-white/6">
-                {[
-                  { city: "Atlanta, GA",   artist: "Aishwarya Majmudar", venue: "Gas South Arena",      time: "Tonight · 7:30p",   badge: "almost gone",   badgeStyle: "bg-red-900/60 text-red-300 border-red-500/30"     },
-                  { city: "Houston, TX",   artist: "Atul Purohit",       venue: "Stafford Centre",      time: "Tonight · 8:00p",   badge: "last 40 seats", badgeStyle: "bg-orange-900/50 text-orange-300 border-orange-500/30" },
-                  { city: "Edison, NJ",    artist: "Falguni Pathak",     venue: "NJ Convention Center", time: "Tonight · 8:30p",   badge: "waitlist",      badgeStyle: "bg-white/8 text-white/50 border-white/10"         },
-                  { city: "Bay Area, CA",  artist: "Kirtidan Gadhvi",    venue: "SAP Center",           time: "Tomorrow · 7:00p",  badge: "on sale",       badgeStyle: "bg-marigold/15 text-marigold border-marigold/25"  },
-                ].map((ev, i) => (
-                  <Link
-                    key={i}
-                    href="/events"
-                    className="flex items-center gap-4 px-6 py-4 hover:bg-white/4 transition-colors group"
-                  >
-                    {/* City */}
-                    <span className="font-mono text-[10px] uppercase tracking-widest text-white/30 w-24 shrink-0">
-                      {ev.city}
-                    </span>
-                    {/* Artist + venue */}
-                    <div className="flex-1 min-w-0">
-                      <p className="font-ui font-semibold text-white text-sm group-hover:text-marigold transition-colors leading-none mb-0.5">
-                        {ev.artist}
-                      </p>
-                      <p className="font-ui text-xs text-white/35">{ev.venue}</p>
-                    </div>
-                    {/* Time */}
-                    <span className="font-ui text-sm text-white/40 shrink-0 mr-3">{ev.time}</span>
-                    {/* Badge */}
-                    <span className={`inline-flex items-center px-2.5 py-1 rounded-lg font-mono text-[9px] uppercase tracking-widest font-bold border shrink-0 ${ev.badgeStyle}`}>
-                      {ev.badge}
-                    </span>
+              {liveEvents.length === 0 ? (
+                <div className="px-6 py-12 text-center">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-white/25 mb-2">Coming soon</p>
+                  <p className="font-ui text-sm text-white/40">Events are being added — check back soon or browse all events.</p>
+                  <Link href="/events" className="inline-block mt-4 font-ui text-sm font-semibold text-marigold hover:text-marigold/80 transition-colors">
+                    Browse all events →
                   </Link>
-                ))}
-              </div>
+                </div>
+              ) : (
+                <div className="divide-y divide-white/6">
+                  {liveEvents.map((ev) => {
+                    const avail = eventAvailability(ev.ticket_tiers);
+                    const dateObj = new Date(ev.start_date + "T00:00:00");
+                    const dateLabel = dateObj.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+                    const timeLabel = ev.start_time
+                      ? new Date(`1970-01-01T${ev.start_time}`).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })
+                      : "";
+                    const displayName = ev.artists?.name ?? ev.title;
+                    return (
+                      <Link
+                        key={ev.id}
+                        href={`/events/${ev.id}`}
+                        className="flex items-center gap-4 px-6 py-4 hover:bg-white/4 transition-colors group"
+                      >
+                        <span className="font-mono text-[10px] uppercase tracking-widest text-white/30 w-24 shrink-0">
+                          {ev.city}, {ev.state}
+                        </span>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-ui font-semibold text-white text-sm group-hover:text-marigold transition-colors leading-none mb-0.5 truncate">
+                            {displayName}
+                          </p>
+                          <p className="font-ui text-xs text-white/35 truncate">{ev.venue_name}</p>
+                        </div>
+                        <span className="font-ui text-sm text-white/40 shrink-0 mr-3 whitespace-nowrap">
+                          {dateLabel}{timeLabel ? ` · ${timeLabel}` : ""}
+                        </span>
+                        <span className={`inline-flex items-center px-2.5 py-1 rounded-lg font-mono text-[9px] uppercase tracking-widest font-bold border shrink-0 ${avail.style}`}>
+                          {avail.badge}
+                        </span>
+                      </Link>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Footer */}
               <div className="px-6 py-3 border-t border-white/6">
@@ -315,7 +355,7 @@ export default async function HomePage() {
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h10" />
                   </svg>
-                  View all {events.length} upcoming events across 27 cities
+                  View all upcoming events
                 </Link>
               </div>
             </div>
@@ -445,25 +485,39 @@ export default async function HomePage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            {featuredEvents.map((event) => {
-              const pct = Math.round((event.soldTickets / event.totalTickets) * 100);
-              return (
-                <EventCard
-                  key={event.id}
-                  title={event.title}
-                  category={event.category}
-                  city={event.city}
-                  state={event.state}
-                  date={event.date}
-                  price={event.price}
-                  soldPct={pct}
-                  soldOut={event.soldTickets >= event.totalTickets}
-                  isLive={event.id === "1"}
-                />
-              );
-            })}
-          </div>
+          {liveEvents.length === 0 ? (
+            <div className="rounded-2xl border-2 border-dashed border-ivory-200 p-16 text-center">
+              <p className="text-4xl mb-3">🎪</p>
+              <p className="font-display font-semibold text-ink text-lg mb-1" style={{ letterSpacing: "-0.015em" }}>Events coming soon</p>
+              <p className="font-ui text-sm text-ink-muted mb-4">Organizers are listing events now — check back soon.</p>
+              <Link href="/events" className="font-ui text-sm font-semibold text-aubergine hover:underline">Browse all events →</Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {liveEvents.slice(0, 3).map((event) => {
+                const tiers = event.ticket_tiers;
+                const total = tiers.reduce((s, t) => s + t.quantity, 0);
+                const sold  = tiers.reduce((s, t) => s + t.quantity_sold, 0);
+                const pct   = total > 0 ? Math.round((sold / total) * 100) : 0;
+                const minPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : 0;
+                const dateStr  = new Date(event.start_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                return (
+                  <EventCard
+                    key={event.id}
+                    title={event.title}
+                    category={event.category}
+                    city={event.city}
+                    state={event.state}
+                    date={dateStr}
+                    price={minPrice}
+                    soldPct={pct}
+                    soldOut={total > 0 && sold >= total}
+                    href={`/events/${event.id}`}
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 

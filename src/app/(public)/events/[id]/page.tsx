@@ -82,7 +82,7 @@ export default async function EventDetailPage({ params }: Props) {
         venueAddress: event.venue_address ?? undefined,
         performerName: artistName,
         imageUrl: event.cover_image_url ?? undefined,
-        lowestPrice: prices.length > 0 ? Math.min(...prices) : 0,
+        lowestPrice: prices.length > 0 ? Math.min(...prices) : undefined,
         highestPrice: prices.length > 0 ? Math.max(...prices) : undefined,
       })
     : null;
