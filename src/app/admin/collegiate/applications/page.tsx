@@ -77,7 +77,7 @@ export default async function ApplicationsPage({
       <div className="flex items-center justify-between mb-8">
         <div>
           <div className="flex items-center gap-2 mb-1">
-            <Link href="/portal/admin/collegiate" className="font-mono text-[10px] uppercase tracking-widest text-white/30 hover:text-white/60 transition-colors">
+            <Link href="/admin/collegiate" className="font-mono text-[10px] uppercase tracking-widest text-white/30 hover:text-white/60 transition-colors">
               Collegiate Teams
             </Link>
             <span className="text-white/20">›</span>
@@ -98,7 +98,7 @@ export default async function ApplicationsPage({
         {tabs.map(tab => (
           <Link
             key={tab.key}
-            href={`/portal/admin/collegiate/applications?status=${tab.key}`}
+            href={`/admin/collegiate/applications?status=${tab.key}`}
             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl font-ui text-sm transition-all ${
               status === tab.key
                 ? "bg-marigold text-aubergine font-semibold"

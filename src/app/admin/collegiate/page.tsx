@@ -57,7 +57,7 @@ export default async function AdminCollegiatePage() {
         <div className="flex items-start justify-between mb-8">
           <div>
             <div className="flex items-center gap-1.5 mb-2">
-              <Link href="/portal/admin" className="font-mono text-[10px] uppercase tracking-widest text-ink/30 hover:text-ink/60 transition-colors">
+              <Link href="/admin" className="font-mono text-[10px] uppercase tracking-widest text-ink/30 hover:text-ink/60 transition-colors">
                 Admin
               </Link>
               <span className="text-ink/20 text-xs">›</span>
@@ -73,7 +73,7 @@ export default async function AdminCollegiatePage() {
 
           <div className="flex items-center gap-2 shrink-0 mt-1">
             <Link
-              href="/portal/admin/collegiate/applications"
+              href="/admin/collegiate/applications"
               className="relative flex items-center gap-2 px-4 py-2.5 border border-ink/12 bg-white hover:bg-ink/3 text-ink/60 hover:text-ink font-ui font-medium text-sm rounded-xl shadow-sm transition-all"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -88,7 +88,7 @@ export default async function AdminCollegiatePage() {
             </Link>
 
             <Link
-              href="/portal/admin/collegiate/create"
+              href="/admin/collegiate/create"
               className="flex items-center gap-1.5 px-4 py-2.5 bg-aubergine text-white font-ui font-semibold text-sm rounded-xl hover:bg-aubergine/85 shadow-sm transition-all"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -122,7 +122,7 @@ export default async function AdminCollegiatePage() {
         {/* ── Pending applications callout ─────────────────────────────── */}
         {pendingCount > 0 && (
           <Link
-            href="/portal/admin/collegiate/applications"
+            href="/admin/collegiate/applications"
             className="flex items-center justify-between w-full mb-6 px-5 py-3.5 bg-amber-50 border border-amber-200 rounded-2xl hover:bg-amber-100 transition-all group"
           >
             <div className="flex items-center gap-3">
@@ -148,10 +148,10 @@ export default async function AdminCollegiatePage() {
               Add your first collegiate raas team manually, or approve a team application.
             </p>
             <div className="flex items-center justify-center gap-3">
-              <Link href="/portal/admin/collegiate/create" className="px-5 py-2.5 bg-aubergine text-white font-ui font-semibold text-sm rounded-xl hover:bg-aubergine/85 transition-all shadow-sm">
+              <Link href="/admin/collegiate/create" className="px-5 py-2.5 bg-aubergine text-white font-ui font-semibold text-sm rounded-xl hover:bg-aubergine/85 transition-all shadow-sm">
                 Add Team
               </Link>
-              <Link href="/portal/admin/collegiate/applications" className="px-5 py-2.5 border border-ink/12 bg-white text-ink/60 font-ui text-sm rounded-xl hover:bg-ink/3 transition-all shadow-sm">
+              <Link href="/admin/collegiate/applications" className="px-5 py-2.5 border border-ink/12 bg-white text-ink/60 font-ui text-sm rounded-xl hover:bg-ink/3 transition-all shadow-sm">
                 View Applications
               </Link>
             </div>
@@ -256,7 +256,7 @@ export default async function AdminCollegiatePage() {
                           </svg>
                         </Link>
                         <Link
-                          href={`/portal/admin/collegiate/${team.id}/edit`}
+                          href={`/admin/collegiate/${team.id}/edit`}
                           className="px-3 py-1 rounded-lg bg-aubergine/8 border border-aubergine/15 font-mono text-[9px] uppercase tracking-wider text-aubergine hover:bg-aubergine/15 transition-all"
                         >
                           Edit

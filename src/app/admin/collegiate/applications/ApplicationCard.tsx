@@ -164,7 +164,7 @@ export default function ApplicationCard({ application: app }: { application: App
               <div>
                 <p className="font-ui font-semibold text-emerald-400 text-sm">Team created successfully</p>
                 {result.teamId && (
-                  <Link href={`/portal/admin/collegiate/${result.teamId}/edit`} className="font-mono text-[10px] text-emerald-400/60 hover:text-emerald-400 transition-colors">
+                  <Link href={`/admin/collegiate/${result.teamId}/edit`} className="font-mono text-[10px] text-emerald-400/60 hover:text-emerald-400 transition-colors">
                     Edit full profile →
                   </Link>
                 )}
@@ -226,7 +226,7 @@ export default function ApplicationCard({ application: app }: { application: App
           {/* Already reviewed — show link to edit */}
           {app.status === "approved" && app.created_team_id && (
             <div className="border-t border-white/8 pt-4">
-              <Link href={`/portal/admin/collegiate/${app.created_team_id}/edit`}
+              <Link href={`/admin/collegiate/${app.created_team_id}/edit`}
                 className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-marigold/60 hover:text-marigold transition-colors">
                 Edit team profile →
               </Link>

@@ -101,7 +101,7 @@ export default function AdminUsersPage() {
                 {filtered.map((profile) => (
                   <tr key={profile.id} className="hover:bg-ivory/50 transition-colors group cursor-pointer">
                     <td className="px-5 py-4">
-                      <Link href={`/portal/admin/users/${profile.id}`} className="flex items-center gap-3">
+                      <Link href={`/admin/users/${profile.id}`} className="flex items-center gap-3">
                         <div
                           className="w-8 h-8 rounded-full flex items-center justify-center text-white text-[11px] font-bold shrink-0"
                           style={{ backgroundColor: "#" + ((profile.first_name.charCodeAt(0) * 1234567) % 0xffffff).toString(16).padStart(6, "8") }}

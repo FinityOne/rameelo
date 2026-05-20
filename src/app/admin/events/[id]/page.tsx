@@ -146,7 +146,7 @@ export default function AdminEventReviewPage() {
         .eq('id', id)
         .single();
 
-      if (!data) { router.replace('/portal/admin/events'); return; }
+      if (!data) { router.replace('/admin/events'); return; }
       setEvent(data as unknown as EventFull);
 
       const { data: interestData } = await supabase
@@ -239,7 +239,7 @@ export default function AdminEventReviewPage() {
     <div className="max-w-3xl mx-auto space-y-6">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2">
-        <Link href="/portal/admin/events" className="font-ui text-xs text-ink-muted hover:text-ink flex items-center gap-1">
+        <Link href="/admin/events" className="font-ui text-xs text-ink-muted hover:text-ink flex items-center gap-1">
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           Event Review
         </Link>
@@ -255,7 +255,7 @@ export default function AdminEventReviewPage() {
             <p className="font-ui font-semibold text-peacock text-sm">Event published</p>
             <p className="font-ui text-xs text-ink-muted">This event is now live and visible to the public.</p>
           </div>
-          <Link href="/portal/admin/events" className="ml-auto font-ui text-xs text-aubergine hover:underline shrink-0">← Back to queue</Link>
+          <Link href="/admin/events" className="ml-auto font-ui text-xs text-aubergine hover:underline shrink-0">← Back to queue</Link>
         </div>
       )}
       {done === 'rejected' && (
@@ -265,7 +265,7 @@ export default function AdminEventReviewPage() {
             <p className="font-ui font-semibold text-durga text-sm">Event rejected</p>
             <p className="font-ui text-xs text-ink-muted">The organizer has been notified with your feedback.</p>
           </div>
-          <Link href="/portal/admin/events" className="ml-auto font-ui text-xs text-aubergine hover:underline shrink-0">← Back to queue</Link>
+          <Link href="/admin/events" className="ml-auto font-ui text-xs text-aubergine hover:underline shrink-0">← Back to queue</Link>
         </div>
       )}
 

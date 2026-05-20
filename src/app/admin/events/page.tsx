@@ -87,7 +87,7 @@ export default function AdminEventsPage() {
 
   async function quickReject(id: string, e: React.MouseEvent) {
     e.stopPropagation();
-    router.push(`/portal/admin/events/${id}`);
+    router.push(`/admin/events/${id}`);
   }
 
   const tabEvents = tab === 'all'
@@ -109,7 +109,7 @@ export default function AdminEventsPage() {
           </p>
         </div>
         <Link
-          href="/portal/admin/events/create"
+          href="/admin/events/create"
           className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:bg-aubergine/90 active:scale-[0.98] transition-all shadow-sm"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -165,7 +165,7 @@ export default function AdminEventsPage() {
             return (
               <div
                 key={ev.id}
-                onClick={() => router.push(`/portal/admin/events/${ev.id}`)}
+                onClick={() => router.push(`/admin/events/${ev.id}`)}
                 className={`bg-white rounded-2xl border overflow-hidden flex cursor-pointer transition-all hover:shadow-sm ${
                   isPending ? 'border-marigold/30 hover:border-marigold/50' : 'border-ivory-200 hover:border-aubergine/25'
                 }`}

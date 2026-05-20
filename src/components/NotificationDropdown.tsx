@@ -184,7 +184,7 @@ export function NotificationDropdown({ role }: Props) {
           {isAdmin && tab === "admin" && (
             <div className="border-t border-ivory-200 px-4 py-2.5">
               <Link
-                href="/portal/admin/notifications"
+                href="/admin/notifications"
                 onClick={() => setOpen(false)}
                 className="font-mono text-[9px] uppercase tracking-widest text-aubergine hover:text-ink transition-colors"
               >

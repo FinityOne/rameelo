@@ -187,7 +187,7 @@ export default function CollegiateTeamForm({ mode, team }: { mode: "create" | "e
       const { error: dbErr } = await supabase.from("collegiate_teams").insert(buildPayload());
       setSaving(false);
       if (dbErr) { setError(dbErr.message); return; }
-      router.push("/portal/admin/collegiate");
+      router.push("/admin/collegiate");
     } else {
       startTransition(async () => {
         const res = await updateTeam(team!.id, buildPayload());
@@ -213,7 +213,7 @@ export default function CollegiateTeamForm({ mode, team }: { mode: "create" | "e
         {/* Header */}
         <div className="px-5 pt-5 pb-4 border-b border-ink/8">
           <div className="flex items-center gap-1.5 mb-2">
-            <Link href="/portal/admin/collegiate"
+            <Link href="/admin/collegiate"
               className="font-mono text-[9px] uppercase tracking-widest text-ink/30 hover:text-ink/60 transition-colors">
               Collegiate
             </Link>

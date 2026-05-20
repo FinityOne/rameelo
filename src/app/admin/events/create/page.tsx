@@ -160,12 +160,12 @@ export default function AdminCreateEventPage() {
         </div>
         <div className="flex gap-3 justify-center flex-wrap">
           {publishStatus === 'published' && (
-            <Link href={`/portal/admin/events/${createdId}`}
+            <Link href={`/admin/events/${createdId}`}
               className="bg-peacock text-white font-ui font-semibold text-sm px-6 py-3 rounded-xl hover:bg-peacock/90 transition-colors">
               View event →
             </Link>
           )}
-          <button onClick={() => router.push('/portal/admin/events')}
+          <button onClick={() => router.push('/admin/events')}
             className="bg-aubergine text-white font-ui font-semibold text-sm px-6 py-3 rounded-xl hover:bg-aubergine-light transition-colors">
             Back to events
           </button>
@@ -186,7 +186,7 @@ export default function AdminCreateEventPage() {
       {/* Breadcrumb + header */}
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <Link href="/portal/admin/events" className="font-ui text-xs text-ink-muted hover:text-ink transition-colors flex items-center gap-1">
+          <Link href="/admin/events" className="font-ui text-xs text-ink-muted hover:text-ink transition-colors flex items-center gap-1">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             Event Review
           </Link>

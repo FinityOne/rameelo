@@ -121,7 +121,7 @@ export default function AdminOrganizationsPage() {
     setForm({ name: "", slug: "", email: "", phone: "", website: "", city: "", state: "", org_type: "", description: "", founded_year: "", instagram: "", facebook: "" });
     await fetchOrgs();
     // Navigate to new org detail
-    if (data?.id) window.location.href = `/portal/admin/organizations/${data.id}`;
+    if (data?.id) window.location.href = `/admin/organizations/${data.id}`;
   }
 
   const filtered = orgs.filter(o => {
@@ -289,7 +289,7 @@ export default function AdminOrganizationsPage() {
               {filtered.map(org => (
                 <tr key={org.id} className="hover:bg-ivory/40 transition-colors">
                   <td className="px-4 py-3.5">
-                    <Link href={`/portal/admin/organizations/${org.id}`} className="group">
+                    <Link href={`/admin/organizations/${org.id}`} className="group">
                       <p className="font-ui font-semibold text-ink group-hover:text-aubergine transition-colors">{org.name}</p>
                       {org.slug && <p className="font-mono text-[10px] text-ink-muted/60">{org.slug}</p>}
                     </Link>

@@ -76,7 +76,7 @@ export default function AdminOrgDetailPage() {
         .order("joined_at"),
     ]);
 
-    if (!orgData) { router.push("/portal/admin/organizations"); return; }
+    if (!orgData) { router.push("/admin/organizations"); return; }
     const o = orgData as OrgData;
     setOrg(o);
     setForm(o);
@@ -170,7 +170,7 @@ export default function AdminOrgDetailPage() {
     <div className="space-y-6 max-w-4xl">
       {/* Breadcrumb */}
       <div className="flex items-center gap-2 text-sm">
-        <Link href="/portal/admin/organizations" className="font-ui text-ink-muted hover:text-aubergine transition-colors">Organizations</Link>
+        <Link href="/admin/organizations" className="font-ui text-ink-muted hover:text-aubergine transition-colors">Organizations</Link>
         <svg className="w-4 h-4 text-ink-muted/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
         <span className="font-ui font-semibold text-ink">{org.name}</span>
       </div>

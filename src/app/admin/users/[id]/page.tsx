@@ -169,7 +169,7 @@ export default function AdminUserDetailPage() {
         .limit(20),
     ]);
 
-    if (!profileData) { router.replace("/portal/admin/users"); return; }
+    if (!profileData) { router.replace("/admin/users"); return; }
     setProfile(profileData as Profile);
 
     // Enrich orders with event titles
@@ -269,7 +269,7 @@ export default function AdminUserDetailPage() {
     <div className="max-w-4xl mx-auto space-y-6">
 
       {/* Back */}
-      <Link href="/portal/admin/users"
+      <Link href="/admin/users"
         className="inline-flex items-center gap-2 font-mono text-[10px] uppercase tracking-widest text-ink/40 hover:text-ink transition-colors">
         <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         All users
