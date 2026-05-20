@@ -307,7 +307,7 @@ export default function OrganizerEventEditPage() {
           .eq("user_id", user.id),
       ]);
 
-      if (!raw) { router.replace("/portal/organizer/events"); return; }
+      if (!raw) { router.replace("/organizer/events"); return; }
 
       setUserOrgs(((orgsData ?? []) as unknown as { organizations: OrgOption }[])
         .map(r => r.organizations).filter(Boolean));
@@ -493,13 +493,13 @@ export default function OrganizerEventEditPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
-            <Link href="/portal/organizer/events"
+            <Link href="/organizer/events"
               className="font-ui text-xs text-ink-muted hover:text-ink flex items-center gap-1 transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               My Events
             </Link>
             <span className="text-ink-muted/40 text-xs">/</span>
-            <Link href={`/portal/organizer/events/${id}`}
+            <Link href={`/organizer/events/${id}`}
               className="font-ui text-xs text-ink-muted hover:text-ink transition-colors truncate max-w-[180px]">
               {ev.title}
             </Link>
@@ -515,7 +515,7 @@ export default function OrganizerEventEditPage() {
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <Link href={`/portal/organizer/events/${id}`}
+          <Link href={`/organizer/events/${id}`}
             className="flex items-center gap-2 font-ui font-semibold text-sm px-4 py-2.5 rounded-xl border border-ivory-200 bg-white text-ink-muted hover:text-ink hover:border-aubergine/20 transition-all">
             ← Dashboard
           </Link>

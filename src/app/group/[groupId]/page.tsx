@@ -6,7 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Logo from "@/components/Logo";
 import { loadGroupOrder, joinGroupOrder, type GroupOrder } from "@/lib/group-orders";
-import { GRADIENTS } from "@/app/portal/organizer/events/create/types";
+import { GRADIENTS } from "@/app/organizer/events/create/types";
 
 function formatPhone(digits: string): string {
   const d = digits.replace(/\D/g, "").slice(0, 10);

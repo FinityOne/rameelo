@@ -289,7 +289,7 @@ export default function OrganizerTicketsPage() {
           </p>
         </div>
         <Link
-          href="/portal/organizer/events/create"
+          href="/organizer/events/create"
           className="flex items-center gap-2 bg-aubergine text-white font-ui font-semibold text-sm px-4 py-2.5 rounded-xl hover:bg-aubergine-light transition-colors shadow-sm"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -310,7 +310,7 @@ export default function OrganizerTicketsPage() {
           <p className="font-ui text-ink-muted text-sm max-w-xs mx-auto mb-6">
             Orders will appear here once attendees purchase tickets to your events.
           </p>
-          <Link href="/portal/organizer/events" className="inline-flex items-center gap-2 bg-marigold text-aubergine font-display font-bold text-sm px-6 py-3 rounded-xl hover:bg-marigold-dark transition-colors shadow-sm">
+          <Link href="/organizer/events" className="inline-flex items-center gap-2 bg-marigold text-aubergine font-display font-bold text-sm px-6 py-3 rounded-xl hover:bg-marigold-dark transition-colors shadow-sm">
             View my events →
           </Link>
         </div>

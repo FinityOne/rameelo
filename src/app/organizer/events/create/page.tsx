@@ -136,7 +136,7 @@ export default function CreateEventPage() {
           </p>
         </div>
         <div className="flex gap-3 justify-center">
-          <button onClick={() => router.push('/portal/organizer/events')}
+          <button onClick={() => router.push('/organizer/events')}
             className="bg-aubergine text-white font-ui font-semibold text-sm px-6 py-3 rounded-xl hover:bg-aubergine-light transition-colors">
             View my events
           </button>
@@ -157,7 +157,7 @@ export default function CreateEventPage() {
       {/* Step header */}
       <div>
         <div className="flex items-center gap-2 mb-1">
-          <button onClick={() => router.push('/portal/organizer/events')} className="font-ui text-xs text-ink-muted hover:text-ink transition-colors flex items-center gap-1">
+          <button onClick={() => router.push('/organizer/events')} className="font-ui text-xs text-ink-muted hover:text-ink transition-colors flex items-center gap-1">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             My Events
           </button>

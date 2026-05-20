@@ -526,7 +526,7 @@ export default function OrganizerSalesPage() {
           <p className="font-ui text-ink-muted text-sm mt-0.5">A complete picture of your ticket sales and revenue potential.</p>
         </div>
         <Link
-          href="/portal/organizer"
+          href="/organizer"
           className="shrink-0 font-ui text-sm text-ink-muted hover:text-ink flex items-center gap-1.5 transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -545,7 +545,7 @@ export default function OrganizerSalesPage() {
           <p className="text-4xl mb-4">📊</p>
           <p className="font-display font-semibold text-ink text-lg mb-2" style={{ letterSpacing: "-0.015em" }}>No events yet</p>
           <p className="font-ui text-ink-muted text-sm max-w-xs mx-auto mb-6">Create an event with ticket tiers and your analytics will appear here — revenue projections, fill rates, and pacing insights.</p>
-          <Link href="/portal/organizer/events/create"
+          <Link href="/organizer/events/create"
             className="inline-flex items-center gap-2 bg-aubergine text-white font-display font-bold text-sm px-6 py-3 rounded-xl hover:bg-aubergine-light transition-colors">
             Create event →
           </Link>

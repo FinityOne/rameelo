@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { GRADIENTS } from "@/app/portal/organizer/events/create/types";
+import { GRADIENTS } from "@/app/organizer/events/create/types";
 
 type DBEvent = {
   id: string;

@@ -62,7 +62,7 @@ export default function OrganizerEventsPage() {
           {!loading && <p className="font-ui text-ink-muted text-sm mt-0.5">{events.length} event{events.length !== 1 ? 's' : ''}</p>}
         </div>
         <Link
-          href="/portal/organizer/events/create"
+          href="/organizer/events/create"
           className="flex items-center gap-2 bg-aubergine text-white font-ui font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-aubergine-light transition-colors shadow-sm"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -80,7 +80,7 @@ export default function OrganizerEventsPage() {
           <div className="w-16 h-16 rounded-2xl bg-marigold/10 border border-marigold/20 flex items-center justify-center mx-auto mb-4 text-3xl">🎉</div>
           <p className="font-display font-semibold text-ink text-xl mb-2" style={{ letterSpacing: '-0.015em' }}>Create your first event</p>
           <p className="font-ui text-ink-muted text-sm max-w-xs mx-auto mb-6">Build your Navratri event in minutes — multi-step, polished, and built for the garba community.</p>
-          <Link href="/portal/organizer/events/create"
+          <Link href="/organizer/events/create"
             className="inline-flex items-center gap-2 bg-marigold text-aubergine font-display font-bold text-sm px-6 py-3 rounded-xl hover:bg-marigold-dark transition-colors shadow-sm">
             Get started →
           </Link>
@@ -94,7 +94,7 @@ export default function OrganizerEventsPage() {
             return (
               <div
                 key={ev.id}
-                onClick={() => router.push(`/portal/organizer/events/${ev.id}`)}
+                onClick={() => router.push(`/organizer/events/${ev.id}`)}
                 className="bg-white rounded-2xl border border-ivory-200 overflow-hidden hover:border-aubergine/30 hover:shadow-sm transition-all cursor-pointer flex"
               >
                 {/* Cover thumbnail */}

@@ -4,13 +4,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { DEFAULT_FORM, type EventFormData } from "@/app/portal/organizer/events/create/types";
-import Step1Basics   from "@/app/portal/organizer/events/create/Step1Basics";
-import Step2Schedule from "@/app/portal/organizer/events/create/Step2Schedule";
-import Step3Venue    from "@/app/portal/organizer/events/create/Step3Venue";
-import Step4Cover    from "@/app/portal/organizer/events/create/Step4Cover";
-import Step5Tickets  from "@/app/portal/organizer/events/create/Step5Tickets";
-import Step6Review   from "@/app/portal/organizer/events/create/Step6Review";
+import { DEFAULT_FORM, type EventFormData } from "@/app/organizer/events/create/types";
+import Step1Basics   from "@/app/organizer/events/create/Step1Basics";
+import Step2Schedule from "@/app/organizer/events/create/Step2Schedule";
+import Step3Venue    from "@/app/organizer/events/create/Step3Venue";
+import Step4Cover    from "@/app/organizer/events/create/Step4Cover";
+import Step5Tickets  from "@/app/organizer/events/create/Step5Tickets";
+import Step6Review   from "@/app/organizer/events/create/Step6Review";
 
 const STEPS = [
   { title: 'Basics',   subtitle: 'Name, type & artist',    icon: '🎉' },

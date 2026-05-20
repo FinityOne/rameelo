@@ -284,7 +284,7 @@ export default function OrganizerFinancialsPage() {
           <p className="text-4xl mb-4">💸</p>
           <p className="font-display font-semibold text-ink text-lg mb-2" style={{ letterSpacing: "-0.015em" }}>No earnings yet</p>
           <p className="font-ui text-ink-muted text-sm max-w-xs mx-auto mb-6">Create an event and start selling tickets — your earnings will show up here.</p>
-          <Link href="/portal/organizer/events/create"
+          <Link href="/organizer/events/create"
             className="inline-flex items-center gap-2 bg-aubergine text-white font-display font-bold text-sm px-6 py-3 rounded-xl hover:bg-aubergine-light transition-colors">
             Create event →
           </Link>

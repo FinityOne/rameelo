@@ -172,7 +172,7 @@ export default function EventDashboardPage() {
           .limit(5),
       ]);
 
-      if (!evRes.data) { router.replace("/portal/organizer/events"); return; }
+      if (!evRes.data) { router.replace("/organizer/events"); return; }
 
       setEv(evRes.data as EventData);
       setRecentOrders((ordRes.data ?? []) as unknown as Order[]);
@@ -222,7 +222,7 @@ export default function EventDashboardPage() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <div className="flex items-center gap-2 mb-1.5">
-            <Link href="/portal/organizer/events"
+            <Link href="/organizer/events"
               className="font-ui text-xs text-ink-muted hover:text-ink flex items-center gap-1 transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
               My Events
@@ -246,7 +246,7 @@ export default function EventDashboardPage() {
         {/* Actions */}
         <div className="flex items-center gap-2 shrink-0">
           <Link
-            href={`/portal/organizer/events/${id}/edit`}
+            href={`/organizer/events/${id}/edit`}
             className="flex items-center gap-2 font-ui font-semibold text-sm px-4 py-2.5 rounded-xl border border-ivory-200 bg-white text-ink hover:border-aubergine/30 hover:text-aubergine transition-all"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
@@ -269,7 +269,7 @@ export default function EventDashboardPage() {
             )}
           </div>
           {ev.status === "draft" && (
-            <Link href={`/portal/organizer/events/${id}/edit`}
+            <Link href={`/organizer/events/${id}/edit`}
               className="shrink-0 font-ui font-semibold text-xs text-aubergine hover:underline">
               Go to edit →
             </Link>
@@ -346,7 +346,7 @@ export default function EventDashboardPage() {
               </p>
             </div>
             <Link
-              href={`/portal/organizer/events/${id}/orders`}
+              href={`/organizer/events/${id}/orders`}
               className="font-ui text-xs font-semibold text-aubergine hover:text-aubergine-light flex items-center gap-1 transition-colors"
             >
               View all
@@ -385,7 +385,7 @@ export default function EventDashboardPage() {
 
           {orderCount > 5 && (
             <div className="px-5 py-3 border-t border-ivory-200 bg-ivory">
-              <Link href={`/portal/organizer/events/${id}/orders`}
+              <Link href={`/organizer/events/${id}/orders`}
                 className="font-ui text-xs text-ink-muted hover:text-aubergine transition-colors">
                 +{orderCount - 5} more order{orderCount - 5 !== 1 ? "s" : ""} →
               </Link>
@@ -403,7 +403,7 @@ export default function EventDashboardPage() {
               </p>
             </div>
             <Link
-              href={`/portal/organizer/events/${id}/groups`}
+              href={`/organizer/events/${id}/groups`}
               className="font-ui text-xs font-semibold text-aubergine hover:text-aubergine-light flex items-center gap-1 transition-colors"
             >
               View all
@@ -456,7 +456,7 @@ export default function EventDashboardPage() {
 
           {groupCount > 5 && (
             <div className="px-5 py-3 border-t border-ivory-200 bg-ivory">
-              <Link href={`/portal/organizer/events/${id}/groups`}
+              <Link href={`/organizer/events/${id}/groups`}
                 className="font-ui text-xs text-ink-muted hover:text-aubergine transition-colors">
                 +{groupCount - 5} more group{groupCount - 5 !== 1 ? "s" : ""} →
               </Link>
@@ -476,7 +476,7 @@ export default function EventDashboardPage() {
               </p>
             </div>
             <Link
-              href={`/portal/organizer/events/${id}/edit#tickets`}
+              href={`/organizer/events/${id}/edit#tickets`}
               className="font-ui text-xs font-semibold text-aubergine hover:text-aubergine-light flex items-center gap-1 transition-colors"
             >
               Manage tiers

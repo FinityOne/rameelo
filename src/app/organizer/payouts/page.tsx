@@ -534,7 +534,7 @@ export default function PayoutsPage() {
           </div>
           <div className="px-5 py-3 bg-ivory border-t border-ivory-200">
             <Link
-              href="/portal/organizer/organization"
+              href="/organizer/organization"
               className="font-ui text-xs font-semibold text-peacock hover:text-peacock/80 transition-colors"
             >
               Manage bank account in Organization settings →

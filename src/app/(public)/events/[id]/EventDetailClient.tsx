@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { GRADIENTS } from "@/app/portal/organizer/events/create/types";
+import { GRADIENTS } from "@/app/organizer/events/create/types";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 

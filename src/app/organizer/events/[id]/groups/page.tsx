@@ -77,7 +77,7 @@ export default function EventGroupsPage() {
           .order("created_at", { ascending: false }),
       ]);
 
-      if (!evRes.data) { router.replace("/portal/organizer/events"); return; }
+      if (!evRes.data) { router.replace("/organizer/events"); return; }
       setEventTitle(evRes.data.title);
       setGroups((grpRes.data ?? []) as unknown as GroupOrder[]);
       setLoading(false);
@@ -103,13 +103,13 @@ export default function EventGroupsPage() {
       {/* Header */}
       <div>
         <div className="flex items-center gap-2 mb-1.5">
-          <Link href="/portal/organizer/events"
+          <Link href="/organizer/events"
             className="font-ui text-xs text-ink-muted hover:text-ink flex items-center gap-1 transition-colors">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
             My Events
           </Link>
           <span className="text-ink-muted/40 text-xs">/</span>
-          <Link href={`/portal/organizer/events/${id}`}
+          <Link href={`/organizer/events/${id}`}
             className="font-ui text-xs text-ink-muted hover:text-ink transition-colors truncate max-w-[180px]">
             {eventTitle}
           </Link>
@@ -123,7 +123,7 @@ export default function EventGroupsPage() {
               {groups.length} group{groups.length !== 1 ? "s" : ""} · {totalMembers} members · {paidMembers} paid
             </p>
           </div>
-          <Link href={`/portal/organizer/events/${id}`}
+          <Link href={`/organizer/events/${id}`}
             className="font-ui text-sm font-semibold text-ink-muted hover:text-ink flex items-center gap-1 transition-colors">
             ← Dashboard
           </Link>
