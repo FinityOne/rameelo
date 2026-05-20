@@ -357,7 +357,7 @@ export default function OrganizerHubPage() {
             {[
               { href: "/organizer/financials", label: "Earnings",   emoji: "💰" },
               { href: "/organizer/payouts",    label: "Payouts",    emoji: "🏦" },
-              { href: "/organizer/tickets",    label: "Attendees",  emoji: "👥" },
+              { href: "/organizer/tickets",    label: "Orders",     emoji: "🧾" },
               { href: "/organizer/organization", label: "Org Setup", emoji: "🏢" },
             ].map((a) => (
               <Link key={a.href} href={a.href}
