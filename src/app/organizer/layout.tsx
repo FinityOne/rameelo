@@ -331,6 +331,13 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
     try { localStorage.setItem("rameelo_active_org", JSON.stringify(org)); } catch { /* ignore */ }
   }, []);
 
+  const pageTitle = getPageTitle(pathname);
+  const isCreateEvent = pathname === "/organizer/events/create";
+
+  useEffect(() => {
+    document.title = `Organizer · ${pageTitle} | Rameelo`;
+  }, [pageTitle]);
+
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
@@ -403,13 +410,6 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
       </div>
     );
   }
-
-  const pageTitle = getPageTitle(pathname);
-  const isCreateEvent = pathname === "/organizer/events/create";
-
-  useEffect(() => {
-    document.title = `Organizer · ${pageTitle} | Rameelo`;
-  }, [pageTitle]);
 
   return (
     <OrgProvider orgs={orgs} activeOrg={activeOrg} setActiveOrg={setActiveOrg}>

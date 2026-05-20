@@ -293,6 +293,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     });
   }, [router]);
 
+  const pageTitle = getPageTitle(pathname);
+
+  useEffect(() => {
+    document.title = `Admin · ${pageTitle} | Rameelo`;
+  }, [pageTitle]);
+
   async function handleSignOut() {
     const supabase = createClient();
     await supabase.auth.signOut();
@@ -322,12 +328,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       </div>
     );
   }
-
-  const pageTitle = getPageTitle(pathname);
-
-  useEffect(() => {
-    document.title = `Admin · ${pageTitle} | Rameelo`;
-  }, [pageTitle]);
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: "#F5F3F0" }}>
