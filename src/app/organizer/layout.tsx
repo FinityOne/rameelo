@@ -345,7 +345,7 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
 
       const [{ data: profile }, { data: orgRows }] = await Promise.all([
         supabase.from("profiles").select("first_name, last_name, email, role, avatar_url").eq("id", authUser.id).single(),
-        supabase.from("org_members")
+        supabase.from("organization_members")
           .select("organizations(id, name, logo_url)")
           .eq("user_id", authUser.id),
       ]);

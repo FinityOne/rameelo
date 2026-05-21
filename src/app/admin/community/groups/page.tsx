@@ -303,7 +303,7 @@ export default function AdminCommunityGroupsPage() {
   const [loading, setLoading]       = useState(true);
   const [search, setSearch]         = useState("");
   const [filterType, setFilterType] = useState<"all" | "interest" | "private">("all");
-  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "hidden" | "inactive">("all");
+  const [filterStatus, setFilterStatus] = useState<"all" | "active" | "hidden" | "inactive">("active");
   const [editGroup, setEditGroup]   = useState<ChatGroup | null | "new">(null);
   const [toast, setToast]           = useState("");
   const [confirmDelete, setConfirmDelete] = useState<ChatGroup | null>(null);

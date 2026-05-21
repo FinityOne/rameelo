@@ -261,8 +261,8 @@ export default function GroupsPage() {
 
     const [{ data: mems }, { data: interest }, { data: priv }] = await Promise.all([
       sb.from("chat_group_members").select("group_id, role, last_read_at").eq("user_id", uid),
-      sb.from("chat_groups").select("*").eq("group_type", "interest").eq("admin_hidden", false).eq("is_active", true).order("sort_order"),
-      sb.from("chat_groups").select("*").eq("group_type", "private").eq("admin_hidden", false).eq("is_active", true),
+      sb.from("chat_groups").select("*").eq("group_type", "interest").eq("admin_hidden", false).eq("is_active", true).gt("member_count", 0).order("sort_order"),
+      sb.from("chat_groups").select("*").eq("group_type", "private").eq("admin_hidden", false).eq("is_active", true).gt("member_count", 0),
     ]);
 
     const memberGroupIds = new Set((mems ?? []).map(m => m.group_id));

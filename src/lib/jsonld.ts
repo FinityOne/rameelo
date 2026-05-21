@@ -39,20 +39,28 @@ export function eventSchema(opts: {
   description: string;
   startDate: string;
   endDate?: string;
-  city: string;
-  state: string;
-  venueName: string;
-  venueAddress?: string;
+  city: string | null;
+  state: string | null;
+  venueName?: string | null;
+  venueAddress?: string | null;
   organizer?: string;
   performerName?: string;
+  performerSlug?: string;
   imageUrl?: string;
   lowestPrice?: number;
   highestPrice?: number;
   currency?: string;
   status?: "EventScheduled" | "EventCancelled" | "EventPostponed";
   category?: string;
+  keywords?: string[];
 }) {
   const eventUrl = `${BASE}/events/${opts.id}`;
+  const city = opts.city ?? "USA";
+  const state = opts.state ?? "US";
+  const categoryLabel = opts.category
+    ? opts.category.charAt(0).toUpperCase() + opts.category.slice(1)
+    : "Garba";
+
   return {
     "@context": "https://schema.org",
     "@type": "Event",
@@ -63,46 +71,46 @@ export function eventSchema(opts: {
     ...(opts.endDate ? { endDate: opts.endDate } : {}),
     eventStatus: `https://schema.org/${opts.status ?? "EventScheduled"}`,
     eventAttendanceMode: "https://schema.org/OfflineEventAttendanceMode",
+    // Google Event Rich Results require location
     location: {
       "@type": "Place",
-      name: opts.venueName,
+      name: opts.venueName ?? `${categoryLabel} Event — ${city}, ${state}`,
       address: {
         "@type": "PostalAddress",
-        streetAddress: opts.venueAddress ?? "",
-        addressLocality: opts.city,
-        addressRegion: opts.state,
+        ...(opts.venueAddress ? { streetAddress: opts.venueAddress } : {}),
+        addressLocality: city,
+        addressRegion: state,
         addressCountry: "US",
       },
     },
-    ...(opts.organizer
-      ? {
-          organizer: {
-            "@type": "Organization",
-            name: opts.organizer,
-            url: BASE,
-          },
-        }
-      : {}),
+    organizer: {
+      "@type": "Organization",
+      name: opts.organizer ?? "Rameelo",
+      url: BASE,
+    },
     ...(opts.performerName
       ? {
           performer: {
             "@type": "PerformingGroup",
             name: opts.performerName,
+            ...(opts.performerSlug
+              ? { url: `${BASE}/artists/${opts.performerSlug}`, "@id": `${BASE}/artists/${opts.performerSlug}` }
+              : {}),
           },
         }
       : {}),
     ...(opts.imageUrl ? { image: [opts.imageUrl] } : {}),
+    ...(opts.keywords?.length ? { keywords: opts.keywords.join(", ") } : {}),
     offers: {
-      "@type": "Offer",
+      "@type": "AggregateOffer",
       url: eventUrl,
-      ...(opts.lowestPrice !== undefined
-        ? { price: opts.lowestPrice, priceCurrency: opts.currency ?? "USD" }
-        : { price: "0", priceCurrency: "USD" }),
-      ...(opts.highestPrice !== undefined
-        ? { highPrice: opts.highestPrice }
-        : {}),
+      priceCurrency: opts.currency ?? "USD",
+      ...(opts.lowestPrice !== undefined ? { lowPrice: opts.lowestPrice } : { lowPrice: 0 }),
+      ...(opts.highestPrice !== undefined ? { highPrice: opts.highestPrice } : {}),
+      offerCount: 1,
       availability: "https://schema.org/InStock",
       validFrom: new Date().toISOString(),
+      seller: { "@type": "Organization", name: "Rameelo", url: BASE },
     },
   };
 }
@@ -145,19 +153,38 @@ export function personSchema(opts: {
   imageUrl?: string;
   sameAs?: string[];
   basedIn?: string;
+  genres?: string[];
 }) {
+  const artistUrl = `${BASE}/artists/${opts.slug}`;
+  // Use @graph to emit both a Person and a PerformingGroup node — covers both
+  // Google's Event performer expectations and general knowledge graph
   return {
     "@context": "https://schema.org",
-    "@type": "Person",
-    "@id": `${BASE}/artists/${opts.slug}`,
-    name: opts.name,
-    url: `${BASE}/artists/${opts.slug}`,
-    ...(opts.description ? { description: opts.description } : {}),
-    ...(opts.imageUrl ? { image: opts.imageUrl } : {}),
-    ...(opts.basedIn
-      ? { homeLocation: { "@type": "Place", name: opts.basedIn } }
-      : {}),
-    ...(opts.sameAs?.length ? { sameAs: opts.sameAs } : {}),
+    "@graph": [
+      {
+        "@type": "Person",
+        "@id": `${artistUrl}#person`,
+        name: opts.name,
+        url: artistUrl,
+        ...(opts.description ? { description: opts.description } : {}),
+        ...(opts.imageUrl ? { image: opts.imageUrl } : {}),
+        ...(opts.basedIn ? { homeLocation: { "@type": "Place", name: opts.basedIn } } : {}),
+        ...(opts.sameAs?.length ? { sameAs: opts.sameAs } : {}),
+        ...(opts.genres?.length ? { knowsAbout: opts.genres } : {}),
+      },
+      {
+        "@type": "PerformingGroup",
+        "@id": `${artistUrl}#group`,
+        name: opts.name,
+        url: artistUrl,
+        ...(opts.description ? { description: opts.description } : {}),
+        ...(opts.imageUrl ? { image: opts.imageUrl } : {}),
+        ...(opts.basedIn ? { location: { "@type": "Place", name: opts.basedIn } } : {}),
+        ...(opts.sameAs?.length ? { sameAs: opts.sameAs } : {}),
+        ...(opts.genres?.length ? { genre: opts.genres.join(", ") } : {}),
+        member: { "@type": "Person", "@id": `${artistUrl}#person` },
+      },
+    ],
   };
 }
 

@@ -81,8 +81,11 @@ export default function AdminOrgDetailPage() {
     setOrg(o);
     setForm(o);
     setMembers((membersData ?? []).map((m: unknown) => {
-      const raw = m as { id: string; org_id: string; user_id: string; role: string; joined_at: string; profiles: { first_name: string; last_name: string; email: string; city: string | null; state: string | null } };
-      return { id: raw.id, org_id: raw.org_id, user_id: raw.user_id, role: raw.role, joined_at: raw.joined_at, profile: raw.profiles };
+      const raw = m as { id: string; org_id: string; user_id: string; role: string; joined_at: string; profiles: { first_name: string; last_name: string; email: string; city: string | null; state: string | null } | null };
+      return {
+        id: raw.id, org_id: raw.org_id, user_id: raw.user_id, role: raw.role, joined_at: raw.joined_at,
+        profile: raw.profiles ?? { first_name: "Unknown", last_name: "", email: raw.user_id, city: null, state: null },
+      };
     }));
     setLoading(false);
   }

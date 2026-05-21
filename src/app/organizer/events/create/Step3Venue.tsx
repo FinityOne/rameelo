@@ -92,9 +92,12 @@ export default function Step3Venue({ data, onChange }: Props) {
 
   return (
     <div className="space-y-7">
+      <p className="font-mono text-[10px] text-ink-muted tracking-wide">
+        City and state are required. Venue name and street address are optional — fill in what you have.
+      </p>
       {/* Venue name */}
       <div>
-        <label className={labelCls}>Venue Name *</label>
+        <label className={labelCls}>Venue Name <span className="normal-case text-ink-muted/50">(optional)</span></label>
         <input
           type="text"
           placeholder="e.g. NJ Convention & Exposition Center"
@@ -106,7 +109,7 @@ export default function Step3Venue({ data, onChange }: Props) {
 
       {/* Address autocomplete */}
       <div ref={wrapperRef} className="relative">
-        <label className={labelCls}>Street Address *</label>
+        <label className={labelCls}>Street Address <span className="normal-case text-ink-muted/50">(optional)</span></label>
         <div className="relative">
           <input
             type="text"

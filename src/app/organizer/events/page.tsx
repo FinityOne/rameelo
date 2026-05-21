@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "./create/types";
+import { useOrg } from "../org-context";
 
 type Event = {
   id: string;
@@ -34,24 +35,28 @@ function fmtDate(d: string) {
 
 export default function OrganizerEventsPage() {
   const router = useRouter();
+  const { activeOrg } = useOrg();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    setLoading(true);
     async function load() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-      const { data } = await supabase
+      const q = supabase
         .from('events')
         .select('id, title, category, artist, start_date, city, state, status, cover_image_url, cover_gradient, created_at')
-        .eq('organizer_id', user.id)
         .order('created_at', { ascending: false });
+      const { data } = await (activeOrg
+        ? q.eq('org_id', activeOrg.id)
+        : q.eq('organizer_id', user.id));
       setEvents((data as Event[]) ?? []);
       setLoading(false);
     }
     load();
-  }, []);
+  }, [activeOrg]);
 
   return (
     <div className="space-y-5">

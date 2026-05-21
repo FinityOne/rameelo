@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "../org-context";
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
@@ -51,6 +52,7 @@ const labelCls = "font-mono text-[10px] uppercase tracking-widest text-ink-muted
 const ROLE_BADGE: Record<string, string> = { owner: "bg-aubergine/10 text-aubergine", admin: "bg-peacock/10 text-peacock", member: "bg-ivory-200 text-ink-muted" };
 
 export default function OrganizerOrganizationPage() {
+  const { activeOrg } = useOrg();
   const [org, setOrg] = useState<OrgData | null>(null);
   const [orgId, setOrgId] = useState<string>("");
   const [members, setMembers] = useState<OrgMember[]>([]);
@@ -86,44 +88,41 @@ export default function OrganizerOrganizationPage() {
   const [showAccount, setShowAccount] = useState(false);
 
   useEffect(() => {
+    if (!activeOrg) { setNotFound(true); setLoading(false); return; }
+    setLoading(true);
+    setNotFound(false);
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
 
-      // Find org membership for this user
-      const { data: membership } = await supabase
-        .from("organization_members")
-        .select("org_id, role")
-        .eq("user_id", user.id)
-        .order("joined_at")
-        .limit(1)
-        .single();
+      const targetOrgId = activeOrg.id;
+      setOrgId(targetOrgId);
 
-      if (!membership) { setNotFound(true); setLoading(false); return; }
-
-      setMyRole(membership.role);
-      setOrgId(membership.org_id);
-
-      const [{ data: orgData }, { data: membersData }] = await Promise.all([
-        supabase.from("organizations").select("*").eq("id", membership.org_id).single(),
+      const [{ data: membershipData }, { data: orgData }, { data: membersData }] = await Promise.all([
+        supabase.from("organization_members").select("role").eq("org_id", targetOrgId).eq("user_id", user.id).single(),
+        supabase.from("organizations").select("*").eq("id", targetOrgId).single(),
         supabase.from("organization_members")
           .select("id, user_id, role, profiles (first_name, last_name, email)")
-          .eq("org_id", membership.org_id)
+          .eq("org_id", targetOrgId)
           .order("joined_at"),
       ]);
 
       if (!orgData) { setNotFound(true); setLoading(false); return; }
 
+      setMyRole(membershipData?.role ?? "member");
       const o = orgData as OrgData;
       setOrg(o);
       setForm(o);
       setMembers((membersData ?? []).map((m: unknown) => {
-        const raw = m as { id: string; user_id: string; role: string; profiles: { first_name: string; last_name: string; email: string } };
-        return { id: raw.id, user_id: raw.user_id, role: raw.role, profile: raw.profiles };
+        const raw = m as { id: string; user_id: string; role: string; profiles: { first_name: string; last_name: string; email: string } | null };
+        return {
+          id: raw.id, user_id: raw.user_id, role: raw.role,
+          profile: raw.profiles ?? { first_name: "Unknown", last_name: "", email: raw.user_id },
+        };
       }));
       setLoading(false);
     });
-  }, []);
+  }, [activeOrg]);
 
   function setField(key: string, value: string | number | null) {
     setForm(f => ({ ...f, [key]: value }));

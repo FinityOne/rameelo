@@ -19,29 +19,43 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   if (!data) return { title: "Artist | Rameelo" };
 
   const location = data.based_in || [data.hometown_city, data.hometown_state].filter(Boolean).join(", ");
-  const description = data.bio?.slice(0, 160) ??
-    `${data.name} — garba artist${location ? ` based in ${location}` : ""}. Book tickets to upcoming events on Rameelo.`;
+  const genres: string[] = data.genres ?? [];
+  const description = data.bio?.slice(0, 155) ??
+    `${data.name} — ${genres.length ? genres.slice(0,2).join(" & ") + " " : ""}garba artist${location ? ` based in ${location}` : ""}. See upcoming events and buy tickets on Rameelo.`;
+
+  const ogImage = data.profile_image_url
+    ? [{ url: data.profile_image_url, width: 800, height: 800, alt: `${data.name} — Garba Artist` }]
+    : [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: `${data.name} on Rameelo` }];
 
   return {
-    title: `${data.name} — Garba Artist | Rameelo`,
+    title: `${data.name} — ${genres[0] ?? "Garba"} Artist | Rameelo`,
     description,
-    keywords: [data.name, "garba artist", "raas garba performer", "navratri artist usa", ...(data.genres ?? [])],
+    keywords: [
+      data.name,
+      `${data.name} garba`,
+      `${data.name} navratri`,
+      `${data.name} tickets`,
+      "garba artist usa",
+      "raas garba performer",
+      "navratri artist usa",
+      "garba singer america",
+      ...(location ? [`garba artist ${location}`, `navratri ${location}`] : []),
+      ...genres,
+    ],
     alternates: { canonical: `https://rameelo.com/artists/${slug}` },
     openGraph: {
-      title: `${data.name} — Garba Artist | Rameelo`,
+      title: `${data.name} — ${genres[0] ?? "Garba"} Artist | Rameelo`,
       description,
       type: "profile",
       url: `https://rameelo.com/artists/${slug}`,
       siteName: "Rameelo",
-      images: data.profile_image_url
-        ? [{ url: data.profile_image_url, width: 800, height: 800, alt: data.name }]
-        : [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: data.name }],
+      images: ogImage,
     },
     twitter: {
       card: "summary_large_image",
-      title: `${data.name} — Garba Artist | Rameelo`,
+      title: `${data.name} — ${genres[0] ?? "Garba"} Artist | Rameelo`,
       description,
-      images: data.profile_image_url ? [data.profile_image_url] : ["https://rameelo.com/og-default.jpg"],
+      images: [ogImage[0].url],
     },
   };
 }
@@ -134,15 +148,85 @@ function fmtDate(iso: string) {
 }
 
 function eventStats(tiers: Tier[]) {
-  const visible = tiers.filter((t) => t.is_visible);
-  const totalQty = visible.reduce((s, t) => s + t.quantity, 0);
+  const visible   = tiers.filter((t) => t.is_visible);
+  const totalQty  = visible.reduce((s, t) => s + t.quantity, 0);
   const totalSold = visible.reduce((s, t) => s + t.quantity_sold, 0);
-  const soldPct = totalQty > 0 ? Math.round((totalSold / totalQty) * 100) : 0;
-  const minPrice = visible.length > 0 ? Math.min(...visible.map((t) => t.price)) : null;
+  const soldPct   = totalQty > 0 ? Math.round((totalSold / totalQty) * 100) : 0;
+  const minPrice  = visible.length > 0 ? Math.min(...visible.map((t) => t.price)) : null;
   const isSoldOut = totalQty > 0 && totalSold >= totalQty;
-  const isAlmostGone = soldPct >= 85 && !isSoldOut;
-  return { soldPct, minPrice, isSoldOut, isAlmostGone };
+  return { soldPct, totalQty, totalSold, minPrice, isSoldOut };
 }
+
+type BadgeStyle = 'urgent' | 'hot' | 'social' | 'neutral';
+type EventBadge = { text: string; dot?: boolean; style: BadgeStyle };
+
+// Deterministic seed from event ID — same event always gets the same badge variant
+function idSeed(id: string): number {
+  return id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
+}
+
+function getEventBadge(
+  soldPct: number, totalQty: number, totalSold: number,
+  isSoldOut: boolean, city: string | null, eventId: string
+): EventBadge {
+  if (isSoldOut) return { text: 'Sold out', style: 'urgent' };
+
+  const remaining  = totalQty > 0 ? totalQty - totalSold : null;
+  const cityLabel  = city ?? null;
+  const seed       = idSeed(eventId);
+
+  // ── Real scarcity: hard ticket counts ──────────────────────────────────────
+  if (remaining !== null && remaining <= 25 && remaining > 0)
+    return { text: `${remaining} tickets left`, dot: true, style: 'urgent' };
+
+  if (remaining !== null && remaining <= 60 && soldPct >= 80)
+    return { text: 'Last few tickets', dot: true, style: 'urgent' };
+
+  // ── High velocity ───────────────────────────────────────────────────────────
+  if (soldPct >= 75) {
+    const opts: EventBadge[] = [
+      { text: cityLabel ? `Selling fast in ${cityLabel}` : 'Selling fast', dot: true, style: 'hot' },
+      { text: '🔥 High demand this season', style: 'hot' },
+    ];
+    return opts[seed % opts.length];
+  }
+
+  // ── Mid-range momentum ──────────────────────────────────────────────────────
+  if (soldPct >= 45) {
+    const opts: EventBadge[] = [
+      { text: cityLabel ? `Popular in ${cityLabel}` : 'Popular event', dot: true, style: 'hot' },
+      { text: 'Trending this Navratri', dot: true, style: 'hot' },
+      { text: cityLabel ? `${cityLabel}'s top event` : 'Top event nearby', style: 'hot' },
+    ];
+    return opts[seed % opts.length];
+  }
+
+  // ── Social proof with real attendee count ───────────────────────────────────
+  if (soldPct >= 15 && totalSold > 0) {
+    const opts: EventBadge[] = [
+      { text: `${totalSold}+ people going`, style: 'social' },
+      { text: cityLabel ? `${totalSold}+ from ${cityLabel} going` : `${totalSold}+ attending`, style: 'social' },
+    ];
+    return opts[seed % opts.length];
+  }
+
+  // ── Aspirational interest signals (no sales data — never show empty/cold) ──
+  const aspirational: EventBadge[] = [
+    { text: 'Featured Garba event', style: 'neutral' },
+    { text: 'Limited capacity venue', style: 'neutral' },
+    { text: cityLabel ? `${cityLabel} exclusive` : 'Regional headliner', style: 'neutral' },
+    { text: 'Navratri season pick', style: 'neutral' },
+    { text: 'Early access open', dot: true, style: 'neutral' },
+  ];
+  return aspirational[seed % aspirational.length];
+}
+
+const BADGE_STYLES: Record<BadgeStyle, string> = {
+  urgent:  'bg-durga/10 text-durga border border-durga/20',
+  hot:     'bg-amber-500/12 text-amber-700 border border-amber-500/20',
+  social:  'bg-peacock/10 text-peacock border border-peacock/20',
+  neutral: 'bg-aubergine/8 text-aubergine border border-aubergine/15',
+};
 
 function extractYouTubeId(url: string): string | null {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?\s]+)/);
@@ -172,6 +256,62 @@ function ArtistAvatar({ artist, size = 64 }: { artist: ArtistFull | OtherArtist;
   );
 }
 
+function EventRow({ event, heroColor, past = false }: { event: EventRow; heroColor: string; past?: boolean }) {
+  const { soldPct, totalQty, totalSold, minPrice, isSoldOut } = eventStats(event.ticket_tiers ?? []);
+  const badge = !past ? getEventBadge(soldPct, totalQty, totalSold, isSoldOut, event.city, event.id) : null;
+  const date  = fmtDate(event.start_date);
+  return (
+    <Link
+      href={`/events/${event.id}`}
+      className={`group flex items-center gap-4 p-4 rounded-2xl border hover:shadow-md transition-all ${past ? "bg-ivory/60 border-ivory-200 opacity-70 hover:opacity-100" : "bg-white border-ivory-200 hover:border-marigold/30"}`}
+    >
+      <div
+        className="w-14 h-14 rounded-xl flex flex-col items-center justify-center shrink-0 text-white"
+        style={{ backgroundColor: past ? "#9ca3af" : heroColor }}
+      >
+        <p className="font-display font-bold text-xl leading-none">{date.day}</p>
+        <p className="font-mono text-[9px] uppercase tracking-wide opacity-70">{date.month}</p>
+      </div>
+
+      <div className="flex-1 min-w-0">
+        <h3 className="font-display font-bold text-ink text-sm leading-tight group-hover:text-aubergine transition-colors truncate">
+          {event.title}
+        </h3>
+        <p className="font-ui text-xs text-ink-muted mt-0.5 truncate">
+          {[event.venue_name, event.city, event.state].filter(Boolean).join(" · ")}
+        </p>
+        {badge && (
+          <div className="mt-2">
+            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-mono text-[9px] font-semibold uppercase tracking-wide ${BADGE_STYLES[badge.style]}`}>
+              {badge.dot && (
+                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${badge.style === 'urgent' ? 'bg-durga animate-pulse' : badge.style === 'hot' ? 'bg-amber-500 animate-pulse' : badge.style === 'social' ? 'bg-peacock' : 'bg-aubergine'}`} />
+              )}
+              {badge.text}
+            </span>
+          </div>
+        )}
+      </div>
+
+      {!past && (
+        <div className="text-right shrink-0">
+          {minPrice !== null ? (
+            <>
+              <p className="font-display font-bold text-ink text-base">${minPrice}</p>
+              <p className="font-mono text-[9px] uppercase tracking-wide text-ink-muted">from</p>
+            </>
+          ) : (
+            <p className="font-mono text-[9px] uppercase tracking-wide text-ink-muted">Free</p>
+          )}
+        </div>
+      )}
+
+      <svg className="w-4 h-4 text-ink-muted group-hover:text-aubergine transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+      </svg>
+    </Link>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default async function ArtistDetailPage({ params }: Props) {
@@ -193,18 +333,16 @@ export default async function ArtistDetailPage({ params }: Props) {
   const location = artist.based_in || [artist.hometown_city, artist.hometown_state].filter(Boolean).join(", ");
   const yearsActive = artist.years_active_since ? new Date().getFullYear() - artist.years_active_since : null;
 
-  // Upcoming events for this artist
+  // All published events for this artist — matched by artist_id FK or free-text name
   const { data: eventsRaw } = await supabase
     .from("events")
     .select(`
       id, title, start_date, start_time, venue_name, city, state, cover_gradient,
       ticket_tiers (id, name, price, quantity, quantity_sold, is_visible)
     `)
-    .eq("artist_id", artist.id)
     .eq("status", "published")
-    .gte("start_date", today)
-    .order("start_date")
-    .limit(6);
+    .or(`artist_id.eq.${artist.id},artist.ilike.${artist.name}`)
+    .order("start_date", { ascending: true });
 
   // Other active artists
   const { data: othersRaw } = await supabase
@@ -214,7 +352,9 @@ export default async function ArtistDetailPage({ params }: Props) {
     .neq("id", artist.id)
     .limit(4);
 
-  const events = (eventsRaw ?? []) as EventRow[];
+  const allEvents    = (eventsRaw ?? []) as EventRow[];
+  const events       = allEvents.filter(e => e.start_date >= today);
+  const pastEvents   = allEvents.filter(e => e.start_date < today).reverse(); // most recent first
   const otherArtists = (othersRaw ?? []) as OtherArtist[];
 
   const awardsList = artist.awards
@@ -231,6 +371,7 @@ export default async function ArtistDetailPage({ params }: Props) {
     imageUrl: artist.profile_image_url ?? undefined,
     basedIn: location || undefined,
     sameAs,
+    genres: artist.genres?.length ? artist.genres : undefined,
   });
   const crumbs = breadcrumbSchema([
     { name: "Home", url: "https://rameelo.com" },
@@ -348,8 +489,10 @@ export default async function ArtistDetailPage({ params }: Props) {
               {artist.years_active_since && (
                 <StatPill value={String(artist.years_active_since)} label="Active since" />
               )}
-              {events.length > 0 && (
-                <StatPill value={String(events.length)} label="Upcoming shows" />
+              {allEvents.length > 0 ? (
+                <StatPill value={String(allEvents.length)} label={events.length > 0 ? "Upcoming shows" : "Shows on Rameelo"} />
+              ) : (
+                <StatPill value="2026" label="Season coming" />
               )}
               {artist.genres.length > 0 && (
                 <StatPill value={artist.genres.join(" · ")} label="Style" />
@@ -376,83 +519,97 @@ export default async function ArtistDetailPage({ params }: Props) {
           </section>
         )}
 
-        {/* ── UPCOMING SHOWS ───────────────────────────────────────────────── */}
-        {events.length > 0 && (
-          <section>
-            <div className="flex items-end justify-between mb-6">
-              <div>
-                <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1">Tour Dates</p>
-                <h2 className="font-display font-bold text-ink text-2xl sm:text-3xl" style={{ letterSpacing: "-0.02em" }}>
-                  Upcoming Shows
-                </h2>
-              </div>
-              <Link href="/events" className="font-ui text-sm font-semibold text-ink-muted hover:text-aubergine transition-colors">
-                All events →
-              </Link>
+        {/* ── SHOWS ────────────────────────────────────────────────────────── */}
+        <section>
+          <div className="flex items-end justify-between mb-6">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1">
+                {events.length > 0 ? "Tour Dates" : allEvents.length > 0 ? "Past Shows" : "2026 Season"}
+              </p>
+              <h2 className="font-display font-bold text-ink text-2xl sm:text-3xl" style={{ letterSpacing: "-0.02em" }}>
+                {events.length > 0 ? "Upcoming Shows" : allEvents.length > 0 ? "Shows on Rameelo" : "Upcoming Shows"}
+              </h2>
             </div>
+            <Link href="/events" className="font-ui text-sm font-semibold text-ink-muted hover:text-aubergine transition-colors">
+              All events →
+            </Link>
+          </div>
 
+          {/* Upcoming */}
+          {events.length > 0 && (
             <div className="space-y-3">
-              {events.map((event) => {
-                const { soldPct, minPrice, isSoldOut, isAlmostGone } = eventStats(event.ticket_tiers ?? []);
-                const date = fmtDate(event.start_date);
-                return (
-                  <Link
-                    key={event.id}
-                    href={`/events/${event.id}`}
-                    className="group flex items-center gap-4 p-4 rounded-2xl bg-white border border-ivory-200 hover:border-marigold/30 hover:shadow-md transition-all"
-                  >
-                    {/* Date block */}
-                    <div
-                      className="w-14 h-14 rounded-xl flex flex-col items-center justify-center shrink-0 text-white"
-                      style={{ backgroundColor: heroColor }}
-                    >
-                      <p className="font-display font-bold text-xl leading-none">{date.day}</p>
-                      <p className="font-mono text-[9px] uppercase tracking-wide opacity-70">{date.month}</p>
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <h3 className="font-display font-bold text-ink text-sm leading-tight group-hover:text-aubergine transition-colors truncate">
-                        {event.title}
-                      </h3>
-                      <p className="font-ui text-xs text-ink-muted mt-0.5 truncate">
-                        {[event.venue_name, event.city, event.state].filter(Boolean).join(" · ")}
-                      </p>
-                      {/* Sell-through bar */}
-                      <div className="mt-2 flex items-center gap-2">
-                        <div className="flex-1 h-1 rounded-full bg-ivory-200 overflow-hidden">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${soldPct}%`,
-                              backgroundColor: isSoldOut ? "#7C1F2C" : isAlmostGone ? "#D4891B" : heroColor,
-                            }}
-                          />
-                        </div>
-                        <span className={`font-mono text-[9px] uppercase tracking-wide shrink-0 ${isSoldOut ? "text-durga font-bold" : isAlmostGone ? "text-amber-600 font-bold" : "text-ink-muted"}`}>
-                          {isSoldOut ? "Sold out" : isAlmostGone ? "Almost gone" : `${soldPct}% sold`}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="text-right shrink-0">
-                      {minPrice !== null ? (
-                        <>
-                          <p className="font-display font-bold text-ink text-base">${minPrice}</p>
-                          <p className="font-mono text-[9px] uppercase tracking-wide text-ink-muted">from</p>
-                        </>
-                      ) : (
-                        <p className="font-mono text-[9px] uppercase tracking-wide text-ink-muted">Free</p>
-                      )}
-                    </div>
-
-                    <svg className="w-4 h-4 text-ink-muted group-hover:text-aubergine transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </Link>
-                );
-              })}
+              {events.map((event) => <EventRow key={event.id} event={event} heroColor={heroColor} />)}
             </div>
+          )}
 
+          {/* No upcoming — teaser state */}
+          {events.length === 0 && allEvents.length === 0 && (
+            <div
+              className="relative overflow-hidden rounded-3xl border border-dashed p-10 sm:p-14 text-center"
+              style={{ borderColor: heroColor + "40", backgroundColor: heroColor + "08" }}
+            >
+              {/* Decorative blurred orbs */}
+              <div className="absolute -top-10 -left-10 w-40 h-40 rounded-full blur-3xl opacity-20" style={{ backgroundColor: heroColor }} />
+              <div className="absolute -bottom-10 -right-10 w-40 h-40 rounded-full blur-3xl opacity-15" style={{ backgroundColor: heroColor }} />
+
+              <div className="relative">
+                {/* Pulsing icon */}
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-5 mx-auto"
+                  style={{ backgroundColor: heroColor + "20", border: `1.5px solid ${heroColor}30` }}>
+                  <svg className="w-7 h-7" fill="none" stroke={heroColor} viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                      d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <span className="absolute inline-flex w-3 h-3 rounded-full animate-ping opacity-60" style={{ backgroundColor: heroColor }} />
+                </div>
+
+                <p
+                  className="font-mono text-[10px] uppercase tracking-widest mb-3"
+                  style={{ color: heroColor }}
+                >
+                  Navratri 2026
+                </p>
+                <h3
+                  className="font-display font-bold text-ink mb-3"
+                  style={{ fontSize: "22px", letterSpacing: "-0.02em" }}
+                >
+                  Shows are being announced.
+                </h3>
+                <p className="font-ui text-ink-muted text-sm leading-relaxed max-w-sm mx-auto mb-7">
+                  {artist.name} hasn&apos;t announced 2026 dates yet — but Navratri season is coming. Create
+                  an account and we&apos;ll notify you the moment a show drops.
+                </p>
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+                  <Link
+                    href="/auth/signup"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-ui font-semibold text-sm text-white hover:opacity-90 transition-all"
+                    style={{ backgroundColor: heroColor }}
+                  >
+                    Notify me when shows drop
+                  </Link>
+                  <Link
+                    href="/events"
+                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-ui font-semibold text-sm text-ink-muted bg-white border border-ivory-200 hover:border-aubergine/25 transition-all"
+                  >
+                    Browse all 2026 events
+                  </Link>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Past events */}
+          {pastEvents.length > 0 && (
+            <div className="mt-8">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-3">Past Shows</p>
+              <div className="space-y-2">
+                {pastEvents.map((event) => <EventRow key={event.id} event={event} heroColor={heroColor} past />)}
+              </div>
+            </div>
+          )}
+
+          {events.length > 0 && (
             <div className="mt-6 text-center">
               <Link
                 href="/events"
@@ -462,8 +619,8 @@ export default async function ArtistDetailPage({ params }: Props) {
                 Get tickets →
               </Link>
             </div>
-          </section>
-        )}
+          )}
+        </section>
 
         {/* ── VIDEOS ───────────────────────────────────────────────────────── */}
         {youtubeVideos.length > 0 && (

@@ -26,32 +26,44 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   });
   const category = event.category.charAt(0).toUpperCase() + event.category.slice(1);
 
-  const title = `${event.title} — ${event.city}, ${event.state} | Rameelo`;
+  const locationLabel = [event.city, event.state].filter(Boolean).join(", ");
+  const title = locationLabel
+    ? `${event.title} — ${locationLabel} | Rameelo`
+    : `${event.title} | Rameelo`;
   const description = event.description
-    ? event.description.slice(0, 160)
-    : `${category} event${artistName ? ` with ${artistName}` : ""} at ${event.venue_name}, ${event.city} on ${date}. Get tickets on Rameelo.`;
+    ? event.description.slice(0, 155)
+    : `${category} event${artistName ? ` with ${artistName}` : ""}${event.venue_name ? ` at ${event.venue_name}` : ""}${locationLabel ? `, ${locationLabel}` : ""} on ${date}. Buy tickets on Rameelo.`;
 
-  const images = event.cover_image_url
+  const ogImages = event.cover_image_url
     ? [{ url: event.cover_image_url, width: 1200, height: 630, alt: event.title }]
-    : [];
+    : [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: `${event.title} — Rameelo` }];
 
   return {
     title,
     description,
+    keywords: [
+      event.title,
+      `${event.category} event`,
+      `${event.category} tickets`,
+      ...(event.city ? [`garba ${event.city}`, `navratri ${event.city}`, `${event.category} ${event.city}`] : []),
+      ...(event.state ? [`garba ${event.state}`, `navratri ${event.state}`] : []),
+      ...(artistName ? [artistName, `${artistName} tickets`, `${artistName} garba`] : []),
+      "garba tickets", "navratri tickets", "raas garba usa",
+    ],
     alternates: { canonical: `https://rameelo.com/events/${id}` },
     openGraph: {
       title: event.title,
       description,
-      images,
-      type: "website",
+      images: ogImages,
+      type: "article",
       siteName: "Rameelo",
       url: `https://rameelo.com/events/${id}`,
     },
     twitter: {
-      card: event.cover_image_url ? "summary_large_image" : "summary",
+      card: "summary_large_image",
       title: event.title,
       description,
-      images: images.map(i => i.url),
+      images: [ogImages[0].url],
     },
   };
 }
@@ -74,7 +86,7 @@ export default async function EventDetailPage({ params }: Props) {
     ? eventSchema({
         id,
         name: event.title,
-        description: event.description ?? `${event.category} event at ${event.venue_name}, ${event.city}`,
+        description: event.description ?? `${event.category} event${event.venue_name ? ` at ${event.venue_name}` : ""}${event.city ? `, ${event.city}` : ""}`,
         startDate: event.start_date,
         city: event.city,
         state: event.state,
@@ -84,6 +96,15 @@ export default async function EventDetailPage({ params }: Props) {
         imageUrl: event.cover_image_url ?? undefined,
         lowestPrice: prices.length > 0 ? Math.min(...prices) : undefined,
         highestPrice: prices.length > 0 ? Math.max(...prices) : undefined,
+        category: event.category,
+        keywords: [
+          event.title,
+          event.category,
+          "garba", "navratri", "raas garba",
+          ...(event.city ? [event.city] : []),
+          ...(event.state ? [event.state] : []),
+          ...(artistName ? [artistName] : []),
+        ],
       })
     : null;
 

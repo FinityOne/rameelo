@@ -683,9 +683,9 @@ export default function EventDetailClient({ id }: { id: string }) {
               <span className="font-mono text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/15 text-white backdrop-blur-sm">
                 {CATEGORY_LABELS[event.category] ?? event.category}
               </span>
-              {event.navratri_nights && event.navratri_nights.length > 0 && (
+              {event.navratri_nights && event.navratri_nights.length > 1 && (
                 <span className="font-mono text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/10 text-white/80 backdrop-blur-sm">
-                  Navratri Night{event.navratri_nights.length > 1 ? "s" : ""} {event.navratri_nights.join(", ")}
+                  {event.navratri_nights.length}-Night Event
                 </span>
               )}
               {totalSoldOut && (

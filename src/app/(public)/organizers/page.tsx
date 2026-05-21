@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Eyebrow, Button, Badge, Avatar } from "@/components/ui";
 import { faqSchema, webPageSchema, ld } from "@/lib/jsonld";
+import { createClient } from "@/lib/supabase/server";
 
 export const metadata: Metadata = {
   title: "Garba Event Organizers — List Your Navratri Event on Rameelo",
@@ -240,7 +241,56 @@ const organizerFaq = faqSchema([
   { question: "Does Rameelo handle ticket transfers?", answer: "Yes. Attendees can transfer tickets directly to other Rameelo members. Organizers control transfer permissions per event." },
 ]);
 
-export default function OrganizersPage() {
+// ─── Region config ───────────────────────────────────────────────────────────
+
+const REGIONS = [
+  { id: 'northeast', label: 'Northeast', states: ['NY','NJ','CT','MA','PA','RI','VT','NH','ME','DE','MD','DC'], color: '#1E3A7A', accent: '#3A6BC7' },
+  { id: 'midwest',   label: 'Midwest',   states: ['IL','OH','MI','IN','WI','MN','IA','MO','KS','NE','SD','ND'], color: '#0E7A6A', accent: '#12A891' },
+  { id: 'southeast', label: 'Southeast', states: ['FL','GA','NC','SC','VA','TN','AL','WV','KY'],                color: '#CC4A20', accent: '#E8673A' },
+  { id: 'south',     label: 'South',     states: ['TX','OK','NM','LA','AR','MS'],                               color: '#4A1060', accent: '#7A2090' },
+  { id: 'west',      label: 'West',      states: ['CA','OR','WA','NV','UT','CO','ID','MT','WY','AK','HI'],      color: '#B8720A', accent: '#E09020' },
+  { id: 'southwest', label: 'Southwest', states: ['AZ'],                                                         color: '#B84A22', accent: '#D06A3A' },
+] as const;
+
+type OrgRow = { id: string; name: string; city: string | null; state: string | null; logo_url: string | null; member_count: number; event_count: number };
+
+function orgInitials(name: string) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+}
+
+export default async function OrganizersPage() {
+  // Fetch real orgs with member + event counts from DB
+  let orgs: OrgRow[] = [];
+  try {
+    const supabase = await createClient();
+    const { data } = await supabase
+      .from('organizations')
+      .select('id, name, city, state, logo_url, organization_members(user_id), events(id)')
+      .order('name');
+
+    if (data) {
+      orgs = (data as Array<{
+        id: string; name: string; city: string | null; state: string | null; logo_url: string | null;
+        organization_members: Array<{ user_id: string }>; events: Array<{ id: string }>;
+      }>).map(o => ({
+        id: o.id,
+        name: o.name,
+        city: o.city,
+        state: o.state,
+        logo_url: o.logo_url,
+        member_count: o.organization_members?.length ?? 0,
+        event_count: o.events?.length ?? 0,
+      }));
+    }
+  } catch { /* silently skip — showcase still renders with empty state */ }
+
+  // Group by region
+  const byRegion = REGIONS.map(r => ({
+    ...r,
+    orgs: orgs.filter(o => (r.states as readonly string[]).includes(o.state ?? '')),
+  })).filter(r => r.orgs.length > 0);
+
+  const totalOrgs = orgs.length;
   return (
     <div className="bg-ivory">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(organizerPage) }} />
@@ -866,6 +916,170 @@ export default function OrganizersPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          ORGANIZER DIRECTORY
+      ══════════════════════════════════════════ */}
+      <section className="bg-ivory py-20">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-14">
+            <Eyebrow className="mb-4">The Rameelo community</Eyebrow>
+            <h2
+              className="font-display font-semibold text-ink mb-4"
+              style={{ fontSize: "clamp(28px, 4vw, 44px)", letterSpacing: "-0.022em", lineHeight: 1.1 }}
+            >
+              Organizers across America.
+              <br />
+              <span className="font-editorial italic text-marigold">Every one of them matters.</span>
+            </h2>
+            <p className="font-ui text-ink-muted text-base max-w-xl mx-auto leading-relaxed">
+              These are the people who keep garba alive in their cities — year after year, night after night.
+              Rameelo is their platform, and this is their directory.
+            </p>
+          </div>
+
+          {totalOrgs === 0 ? (
+            /* Empty state — shown while community is growing */
+            <div className="grid md:grid-cols-3 gap-5">
+              {REGIONS.slice(0, 6).map(r => (
+                <div
+                  key={r.id}
+                  className="rounded-[20px] overflow-hidden border border-ivory-200"
+                  style={{ background: "rgba(0,0,0,0.02)" }}
+                >
+                  <div className="h-2 w-full" style={{ background: r.color }} />
+                  <div className="p-5">
+                    <div className="flex items-center justify-between mb-4">
+                      <p className="font-mono text-[10px] tracking-widest uppercase text-ink-muted">{r.label}</p>
+                      <Badge variant="ivory">Coming soon</Badge>
+                    </div>
+                    <div className="space-y-2">
+                      {[1,2].map(i => (
+                        <div key={i} className="h-12 rounded-xl bg-ivory-200 animate-pulse" />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-10">
+              {byRegion.map(region => (
+                <div key={region.id}>
+                  {/* Region header */}
+                  <div className="flex items-center gap-4 mb-5">
+                    <div
+                      className="w-1 h-8 rounded-full"
+                      style={{ background: `linear-gradient(to bottom, ${region.color}, ${region.accent})` }}
+                    />
+                    <div>
+                      <p
+                        className="font-display font-semibold text-ink"
+                        style={{ fontSize: "20px", letterSpacing: "-0.015em" }}
+                      >
+                        {region.label}
+                      </p>
+                      <p className="font-mono text-[10px] text-ink-muted tracking-widest uppercase">
+                        {region.orgs.length} {region.orgs.length === 1 ? "organization" : "organizations"}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Org cards grid */}
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                    {region.orgs.map(org => (
+                      <div
+                        key={org.id}
+                        className="bg-white rounded-[16px] border border-ivory-200 p-5 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 group"
+                      >
+                        {/* Top accent bar */}
+                        <div
+                          className="h-1 w-8 rounded-full mb-4 group-hover:w-12 transition-all duration-300"
+                          style={{ background: region.color }}
+                        />
+
+                        {/* Avatar + name */}
+                        <div className="flex items-start gap-3 mb-4">
+                          {org.logo_url ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img
+                              src={org.logo_url}
+                              alt={org.name}
+                              className="w-10 h-10 rounded-[10px] object-cover shrink-0"
+                            />
+                          ) : (
+                            <div
+                              className="w-10 h-10 rounded-[10px] flex items-center justify-center shrink-0 text-white font-display font-bold text-sm"
+                              style={{ background: `linear-gradient(135deg, ${region.color}, ${region.accent})` }}
+                            >
+                              {orgInitials(org.name)}
+                            </div>
+                          )}
+                          <div className="min-w-0">
+                            <p
+                              className="font-display font-semibold text-ink leading-snug"
+                              style={{ fontSize: "14px", letterSpacing: "-0.01em" }}
+                            >
+                              {org.name}
+                            </p>
+                            {(org.city || org.state) && (
+                              <p className="font-mono text-[10px] text-ink-muted tracking-widest uppercase mt-0.5">
+                                {[org.city, org.state].filter(Boolean).join(", ")}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* Stats */}
+                        <div className="flex items-center gap-3 pt-3 border-t border-ivory-200">
+                          {org.event_count > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <svg className="w-3 h-3 text-ink-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                              </svg>
+                              <span className="font-mono text-[10px] text-ink-muted tracking-widest">
+                                {org.event_count} {org.event_count === 1 ? "event" : "events"}
+                              </span>
+                            </div>
+                          )}
+                          {org.member_count > 0 && (
+                            <div className="flex items-center gap-1.5">
+                              <svg className="w-3 h-3 text-ink-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              <span className="font-mono text-[10px] text-ink-muted tracking-widest">
+                                {org.member_count} {org.member_count === 1 ? "member" : "members"}
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Join CTA strip */}
+          <div className="mt-12 rounded-[20px] border border-ivory-200 bg-ivory-200 p-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div>
+              <p
+                className="font-display font-semibold text-ink mb-1"
+                style={{ fontSize: "18px", letterSpacing: "-0.015em" }}
+              >
+                Your organization belongs on this map.
+              </p>
+              <p className="font-ui text-sm text-ink-muted">
+                List your first event free and join the directory — your community is already here.
+              </p>
+            </div>
+            <Button href="#get-started" size="md" className="shrink-0">
+              Get listed →
+            </Button>
           </div>
         </div>
       </section>

@@ -62,6 +62,8 @@ export default function CheckoutPage() {
   const [step, setStep] = useState<"contact" | "payment">("contact");
   const [loading, setLoading] = useState(false);
 
+  useEffect(() => { document.title = "Checkout | Rameelo"; }, []);
+
   // Auth
   const [authedUserId, setAuthedUserId] = useState<string | null>(null);
   const [isSignedIn, setIsSignedIn] = useState(false);

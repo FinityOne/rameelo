@@ -23,7 +23,7 @@ const STEPS = [
 function isStepValid(step: number, data: EventFormData): boolean {
   switch (step) {
     case 0: return !!data.title && !!data.category;
-    case 1: return !!data.startDate && !!data.startTime && (!data.isMultiDay || !!data.endDate);
+    case 1: return !!data.startDate && (!data.isMultiDay || !!data.endDate);
     case 2: return !!data.venueName && !!data.addressLine1 && !!data.city && !!data.state;
     case 3: return true;
     case 4: return data.ticketTiers.length > 0 && data.ticketTiers.every(t => t.name && t.price !== '' && t.quantity !== '');
@@ -72,7 +72,7 @@ export default function CreateEventPage() {
           is_multi_day:      form.isMultiDay,
           start_date:        form.startDate,
           end_date:          form.isMultiDay ? form.endDate : null,
-          start_time:        form.startTime,
+          start_time:        form.startTime || null,
           end_time:          form.endTime || null,
           doors_open_time:   form.doorsOpenTime || null,
           venue_name:        form.venueName,

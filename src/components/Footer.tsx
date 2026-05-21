@@ -77,6 +77,11 @@ export default function Footer() {
                 )
               )}
               <li>
+                <Link href="/changelog" className="text-white/50 hover:text-white transition-colors">
+                  Changelog
+                </Link>
+              </li>
+              <li>
                 <Link href="/sitemap-page" className="text-white/50 hover:text-white transition-colors">
                   Sitemap
                 </Link>

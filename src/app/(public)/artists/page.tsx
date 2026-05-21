@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { breadcrumbSchema, ld } from "@/lib/jsonld";
+import { breadcrumbSchema, itemListSchema, ld } from "@/lib/jsonld";
 
 export const metadata: Metadata = {
   title: "Garba & Navratri Artists — Performers on Rameelo",
@@ -88,9 +88,19 @@ export default async function ArtistsPage() {
     { name: "Artists", url: "https://rameelo.com/artists" },
   ]);
 
+  const artistList = itemListSchema(
+    "Garba & Navratri Artists on Rameelo",
+    artists.map((a, i) => ({
+      name: a.name,
+      url: `https://rameelo.com/artists/${a.slug}`,
+      position: i + 1,
+    }))
+  );
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FCF9F2" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(crumbs) }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(artistList) }} />
       {/* Hero */}
       <section className="relative overflow-hidden py-20 sm:py-28">
         <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, #2E1B30 0%, #4a1040 40%, #7C1F2C 100%)" }} />

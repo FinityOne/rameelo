@@ -15,19 +15,19 @@ import Step6Review   from "@/app/organizer/events/create/Step6Review";
 const STEPS = [
   { title: 'Basics',   subtitle: 'Name, type & artist',    icon: '🎉' },
   { title: 'Schedule', subtitle: 'Dates & times',           icon: '📅' },
-  { title: 'Venue',    subtitle: 'Location & parking',      icon: '📍' },
+  { title: 'Venue',    subtitle: 'Location or TBA',         icon: '📍' },
   { title: 'Cover',    subtitle: 'Photo & event style',     icon: '🎨' },
-  { title: 'Tickets',  subtitle: 'Tiers & group discounts', icon: '🎟️' },
+  { title: 'Tickets',  subtitle: 'Tiers or skip',           icon: '🎟️' },
   { title: 'Publish',  subtitle: 'Settings & go live',      icon: '🚀' },
 ];
 
 const inputCls = "w-full rounded-xl border border-ivory-200 bg-white px-3.5 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all";
 
-function isStepValid(step: number, data: EventFormData, sellingOnRameelo: boolean): boolean {
+function isStepValid(step: number, data: EventFormData, sellingOnRameelo: boolean, locationTba: boolean): boolean {
   switch (step) {
     case 0: return !!data.title && !!data.category;
-    case 1: return !!data.startDate && !!data.startTime && (!data.isMultiDay || !!data.endDate);
-    case 2: return !!data.venueName && !!data.addressLine1 && !!data.city && !!data.state;
+    case 1: return !!data.startDate && (!data.isMultiDay || !!data.endDate);
+    case 2: return locationTba || (!!data.city && !!data.state);
     case 3: return true;
     case 4: return !sellingOnRameelo || (
       data.ticketTiers.length > 0 &&
@@ -51,6 +51,7 @@ export default function AdminCreateEventPage() {
   // Admin-specific publish settings
   const [publishStatus, setPublishStatus]       = useState<'published' | 'draft'>('published');
   const [sellingOnRameelo, setSellingOnRameelo] = useState(true);
+  const [locationTba, setLocationTba]           = useState(false);
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data: { user } }) => {
@@ -68,10 +69,37 @@ export default function AdminCreateEventPage() {
     try {
       const supabase = createClient();
 
+      // Derive organizer_id from the org's owner when an org is selected.
+      // Never auto-assign the admin as organizer.
+      let organizerId: string | null = null;
+      if (form.orgId) {
+        const { data: ownerRow } = await supabase
+          .from('organization_members')
+          .select('user_id')
+          .eq('org_id', form.orgId)
+          .eq('role', 'owner')
+          .limit(1)
+          .single();
+        // Fall back to first admin member if no explicit owner
+        if (!ownerRow) {
+          const { data: adminRow } = await supabase
+            .from('organization_members')
+            .select('user_id')
+            .eq('org_id', form.orgId)
+            .in('role', ['owner', 'admin'])
+            .order('joined_at')
+            .limit(1)
+            .single();
+          organizerId = adminRow?.user_id ?? null;
+        } else {
+          organizerId = ownerRow.user_id;
+        }
+      }
+
       const { data: evt, error: evtErr } = await supabase
         .from('events')
         .insert({
-          organizer_id:       adminId,
+          organizer_id:       organizerId,
           org_id:             form.orgId || null,
           title:              form.title,
           category:           form.category,
@@ -82,17 +110,18 @@ export default function AdminCreateEventPage() {
           is_multi_day:       form.isMultiDay,
           start_date:         form.startDate,
           end_date:           form.isMultiDay ? form.endDate : null,
-          start_time:         form.startTime,
+          start_time:         form.startTime || null,
           end_time:           form.endTime || null,
           doors_open_time:    form.doorsOpenTime || null,
-          venue_name:         form.venueName,
-          address_line1:      form.addressLine1,
-          address_line2:      form.addressLine2 || null,
-          city:               form.city,
-          state:              form.state,
-          zip:                form.zip || null,
-          parking:            form.parking,
-          parking_notes:      form.parkingNotes || null,
+          venue_name:         locationTba ? null : (form.venueName || null),
+          address_line1:      locationTba ? null : (form.addressLine1 || null),
+          address_line2:      locationTba ? null : (form.addressLine2 || null),
+          city:               locationTba ? null : (form.city || null),
+          state:              locationTba ? null : (form.state || null),
+          zip:                locationTba ? null : (form.zip || null),
+          parking:            locationTba ? null : (form.parking || null),
+          parking_notes:      locationTba ? null : (form.parkingNotes || null),
+          location_tba:       locationTba,
           website_url:        form.websiteUrl || null,
           cover_image_url:    form.coverImageUrl || null,
           cover_gradient:     form.coverGradient,
@@ -169,7 +198,8 @@ export default function AdminCreateEventPage() {
             className="bg-aubergine text-white font-ui font-semibold text-sm px-6 py-3 rounded-xl hover:bg-aubergine-light transition-colors">
             Back to events
           </button>
-          <button onClick={() => { setSubmitted(false); setForm(DEFAULT_FORM); setStep(0); setPublishStatus('published'); setSellingOnRameelo(true); }}
+          <button
+            onClick={() => { setSubmitted(false); setForm(DEFAULT_FORM); setStep(0); setPublishStatus('published'); setSellingOnRameelo(true); setLocationTba(false); }}
             className="border border-ivory-200 text-ink font-ui font-semibold text-sm px-6 py-3 rounded-xl hover:bg-ivory transition-colors">
             Create another
           </button>
@@ -178,7 +208,7 @@ export default function AdminCreateEventPage() {
     );
   }
 
-  const valid  = isStepValid(step, form, sellingOnRameelo);
+  const valid  = isStepValid(step, form, sellingOnRameelo, locationTba);
   const isLast = step === STEPS.length - 1;
 
   return (
@@ -238,29 +268,66 @@ export default function AdminCreateEventPage() {
 
         {step === 0 && <Step1Basics   data={form} onChange={patch} />}
         {step === 1 && <Step2Schedule data={form} onChange={patch} />}
-        {step === 2 && <Step3Venue    data={form} onChange={patch} />}
+        {step === 2 && (
+          <div className="space-y-5">
+            {/* Location TBA toggle */}
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                { value: false, icon: '📍', label: 'Location confirmed', desc: 'Enter venue name, address & parking' },
+                { value: true,  icon: '🕐', label: 'Location TBA',        desc: 'Venue not announced yet — skip for now' },
+              ] as const).map(opt => (
+                <button key={String(opt.value)} type="button" onClick={() => setLocationTba(opt.value)}
+                  className={`p-3.5 rounded-xl border-2 text-left transition-all ${locationTba === opt.value ? 'border-aubergine bg-aubergine/5' : 'border-ivory-200 hover:border-aubergine/30'}`}>
+                  <p className="font-ui text-sm font-semibold text-ink mb-0.5">{opt.icon} {opt.label}</p>
+                  <p className="font-mono text-[9px] text-ink-muted leading-snug">{opt.desc}</p>
+                </button>
+              ))}
+            </div>
+
+            {locationTba ? (
+              <div className="rounded-xl border-2 border-dashed border-marigold/30 bg-marigold/5 px-5 py-8 text-center space-y-2">
+                <p className="text-2xl">🕐</p>
+                <p className="font-ui font-semibold text-ink text-sm">Venue to be announced</p>
+                <p className="font-mono text-[10px] text-ink-muted max-w-xs mx-auto">
+                  The event page will show "Venue TBA". You can add the location later from the event review page once it&apos;s confirmed.
+                </p>
+              </div>
+            ) : (
+              <Step3Venue data={form} onChange={patch} />
+            )}
+          </div>
+        )}
         {step === 3 && <Step4Cover    data={form} onChange={patch} organizerId={adminId} />}
         {step === 4 && (
           <div className="space-y-5">
-            {/* Ticketing mode banner */}
-            <div className={`rounded-xl border p-4 flex items-start gap-3 ${sellingOnRameelo ? 'border-peacock/25 bg-peacock/5' : 'border-marigold/30 bg-marigold/5'}`}>
-              <span className="text-lg shrink-0">{sellingOnRameelo ? '🎟️' : '👀'}</span>
-              <div className="flex-1 min-w-0">
-                <p className="font-ui text-sm font-semibold text-ink mb-0.5">
-                  {sellingOnRameelo ? 'Selling tickets on Rameelo' : 'Interest collection only — tickets not required'}
-                </p>
-                <p className="font-mono text-[10px] text-ink-muted">
-                  {sellingOnRameelo
-                    ? 'Add at least one ticket tier below.'
-                    : 'You can skip this step — the event will show an interest form instead of ticket purchase.'}
+            {/* Ticketing mode selector */}
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2">Ticket sales on Rameelo</p>
+              <div className="grid grid-cols-2 gap-2">
+                {([
+                  { value: true,  icon: '🎟️', label: 'Sell tickets here',   desc: 'Attendees buy tickets directly on Rameelo — add at least one tier below' },
+                  { value: false, icon: '👀', label: 'Not selling on Rameelo', desc: 'Show an interest form instead — flip this on anytime from the event page' },
+                ] as const).map(opt => (
+                  <button key={String(opt.value)} type="button" onClick={() => setSellingOnRameelo(opt.value)}
+                    className={`p-3.5 rounded-xl border-2 text-left transition-all ${sellingOnRameelo === opt.value ? 'border-aubergine bg-aubergine/5' : 'border-ivory-200 hover:border-aubergine/30'}`}>
+                    <p className="font-ui text-sm font-semibold text-ink mb-0.5">{opt.icon} {opt.label}</p>
+                    <p className="font-mono text-[9px] text-ink-muted leading-snug">{opt.desc}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {sellingOnRameelo ? (
+              <Step5Tickets data={form} onChange={patch} />
+            ) : (
+              <div className="rounded-xl border-2 border-dashed border-peacock/25 bg-peacock/5 px-5 py-8 text-center space-y-2">
+                <p className="text-2xl">👀</p>
+                <p className="font-ui font-semibold text-ink text-sm">Interest form mode</p>
+                <p className="font-mono text-[10px] text-ink-muted max-w-xs mx-auto">
+                  The event page will show a &quot;Claim My Spot&quot; interest form. You can enable ticket sales anytime from the event review page.
                 </p>
               </div>
-              <button type="button" onClick={() => setSellingOnRameelo(s => !s)}
-                className="font-mono text-[10px] text-aubergine hover:underline shrink-0">
-                Change
-              </button>
-            </div>
-            {sellingOnRameelo && <Step5Tickets data={form} onChange={patch} />}
+            )}
           </div>
         )}
         {step === 5 && (
@@ -350,7 +417,7 @@ export default function AdminCreateEventPage() {
               className={`flex items-center gap-2 font-display font-bold text-base px-8 py-3.5 rounded-2xl transition-all ${
                 valid ? 'bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-sm' : 'bg-ivory-200 text-ink-muted cursor-not-allowed'
               }`}>
-              {step === 4 && !sellingOnRameelo ? 'Skip to publish →' : 'Continue'}
+              {(step === 2 && locationTba) || (step === 4 && !sellingOnRameelo) ? 'Skip →' : 'Continue'}
               {!(step === 4 && !sellingOnRameelo) && (
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
               )}

@@ -29,6 +29,8 @@ export default function ConfirmationPage() {
   const [confettiActive, setConfettiActive] = useState(false);
   const [copied, setCopied] = useState(false);
 
+  useEffect(() => { document.title = "Order Confirmed | Rameelo"; }, []);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem("rameelo_order");

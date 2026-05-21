@@ -13,9 +13,11 @@ type DBEvent = {
   artist_id: string | null;
   description: string | null;
   start_date: string;
-  city: string;
-  state: string;
-  venue_name: string;
+  end_date: string | null;
+  is_multi_day: boolean;
+  city: string | null;
+  state: string | null;
+  venue_name: string | null;
   start_time: string;
   cover_image_url: string | null;
   cover_gradient: string;
@@ -37,9 +39,11 @@ type EventVM = {
   artistFeatured: boolean;
   description: string | null;
   date: string;
-  city: string;
-  state: string;
-  venue: string;
+  endDate: string | null;
+  isMultiDay: boolean;
+  city: string | null;
+  state: string | null;
+  venue: string | null;
   time: string;
   coverImageUrl: string | null;
   gradient: typeof GRADIENTS[0];
@@ -58,6 +62,19 @@ const SORT_OPTIONS = ['Date: Soonest', 'Price: Low to High', 'Price: High to Low
 
 function fmtDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function fmtDateRange(start: string, end: string | null, isMulti: boolean): string {
+  if (!isMulti || !end || end === start) return fmtDate(start);
+  const s = new Date(start + 'T00:00:00');
+  const e = new Date(end   + 'T00:00:00');
+  const sameYear  = s.getFullYear() === e.getFullYear();
+  const sameMonth = sameYear && s.getMonth() === e.getMonth();
+  const mo  = (d: Date) => d.toLocaleDateString('en-US', { month: 'short' });
+  const day = (d: Date) => d.getDate();
+  const yr  = (d: Date) => d.getFullYear();
+  if (sameMonth) return `${mo(s)} ${day(s)}–${day(e)}, ${yr(s)}`;
+  if (sameYear)  return `${mo(s)} ${day(s)} – ${mo(e)} ${day(e)}, ${yr(s)}`;
+  return `${mo(s)} ${day(s)}, ${yr(s)} – ${mo(e)} ${day(e)}, ${yr(e)}`;
 }
 function fmt12(t: string) {
   if (!t) return '';
@@ -93,11 +110,10 @@ function EventCard({ event }: { event: EventVM }) {
             style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(4px)' }}>
             {CATEGORY_LABELS[event.category] ?? event.category}
           </span>
-          {event.navratriNights.length > 0 && (
+          {event.navratriNights.length > 1 && (
             <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full text-white/80"
               style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
-              Night{event.navratriNights.length > 1 ? 's' : ''} {event.navratriNights.slice(0, 3).join(', ')}
-              {event.navratriNights.length > 3 ? '…' : ''}
+              {event.navratriNights.length}-Night Event
             </span>
           )}
         </div>
@@ -119,7 +135,8 @@ function EventCard({ event }: { event: EventVM }) {
 
       <div className="p-4 flex flex-col flex-1">
         <p className="font-mono text-[10px] text-ink-muted uppercase tracking-widest mb-1">
-          {fmtDate(event.date)} · {event.city}, {event.state}
+          {fmtDateRange(event.date, event.endDate, event.isMultiDay)}
+          {(event.city || event.state) && ` · ${[event.city, event.state].filter(Boolean).join(', ')}`}
         </p>
         <Link href={`/events/${event.id}`}>
           <h3 className="font-display font-bold text-ink text-sm leading-snug mb-2 line-clamp-2 group-hover:text-aubergine transition-colors">
@@ -183,6 +200,8 @@ export default function EventsPage() {
   const [geoCity, setGeoCity]             = useState<string | null>(null);
   const pillRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => { document.title = "Find Garba & Navratri Events | Rameelo"; }, []);
+
   useEffect(() => {
     async function load() {
       const supabase = createClient();
@@ -190,7 +209,7 @@ export default function EventsPage() {
         .from('events')
         .select(`
           id, title, category, artist, artist_id, description,
-          start_date, city, state, venue_name, start_time,
+          start_date, end_date, is_multi_day, city, state, venue_name, start_time,
           cover_image_url, cover_gradient, dress_code, dandiya_sticks,
           age_restriction, navratri_nights, capacity,
           ticket_tiers (price, quantity),
@@ -212,6 +231,8 @@ export default function EventsPage() {
           artistFeatured: artistRecord?.is_featured ?? false,
           description: ev.description,
           date: ev.start_date,
+          endDate: ev.end_date ?? null,
+          isMultiDay: ev.is_multi_day,
           city: ev.city,
           state: ev.state,
           venue: ev.venue_name,
@@ -232,8 +253,8 @@ export default function EventsPage() {
 
       // After events load, match geo city to an actual event city
       if (geoCity) {
-        const matched = vms.find(e => e.city.toLowerCase() === geoCity.toLowerCase());
-        if (matched) setActiveCity(matched.city);
+        const matched = vms.find(e => e.city?.toLowerCase() === geoCity.toLowerCase());
+        if (matched?.city) setActiveCity(matched.city);
       }
     }
     load();
@@ -273,12 +294,12 @@ export default function EventsPage() {
   // Once geo city is known and events are loaded, auto-select nearest city
   useEffect(() => {
     if (!geoCity || events.length === 0) return;
-    const matched = events.find(e => e.city.toLowerCase() === geoCity.toLowerCase());
-    if (matched && activeCity === 'All Cities') setActiveCity(matched.city);
+    const matched = events.find(e => e.city?.toLowerCase() === geoCity.toLowerCase());
+    if (matched?.city && activeCity === 'All Cities') setActiveCity(matched.city);
   }, [geoCity, events]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const categories = ['All', ...Array.from(new Set(events.map(e => CATEGORY_LABELS[e.category] ?? e.category))).sort()];
-  const cities = ['All Cities', ...Array.from(new Set(events.map(e => e.city))).sort()];
+  const cities = ['All Cities', ...Array.from(new Set(events.map(e => e.city).filter((c): c is string => !!c))).sort()];
 
   const filtered = useMemo(() => {
     let result = [...events];
@@ -289,8 +310,8 @@ export default function EventsPage() {
       result = result.filter(e =>
         e.title.toLowerCase().includes(q) ||
         (e.artist ?? '').toLowerCase().includes(q) ||
-        e.city.toLowerCase().includes(q) ||
-        e.venue.toLowerCase().includes(q)
+        (e.city ?? '').toLowerCase().includes(q) ||
+        (e.venue ?? '').toLowerCase().includes(q)
       );
     }
     result.sort((a, b) => {

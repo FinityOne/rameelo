@@ -25,6 +25,8 @@ const STATE_NAME_TO_ABBR: Record<string, string> = {
 export default function SignUpPage() {
   const router = useRouter();
   const [step, setStep] = useState<1 | 2>(1);
+
+  useEffect(() => { document.title = "Create Account | Rameelo"; }, []);
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [email, setEmail] = useState("");
@@ -92,6 +94,13 @@ export default function SignUpPage() {
     // Build and save local user for portal pages
     const user = createUser({ firstName, lastName, email, phone, city, state });
     saveUser(user);
+
+    // Fire welcome email (non-blocking — don't delay registration on failure)
+    fetch("/api/send-welcome", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ firstName, email }),
+    }).catch(() => { /* silent — welcome email failure shouldn't block onboarding */ });
 
     if (data.session) {
       // Email confirmation disabled — go straight to portal

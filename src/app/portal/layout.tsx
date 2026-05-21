@@ -218,6 +218,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       pathname === "/portal/community"     ? "Community" :
       pathname === "/portal/friends"       ? "Friends" :
       pathname === "/portal/groups"        ? "My Groups" :
+      pathname.startsWith("/portal/tickets/")    ? "Ticket Details" :
       pathname.startsWith("/portal/events/")     ? "Event Details" :
       pathname.startsWith("/portal/group-chat/") ? "Group Chat" :
       "Member Portal";
