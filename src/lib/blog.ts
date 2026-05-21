@@ -629,6 +629,630 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <p><a href="/events">Find garba events near you →</a></p>
     `,
   },
+
+  // ── CITY GUIDES ────────────────────────────────────────────────────────────
+
+  {
+    slug: "garba-events-new-jersey-guide",
+    title: "Garba Events in New Jersey: The Complete Guide to NJ's Navratri Scene",
+    excerpt: "New Jersey is the undisputed capital of garba in America. Edison, Iselin, and Parsippany host the largest, most authentic Navratri celebrations outside Gujarat itself. Here's everything you need to know to experience it.",
+    category: "City Guide",
+    author: "Rameelo Editorial",
+    authorTitle: "City Desk",
+    publishedAt: "2026-05-21",
+    readMinutes: 8,
+    featured: false,
+    coverGradient: "from-[#1E3A7A] via-[#2a4f9e] to-[#3a6bc7]",
+    coverEmoji: "🗽",
+    tags: [
+      "garba events new jersey", "navratri new jersey", "garba events edison nj",
+      "garba events iselin nj", "garba events parsippany", "navratri 2026 new jersey",
+      "raas garba nj", "dandiya events new jersey", "garba tickets new jersey",
+      "navratri events nj", "gujarati events new jersey",
+    ],
+    body: `
+<p class="lead">If there is one place in America where garba is not just an event but a civic institution, it is <strong>New Jersey</strong>. Specifically, the Middlesex County corridor — Edison, Iselin, Metuchen, South Brunswick — where the highest concentration of Gujarati Americans in the United States has built a garba culture that rivals Baroda and Surat in scale, and in many ways surpasses them in production quality.</p>
+
+<p>Searching for <strong>garba events in New Jersey</strong>? You've come to the right place. This guide covers everything: the best venues, the biggest events, how tickets work, where to buy group tickets, and what to expect if you're attending NJ garba for the first time.</p>
+
+<h2>Why New Jersey Is America's Garba Capital</h2>
+
+<p>The numbers tell the story. Middlesex County is home to over 100,000 Gujarati-Americans — the largest single-county concentration in the country. The towns of Edison and Iselin have entire commercial districts with Gujarati restaurants, sari shops, sweet shops, and cultural organizations. When Navratri arrives, the entire community mobilizes.</p>
+
+<p>What makes NJ garba distinctive is the combination of scale and tradition. You'll find events that draw 5,000–12,000 attendees on a single night — big enough to rival a concert — that still maintain the circular formation of traditional garba, the devotional aarti at the opening, and the folk steps passed down through generations. The biggest NJ events bring artists directly from Gujarat: live vocalists, dhol players, and ensembles that make the NJ Navratri season a destination for garba lovers across the entire East Coast.</p>
+
+<h2>The Best Venues for Garba in New Jersey</h2>
+
+<h3>Edison / Iselin Area</h3>
+<p>The heart of NJ garba. Events in this corridor — typically held at the NJ Convention &amp; Expo Center, Raritan Center, and large community halls — are the ones that sell out months in advance. Edison is where you'll find the most traditional folk garba alongside high-production Bollywood-fusion nights. If you only attend one area, make it here.</p>
+
+<h3>Parsippany / Morris County</h3>
+<p>Morris County hosts its own strong Navratri scene, drawing from the Gujarati communities in Parsippany, Morris Plains, and the I-287 corridor. Events here tend to be slightly more intimate than the Edison mega-events, with excellent food and strong community organization.</p>
+
+<h3>Piscataway / New Brunswick</h3>
+<p>The Rutgers University area has a vibrant collegiate garba scene alongside community events, making it popular with younger attendees and recent graduates who want the social experience alongside the dance.</p>
+
+<h2>What to Expect at NJ Garba Events</h2>
+
+<p>New Jersey garba events typically follow a structured format across the nine nights of Navratri:</p>
+<ul>
+  <li><strong>Nights 1–3:</strong> Opening folk garba, more devotional in character, traditional garba steps. Excellent for families and first-timers.</li>
+  <li><strong>Nights 4–6:</strong> Mix of folk garba and entertainment garba, stepping up the energy and production.</li>
+  <li><strong>Nights 7–9:</strong> The biggest nights. Celebrity artists from Gujarat, full production setups with concert-grade lighting and sound, massive attendance. These are the nights that require tickets purchased months in advance.</li>
+</ul>
+
+<h2>How to Buy Garba Tickets in New Jersey</h2>
+
+<p><strong>Buy early.</strong> This is the single most important piece of advice for NJ garba. The best events — particularly the celebrity artist nights — routinely sell out by September, sometimes earlier. Prices also tier upward as the event approaches, meaning early buyers pay significantly less.</p>
+
+<p>On Rameelo, you can browse all <a href="/events">garba events in New Jersey</a>, see full ticket tier breakdowns, and book directly. Multi-night passes are available from most major NJ organizers and offer significant savings over single-night purchases.</p>
+
+<h3>Group Tickets for NJ Garba</h3>
+<p>Garba in NJ is a group activity — no one goes alone. Rameelo's group order feature was built for exactly this: start a group, share a link on WhatsApp, and when your group hits 5 people, everyone automatically gets 10% off. 8 people: 12% off. 10+ people: 15% off. For a group of 10 attending a $75 celebrity night, that's $112.50 saved with zero effort.</p>
+
+<h2>Frequently Asked Questions: Garba Events in New Jersey</h2>
+
+<h3>Where are garba events held in New Jersey?</h3>
+<p>Major garba events in New Jersey take place in Edison, Iselin, Parsippany, Piscataway, and New Brunswick. The most popular venues include the NJ Convention &amp; Expo Center in Edison, Raritan Center, and various community halls throughout Middlesex and Morris counties.</p>
+
+<h3>When do garba events start in New Jersey?</h3>
+<p>Navratri 2026 runs from October 21–30. Most major NJ garba events run across the full nine nights, with opening night typically October 21 and the biggest celebration on the final night (Navami), October 29–30. Some organizers also host pre-season garba workshops in September.</p>
+
+<h3>How much do garba tickets cost in New Jersey?</h3>
+<p>NJ garba ticket prices range from $30–$50 for folk garba community nights to $80–$150+ for celebrity artist entertainment nights. Multi-night passes typically offer 20–30% savings. Group tickets on Rameelo automatically discount 10–15% based on group size.</p>
+
+<h3>Are there garba events in New Jersey outside of Navratri?</h3>
+<p>Yes. The NJ Gujarati community hosts garba and raas events year-round — workshops, cultural festivals, Diwali celebrations, and community events. Browse <a href="/events">Rameelo's full NJ event calendar</a> for what's coming up.</p>
+
+<h3>What should I wear to garba in New Jersey?</h3>
+<p>Women typically wear chaniya choli (traditional skirt and blouse) with heavy jewelry. Men wear kediyu-dhoti or embroidered kurta sets. The NJ garba scene is known for elaborate outfits — it's as much a fashion showcase as a dance event. First-timers are welcome in any Indian festive wear.</p>
+
+<p><a href="/events">Find garba events in New Jersey on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "garba-events-atlanta-georgia-guide",
+    title: "Garba Events in Atlanta: The South's Premier Navratri Destination",
+    excerpt: "Atlanta has become the Southeast's undisputed garba hub — with events in Alpharetta, Duluth, and Johns Creek drawing tens of thousands each Navratri. Here's your complete guide to garba in Atlanta and across Georgia.",
+    category: "City Guide",
+    author: "Rameelo Editorial",
+    authorTitle: "City Desk",
+    publishedAt: "2026-05-21",
+    readMinutes: 7,
+    featured: false,
+    coverGradient: "from-[#CC4A20] via-[#e05a2a] to-[#f07a4a]",
+    coverEmoji: "🍑",
+    tags: [
+      "garba events atlanta", "navratri atlanta", "garba events georgia",
+      "navratri 2026 atlanta", "dandiya events atlanta", "garba alpharetta",
+      "garba duluth georgia", "garba johns creek", "raas garba atlanta",
+      "gujarati events atlanta", "garba tickets atlanta",
+    ],
+    body: `
+<p class="lead"><strong>Atlanta, Georgia</strong> has quietly built one of the most vibrant garba scenes in the United States. What was once a small community celebration has grown into a full Navratri ecosystem — multiple professional productions, community organizations, and temple events drawing tens of thousands of attendees from across the Southeast every October.</p>
+
+<p>If you're searching for <strong>garba events in Atlanta</strong>, this guide covers every corner of the scene: where events happen, what to expect, how to buy tickets, and why Atlanta Navratri has earned its reputation as the South's premier garba destination.</p>
+
+<h2>Why Atlanta's Garba Scene Has Exploded</h2>
+
+<p>Atlanta's growth as a tech and business hub over the past two decades brought a significant wave of Gujarati and broader South Asian professionals. The suburbs of Alpharetta, Duluth, Johns Creek, and Suwanee now have concentrations of Gujarati families large enough to support professional-grade Navratri productions.</p>
+
+<p>Atlanta garba has also benefited from geography: it draws attendees from Tennessee, the Carolinas, Alabama, and Florida — people for whom Atlanta is the most accessible major garba destination. This regional draw means Atlanta events have scaled faster than the local population alone would suggest.</p>
+
+<h2>Where Garba Happens in Atlanta</h2>
+
+<h3>Alpharetta &amp; Johns Creek</h3>
+<p>The epicenter of Atlanta garba. The Alpharetta-Johns Creek corridor in Fulton and Forsyth counties hosts the largest and most professionally produced events. The Georgia International Convention Center and large hotel ballrooms in the area are common venues. Events here draw 3,000–8,000 attendees on major nights.</p>
+
+<h3>Duluth &amp; Suwanee (Gwinnett County)</h3>
+<p>Gwinnett County has one of the largest South Asian populations in Georgia, and its garba events reflect that. Duluth and Suwanee events tend to combine strong community organization with good production values — excellent for families seeking a more traditional experience alongside entertainment nights.</p>
+
+<h3>Downtown Atlanta &amp; Buckhead</h3>
+<p>Larger, more commercially produced events sometimes use venues in the Atlanta perimeter — the Cobb Galleria, Gas South Arena, and hotel convention centers. These events draw from the entire metro and typically feature headlining artists.</p>
+
+<h2>What Makes Atlanta Garba Unique</h2>
+
+<p>Atlanta's garba scene has a notably welcoming culture. Because the community draws from across the Southeast — including many people who didn't grow up with garba and are attending for the first time — events here tend to be more beginner-friendly than NJ or Houston, without sacrificing quality.</p>
+
+<p>Atlanta also has a strong tradition of pairing garba with food — the Gujarati and broader South Asian restaurant scene in Alpharetta and Duluth is excellent, and many event organizers incorporate food vendors and late-night dining into the event experience.</p>
+
+<h2>Garba Events in Georgia Beyond Atlanta</h2>
+
+<p>While Atlanta is the hub, garba events in Georgia extend statewide. Augusta, Savannah, Macon, and Columbus host community garba events, typically organized through local temple organizations and cultural groups. These smaller events are often free or low-cost and offer a more devotional experience.</p>
+
+<h2>How to Get Garba Tickets in Atlanta</h2>
+
+<p>Browse and book Atlanta garba events on <a href="/events">Rameelo</a>. As with NJ and Houston, early purchase is strongly recommended — the major Alpharetta and Duluth events typically sell out by late September. Group tickets through Rameelo unlock automatic discounts for groups of 5 or more.</p>
+
+<h2>Frequently Asked Questions: Garba in Atlanta</h2>
+
+<h3>Where are garba events held in Atlanta?</h3>
+<p>Atlanta garba events are concentrated in Alpharetta, Johns Creek, Duluth, and Suwanee in the northern suburbs. Major venues include the Georgia International Convention Center, Gwinnett Center, hotel convention facilities, and large community halls throughout North Fulton and Gwinnett counties.</p>
+
+<h3>When is Navratri 2026 in Atlanta?</h3>
+<p>Navratri 2026 runs October 21–30 nationally. Atlanta events begin on or near October 21 and run through the final night on October 29–30. The biggest Atlanta events — typically the mid-week and final weekend nights — sell out first.</p>
+
+<h3>Are Atlanta garba events family-friendly?</h3>
+<p>Yes. Atlanta garba events are known for being welcoming to families, children, and first-time attendees. Many events have designated family seating areas. Children under a certain age (typically 5–8) are often admitted free.</p>
+
+<h3>How far do people travel to attend Atlanta garba?</h3>
+<p>Atlanta serves as the regional garba hub for the entire Southeast. Attendees routinely travel from Charlotte, Nashville, Birmingham, Tampa, Orlando, and Raleigh to attend Atlanta's major Navratri events.</p>
+
+<p><a href="/events">Find garba events in Atlanta on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "garba-events-florida-tampa-orlando-miami",
+    title: "Garba Events in Florida: Tampa, Orlando & Miami's Navratri Scene",
+    excerpt: "Florida's garba scene spans three major metros — Tampa, Orlando, and Miami — each with its own distinct flavor. From temple garba in Pinellas County to arena-scale Navratri in the Orlando suburbs, here's your complete guide.",
+    category: "City Guide",
+    author: "Rameelo Editorial",
+    authorTitle: "City Desk",
+    publishedAt: "2026-05-21",
+    readMinutes: 7,
+    featured: false,
+    coverGradient: "from-[#0E7A6A] via-[#0a9e8a] to-[#12c4a8]",
+    coverEmoji: "🌴",
+    tags: [
+      "garba events florida", "navratri florida", "garba events tampa",
+      "garba events orlando", "garba events miami", "navratri 2026 florida",
+      "dandiya events florida", "garba events south florida",
+      "gujarati events florida", "raas garba florida", "garba tickets florida",
+    ],
+    body: `
+<p class="lead"><strong>Florida</strong> has emerged as one of the most exciting garba markets in the United States. Three distinct metros — Tampa Bay, Greater Orlando, and South Florida (Miami/Fort Lauderdale) — each host thriving Navratri celebrations with their own character, venues, and communities.</p>
+
+<p>Whether you're searching for <strong>garba events in Tampa</strong>, <strong>Navratri in Orlando</strong>, or <strong>dandiya events in Miami</strong>, this guide maps out Florida's full garba landscape.</p>
+
+<h2>Garba Events in Tampa Bay, Florida</h2>
+
+<p>Tampa Bay — including Tampa, St. Petersburg, Clearwater, and the surrounding Pinellas and Hillsborough counties — has a well-established South Asian community that has built a genuine Navratri tradition over decades.</p>
+
+<h3>What to Expect in Tampa Garba</h3>
+<p>Tampa garba events range from intimate temple celebrations organized by the local BAPS Swaminarayan community to mid-size entertainment events at venues like the Marriott Waterside, Straz Center area venues, and convention facilities in Brandon and Carrollwood. Tampa events tend to blend devotional and entertainment elements well, making them excellent for families who want both the spiritual opening and the high-energy dandiya raas.</p>
+
+<h3>Tampa Bay Garba Venues</h3>
+<p>Events are spread across the greater Tampa Bay metro: the Tampa Convention Center area, Westshore hotel ballrooms, venues in Carrollwood and Wesley Chapel (where much of the Gujarati community lives), and the BAPS temple complex in Tampa which hosts devotional garba throughout Navratri.</p>
+
+<h2>Garba Events in Orlando, Florida</h2>
+
+<p>Greater Orlando — Kissimmee, Lake Nona, Oviedo, Windermere — has seen explosive South Asian community growth driven by the healthcare, tech, and hospitality sectors. This has translated directly into bigger, better-produced Navratri events that now draw attendees from across Central Florida and even from Tampa and South Florida.</p>
+
+<h3>Why Orlando Garba Has Grown So Fast</h3>
+<p>Orlando's appeal as a destination city means event organizers have access to world-class venues and hospitality infrastructure. The area's Gujarati community has used this to its advantage — Orlando Navratri events now routinely feature celebrity artists and production quality that rivals much larger markets.</p>
+
+<h3>Orlando Garba Venues</h3>
+<p>Large hotel convention centers (Marriott, Hyatt, Rosen facilities), the Orange County Convention Center area, and dedicated event venues in Windermere and Lake Nona are the primary Orlando garba locations. The Oviedo and Lake Nona communities host strong community-organized events as well.</p>
+
+<h2>Garba Events in Miami &amp; South Florida</h2>
+
+<p>South Florida's garba scene is concentrated in the Miramar, Weston, Boca Raton, and Doral areas — all neighborhoods with substantial Gujarati and broader South Asian populations. Miami garba has a distinctive energy: the cosmopolitan, multicultural character of South Florida means these events often attract a broader audience than garba events in other cities, with non-Gujarati attendees well-represented and welcomed.</p>
+
+<h3>South Florida Garba Venues</h3>
+<p>Events in South Florida use large hotel ballrooms and convention facilities in Miramar, Doral, and Boca Raton, as well as the Broward County Convention Center for larger productions. Fort Lauderdale and Boca Raton community centers host more intimate folk garba events.</p>
+
+<h2>Florida Garba Travel Tips</h2>
+
+<p>If you're willing to travel within Florida for the best garba experience, here's the pecking order: Orlando tends to have the largest single-night productions during peak Navratri. Tampa has the strongest community feel and most traditional atmosphere. Miami offers the most diverse, cosmopolitan crowd.</p>
+
+<p>All three metros are accessible from each other within a 3–4 hour drive, making it feasible to attend events across Florida during Navratri season with some planning.</p>
+
+<h2>Frequently Asked Questions: Garba in Florida</h2>
+
+<h3>Where can I find garba events in Florida?</h3>
+<p>Garba events in Florida are primarily concentrated in three metros: Tampa Bay (Tampa, Carrollwood, Wesley Chapel), Greater Orlando (Kissimmee, Lake Nona, Oviedo, Windermere), and South Florida (Miramar, Weston, Doral, Boca Raton). Browse all Florida events at <a href="/events">rameelo.com/events</a>.</p>
+
+<h3>Are there garba events in Florida outside of Navratri?</h3>
+<p>Yes. Florida's South Asian communities host garba workshops, Diwali celebrations with dandiya, and cultural events year-round. The warm climate and event-friendly infrastructure make Florida a year-round garba destination.</p>
+
+<h3>Which Florida city has the biggest garba events?</h3>
+<p>Greater Orlando currently hosts the largest-scale Navratri productions in Florida, often featuring celebrity garba artists. Tampa has the most established community tradition. South Florida has the most diverse audience.</p>
+
+<h3>Can I attend garba events in Florida if I'm not Gujarati?</h3>
+<p>Absolutely. Florida garba events are welcoming to everyone. The South Florida scene in particular has a notably diverse and multicultural audience. Anyone who respects the tradition and dresses appropriately is warmly welcomed.</p>
+
+<p><a href="/events">Find garba events in Florida on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "garba-events-los-angeles-california",
+    title: "Garba Events in Los Angeles: Navratri in SoCal's Garba Scene",
+    excerpt: "Los Angeles and Southern California host some of the most stylish and diverse garba events in America — from Artesia's Little India corridor to Irvine's booming Gujarati suburb. Your complete guide to LA garba.",
+    category: "City Guide",
+    author: "Rameelo Editorial",
+    authorTitle: "City Desk",
+    publishedAt: "2026-05-21",
+    readMinutes: 7,
+    featured: false,
+    coverGradient: "from-[#B8720A] via-[#d08a10] to-[#e8a020]",
+    coverEmoji: "🎬",
+    tags: [
+      "garba events los angeles", "navratri los angeles", "garba events irvine",
+      "garba events orange county", "navratri southern california",
+      "garba events artesia", "dandiya events los angeles", "raas garba los angeles",
+      "garba events socal", "gujarati events los angeles", "navratri 2026 california",
+    ],
+    body: `
+<p class="lead"><strong>Los Angeles and Southern California</strong> bring something unique to the American garba scene: a combination of Hollywood production sensibility, multicultural energy, and one of the most geographically diverse Gujarati communities in the country. From Artesia's Little India to Irvine's tech-industry suburbs to Cerritos and Diamond Bar, SoCal garba is vibrant, growing, and increasingly world-class.</p>
+
+<p>Searching for <strong>garba events in Los Angeles</strong> or <strong>Navratri in Southern California</strong>? This guide covers every major pocket of the LA garba scene.</p>
+
+<h2>The Geography of LA Garba</h2>
+
+<p>Unlike NJ or Houston, where garba is concentrated in one geographic corridor, the LA garba scene is distributed across the sprawling SoCal metro. Four distinct clusters:</p>
+
+<h3>Artesia &amp; Cerritos — Little India</h3>
+<p>The Los Angeles County corridor along Pioneer Boulevard in Artesia is the spiritual and cultural center of LA's Indian community. During Navratri, the area transforms — temples, cultural organizations, and professional event producers all host celebrations. Events here range from intimate devotional garba at temples to mid-size entertainment productions at the Cerritos Performing Arts Center and local convention venues.</p>
+
+<h3>Irvine &amp; Orange County</h3>
+<p>Orange County, particularly Irvine and its surrounding cities (Tustin, Anaheim Hills, Yorba Linda), has seen explosive South Asian population growth driven by the tech and biosciences industries. OC Navratri events are increasingly well-produced and heavily attended, often with headlining artists and premium venues like the Irvine Marriott and Anaheim Convention Center-adjacent properties.</p>
+
+<h3>San Fernando Valley</h3>
+<p>The Valley — Northridge, Chatsworth, Woodland Hills — has its own established Gujarati community with community-organized garba events that tend to be more affordable and traditionally focused.</p>
+
+<h3>Inland Empire (Chino, Ontario, Rancho Cucamonga)</h3>
+<p>As South Asian families have moved eastward into the Inland Empire, garba events have followed. These events serve the growing communities of Chino, Chino Hills, and Ontario, often at the Ontario Convention Center and area hotel venues.</p>
+
+<h2>What Makes LA Garba Different</h2>
+
+<p>LA garba has a distinctly glamorous edge. Outfit culture at Southern California events has evolved into something almost competitive — the chaniya choli and kediyu game in LA is elaborate, with bespoke outfits and jewelry that reflect the city's fashion consciousness. If you want to see the absolute cutting edge of garba fashion, LA is where to look.</p>
+
+<p>The multicultural character of LA also means non-Gujarati and non-South Asian attendees are common — LA garba events are genuinely diverse in a way that few other cities match.</p>
+
+<h2>How to Find &amp; Buy LA Garba Tickets</h2>
+
+<p>Browse all Southern California garba events on <a href="/events">Rameelo</a>, filtered by city. OC and Artesia events for major Navratri nights typically sell out 4–6 weeks before the event. Early purchase and group tickets are the smart play — Rameelo's group order feature applies the same 10–15% automatic discount for groups of 5+.</p>
+
+<h2>Frequently Asked Questions: Garba in Los Angeles</h2>
+
+<h3>Where are garba events held in Los Angeles?</h3>
+<p>LA garba events are spread across several areas: Artesia and Cerritos (Little India corridor), Irvine and Orange County, the San Fernando Valley (Northridge, Woodland Hills), and the Inland Empire (Chino, Ontario). Major venues include the Cerritos Performing Arts Center, Irvine Marriott, and convention centers throughout the region.</p>
+
+<h3>When do garba events happen in Los Angeles?</h3>
+<p>The primary garba season in LA is Navratri (October 21–30, 2026). Major events cluster around the opening and final weekends. Year-round workshop and community events are common in Artesia and Irvine.</p>
+
+<h3>What is the best garba event in Southern California?</h3>
+<p>The answer changes year to year depending on which artists are booked. Orange County events have grown into the most production-intensive in the region. Artesia remains the most culturally authentic. Check the current Rameelo listings for artist and venue details for the upcoming season.</p>
+
+<h3>Are there garba workshops in Los Angeles?</h3>
+<p>Yes. The LA area has a strong garba workshop culture, particularly in Artesia, Irvine, and the Valley. Workshops typically run August through September, taught by experienced instructors covering traditional garba steps and dandiya raas basics. Browse <a href="/events">Rameelo events</a> for current workshops.</p>
+
+<p><a href="/events">Find garba events in Los Angeles on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "garba-events-bay-area-san-jose-california",
+    title: "Garba Events in the Bay Area & San Jose: Silicon Valley's Navratri Guide",
+    excerpt: "The San Francisco Bay Area and San Jose host some of the most sophisticated garba events in America — fueled by Silicon Valley's enormous Gujarati tech community. Here's your complete guide to Bay Area Navratri.",
+    category: "City Guide",
+    author: "Rameelo Editorial",
+    authorTitle: "City Desk",
+    publishedAt: "2026-05-21",
+    readMinutes: 7,
+    featured: false,
+    coverGradient: "from-[#1a4a5e] via-[#1e6880] to-[#2a8aaa]",
+    coverEmoji: "🌉",
+    tags: [
+      "garba events bay area", "navratri bay area", "garba events san jose",
+      "navratri san jose", "garba events fremont", "garba events silicon valley",
+      "navratri 2026 bay area", "dandiya events san jose", "raas garba bay area",
+      "gujarati events bay area", "garba events santa clara", "navratri san francisco",
+    ],
+    body: `
+<p class="lead">The <strong>San Francisco Bay Area</strong> — and Silicon Valley specifically — is home to one of the most educated, well-resourced, and culturally engaged Gujarati communities in the world. The result: <strong>Bay Area garba events</strong> that combine serious production budgets with deep cultural authenticity. These are events where software engineers who learned garba from their grandmothers in Surat dance alongside first-generation Americans learning the steps for the first time, in venues lit by professional rigs, to artists flown in from Gujarat.</p>
+
+<p>This is your complete guide to garba events in San Jose, Fremont, Santa Clara, and across the Bay Area.</p>
+
+<h2>Where Bay Area Garba Happens</h2>
+
+<h3>San Jose &amp; Santa Clara</h3>
+<p>The heart of Bay Area garba. San Jose has the largest South Asian population in the Bay Area, concentrated in neighborhoods like Berryessa, Evergreen, and the suburban corridors of Cupertino and Sunnyvale. The San Jose Convention Center, SAP Center area venues, and large hotel convention facilities in Santa Clara host the Bay Area's biggest Navratri events — some drawing 5,000+ attendees on celebrity artist nights.</p>
+
+<h3>Fremont</h3>
+<p>Fremont has one of the largest Gujarati communities in California, and its garba events are legendary within the community. Fremont events tend to run longer, with more traditional folk garba time before the entertainment portion — a reflection of the strong first-generation presence in the community. The Fremont Hub and area convention facilities are primary venues.</p>
+
+<h3>Milpitas &amp; Newark</h3>
+<p>The South Bay cities of Milpitas and Newark have significant Gujarati populations and host community-organized garba events that offer excellent quality at lower price points than the larger San Jose productions.</p>
+
+<h3>East Bay (Dublin, Pleasanton, Livermore)</h3>
+<p>The Tri-Valley area has seen significant South Asian community growth. Dublin, Pleasanton, and Livermore now host their own garba events serving the community that has moved to the East Bay suburbs.</p>
+
+<h2>The Silicon Valley Difference</h2>
+
+<p>Bay Area garba events benefit from community members who bring their professional skills to the table. Sound engineers, lighting designers, event producers, and tech professionals within the community routinely volunteer production expertise that raises the bar for everyone. The result is events that feel like tech-industry product launches applied to cultural tradition — highly organized, well-marketed, and polished.</p>
+
+<p>Bay Area events also have strong gender-balanced attendance and tend to attract a higher proportion of younger (20s–30s) professionals than garba scenes in older diaspora hubs.</p>
+
+<h2>Bay Area Garba Artists &amp; the Gujarat Connection</h2>
+
+<p>The Bay Area community has strong ties to Gujarat and organizes significant artist imports for Navratri. The community's financial resources mean Bay Area events can afford top-tier artists — Kinjal Dave, Jignesh Kaviraj, Geeta Rabari — and often feature exclusive Bay Area performances by artists mid-tour. Follow artists on <a href="/artists">Rameelo's artist directory</a> to know when your favorite performer is coming to the Bay.</p>
+
+<h2>Frequently Asked Questions: Garba in the Bay Area</h2>
+
+<h3>Where are garba events held in the Bay Area?</h3>
+<p>Major Bay Area garba events are held in San Jose (Convention Center, large hotel venues), Fremont (Fremont Hub, community centers), Santa Clara, Milpitas, and the Tri-Valley (Dublin, Pleasanton). The South Bay is the primary hub — San Jose alone hosts multiple simultaneous Navratri productions during peak nights.</p>
+
+<h3>When do Bay Area garba events happen?</h3>
+<p>Navratri 2026 runs October 21–30. Bay Area events tend to sell out faster than most other cities due to the high density of demand relative to venue capacity. Early purchase — ideally by August — is strongly recommended for the major San Jose and Fremont events.</p>
+
+<h3>How competitive are tickets for Bay Area garba?</h3>
+<p>Very. The Bay Area has high garba demand and somewhat constrained venue supply compared to cities with larger convention infrastructure. Celebrity artist nights at major San Jose venues routinely sell out within days of going on sale. Set up an account on <a href="/auth/signup">Rameelo</a> and follow your preferred events to be notified immediately when tickets go live.</p>
+
+<h3>Are there garba events in San Francisco proper?</h3>
+<p>Most Bay Area garba events are in the South Bay (San Jose, Fremont, Santa Clara) rather than in San Francisco proper, reflecting where the Gujarati community lives. Some larger Diwali-season events use San Francisco venues, but Navratri garba is predominantly a South Bay and East Bay phenomenon.</p>
+
+<p><a href="/events">Find garba events in the Bay Area on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "garba-events-seattle-washington-pacific-northwest",
+    title: "Garba Events in Seattle: The Pacific Northwest's Navratri Scene",
+    excerpt: "Seattle and the Pacific Northwest have built a thriving garba community centered in Bellevue, Redmond, and Kirkland — fueled by the region's massive South Asian tech workforce. Here's everything you need to know.",
+    category: "City Guide",
+    author: "Rameelo Editorial",
+    authorTitle: "City Desk",
+    publishedAt: "2026-05-21",
+    readMinutes: 6,
+    featured: false,
+    coverGradient: "from-[#0E5A52] via-[#0d7a6e] to-[#0d9e8e]",
+    coverEmoji: "🌲",
+    tags: [
+      "garba events seattle", "navratri seattle", "garba events bellevue",
+      "garba events redmond", "navratri pacific northwest", "dandiya events seattle",
+      "raas garba seattle", "gujarati events seattle", "navratri 2026 seattle",
+      "garba events kirkland", "garba washington state",
+    ],
+    body: `
+<p class="lead"><strong>Seattle and the Pacific Northwest</strong> might not be the first region you think of for garba events — but the reality is that the Eastside suburbs of Bellevue, Redmond, and Kirkland have become a genuine garba destination, powered by the enormous South Asian tech workforce at Amazon, Microsoft, Google, and hundreds of startups across the region.</p>
+
+<p>If you're searching for <strong>garba events in Seattle</strong> or <strong>Navratri in the Pacific Northwest</strong>, you'll find a growing, passionate community producing increasingly impressive events each year.</p>
+
+<h2>Where Seattle Garba Lives: The Eastside</h2>
+
+<p>The garba community in the Seattle area is concentrated on the Eastside — Bellevue, Redmond, Kirkland, Issaquah, and Sammamish — where the highest concentration of South Asian tech professionals live. This is Amazon and Microsoft country, and those companies' H-1B and permanent resident populations include a substantial Gujarati cohort.</p>
+
+<h3>Bellevue</h3>
+<p>Bellevue is the hub of Seattle-area garba. The Meydenbauer Center, Hyatt Regency Bellevue, and large hotel ballrooms in the Bellevue downtown corridor are primary event venues. Bellevue events tend to be the largest-scale in the Pacific Northwest, often featuring nationally touring garba artists.</p>
+
+<h3>Redmond &amp; Kirkland</h3>
+<p>Microsoft's campus presence in Redmond has created a significant South Asian community in the immediate area. Garba events in Redmond and Kirkland are often organized by community groups and Indian cultural associations connected to the tech companies, with a strong collegiate and young professional attendance.</p>
+
+<h3>Issaquah &amp; Sammamish</h3>
+<p>The bedroom communities of Issaquah and Sammamish have growing South Asian populations and host community-organized garba that tends to be more family-focused and traditional in character.</p>
+
+<h2>The Character of Seattle Garba</h2>
+
+<p>Seattle garba has a distinctly community-first feel. The Pacific Northwest culture of civic engagement and volunteerism permeates the garba community — events here are often highly participatory, with community members contributing to organization, decoration, food, and volunteer staffing in ways that give Seattle events a warm, familial atmosphere even at scale.</p>
+
+<p>The tech industry background of the community also means Seattle garba events are often well-organized logistically — clear parking instructions, digital ticketing that actually works, well-staffed entry queues. Small things that matter when you're attending with a family.</p>
+
+<h2>Seattle Garba Beyond Navratri</h2>
+
+<p>The Pacific Northwest's Gujarati community hosts garba and raas events year-round. Pre-season workshops are popular in August and September. Diwali celebrations in late October and November often include dandiya raas. Community cultural events at the BAPS temple in Bothell anchor the spiritual calendar.</p>
+
+<h2>Frequently Asked Questions: Garba in Seattle</h2>
+
+<h3>Where are garba events held in Seattle?</h3>
+<p>Seattle-area garba events are primarily held on the Eastside: Bellevue (Meydenbauer Center, Hyatt Regency, hotel ballrooms), Redmond, Kirkland, and Issaquah. Events serving the broader Seattle metro sometimes use the Westin Seattle or Sheraton Grand Seattle for larger productions.</p>
+
+<h3>When do Navratri events happen in Seattle?</h3>
+<p>Navratri 2026 runs October 21–30. Seattle-area events typically run 4–7 nights of the full nine, with the biggest productions on weekends. Unlike NJ or Houston, Seattle events don't always run all nine nights — check Rameelo for confirmed dates each season.</p>
+
+<h3>How has the Seattle garba scene grown?</h3>
+<p>Seattle's garba scene has grown substantially over the past decade, tracking the growth of the South Asian tech workforce. Events that drew a few hundred people a decade ago now draw thousands. The community expects continued growth as Seattle solidifies its position as a top-tier tech hub.</p>
+
+<h3>Are there garba events in Portland or Vancouver BC near Seattle?</h3>
+<p>Portland, Oregon has a smaller but growing garba scene, typically with 1–3 Navratri events. Vancouver, BC has a large South Asian community with strong Navratri celebrations across the border. Some Seattle-area community members attend events in both cities. Check <a href="/events">Rameelo</a> for current Pacific Northwest listings.</p>
+
+<p><a href="/events">Find garba events in Seattle on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "garba-events-houston-texas-guide",
+    title: "Garba Events in Houston: Texas's Premier Navratri Destination",
+    excerpt: "Houston has one of America's largest Gujarati communities — and one of its best garba scenes. From Sugar Land to Katy to Pearland, NRG-area events draw 8,000+ attendees. Your complete Houston Navratri guide.",
+    category: "City Guide",
+    author: "Rameelo Editorial",
+    authorTitle: "City Desk",
+    publishedAt: "2026-05-21",
+    readMinutes: 7,
+    featured: false,
+    coverGradient: "from-[#7C1F2C] via-[#9e2a38] to-[#c44a5a]",
+    coverEmoji: "🤠",
+    tags: [
+      "garba events houston", "navratri houston", "garba events sugar land",
+      "garba events katy texas", "garba houston texas", "navratri 2026 houston",
+      "dandiya events houston", "raas garba houston", "gujarati events houston",
+      "garba events pearland", "navratri tickets houston",
+    ],
+    body: `
+<p class="lead"><strong>Houston, Texas</strong> is home to the second-largest Gujarati-American community in the United States — and it shows. Houston garba events are among the most impressive in the country: high-production, heavily attended, with celebrity artists routinely booking Houston as a major stop on their Navratri USA tours.</p>
+
+<p>If you're searching for <strong>garba events in Houston</strong> or <strong>Navratri tickets in Texas</strong>, this is your complete guide to the Houston garba scene, from the suburban event corridors to the mega-productions near NRG Park.</p>
+
+<h2>The Houston Garba Community</h2>
+
+<p>Houston's Gujarati community is concentrated in the southwestern and western suburbs — Sugar Land, Missouri City, Katy, Pearland, and Stafford — all of which have large South Asian populations, Gujarati restaurants, temples, and cultural organizations. The community has been in Houston for generations, which means there's deep institutional knowledge and established organizational infrastructure behind the best Houston garba events.</p>
+
+<p>Houston garba has a distinct character: the city's Southern hospitality culture combines with Gujarati warmth to create events that feel genuinely welcoming, with strong food culture and post-event community gatherings that extend the celebration well past the closing aarti.</p>
+
+<h2>Where Houston Garba Events Happen</h2>
+
+<h3>NRG Park Area &amp; Southwest Houston</h3>
+<p>The biggest Houston Navratri productions use venues near NRG Park — the Reliant Center, George R. Brown Convention Center, and large hotel convention facilities in the Energy Corridor and Westchase areas. These mega-events draw 5,000–10,000 attendees on peak nights and feature the headlining artists that attract visitors from across Texas and neighboring states.</p>
+
+<h3>Sugar Land &amp; Missouri City</h3>
+<p>Sugar Land is effectively Houston's Edison — the highest concentration of Gujarati families in the metro, with community organizations that have been running garba for decades. Sugar Land events tend to combine strong community participation with excellent production quality. The Smart Financial Centre in Sugar Land is a premier garba venue.</p>
+
+<h3>Katy, Pearland &amp; Stafford</h3>
+<p>The outer suburban ring also hosts strong community events. Katy, Pearland, and Stafford each have significant South Asian communities and host Navratri events that serve families who don't want to commute to the city's larger productions.</p>
+
+<h2>Houston Garba Artists &amp; Celebrity Nights</h2>
+
+<p>Houston's market size and community wealth mean it consistently attracts top Gujarati artists for Navratri. Artists like Kinjal Dave, Jignesh Kaviraj, Aishwarya Majmudar, and Geeta Rabari regularly perform in Houston during Navratri season. These celebrity nights are the events that sell out fastest — often within days of ticket release. Follow artists on <a href="/artists">Rameelo's artist pages</a> to be notified when Houston dates are announced.</p>
+
+<h2>Dallas vs. Houston Garba: The Texas Rivalry</h2>
+
+<p>Texas garba attendees often debate which city has the better Navratri scene. Houston's scale advantage — larger community, longer tradition, bigger venues — means the productions are generally larger. But Dallas's garba scene has grown dramatically and now produces events that rival Houston in quality if not in pure volume. Many Texas garba enthusiasts attend events in both cities during Navratri season.</p>
+
+<h2>Frequently Asked Questions: Garba in Houston</h2>
+
+<h3>Where are garba events held in Houston?</h3>
+<p>Houston garba events are spread across the metro: major productions near NRG Park and the Energy Corridor, community events in Sugar Land and Missouri City, and suburban events in Katy, Pearland, and Stafford. The Smart Financial Centre in Sugar Land is a premier dedicated garba venue.</p>
+
+<h3>When is Navratri in Houston 2026?</h3>
+<p>Navratri 2026 runs October 21–30. Houston events run across most or all nine nights, with the biggest productions on opening weekend (October 21–22) and final weekend (October 28–30). Celebrity artist nights typically sell out first.</p>
+
+<h3>How much do Houston garba tickets cost?</h3>
+<p>Houston garba tickets range from $25–$50 for community events to $60–$150+ for celebrity artist entertainment nights. Sugar Land events tend to be mid-range. NRG-area mega-productions command premium pricing. Group tickets on Rameelo automatically discount 10–15% for groups of 5+.</p>
+
+<h3>Do people travel from outside Houston for garba?</h3>
+<p>Yes. Houston's garba scene draws visitors from Austin, San Antonio, Dallas (for specific artists), and neighboring states like Louisiana and Oklahoma. During Navratri, Sugar Land hotels and Houston's hotel corridor fill with garba travelers.</p>
+
+<p><a href="/events">Find garba events in Houston on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "garba-events-dallas-texas-guide",
+    title: "Garba Events in Dallas: DFW's Fast-Growing Navratri Scene",
+    excerpt: "Dallas–Fort Worth has become one of America's most exciting garba markets. From Irving to Plano to Frisco, the DFW garba scene is growing fast — and the events are world-class. Your complete guide to Dallas Navratri.",
+    category: "City Guide",
+    author: "Rameelo Editorial",
+    authorTitle: "City Desk",
+    publishedAt: "2026-05-21",
+    readMinutes: 6,
+    featured: false,
+    coverGradient: "from-[#1A2A4A] via-[#24408a] to-[#3060c0]",
+    coverEmoji: "⭐",
+    tags: [
+      "garba events dallas", "navratri dallas", "garba events irving texas",
+      "garba events plano", "garba dallas fort worth", "navratri 2026 dallas",
+      "dandiya events dallas", "raas garba dallas", "gujarati events dallas",
+      "garba events frisco", "garba events dfw", "navratri tickets dallas",
+    ],
+    body: `
+<p class="lead"><strong>Dallas–Fort Worth</strong> has emerged as one of the fastest-growing garba markets in America. DFW's explosive overall population growth — particularly in the tech corridor stretching from Irving through Plano and Frisco — has brought a large, young, and enthusiastic South Asian community that is building the garba infrastructure to match.</p>
+
+<p>If you're searching for <strong>garba events in Dallas</strong> or <strong>Navratri events in DFW</strong>, this guide maps the full landscape of the North Texas garba scene.</p>
+
+<h2>DFW's Garba Geography</h2>
+
+<p>The Dallas garba community is distributed across the vast DFW metroplex, with three primary clusters:</p>
+
+<h3>Irving &amp; Las Colinas</h3>
+<p>The original center of Dallas-area garba. Irving's South Asian community — established for decades around the Las Colinas commercial corridor — has produced some of DFW's most traditional and community-rooted garba events. The Irving Convention Center and area hotel ballrooms are primary venues.</p>
+
+<h3>Plano, Allen &amp; Frisco (North Dallas)</h3>
+<p>The tech corridor north of Dallas — Plano, Allen, McKinney, Frisco — now has one of the fastest-growing South Asian populations in Texas. Events here are newer but rapidly scaling, driven by the large number of young tech professionals who want high-quality Navratri experiences. The Plano Event Center, Toyota Music Factory area venues, and large hotel facilities in this corridor host some of the most exciting new events in the DFW scene.</p>
+
+<h3>Fort Worth &amp; Mid-Cities</h3>
+<p>Fort Worth and the Mid-Cities (Arlington, Grand Prairie, Grapevine) have their own South Asian communities and host community garba events, particularly through temple organizations and cultural groups.</p>
+
+<h2>What Makes Dallas Garba Special</h2>
+
+<p>Dallas garba has an entrepreneurial energy. Because the scene is newer and faster-growing than Houston or NJ, event organizers are competing hard to differentiate — which means DFW events are innovating in ways that more established markets sometimes don't. Expect experimentation with venue types, production styles, artist bookings, and event formats.</p>
+
+<p>Dallas also benefits from the city's exceptional venue infrastructure. The DFW metroplex has world-class convention and entertainment venues that are increasingly being used for Navratri productions at scale.</p>
+
+<h2>Dallas vs. Houston: Choosing Your Texas Garba</h2>
+
+<p>If you're in Texas and can attend events in either city, here's how to think about it: Houston has more tradition, larger established events, and the deeper Gujarati community roots. Dallas has more energy, faster growth, and events that are punching above their weight in production quality. Many Texas garba enthusiasts do both cities — Houston for the community feel and legacy, Dallas for the buzz and newcomer energy.</p>
+
+<h2>Frequently Asked Questions: Garba in Dallas</h2>
+
+<h3>Where are garba events in Dallas–Fort Worth?</h3>
+<p>DFW garba events are primarily in Irving (Las Colinas corridor), North Dallas (Plano, Allen, Frisco), and the Mid-Cities (Arlington, Grand Prairie). The Irving Convention Center and Plano Event Center are primary dedicated garba venues. Browse the full listing at <a href="/events">rameelo.com/events</a>.</p>
+
+<h3>When do Dallas garba events happen?</h3>
+<p>The main season is Navratri 2026, October 21–30. DFW events typically concentrate around the opening and final weekends. Pre-season workshops run through August and September, often taught by artists or community instructors in the Plano and Irving areas.</p>
+
+<h3>Is the Dallas garba scene growing?</h3>
+<p>Significantly. DFW has been one of the fastest-growing South Asian metro areas in the country for the past decade, and the garba scene reflects that growth. Events that were small community gatherings five years ago are now professional productions with national artist bookings.</p>
+
+<h3>Can I get group garba tickets in Dallas?</h3>
+<p>Yes — Rameelo's group order feature works for all Dallas events on the platform. Start a group, share the link, and automatic discounts unlock at 5, 8, and 10+ people. Particularly useful for the large friend and family groups that form around tech company Navratri celebrations in the Plano corridor.</p>
+
+<p><a href="/events">Find garba events in Dallas on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "garba-events-chicago-illinois-midwest-guide",
+    title: "Garba Events in Chicago: The Midwest's Premier Navratri Scene",
+    excerpt: "Chicago and its South Asian suburbs — Schaumburg, Naperville, Lisle — host the Midwest's largest and most beloved garba events. Here's your complete guide to Chicago-area Navratri, from first-timer tips to insider knowledge.",
+    category: "City Guide",
+    author: "Rameelo Editorial",
+    authorTitle: "City Desk",
+    publishedAt: "2026-05-21",
+    readMinutes: 7,
+    featured: false,
+    coverGradient: "from-[#2E1B30] via-[#4a2a50] to-[#6a3a70]",
+    coverEmoji: "🌬️",
+    tags: [
+      "garba events chicago", "navratri chicago", "garba events schaumburg",
+      "garba events naperville", "garba illinois", "navratri 2026 chicago",
+      "dandiya events chicago", "raas garba chicago", "gujarati events chicago",
+      "garba midwest", "garba events lisle illinois", "navratri tickets chicago",
+    ],
+    body: `
+<p class="lead"><strong>Chicago</strong> is the Midwest's garba capital — full stop. The city's South Asian suburbs, particularly Schaumburg, Naperville, Lisle, and the broader I-88 corridor, host Navratri events that are among the best-organized and most beloved in the country. For garba lovers in Indiana, Michigan, Wisconsin, Minnesota, Ohio, and Missouri, Chicago is the destination every October.</p>
+
+<p>Searching for <strong>garba events in Chicago</strong> or <strong>Navratri in the Midwest</strong>? This guide covers the full landscape.</p>
+
+<h2>Where Chicago Garba Happens</h2>
+
+<h3>Schaumburg &amp; the Northwest Suburbs</h3>
+<p>Schaumburg is the heartbeat of Chicago garba. The Schaumburg Convention Center, Renaissance Schaumburg Hotel, and numerous large ballrooms in the northwest suburbs host Chicago's biggest and most attended Navratri events. The northwest corridor has the highest concentration of Gujarati families in the Chicago metro — decades of community building have created the organizational infrastructure for truly large-scale events.</p>
+
+<h3>Naperville &amp; the I-88 Corridor</h3>
+<p>The western suburb corridor — Naperville, Lisle, Downers Grove, Aurora — has its own vibrant garba scene. The Naperville area community is large enough to support independent productions that aren't just satellites of the Schaumburg events. Venues in this corridor range from hotel convention facilities to the Naperville Convention Center.</p>
+
+<h3>Itasca, Rosemont &amp; O'Hare Area</h3>
+<p>Some of Chicago's largest-scale Navratri events use venues near O'Hare — the Donald E. Stephens Convention Center in Rosemont, Westin O'Hare, and Marriott facilities in Itasca and Schaumburg. The easy airport access makes these venues popular for events drawing attendees from across the Midwest.</p>
+
+<h3>Chicago Proper</h3>
+<p>While most garba happens in the suburbs, some events use Chicago venues — the Navy Pier Festival Hall and downtown hotel convention facilities host occasional larger productions. The South Asian communities of Devon Avenue and the North Shore also host community garba through temple organizations.</p>
+
+<h2>Chicago Garba as a Regional Destination</h2>
+
+<p>Chicago garba events function as a regional draw in a way that few other markets can match. The city's central location and excellent flight connections mean garba enthusiasts drive and fly in from all over the Midwest:</p>
+<ul>
+  <li>Detroit (4.5-hour drive) — strong Michigan attendance at Chicago events</li>
+  <li>Indianapolis (3-hour drive) — Indiana community regularly attends Chicago</li>
+  <li>Columbus and Cleveland — regular Ohio attendees for major Chicago events</li>
+  <li>Minneapolis (6-hour drive or short flight) — the Minnesota community often makes the Chicago trip for celebrity artist nights</li>
+  <li>St. Louis (4.5-hour drive) — strong Missouri attendance</li>
+</ul>
+
+<h2>What Defines Chicago Garba Culture</h2>
+
+<p>Chicago garba has a reputation for the strongest folk garba tradition outside of NJ. The first-generation Gujarati community in the northwest suburbs has prioritized keeping traditional garba steps alive — you'll see more authentic folk garba on the early nights, before the entertainment garba takes over on the later nights. For people who want both the spiritual depth of traditional garba and the high-energy entertainment of celebrity artist nights, Chicago is the best of both worlds.</p>
+
+<h2>Frequently Asked Questions: Garba in Chicago</h2>
+
+<h3>Where are garba events held in Chicago?</h3>
+<p>Chicago-area garba events are primarily in the suburbs: Schaumburg (Convention Center, Renaissance Hotel), Naperville, Lisle, Rosemont (Donald E. Stephens Convention Center), and Itasca. The northwest suburbs are the primary hub. Some larger events use downtown Chicago or O'Hare-area venues.</p>
+
+<h3>When do Chicago Navratri events happen in 2026?</h3>
+<p>Navratri 2026 is October 21–30. Chicago events typically run 6–9 nights, with the major Schaumburg and Naperville events covering most of the festival. Weekends are the highest-demand nights — celebrity artist nights on the final weekend sell out weeks in advance.</p>
+
+<h3>How far do people travel for Chicago garba?</h3>
+<p>Chicago garba draws from a 6-state Midwest region. It's common to meet attendees who drove 3–5 hours from Michigan, Ohio, Indiana, Missouri, or Wisconsin. The major Schaumburg events are a regional pilgrimage for Midwest Gujarati-Americans.</p>
+
+<h3>Are there garba events in Chicago outside of Navratri?</h3>
+<p>Yes. The Chicago Gujarati community hosts garba workshops (August–September), Diwali dandiya events, and cultural celebrations year-round. BAPS temples in Bartlett and Chicago host devotional garba through the year. Check <a href="/events">Rameelo's full event calendar</a> for current listings.</p>
+
+<p><a href="/events">Find garba events in Chicago on Rameelo →</a></p>
+    `,
+  },
+
 ];
 
 export function getArticle(slug: string): BlogArticle | undefined {
