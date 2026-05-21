@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getArticle, BLOG_ARTICLES, type BlogArticle } from "@/lib/blog";
-import { breadcrumbSchema, ld } from "@/lib/jsonld";
+import { breadcrumbSchema, faqSchema, ld } from "@/lib/jsonld";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -14,12 +14,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const article = getArticle(slug);
   if (!article) return {};
+
+  const ogImage = { url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: article.title };
+
   return {
     title: article.title,
     description: article.excerpt,
     keywords: article.tags,
     authors: [{ name: article.author }],
     alternates: { canonical: `https://rameelo.com/blog/${article.slug}` },
+    robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-snippet": -1, "max-image-preview": "large" } },
     openGraph: {
       title: article.title,
       description: article.excerpt,
@@ -29,11 +33,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       tags: article.tags,
       url: `https://rameelo.com/blog/${article.slug}`,
       siteName: "Rameelo",
+      images: [ogImage],
     },
     twitter: {
       card: "summary_large_image",
+      site: "@rameelo",
       title: article.title,
       description: article.excerpt,
+      images: [ogImage.url],
     },
   };
 }
@@ -91,11 +98,15 @@ export default async function BlogArticlePage({ params }: Props) {
     { name: article.title, url: `https://rameelo.com/blog/${article.slug}` },
   ]);
 
+  const articleUrl = `https://rameelo.com/blog/${article.slug}`;
+
   const jsonLd = {
     "@context": "https://schema.org",
     "@type": "BlogPosting",
+    "@id": articleUrl,
     "headline": article.title,
     "description": article.excerpt,
+    "image": "https://rameelo.com/og-default.jpg",
     "author": {
       "@type": "Person",
       "name": article.author,
@@ -105,20 +116,36 @@ export default async function BlogArticlePage({ params }: Props) {
       "@type": "Organization",
       "name": "Rameelo",
       "url": "https://rameelo.com",
+      "logo": { "@type": "ImageObject", "url": "https://rameelo.com/logo/rameelo-icon-goldred.png" },
     },
     "datePublished": article.publishedAt,
-    "url": `https://rameelo.com/blog/${article.slug}`,
+    "dateModified": article.publishedAt,
+    "url": articleUrl,
     "keywords": article.tags.join(", "),
-    "mainEntityOfPage": {
-      "@type": "WebPage",
-      "@id": `https://rameelo.com/blog/${article.slug}`,
-    },
+    "articleSection": article.category,
+    "wordCount": Math.round(article.body.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length),
+    "inLanguage": "en-US",
+    "isPartOf": { "@type": "Blog", "name": "The Rameelo Review", "url": "https://rameelo.com/blog" },
+    "mainEntityOfPage": { "@type": "WebPage", "@id": articleUrl },
   };
+
+  // Extract FAQ pairs from <h3>…</h3> <p>…</p> patterns in the body
+  const faqPairs: { question: string; answer: string }[] = [];
+  const faqBlockRe = /<h3>([^<]+)<\/h3>\s*<p>([^<]*(?:<(?!\/p>)[^<]*)*)<\/p>/g;
+  let m: RegExpExecArray | null;
+  while ((m = faqBlockRe.exec(article.body)) !== null) {
+    const q = m[1].trim();
+    const a = m[2].replace(/<[^>]+>/g, "").trim();
+    // Only include question-shaped headings
+    if (q.endsWith("?")) faqPairs.push({ question: q, answer: a });
+  }
+  const faqLd = faqPairs.length > 0 ? faqSchema(faqPairs) : null;
 
   return (
     <div className="bg-ivory min-h-screen">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(crumbs) }} />
+      {faqLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(faqLd) }} />}
 
       {/* ── Masthead strip ── */}
       <div style={{ backgroundColor: "#2E1B30" }} className="border-b border-white/10">

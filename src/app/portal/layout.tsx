@@ -39,7 +39,6 @@ const MEMBER_NAV: NavItem[] = [
     href: "/portal/friends",
     label: "Friends",
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>,
-    badge: "4",
   },
   {
     href: "/portal/groups",
@@ -154,6 +153,7 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [ticketCount, setTicketCount] = useState<number>(0);
+  const [friendRequestCount, setFriendRequestCount] = useState<number>(0);
 
   useEffect(() => {
     const supabase = createClient();
@@ -163,8 +163,8 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         return;
       }
 
-      // Fetch profile + ticket count in parallel
-      const [{ data: profile }, { count }] = await Promise.all([
+      // Fetch profile, ticket count, and pending friend requests in parallel
+      const [{ data: profile }, { count }, { count: friendCount }] = await Promise.all([
         supabase
           .from("profiles")
           .select("first_name, last_name, email, phone, city, state, role, avatar_url")
@@ -175,8 +175,27 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           .select("id", { count: "exact", head: true })
           .eq("user_id", authUser.id)
           .eq("status", "confirmed"),
+        supabase
+          .from("friendships")
+          .select("id", { count: "exact", head: true })
+          .eq("addressee_id", authUser.id)
+          .eq("status", "pending"),
       ]);
       setTicketCount(count ?? 0);
+      setFriendRequestCount(friendCount ?? 0);
+
+      // Realtime: keep friend request badge in sync
+      supabase
+        .channel(`layout:friendships:${authUser.id}`)
+        .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, async () => {
+          const { count: fresh } = await supabase
+            .from("friendships")
+            .select("id", { count: "exact", head: true })
+            .eq("addressee_id", authUser.id)
+            .eq("status", "pending");
+          setFriendRequestCount(fresh ?? 0);
+        })
+        .subscribe();
 
       const meta = authUser.user_metadata ?? {};
       const firstName = profile?.first_name || meta.firstName || authUser.email?.split("@")[0] || "Member";
@@ -258,9 +277,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
           {/* Member section — everyone */}
           <NavDivider label="Member" />
           {MEMBER_NAV.map((item) => {
-            const navItem = item.href === "/portal/tickets" && ticketCount > 0
-              ? { ...item, badge: String(ticketCount) }
-              : item;
+            let navItem = item;
+            if (item.href === "/portal/tickets" && ticketCount > 0)
+              navItem = { ...item, badge: String(ticketCount) };
+            if (item.href === "/portal/friends" && friendRequestCount > 0)
+              navItem = { ...item, badge: String(friendRequestCount) };
             return <NavLink key={item.href} item={navItem} pathname={pathname} onClick={() => setSidebarOpen(false)} />;
           })}
 

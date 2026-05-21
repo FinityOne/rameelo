@@ -8,11 +8,19 @@ interface StoredOrder {
   firstName: string;
   lastName: string;
   email: string;
-  event1: { title: string; date: string; venue: string; city: string; state: string } | null;
-  event2: { title: string; date: string; venue: string; city: string; state: string } | null;
+  // flat fields written by current checkout
+  eventTitle?: string;
+  eventDate?: string;
+  eventVenue?: string;
+  eventCity?: string;
+  eventState?: string;
+  tierName?: string;
+  // legacy nested shape (kept for backwards-compat)
+  event1?: { title: string; date: string; venue: string; city: string; state: string } | null;
+  event2?: { title: string; date: string; venue: string; city: string; state: string } | null;
+  type?: string;
   grandTotal: number;
   qty: number;
-  type: string;
   purchasedAt: string;
 }
 
@@ -138,7 +146,30 @@ export default function ConfirmationPage() {
 
           {/* Events in this order */}
           <div className="divide-y divide-ivory-200">
-            {[order.event1, order.event2].filter(Boolean).map((ev, i) => ev && (
+            {/* Current flat shape */}
+            {order.eventTitle && (
+              <div className="px-6 py-4">
+                <p className="font-display font-bold text-ink mb-1">{order.eventTitle}</p>
+                <div className="flex flex-wrap gap-4 text-xs text-ink-muted">
+                  {order.eventDate && (
+                    <span className="flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                      <span className="font-ui">{order.eventDate}</span>
+                    </span>
+                  )}
+                  {(order.eventVenue || order.eventCity) && (
+                    <span className="flex items-center gap-1.5">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
+                      <span className="font-ui">
+                        {[order.eventVenue, order.eventCity, order.eventState].filter(Boolean).join(", ")}
+                      </span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+            {/* Legacy nested shape */}
+            {!order.eventTitle && [order.event1, order.event2].filter(Boolean).map((ev, i) => ev && (
               <div key={i} className="px-6 py-4">
                 {i === 1 && (
                   <span className="inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-widest text-marigold-dark bg-marigold/10 px-2 py-0.5 rounded-full mb-2">
@@ -164,7 +195,7 @@ export default function ConfirmationPage() {
           <div className="px-6 py-4 bg-ivory border-t border-ivory-200 flex items-center justify-between">
             <div>
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-0.5">
-                {order.qty} × {order.type === "combo" ? "Bundle Tickets" : order.type?.toUpperCase() + " Tickets"}
+                {order.qty} × {order.tierName ?? (order.type === "combo" ? "Bundle" : order.type) ?? "Ticket"}{order.qty !== 1 ? "s" : ""}
               </p>
               <p className="font-ui text-xs text-ink-muted">
                 Purchased {formatTime(order.purchasedAt)} · Sent to {order.email}
@@ -205,35 +236,27 @@ export default function ConfirmationPage() {
           </button>
         </div>
 
-        {/* Group order nudge */}
-        <div className="rounded-2xl p-5" style={{ backgroundColor: "#2E1B30" }}>
-          <div className="flex items-start gap-4">
-            <div className="w-10 h-10 rounded-xl bg-marigold/20 flex items-center justify-center shrink-0">
-              <svg className="w-5 h-5 text-marigold" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-            </div>
-            <div className="flex-1">
-              <p className="font-display font-bold text-white mb-1">Bring the whole crew</p>
-              <p className="font-ui text-white/60 text-sm">
-                Start a Group Order and your friends get a sharable link to buy their own tickets. 5+ tickets unlock group discounts up to 15% off.
-              </p>
-            </div>
-          </div>
-          <button className="mt-4 w-full py-3 rounded-xl bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark transition-all">
-            Start Group Order
-          </button>
-        </div>
-
-        {/* More events */}
-        {/* Footer */}
-        <div className="text-center py-6 space-y-4">
-          <p className="font-ui text-ink-muted text-sm">
-            Questions about your order? <Link href="/portal/tickets" className="text-marigold-dark hover:underline">View your tickets</Link>.
-          </p>
+        {/* CTA row */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+          <Link
+            href="/portal/tickets"
+            className="flex items-center justify-center gap-2 py-3.5 rounded-2xl font-display font-bold text-sm text-white hover:opacity-90 transition-all"
+            style={{ backgroundColor: "#2E1B30" }}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+            </svg>
+            View My Tickets
+          </Link>
           <Link
             href="/events"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark transition-all"
+            className="flex items-center justify-center gap-2 py-3.5 rounded-2xl font-display font-bold text-sm text-aubergine hover:opacity-90 transition-all"
+            style={{ backgroundColor: "#F5A623" }}
           >
-            Discover More Events →
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Buy More Tickets
           </Link>
         </div>
       </div>

@@ -490,6 +490,145 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <p>Find an event on Rameelo, select "Group Order" at checkout, and share the link in your WhatsApp thread. Watch the maybe crowd turn into the definitely crowd. Experience garba the way it was always meant to be experienced — with your people, together.</p>
     `,
   },
+
+  {
+    slug: "garba-events-near-me-find-navratri-usa-rameelo",
+    title: "Garba Events Near Me: The Fastest Way to Find Navratri & Raas Garba in the USA",
+    excerpt: "Searching for garba events near you? Rameelo is the only platform built exclusively for raas garba, dandiya, and Navratri events across the United States — with every event verified, organized by city, and bookable in minutes.",
+    category: "Platform",
+    author: "Rameelo Editorial",
+    authorTitle: "Platform Team",
+    publishedAt: "2026-05-21",
+    readMinutes: 9,
+    featured: false,
+    coverGradient: "from-[#2E1B30] via-[#4a1060] to-[#7C1F2C]",
+    coverEmoji: "🔍",
+    tags: [
+      "garba events near me",
+      "navratri events near me",
+      "dandiya events near me",
+      "raas garba events usa",
+      "garba tickets online",
+      "navratri 2026 tickets",
+      "find garba events",
+      "best garba platform usa",
+      "garba events new jersey",
+      "garba events houston",
+      "garba events chicago",
+      "garba events atlanta",
+      "navratri tickets online",
+      "rameelo garba",
+    ],
+    body: `
+<p class="lead">Every fall, millions of searches flood Google: <em>"garba events near me," "navratri events near me," "dandiya near me this weekend."</em> If you've typed those words and landed on a generic events page showing concerts and 5K runs, you've felt the frustration. <strong>Rameelo exists to end that frustration forever.</strong></p>
+
+<p>Rameelo is the first and only platform in the United States built exclusively for raas garba, dandiya, and Navratri events. Every listing is a real garba event — curated, verified, and organized by city so you can find what you're looking for in seconds, not scroll through results that have nothing to do with your search.</p>
+
+<h2>Why "Garba Near Me" Searches Fail on Generic Platforms</h2>
+
+<p>Eventbrite, Ticketmaster, and Facebook Events were built for everything — which means they're optimized for nothing specific. When you search for garba or Navratri events, you're competing against millions of other event types for algorithm attention. Results are inconsistent, outdated, and frequently miss smaller community-organized events that don't have the marketing budget to stand out on general platforms.</p>
+
+<p>Rameelo solves this at the architecture level. Every event on the platform is one of these:</p>
+<ul>
+  <li><strong>Garba</strong> — Traditional circular folk dance events</li>
+  <li><strong>Raas</strong> — Dandiya raas stick-dance events</li>
+  <li><strong>Dandiya</strong> — Open dandiya nights, often accessible to beginners</li>
+  <li><strong>Workshop</strong> — Garba and raas practice sessions, typically pre-season</li>
+  <li><strong>Fusion</strong> — Bollywood-garba fusion events year-round</li>
+</ul>
+
+<p>Nothing else. No open-mic nights. No 5K runs. No tech meetups accidentally tagged "Navratri." Just garba — every time, for every search.</p>
+
+<h2>Where to Find Garba Events Near You: City by City</h2>
+
+<p>Rameelo covers garba and Navratri events in every major U.S. metro where the Gujarati-American and South Asian community has established a meaningful presence. Here's where we're live:</p>
+
+<h3>Garba Events in New Jersey</h3>
+<p>New Jersey — specifically the Middlesex County corridor of Edison, Iselin, and Parsippany — is the undisputed epicenter of American garba. The densest concentration of Gujarati Americans in the country means the most garba events per square mile anywhere outside Gujarat itself. On Rameelo, NJ events are among the first to list and the first to sell out. If you're searching for <strong>garba events in New Jersey</strong>, start here months before Navratri season begins.</p>
+
+<h3>Garba Events in Houston</h3>
+<p>Houston hosts one of America's premier Navratri celebrations. The city's large Gujarati community — concentrated in the Sugar Land, Katy, and Pearland suburbs — organizes events that rival NJ in scale and production quality. <strong>Garba events in Houston</strong> on Rameelo include both high-production entertainment nights and more intimate folk garba circles.</p>
+
+<h3>Garba Events in Chicago</h3>
+<p>The Midwest's garba capital. Chicago's South Asian suburbs — Naperville, Schaumburg, Lisle, Downers Grove — produce some of the best-organized Navratri events in the country. Find <strong>garba events in Chicago</strong> on Rameelo, including multi-night passes and group tickets for families traveling from across the Midwest.</p>
+
+<h3>Garba Events in Atlanta</h3>
+<p>Atlanta is the South's garba hub, drawing attendees from Georgia, Tennessee, and the Carolinas. The community is growing fast, and events have scaled accordingly. <strong>Garba events in Atlanta</strong> on Rameelo include both community-organized celebrations and larger professional productions.</p>
+
+<h3>Garba Events in the San Jose / Bay Area</h3>
+<p>Silicon Valley's garba scene is sophisticated and well-funded — no surprise given the density of Gujarati tech professionals in the region. <strong>Garba events in the Bay Area</strong> on Rameelo often feature elaborate production setups and artists flown in from India.</p>
+
+<h3>Garba Events in Dallas, Boston, Philadelphia, Seattle, Denver, Phoenix, and Beyond</h3>
+<p>Rameelo is live nationwide. As the Gujarati diaspora has spread across every major American metro, so has garba — and so has our coverage. Browse the <a href="/events">full events map</a> to find what's happening in your city this season.</p>
+
+<h2>What Makes Rameelo the #1 Garba Platform in America</h2>
+
+<p>There are a few things we do that no general platform can match:</p>
+
+<h3>1. Every Event Is Verified</h3>
+<p>Every event on Rameelo goes through an internal review before it's published. We check that it's a real garba or Navratri event, that the dates and venue information are accurate, and that the organizer is legitimate. You will never buy a ticket to a phantom event on Rameelo. That's not a feature — it's a baseline standard we hold ourselves to.</p>
+
+<h3>2. Built-In Group Discounts That Actually Work</h3>
+<p>Garba has always been a group activity. Your whole family goes. Your college crew goes. Your WhatsApp group debates for two weeks and then all goes. But general ticketing platforms have no native concept of "group of friends buying together."</p>
+<p>Rameelo's group order system was built specifically for this. One person starts a group, shares a link, and everyone in the group buys their own tickets at their own pace. When the group hits 5 people, everyone gets 10% off automatically. 8 people: 12% off. 10+ people: 15% off. No coupon codes. No calling customer service. Just a link and a WhatsApp message.</p>
+
+<h3>3. Artist Profiles Linked to Events</h3>
+<p>You don't just want to go to <em>a</em> garba event — you want to go to the event where <em>Kinjal Dave</em> is performing. Or Jignesh Kaviraj. Or Geeta Rabari. On Rameelo, every artist has a dedicated profile page, and events automatically link to artist pages. You can browse <a href="/artists">every garba artist</a> on the platform, see their upcoming shows, and buy tickets directly — all in one place.</p>
+
+<h3>4. Navratri-Native Event Structure</h3>
+<p>Navratri is a nine-night festival. Most general platforms have no way to express that elegantly — you end up with nine separate event listings that don't connect to each other, no way to buy a multi-night pass, no indication of which nights have which artists. Rameelo's event model is built for multi-night Navratri festivals from the ground up. Every event can have multiple dates, each with its own ticket tiers, artist, and pricing.</p>
+
+<h3>5. A Community, Not Just a Marketplace</h3>
+<p>Rameelo members get more than a ticket. They get a profile, a friend network, community groups (Fashion, Dance, Hangout, Marketplace, Beginner Circles), and a feed of what their friends are attending. The people you meet at garba every October — you can stay connected to them on Rameelo year-round.</p>
+
+<h2>How to Find Garba Events Near You Right Now</h2>
+
+<p>It takes under 60 seconds:</p>
+<ol>
+  <li>Go to <a href="/events">rameelo.com/events</a></li>
+  <li>No account required — start browsing immediately</li>
+  <li>Filter by your city or state</li>
+  <li>Filter by event type (Garba, Raas, Dandiya, Workshop)</li>
+  <li>Filter by date range to find events this weekend or this Navratri season</li>
+  <li>Click any event for full details: venue, artists, ticket tiers, group discount thresholds</li>
+</ol>
+
+<p>Creating a free account unlocks group orders, ticket transfers, artist follows, and notifications when new events are added in your city.</p>
+
+<h2>Frequently Asked Questions About Finding Garba Events</h2>
+
+<h3>Where can I find garba events near me?</h3>
+<p>Rameelo (rameelo.com/events) is the most complete directory of garba, dandiya, and Navratri events in the United States. Filter by city and date to find events near you. Every listing is verified — you won't find off-topic results.</p>
+
+<h3>When are Navratri events in 2026?</h3>
+<p>Navratri 2026 runs from October 21 to October 30. The most popular event nights are typically October 22–23 (opening weekend), October 28 (penultimate night), and October 29 (Navami, the final night). Major events in cities like Edison NJ, Houston TX, and Chicago IL typically announce dates by July and sell out by September.</p>
+
+<h3>How much do garba tickets cost?</h3>
+<p>Garba tickets vary widely by event type, location, and artist. Community garba nights can be as low as $15–$25. Mid-range events with live music typically run $40–$80. High-production celebrity artist nights range from $80–$200+. Group tickets on Rameelo automatically discount 10–15% when your group hits the threshold — often saving $50–$150 for a group of 10.</p>
+
+<h3>Can I buy garba tickets online?</h3>
+<p>Yes — Rameelo is the dedicated platform for buying garba tickets online. All events on Rameelo are bookable directly through the website. No need to find a local organizer's Venmo, a Facebook post with an embedded Google Form, or a cash-only entry at the door.</p>
+
+<h3>What is the best app for finding Navratri events?</h3>
+<p>Rameelo is the only platform built specifically for Navratri and garba events in the USA. General apps like Eventbrite or Facebook Events include garba events but aren't specialized for the community — you'll get irrelevant results alongside legitimate events. Rameelo's entire inventory is garba, dandiya, and Navratri events.</p>
+
+<h3>Are there garba events outside of October?</h3>
+<p>Yes. While Navratri (October) is peak season, Rameelo lists garba and raas events year-round — including workshops (usually August–September), Bollywood-garba fusion nights, cultural festival stages, and community garba practice circles. Browse <a href="/events">all events</a> and remove the date filter to see the full calendar.</p>
+
+<h3>How do I get group discounts on garba tickets?</h3>
+<p>Rameelo's group order feature is built for exactly this. Start a group order for any event, share the link with your crew, and discounts unlock automatically when your group hits 5 (10% off), 8 (12% off), or 10+ people (15% off). No coupon codes, no minimum upfront commitment — everyone buys at their own pace.</p>
+
+<h2>The Bottom Line</h2>
+
+<p>If you've been searching for "garba events near me" and landing on results that don't understand what you're looking for — that search ends on Rameelo.</p>
+
+<p>We built this platform because we were tired of the same thing you were tired of: garba events scattered across Facebook posts, cash-only registrations, sold-out events you didn't know existed until it was too late, and no way to coordinate tickets with your whole group without a logistical nightmare.</p>
+
+<p>Rameelo is the platform the garba community deserves. Verified events. City-by-city discovery. Artist pages. Group discounts that actually work. And a community layer that keeps you connected to your garba crew past the last night of Navratri.</p>
+
+<p><a href="/events">Find garba events near you →</a></p>
+    `,
+  },
 ];
 
 export function getArticle(slug: string): BlogArticle | undefined {
