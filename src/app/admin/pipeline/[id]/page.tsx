@@ -342,21 +342,62 @@ export default function LeadDetailPage() {
                   <div><label className={label}>LinkedIn URL</label><input className={inp} value={editForm.linkedin_url ?? ""} onChange={e => setEditForm(f => ({...f, linkedin_url: e.target.value}))} /></div>
                 </>
               ) : (
-                <dl className="space-y-2">
-                  {[
-                    { k: "Email",    v: lead.email,    href: lead.email ? `mailto:${lead.email}` : undefined },
-                    { k: "Phone",    v: lead.phone,    href: lead.phone ? `tel:${lead.phone}` : undefined },
-                    { k: "Title",    v: lead.title,    href: undefined },
-                    { k: "Location", v: [lead.city, lead.state].filter(Boolean).join(", ") || null, href: undefined },
-                    { k: "LinkedIn", v: lead.linkedin_url ? "View Profile" : null, href: lead.linkedin_url ?? undefined },
-                  ].map(row => row.v && (
-                    <div key={row.k} className="flex gap-3">
-                      <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0 mt-0.5">{row.k}</dt>
-                      <dd className="font-ui text-[13px] text-ink/65 flex-1">
-                        {row.href ? <a href={row.href} target={row.href.startsWith("http") ? "_blank" : undefined} rel="noopener noreferrer" className="text-aubergine/70 hover:text-aubergine transition-colors">{row.v}</a> : row.v}
+                <dl className="space-y-3">
+                  {/* Email — always visible */}
+                  <div className="flex items-center gap-3">
+                    <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0">Email</dt>
+                    <dd className="flex-1 min-w-0">
+                      {lead.email ? (
+                        <div className="flex items-center gap-2 min-w-0">
+                          <a href={`mailto:${lead.email}`} className="font-ui text-[13px] text-aubergine/70 hover:text-aubergine transition-colors truncate">
+                            {lead.email}
+                          </a>
+                          <CopyButton text={lead.email} />
+                        </div>
+                      ) : (
+                        <span className="font-ui text-[12px] text-ink/28 italic">Not added</span>
+                      )}
+                    </dd>
+                  </div>
+
+                  {/* Phone — always visible */}
+                  <div className="flex items-center gap-3">
+                    <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0">Phone</dt>
+                    <dd className="flex-1 min-w-0">
+                      {lead.phone ? (
+                        <div className="flex items-center gap-2">
+                          <a href={`tel:${lead.phone}`} className="font-ui text-[13px] text-aubergine/70 hover:text-aubergine transition-colors">
+                            {lead.phone}
+                          </a>
+                          <CopyButton text={lead.phone} />
+                        </div>
+                      ) : (
+                        <span className="font-ui text-[12px] text-ink/28 italic">Not added</span>
+                      )}
+                    </dd>
+                  </div>
+
+                  {/* Remaining fields — only shown when present */}
+                  {lead.title && (
+                    <div className="flex gap-3">
+                      <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0 mt-0.5">Title</dt>
+                      <dd className="font-ui text-[13px] text-ink/65">{lead.title}</dd>
+                    </div>
+                  )}
+                  {([lead.city, lead.state].filter(Boolean).length > 0) && (
+                    <div className="flex gap-3">
+                      <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0 mt-0.5">Location</dt>
+                      <dd className="font-ui text-[13px] text-ink/65">{[lead.city, lead.state].filter(Boolean).join(", ")}</dd>
+                    </div>
+                  )}
+                  {lead.linkedin_url && (
+                    <div className="flex gap-3">
+                      <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0 mt-0.5">LinkedIn</dt>
+                      <dd className="font-ui text-[13px] text-ink/65">
+                        <a href={lead.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-aubergine/70 hover:text-aubergine transition-colors">View Profile</a>
                       </dd>
                     </div>
-                  ))}
+                  )}
                 </dl>
               )}
             </div>
