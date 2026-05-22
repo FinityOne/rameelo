@@ -109,7 +109,7 @@ function LeadCard({ lead, onStageChange }: { lead: Lead; onStageChange: (id: str
       {/* Top row */}
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1 min-w-0">
-          <Link href={`/admin/pipeline/${lead.id}`} className="font-ui font-semibold text-ink/80 text-[13px] hover:text-aubergine transition-colors leading-snug block truncate">
+          <Link href={`/admin/pipeline/${lead.id}`} target="_blank" rel="noopener noreferrer" className="font-ui font-semibold text-ink/80 text-[13px] hover:text-aubergine transition-colors leading-snug block truncate">
             {lead.first_name} {lead.last_name}
           </Link>
           {company && <p className="font-mono text-[10px] text-ink/40 truncate mt-0.5">{company}</p>}
@@ -558,7 +558,7 @@ export default function PipelinePage() {
                   return (
                     <tr key={lead.id} className="hover:bg-black/[0.015] transition-colors group">
                       <td className="px-4 py-3">
-                        <Link href={`/admin/pipeline/${lead.id}`} className="font-ui font-semibold text-ink/75 hover:text-aubergine transition-colors">
+                        <Link href={`/admin/pipeline/${lead.id}`} target="_blank" rel="noopener noreferrer" className="font-ui font-semibold text-ink/75 hover:text-aubergine transition-colors">
                           {lead.first_name} {lead.last_name}
                         </Link>
                         <p className="font-mono text-[10px] text-ink/35">{lead.email ?? "—"}</p>
