@@ -67,7 +67,7 @@ export default function Footer() {
               Support
             </h4>
             <ul className="space-y-3 font-ui text-sm">
-              {["Help Center", "Contact Us", "Organizer Hub", "Privacy Policy", "Terms of Service"].map(
+              {["Help Center", "Organizer Hub", "Privacy Policy", "Terms of Service"].map(
                 (item) => (
                   <li key={item}>
                     <a href="#" className="text-white/50 hover:text-white transition-colors">
@@ -76,6 +76,11 @@ export default function Footer() {
                   </li>
                 )
               )}
+              <li>
+                <Link href="/contact" className="text-white/50 hover:text-white transition-colors">
+                  Contact Us
+                </Link>
+              </li>
               <li>
                 <Link href="/changelog" className="text-white/50 hover:text-white transition-colors">
                   Changelog
