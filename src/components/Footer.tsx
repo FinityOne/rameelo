@@ -67,7 +67,12 @@ export default function Footer() {
               Support
             </h4>
             <ul className="space-y-3 font-ui text-sm">
-              {["Help Center", "Organizer Hub", "Privacy Policy", "Terms of Service"].map(
+              <li>
+                <Link href="/help" className="text-white/50 hover:text-white transition-colors">
+                  Help Center
+                </Link>
+              </li>
+              {["Organizer Hub", "Privacy Policy", "Terms of Service"].map(
                 (item) => (
                   <li key={item}>
                     <a href="#" className="text-white/50 hover:text-white transition-colors">
