@@ -26,6 +26,7 @@ type DBEvent = {
   age_restriction: string;
   navratri_nights: number[] | null;
   capacity: number | null;
+  selling_on_rameelo: boolean;
   ticket_tiers: { price: number; quantity: number }[];
   artists: { name: string; tagline: string | null; profile_image_url: string | null; is_featured: boolean } | null;
 };
@@ -53,6 +54,7 @@ type EventVM = {
   dressCode: string;
   ageRestriction: string;
   navratriNights: number[];
+  sellingOnRameelo: boolean;
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -165,20 +167,30 @@ function EventCard({ event }: { event: EventVM }) {
 
         <div className="flex items-center justify-between pt-2 border-t border-ivory-200">
           <div>
-            {event.minPrice === null ? null : event.minPrice === 0 ? (
-              <span className="font-display font-bold text-peacock text-base">Free</span>
+            {!event.sellingOnRameelo ? (
+              <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Interest only</span>
+            ) : event.minPrice === null ? (
+              <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Tickets TBA</span>
+            ) : event.minPrice === 0 ? (
+              <span className="font-display font-bold text-peacock text-sm">Complimentary</span>
             ) : (
               <>
-                <span className="font-display font-bold text-ink text-base">${event.minPrice}</span>
+                <span className="font-display font-bold text-ink text-base">From ${event.minPrice}</span>
                 {event.maxPrice !== null && event.maxPrice > event.minPrice && (
                   <span className="text-ink-muted text-xs ml-1">– ${event.maxPrice}</span>
                 )}
               </>
             )}
           </div>
-          <Link href={`/events/${event.id}`}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold bg-marigold text-aubergine hover:bg-[#d4891b] transition-all">
-            Get Tickets
+          <Link
+            href={`/events/${event.id}`}
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              event.sellingOnRameelo
+                ? "bg-marigold text-aubergine hover:bg-[#d4891b]"
+                : "bg-aubergine/8 text-aubergine border border-aubergine/20 hover:bg-aubergine/15"
+            }`}
+          >
+            {event.sellingOnRameelo ? "Get Tickets" : "Express Interest"}
           </Link>
         </div>
       </div>
@@ -211,7 +223,7 @@ export default function EventsPage() {
           id, title, category, artist, artist_id, description,
           start_date, end_date, is_multi_day, city, state, venue_name, start_time,
           cover_image_url, cover_gradient, dress_code, dandiya_sticks,
-          age_restriction, navratri_nights, capacity,
+          age_restriction, navratri_nights, capacity, selling_on_rameelo,
           ticket_tiers (price, quantity),
           artists (name, tagline, profile_image_url, is_featured)
         `)
@@ -245,6 +257,7 @@ export default function EventsPage() {
           dressCode: ev.dress_code,
           ageRestriction: ev.age_restriction,
           navratriNights: ev.navratri_nights ?? [],
+          sellingOnRameelo: ev.selling_on_rameelo,
         };
       });
 

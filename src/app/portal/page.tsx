@@ -15,61 +15,42 @@ const SPONSOR_ADS = [
   { id: "chiro",  biz: "Bay Area Chiro & Wellness", tag: "Chiropractic", tagline: "Back pain after Garba? We've got you.", desc: "Dr. Meera Choksi, DC — performance recovery. First visit free.", cta: "Schedule Now", color: "#3D2543", accent: "#0E8C7A", emoji: "💆", sponsor: "Sponsored" },
 ];
 
-// ── Live activity feed data ───────────────────────────────────────────────────
+// ── Live platform types ───────────────────────────────────────────────────────
 
-type ActivityType = "ticket" | "post" | "reaction" | "group" | "hype" | "join";
-
-type Activity = {
-  id: string;
-  type: ActivityType;
-  icon: string;
-  text: string;
-  sub: string;
-  color: string;
-  highlight?: boolean;
+type PlatformStats = {
+  total_members: number;
+  tickets_today: number;
+  upcoming_events: number;
+  active_groups: number;
 };
 
-const ACTIVITY_POOL: Activity[] = [
-  { id: "a1",  type: "ticket",   icon: "🎟️", text: "6 tickets just sold",               sub: "Navratri Night 4 · Houston · 41 left",      color: "#F5A623", highlight: true },
-  { id: "a2",  type: "post",     icon: "📸", text: "Priya posted Night 3 photos",        sub: "800+ dancers · Houston · 3 new photos",     color: "#E8547A" },
-  { id: "a3",  type: "reaction", icon: "🔥", text: "Karan's post is blowing up",         sub: "142 reactions · Championship win · ATL",    color: "#F97316", highlight: true },
-  { id: "a4",  type: "group",    icon: "👥", text: "New group forming",                  sub: "Chicago Garba · 3 spots still open",        color: "#0E8C7A" },
-  { id: "a5",  type: "hype",     icon: "⚡", text: "Dallas tickets selling fast",        sub: "Desi Night · 38 seats left · This Sat",     color: "#a06b00", highlight: true },
-  { id: "a6",  type: "post",     icon: "🏆", text: "Atlanta Championship results are in", sub: "Dandiya Dhol wins couples raas · See post", color: "#F5A623", highlight: true },
-  { id: "a7",  type: "ticket",   icon: "🎟️", text: "4 tickets just sold",               sub: "Bhangra Blast · Houston · 120 left",        color: "#F5A623" },
-  { id: "a8",  type: "join",     icon: "🪈", text: "Arjun joined from San Jose",         sub: "Bay Area Bhangra Night recap posted",       color: "#6366F1" },
-  { id: "a9",  type: "reaction", icon: "❤️", text: "Meera's couples post hit 178 loves", sub: "Chicago Garba Night · Community trending",  color: "#E8547A", highlight: true },
-  { id: "a10", type: "group",    icon: "👥", text: "Group completed checkout",           sub: "8-person group · Navratri Night 4 · Full!", color: "#0E8C7A" },
-  { id: "a11", type: "hype",     icon: "🌟", text: "Bay Area Bhangra sold out",          sub: "3× capacity — next event dates announced",  color: "#a06b00", highlight: true },
-  { id: "a12", type: "post",     icon: "📸", text: "Divya posted Boston garba moments",  sub: "New moments · 12 reactions so far",         color: "#0E8C7A" },
-  { id: "a13", type: "ticket",   icon: "🎟️", text: "3 tickets just sold",               sub: "Desi Night Dallas · 35 left",               color: "#F5A623" },
-  { id: "a14", type: "reaction", icon: "✨", text: "Night 3 post at 545 reactions",      sub: "Priya Sharma · Most reacted this week",     color: "#6366F1", highlight: true },
-  { id: "a15", type: "join",     icon: "🪈", text: "12 new members this hour",           sub: "Across Houston · ATL · Chicago",            color: "#E8547A" },
-];
+type LiveActivityItem = {
+  type: "ticket" | "group";
+  event_title: string;
+  city: string;
+  state: string;
+  qty: number | null;
+  group_size: number | null;
+  created_at: string;
+};
 
-// ── Community moments (preview cards) ────────────────────────────────────────
-
-const COMMUNITY_MOMENTS = [
-  { id: "m1", name: "Priya S.", initials: "PS", color: "#E8547A", gradient: "linear-gradient(135deg,#F5A623 0%,#E8547A 50%,#2E1B30 100%)", city: "Houston", text: "Night 3 was absolutely magical ✨ The energy on that floor was unlike anything…", reactions: 545, photos: 3 },
-  { id: "m2", name: "Karan M.", initials: "KM", color: "#0E8C7A", gradient: "linear-gradient(135deg,#F5A623 0%,#a06b00 100%)",              city: "Atlanta", text: "WE WON 🏆🏆🏆 Atlanta Dandiya Dhol took first place in the couple's raas category!", reactions: 586, photos: 2 },
-  { id: "m3", name: "Meera T.", initials: "MT", color: "#6C4F9E", gradient: "linear-gradient(135deg,#E8547A 0%,#C73B5E 50%,#2E1B30 100%)", city: "Chicago", text: "My husband said 'I'm not a dancer' in January. Look at him now 😂❤️", reactions: 383, photos: 2 },
-  { id: "m4", name: "Arjun K.", initials: "AK", color: "#2E1B30", gradient: "linear-gradient(135deg,#F97316 0%,#DC2626 50%,#7C1F2C 100%)", city: "San Jose", text: "Bay Area Bhangra Night in the books! 🎊 We packed the venue 3× over what we expected.", reactions: 425, photos: 3 },
-];
-
-// ── Hype counter data ─────────────────────────────────────────────────────────
-
-const HYPE_STATS = [
-  { label: "Fans online",    target: 847,  suffix: "",  color: "#F5A623", icon: "🪈" },
-  { label: "Tickets today",  target: 94,   suffix: "",  color: "#0E8C7A", icon: "🎟️" },
-  { label: "Active events",  target: 23,   suffix: "",  color: "#E8547A", icon: "📅" },
-  { label: "Community posts",target: 120,  suffix: "+", color: "#6366F1", icon: "📸" },
-];
+type CommunityGroup = {
+  id: string;
+  name: string;
+  emoji: string | null;
+  description: string | null;
+  category: string | null;
+  color1: string | null;
+  color2: string | null;
+  member_count: number;
+  is_hot: boolean;
+};
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type RecommendedEvent = {
   id: string; title: string; start_date: string; city: string; state: string;
-  cover_gradient: string; lowestPrice: number; fillPct: number;
+  cover_gradient: string; lowestPrice: number | null; fillPct: number; sellingOnRameelo: boolean;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -237,66 +218,61 @@ function AnimatedCount({ target, suffix = "" }: { target: number; suffix?: strin
 
 // ── Live activity feed ────────────────────────────────────────────────────────
 
-function LiveActivityFeed() {
-  const [items, setItems] = useState<Activity[]>(ACTIVITY_POOL.slice(0, 6));
-  const [poolIdx, setPoolIdx] = useState(6);
-  const [newId, setNewId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const next = ACTIVITY_POOL[poolIdx % ACTIVITY_POOL.length];
-      setItems(prev => [next, ...prev.slice(0, 7)]);
-      setNewId(next.id);
-      setPoolIdx(i => i + 1);
-      setTimeout(() => setNewId(null), 600);
-    }, 3200);
-    return () => clearInterval(interval);
-  }, [poolIdx]);
+function LiveActivityFeed({ items }: { items: LiveActivityItem[] }) {
+  function timeAgo(iso: string) {
+    const diff = Date.now() - new Date(iso).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return "just now";
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  }
 
   return (
     <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
-      {/* Header */}
       <div className="px-4 py-3.5 border-b border-ivory-200 flex items-center gap-2.5">
         <div className="relative flex items-center gap-1.5">
           <div className="w-2 h-2 rounded-full bg-peacock" />
           <div className="absolute w-2 h-2 rounded-full bg-peacock animate-ping" />
         </div>
         <p className="font-mono text-[10px] uppercase tracking-widest text-ink font-bold">Live on Rameelo</p>
-        <div className="flex-1" />
-        <span className="font-mono text-[9px] text-ink-muted/50">Updates every few sec</span>
       </div>
 
-      {/* Feed */}
-      <div className="divide-y divide-ivory-200">
-        {items.map((item, i) => (
-          <div
-            key={item.id + i}
-            className={`px-4 py-3 flex items-start gap-3 transition-all duration-500 ${
-              item.id === newId ? "bg-peacock/5" : i === 0 && item.id === newId ? "bg-peacock/5" : ""
-            }`}
-          >
-            <div
-              className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0"
-              style={{ backgroundColor: item.color + "18" }}
-            >
-              {item.icon}
+      {items.length === 0 ? (
+        <div className="px-4 py-8 text-center space-y-2">
+          <p className="text-2xl">🪈</p>
+          <p className="font-display font-bold text-ink text-sm">Platform is live</p>
+          <p className="font-ui text-xs text-ink-muted">Ticket activity will appear here as events fill up.</p>
+          <Link href="/events" className="inline-block mt-2 font-ui text-xs font-semibold text-peacock hover:text-peacock/70 transition-colors">Browse events →</Link>
+        </div>
+      ) : (
+        <div className="divide-y divide-ivory-200">
+          {items.map((item, i) => (
+            <div key={i} className="px-4 py-3 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0"
+                style={{ backgroundColor: item.type === "ticket" ? "#F5A62318" : "#0E8C7A18" }}>
+                {item.type === "ticket" ? "🎟️" : "👥"}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-ui text-xs font-semibold text-ink leading-snug">
+                  {item.type === "ticket"
+                    ? `${item.qty} ticket${(item.qty ?? 1) > 1 ? "s" : ""} sold`
+                    : `Group of ${item.group_size} forming`}
+                </p>
+                <p className="font-mono text-[9px] text-ink-muted mt-0.5 truncate">
+                  {item.event_title} · {item.city}, {item.state}
+                </p>
+              </div>
+              <span className="font-mono text-[9px] text-ink-muted shrink-0">{timeAgo(item.created_at)}</span>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className={`font-ui text-xs leading-snug ${item.highlight ? "font-semibold text-ink" : "text-ink"}`}>
-                {item.text}
-              </p>
-              <p className="font-mono text-[9px] text-ink-muted mt-0.5 leading-snug">{item.sub}</p>
-            </div>
-            {item.highlight && (
-              <div className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: item.color }} />
-            )}
-          </div>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       <div className="px-4 py-3 border-t border-ivory-200 bg-ivory">
-        <Link href="/portal/community" className="flex items-center justify-center gap-1.5 font-ui text-xs font-semibold text-peacock hover:text-peacock/70 transition-colors">
-          Join the conversation →
+        <Link href="/events" className="flex items-center justify-center gap-1.5 font-ui text-xs font-semibold text-peacock hover:text-peacock/70 transition-colors">
+          Browse all events →
         </Link>
       </div>
     </div>
@@ -305,23 +281,23 @@ function LiveActivityFeed() {
 
 // ── Hype bar ──────────────────────────────────────────────────────────────────
 
-function HypeBar() {
+function HypeBar({ stats }: { stats: PlatformStats | null }) {
+  const items = [
+    { label: "Members",         value: stats?.total_members   ?? 0, color: "#F5A623", icon: "🪈" },
+    { label: "Tickets Today",   value: stats?.tickets_today   ?? 0, color: "#0E8C7A", icon: "🎟️" },
+    { label: "Upcoming Events", value: stats?.upcoming_events ?? 0, color: "#E8547A", icon: "📅" },
+    { label: "Active Groups",   value: stats?.active_groups   ?? 0, color: "#6366F1", icon: "👥" },
+  ];
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      {HYPE_STATS.map(s => (
-        <div
-          key={s.label}
-          className="bg-white rounded-2xl border border-ivory-200 px-4 py-3.5 flex items-center gap-3"
-        >
-          <div
-            className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0"
-            style={{ backgroundColor: s.color + "18" }}
-          >
+      {items.map(s => (
+        <div key={s.label} className="bg-white rounded-2xl border border-ivory-200 px-4 py-3.5 flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0" style={{ backgroundColor: s.color + "18" }}>
             {s.icon}
           </div>
           <div className="min-w-0">
             <p className="font-display font-bold text-ink leading-none" style={{ fontSize: 22, letterSpacing: "-0.03em", color: s.color }}>
-              <AnimatedCount target={s.target} suffix={s.suffix} />
+              {stats ? <AnimatedCount target={s.value} /> : "—"}
             </p>
             <p className="font-mono text-[9px] text-ink-muted uppercase tracking-widest mt-0.5">{s.label}</p>
           </div>
@@ -331,78 +307,62 @@ function HypeBar() {
   );
 }
 
-// ── Community moments row ─────────────────────────────────────────────────────
+// ── Community groups row ──────────────────────────────────────────────────────
 
-function CommunityMomentsRow() {
+function CommunityGroupsRow({ groups }: { groups: CommunityGroup[] }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  if (groups.length === 0) return null;
 
   return (
     <div>
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2.5">
           <h3 className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>
-            Community Moments
+            Community Groups
           </h3>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-durga/10 font-mono text-[9px] font-bold uppercase tracking-widest text-durga">
-            <span className="w-1 h-1 rounded-full bg-durga animate-pulse" />
-            New
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-peacock/10 font-mono text-[9px] font-bold uppercase tracking-widest text-peacock">
+            <span className="w-1 h-1 rounded-full bg-peacock animate-pulse" />
+            Live
           </span>
         </div>
-        <Link href="/portal/community" className="font-ui text-sm text-peacock hover:text-peacock/70 transition-colors font-semibold">
+        <Link href="/portal/groups" className="font-ui text-sm text-peacock hover:text-peacock/70 transition-colors font-semibold">
           See all →
         </Link>
       </div>
       <div ref={scrollRef} className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
-        {COMMUNITY_MOMENTS.map(m => (
+        {groups.map(g => (
           <Link
-            key={m.id}
-            href="/portal/community"
-            className="group shrink-0 w-64 bg-white rounded-2xl border border-ivory-200 overflow-hidden hover:border-marigold/30 hover:shadow-md transition-all"
+            key={g.id}
+            href="/portal/groups"
+            className="group shrink-0 w-56 bg-white rounded-2xl border border-ivory-200 overflow-hidden hover:border-peacock/30 hover:shadow-md transition-all"
           >
-            {/* Photo strip */}
-            <div className="h-28 relative" style={{ background: m.gradient }}>
-              <div className="absolute inset-0" style={{ backgroundImage: "radial-gradient(circle at 20% 30%, rgba(255,255,255,0.06) 20%, transparent 21%), radial-gradient(circle at 75% 70%, rgba(255,255,255,0.04) 30%, transparent 31%)" }} />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-              <div className="absolute bottom-2.5 left-3 right-3 flex items-end justify-between">
-                <div className="flex items-center gap-1.5">
-                  <div className="w-6 h-6 rounded-full border-2 border-white/60 flex items-center justify-center text-white text-[8px] font-bold shrink-0" style={{ backgroundColor: m.color }}>
-                    {m.initials}
-                  </div>
-                  <p className="font-ui text-white text-[10px] font-semibold drop-shadow">{m.name}</p>
-                </div>
-                <div className="flex items-center gap-1 bg-black/30 rounded-full px-1.5 py-0.5">
-                  <span className="text-[10px]">🔥</span>
-                  <span className="font-mono text-white text-[9px]">{m.reactions}</span>
-                </div>
-              </div>
+            <div
+              className="h-20 flex items-center justify-center text-4xl"
+              style={{ background: g.color1 && g.color2 ? `linear-gradient(135deg, ${g.color1}, ${g.color2})` : "#2E1B30" }}
+            >
+              {g.emoji ?? "🪈"}
             </div>
-            {/* Text */}
             <div className="px-3 py-2.5">
-              <p className="font-ui text-xs text-ink leading-snug line-clamp-2">{m.text}</p>
-              <div className="flex items-center gap-1.5 mt-1.5">
-                <svg className="w-2.5 h-2.5 text-ink-muted/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                </svg>
-                <span className="font-mono text-[9px] text-ink-muted">{m.city}</span>
-                <span className="text-ink-muted/30">·</span>
-                <span className="font-mono text-[9px] text-ink-muted">{m.photos} photos</span>
+              <p className="font-display font-bold text-ink text-xs leading-snug group-hover:text-peacock transition-colors">{g.name}</p>
+              {g.description && <p className="font-ui text-[11px] text-ink-muted mt-0.5 line-clamp-2 leading-snug">{g.description}</p>}
+              <div className="flex items-center gap-1.5 mt-2">
+                <div className="flex -space-x-1">
+                  {[0,1,2].map(n => (
+                    <div key={n} className="w-4 h-4 rounded-full border border-white" style={{ backgroundColor: ["#2E1B30","#0E8C7A","#F5A623"][n] }} />
+                  ))}
+                </div>
+                <span className="font-mono text-[9px] text-ink-muted">{g.member_count} member{g.member_count !== 1 ? "s" : ""}</span>
+                {g.is_hot && <span className="font-mono text-[9px] text-durga">🔥 Hot</span>}
               </div>
             </div>
           </Link>
         ))}
-
-        {/* CTA card */}
         <Link
-          href="/portal/community"
-          className="shrink-0 w-48 rounded-2xl border-2 border-dashed border-marigold/30 hover:border-marigold/60 transition-all flex flex-col items-center justify-center gap-2.5 p-4 group"
+          href="/portal/groups"
+          className="shrink-0 w-44 rounded-2xl border-2 border-dashed border-peacock/25 hover:border-peacock/50 transition-all flex flex-col items-center justify-center gap-2 p-4 group"
         >
-          <div className="w-10 h-10 rounded-xl bg-marigold/15 flex items-center justify-center text-xl group-hover:bg-marigold/25 transition-colors">
-            🪈
-          </div>
-          <div className="text-center">
-            <p className="font-ui font-bold text-ink text-xs group-hover:text-aubergine transition-colors">Share your moment</p>
-            <p className="font-mono text-[9px] text-ink-muted mt-0.5">Post photos &amp; stories</p>
-          </div>
+          <div className="w-9 h-9 rounded-xl bg-peacock/10 flex items-center justify-center text-xl group-hover:bg-peacock/20 transition-colors">👥</div>
+          <p className="font-ui font-bold text-ink text-xs text-center group-hover:text-peacock transition-colors">Browse all groups</p>
         </Link>
       </div>
     </div>
@@ -535,10 +495,14 @@ function RecommendedCard({ ev }: { ev: RecommendedEvent }) {
       )}
       <div className="flex items-center justify-between">
         <p className="font-mono text-[10px] text-ink-muted">
-          {ev.fillPct > 0 ? `${ev.fillPct}% sold` : "On sale now"}
+          {ev.fillPct > 0 ? `${ev.fillPct}% sold` : ev.sellingOnRameelo ? "On sale now" : "Express interest"}
           {ev.fillPct >= 85 && " · 🔥 Almost gone"}
         </p>
-        <p className="font-display font-bold text-ink text-sm">{ev.lowestPrice > 0 ? `From $${ev.lowestPrice}` : "Free"}</p>
+        <p className="font-display font-bold text-ink text-sm">
+          {!ev.sellingOnRameelo ? (
+            <span className="font-mono text-[9px] text-ink-muted uppercase tracking-widest">Interest only</span>
+          ) : ev.lowestPrice && ev.lowestPrice > 0 ? `From $${ev.lowestPrice}` : "TBA"}
+        </p>
       </div>
     </Link>
   );
@@ -552,6 +516,9 @@ export default function PortalDashboard() {
   const [pendingGroups, setPendingGroups] = useState<PendingGroup[]>([]);
   const [recommended, setRecommended]     = useState<RecommendedEvent[]>([]);
   const [incomingTransfers, setIncomingTransfers] = useState<IncomingTransfer[]>([]);
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
+  const [liveActivity, setLiveActivity]   = useState<LiveActivityItem[]>([]);
+  const [communityGroups, setCommunityGroups] = useState<CommunityGroup[]>([]);
   const [loading, setLoading]             = useState(true);
 
   useEffect(() => {
@@ -561,24 +528,37 @@ export default function PortalDashboard() {
       if (!authUser) return;
       const today = new Date().toISOString().slice(0, 10);
       const email = authUser.email ?? "";
-      const [myOrders, myPending, incoming, { data: eventsRaw }] = await Promise.all([
+      const [myOrders, myPending, incoming, { data: eventsRaw }, statsRes, activityRes, groupsRes] = await Promise.all([
         loadMyOrders(authUser.id),
         loadMyPendingGroups(authUser.id),
         email ? loadIncomingTransfers(email) : Promise.resolve([]),
         supabase
           .from("events")
-          .select("id, title, start_date, city, state, cover_gradient, ticket_tiers (price, quantity, quantity_sold)")
+          .select("id, title, start_date, city, state, cover_gradient, selling_on_rameelo, ticket_tiers (price, quantity, quantity_sold)")
           .eq("status", "published")
           .gte("start_date", today)
           .order("start_date")
           .limit(6),
+        supabase.rpc("get_platform_stats"),
+        supabase.rpc("get_recent_activity", { p_limit: 10 }),
+        supabase
+          .from("chat_groups")
+          .select("id, name, emoji, description, category, color1, color2, member_count, is_hot")
+          .eq("is_active", true)
+          .eq("admin_hidden", false)
+          .order("sort_order")
+          .limit(8),
       ]);
       setOrders(myOrders);
       setPendingGroups(myPending);
       setIncomingTransfers(incoming);
+      if (statsRes.data) setPlatformStats(statsRes.data as PlatformStats);
+      if (activityRes.data) setLiveActivity((activityRes.data as LiveActivityItem[]) ?? []);
+      if (groupsRes.data) setCommunityGroups(groupsRes.data as CommunityGroup[]);
       const myEventIds = new Set(myOrders.map(o => o.eventId));
       const recs: RecommendedEvent[] = ((eventsRaw ?? []) as {
         id: string; title: string; start_date: string; city: string; state: string; cover_gradient: string;
+        selling_on_rameelo: boolean;
         ticket_tiers: { price: number; quantity: number; quantity_sold: number }[];
       }[])
         .filter(e => !myEventIds.has(e.id)).slice(0, 3)
@@ -587,7 +567,13 @@ export default function PortalDashboard() {
           const prices = tiers.map(t => t.price).filter(p => p > 0);
           const totalQ = tiers.reduce((s, t) => s + t.quantity, 0);
           const totalS = tiers.reduce((s, t) => s + t.quantity_sold, 0);
-          return { id: e.id, title: e.title, start_date: e.start_date, city: e.city, state: e.state, cover_gradient: e.cover_gradient, lowestPrice: prices.length > 0 ? Math.min(...prices) : 0, fillPct: totalQ > 0 ? Math.round((totalS / totalQ) * 100) : 0 };
+          return {
+            id: e.id, title: e.title, start_date: e.start_date, city: e.city ?? "", state: e.state ?? "",
+            cover_gradient: e.cover_gradient,
+            lowestPrice: e.selling_on_rameelo && prices.length > 0 ? Math.min(...prices) : null,
+            fillPct: totalQ > 0 ? Math.round((totalS / totalQ) * 100) : 0,
+            sellingOnRameelo: e.selling_on_rameelo,
+          };
         });
       setRecommended(recs);
       setLoading(false);
@@ -660,7 +646,7 @@ export default function PortalDashboard() {
       </div>
 
       {/* ── Hype bar ── */}
-      {!loading && <HypeBar />}
+      {!loading && <HypeBar stats={platformStats} />}
 
       {/* ── Transfer alert ── */}
       {!loading && incomingTransfers.length > 0 && (
@@ -739,12 +725,12 @@ export default function PortalDashboard() {
           </div>
 
           {/* Right: Live feed */}
-          <LiveActivityFeed />
+          <LiveActivityFeed items={liveActivity} />
         </div>
       )}
 
-      {/* ── Community moments ── */}
-      <CommunityMomentsRow />
+      {/* ── Community groups ── */}
+      <CommunityGroupsRow groups={communityGroups} />
 
       {/* ── Quick actions ── */}
       <QuickActions hasTickets={hasTickets} orderCount={orders.length} />
