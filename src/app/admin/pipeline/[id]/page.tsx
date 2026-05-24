@@ -13,6 +13,7 @@ type Lead = {
   email: string | null; phone: string | null; title: string | null;
   city: string | null; state: string | null; linkedin_url: string | null;
   organization_name: string | null; org_id: string | null; platform_user_id: string | null;
+  artist_id: string | null;
   stage: string; priority: string; source: string | null;
   assigned_to: string | null; next_follow_up_at: string | null;
   est_events_per_year: number | null; est_avg_attendance: number | null; est_avg_ticket_price: number | null;
@@ -30,6 +31,8 @@ type Note = {
 type Doc = { id: string; file_name: string; file_url: string; file_size_bytes: number | null; mime_type: string | null; created_at: string };
 type AdminProfile = { id: string; first_name: string; last_name: string };
 type OrgOption    = { id: string; name: string };
+type ArtistOption = { id: string; name: string; slug: string };
+type PastEvent    = { id: string; title: string; start_date: string; city: string | null; state: string | null; venue_name: string | null };
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -96,8 +99,8 @@ const TEMPLATES: Record<string, { subject: string; sms: string; email: string }>
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtMoney(n: number) {
-  if (n >= 1000000) return `$${(n / 1000000).toFixed(1)}M`;
-  if (n >= 1000)    return `$${(n / 1000).toFixed(1)}K`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000)     return `$${(n / 1_000).toFixed(1)}K`;
   return `$${n.toFixed(0)}`;
 }
 
@@ -134,41 +137,54 @@ function CopyButton({ text }: { text: string }) {
 
 export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
+  const router  = useRouter();
 
-  const [lead, setLead]   = useState<Lead | null>(null);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [docs, setDocs]   = useState<Doc[]>([]);
+  const [lead,   setLead]   = useState<Lead | null>(null);
+  const [notes,  setNotes]  = useState<Note[]>([]);
+  const [docs,   setDocs]   = useState<Doc[]>([]);
   const [admins, setAdmins] = useState<AdminProfile[]>([]);
-  const [orgs, setOrgs]   = useState<OrgOption[]>([]);
+  const [orgs,   setOrgs]   = useState<OrgOption[]>([]);
+  const [artists, setArtists] = useState<ArtistOption[]>([]);
+  const [pastEvents, setPastEvents] = useState<PastEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const [editing, setEditing] = useState(false);
+  const [editing,  setEditing]  = useState(false);
   const [editForm, setEditForm] = useState<Partial<Lead>>({});
-  const [saving, setSaving] = useState(false);
+  const [saving,   setSaving]   = useState(false);
 
-  const [noteBody, setNoteBody] = useState("");
-  const [noteType, setNoteType] = useState("note");
-  const [addingNote, setAddingNote] = useState(false);
+  const [noteBody,    setNoteBody]    = useState("");
+  const [noteType,    setNoteType]    = useState("note");
+  const [addingNote,  setAddingNote]  = useState(false);
 
-  // Revenue calculator state (separate from lead — allows what-if)
-  const [calcEvents, setCalcEvents]   = useState("");
-  const [calcAtt, setCalcAtt]         = useState("");
-  const [calcPrice, setCalcPrice]     = useState("");
+  // Past events quick-add
+  const [showQuickAdd,  setShowQuickAdd]  = useState(false);
+  const [qaForm, setQaForm] = useState({ title: "", start_date: "", city: "", state: "", venue_name: "" });
+  const [addingEvent, setAddingEvent] = useState(false);
+  const [qaError,     setQaError]     = useState("");
+
+  // Revenue calculator state (what-if)
+  const [calcEvents, setCalcEvents] = useState("");
+  const [calcAtt,    setCalcAtt]    = useState("");
+  const [calcPrice,  setCalcPrice]  = useState("");
 
   const [activeTemplate, setActiveTemplate] = useState<"sms" | "email">("sms");
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
-    const [leadRes, notesRes, docsRes, adminsRes, orgsRes] = await Promise.all([
+    const today    = new Date().toISOString().split("T")[0];
+
+    const [leadRes, notesRes, docsRes, adminsRes, orgsRes, artistsRes] = await Promise.all([
       supabase.from("sales_leads").select("*").eq("id", id).single(),
       supabase.from("sales_notes").select("*, author:author_id(first_name,last_name)").eq("lead_id", id).order("created_at", { ascending: false }),
       supabase.from("sales_documents").select("*").eq("lead_id", id).order("created_at", { ascending: false }),
       supabase.from("profiles").select("id, first_name, last_name").eq("role", "admin"),
       supabase.from("organizations").select("id, name"),
+      supabase.from("artists").select("id, name, slug").eq("is_active", true).order("name"),
     ]);
+
     if (!leadRes.data) { router.push("/admin/pipeline"); return; }
     const l = leadRes.data as Lead;
+
     setLead(l);
     setEditForm(l);
     setCalcEvents(String(l.est_events_per_year ?? ""));
@@ -178,6 +194,23 @@ export default function LeadDetailPage() {
     setDocs((docsRes.data ?? []) as Doc[]);
     setAdmins((adminsRes.data ?? []) as AdminProfile[]);
     setOrgs((orgsRes.data ?? []) as OrgOption[]);
+    setArtists((artistsRes.data ?? []) as ArtistOption[]);
+
+    // Fetch past events linked via org or artist
+    const filters: string[] = [];
+    if (l.org_id)    filters.push(`org_id.eq.${l.org_id}`);
+    if (l.artist_id) filters.push(`artist_id.eq.${l.artist_id}`);
+    if (filters.length > 0) {
+      const { data: evData } = await supabase
+        .from("events")
+        .select("id, title, start_date, city, state, venue_name")
+        .or(filters.join(","))
+        .lt("start_date", today)
+        .order("start_date", { ascending: false })
+        .limit(30);
+      setPastEvents((evData ?? []) as PastEvent[]);
+    }
+
     setLoading(false);
   }, [id, router]);
 
@@ -194,17 +227,37 @@ export default function LeadDetailPage() {
       state: editForm.state || null, linkedin_url: editForm.linkedin_url || null,
       organization_name: editForm.organization_name || null,
       org_id: editForm.org_id || null,
+      artist_id: editForm.artist_id || null,
       priority: editForm.priority, source: editForm.source || null,
       assigned_to: editForm.assigned_to || null,
       next_follow_up_at: editForm.next_follow_up_at || null,
-      est_events_per_year: editForm.est_events_per_year || null,
-      est_avg_attendance: editForm.est_avg_attendance || null,
+      est_events_per_year:  editForm.est_events_per_year  || null,
+      est_avg_attendance:   editForm.est_avg_attendance   || null,
       est_avg_ticket_price: editForm.est_avg_ticket_price || null,
       internal_summary: editForm.internal_summary || null,
     }).eq("id", id);
     setLead(prev => prev ? { ...prev, ...editForm } as Lead : null);
     setEditing(false);
     setSaving(false);
+    // Re-fetch past events if org/artist changed
+    if (editForm.org_id !== lead.org_id || editForm.artist_id !== lead.artist_id) {
+      const today   = new Date().toISOString().split("T")[0];
+      const supabase2 = createClient();
+      const filters: string[] = [];
+      if (editForm.org_id)    filters.push(`org_id.eq.${editForm.org_id}`);
+      if (editForm.artist_id) filters.push(`artist_id.eq.${editForm.artist_id}`);
+      if (filters.length > 0) {
+        const { data } = await supabase2.from("events")
+          .select("id, title, start_date, city, state, venue_name")
+          .or(filters.join(","))
+          .lt("start_date", today)
+          .order("start_date", { ascending: false })
+          .limit(30);
+        setPastEvents((data ?? []) as PastEvent[]);
+      } else {
+        setPastEvents([]);
+      }
+    }
   }
 
   async function changeStage(newStage: string) {
@@ -241,19 +294,45 @@ export default function LeadDetailPage() {
     setNotes(prev => prev.filter(n => n.id !== noteId));
   }
 
+  async function addPastEvent() {
+    if (!qaForm.title.trim()) { setQaError("Event title is required."); return; }
+    if (!qaForm.start_date)   { setQaError("Date is required."); return; }
+    const today = new Date().toISOString().split("T")[0];
+    if (qaForm.start_date >= today) { setQaError("Date must be in the past."); return; }
+    setAddingEvent(true);
+    const supabase = createClient();
+    const { data, error } = await supabase.from("events").insert({
+      title:      qaForm.title.trim(),
+      start_date: qaForm.start_date,
+      city:       qaForm.city       || null,
+      state:      qaForm.state      || null,
+      venue_name: qaForm.venue_name || null,
+      org_id:     lead?.org_id    || null,
+      artist_id:  lead?.artist_id || null,
+      status:             "published",
+      selling_on_rameelo: false,
+      category:           "garba",
+    }).select("id, title, start_date, city, state, venue_name").single();
+    if (error) { setQaError(error.message); setAddingEvent(false); return; }
+    setPastEvents(prev => [data as PastEvent, ...prev]);
+    setQaForm({ title: "", start_date: "", city: "", state: "", venue_name: "" });
+    setQaError("");
+    setShowQuickAdd(false);
+    setAddingEvent(false);
+  }
+
   // Revenue calc
-  const calcArr = calcEvents && calcAtt && calcPrice
-    ? Number(calcEvents) * Number(calcAtt) * Number(calcPrice) * 0.03 : null;
-  const calcGross = calcEvents && calcAtt && calcPrice
-    ? Number(calcEvents) * Number(calcAtt) * Number(calcPrice) : null;
+  const calcArr   = calcEvents && calcAtt && calcPrice ? Number(calcEvents) * Number(calcAtt) * Number(calcPrice) * 0.03 : null;
+  const calcGross = calcEvents && calcAtt && calcPrice ? Number(calcEvents) * Number(calcAtt) * Number(calcPrice) : null;
 
-  const stageInfo = STAGES.find(s => s.id === lead?.stage);
-  const prio = PRIORITY_META[(lead?.priority ?? "medium") as keyof typeof PRIORITY_META];
-  const template = TEMPLATES[lead?.stage ?? "new_lead"];
+  const stageInfo   = STAGES.find(s => s.id === lead?.stage);
+  const prio        = PRIORITY_META[(lead?.priority ?? "medium") as keyof typeof PRIORITY_META];
+  const template    = TEMPLATES[lead?.stage ?? "new_lead"];
   const displayName = lead ? `${lead.first_name} ${lead.last_name}` : "";
-  const company = lead?.organization_name || (orgs.find(o => o.id === lead?.org_id)?.name);
+  const company     = lead?.organization_name || (orgs.find(o => o.id === lead?.org_id)?.name);
+  const linkedArtist = artists.find(a => a.id === lead?.artist_id);
 
-  const inp = "w-full rounded-lg border border-black/10 bg-white px-3 py-2 font-ui text-[13px] text-ink/80 placeholder-ink/25 focus:outline-none focus:ring-2 focus:ring-aubergine/15 focus:border-aubergine/30 transition-all";
+  const inp   = "w-full rounded-lg border border-black/10 bg-white px-3 py-2 font-ui text-[13px] text-ink/80 placeholder-ink/25 focus:outline-none focus:ring-2 focus:ring-aubergine/15 focus:border-aubergine/30 transition-all";
   const label = "block font-mono text-[9px] uppercase tracking-widest text-ink/35 mb-1";
 
   if (loading) return (
@@ -277,7 +356,12 @@ export default function LeadDetailPage() {
             <h1 className="font-display font-black text-ink/85 text-2xl" style={{ letterSpacing: "-0.03em" }}>{displayName}</h1>
             {company && <span className="font-ui text-ink/40 text-sm">· {company}</span>}
             {lead.title && <span className="font-ui text-ink/35 text-sm">{lead.title}</span>}
-            {/* Platform indicator */}
+            {linkedArtist && (
+              <Link href={`/artists/${linkedArtist.slug}`} target="_blank" rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-mono text-[9px] font-bold uppercase tracking-widest bg-aubergine/8 text-aubergine/70 border border-aubergine/15 hover:bg-aubergine/12 transition-colors">
+                🎵 {linkedArtist.name}
+              </Link>
+            )}
             <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-mono text-[9px] font-bold uppercase tracking-widest border ${lead.platform_user_id ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-50 text-slate-500 border-slate-200"}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${lead.platform_user_id ? "bg-emerald-400" : "bg-slate-300"}`} />
               {lead.platform_user_id ? "On Platform" : "External Lead"}
@@ -292,14 +376,14 @@ export default function LeadDetailPage() {
         </button>
       </div>
 
-      {/* ── Stage stepper ────────────────────────────────────────── */}
+      {/* ── Stage stepper ─────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-black/[0.06] px-4 py-3 shadow-sm overflow-x-auto">
         <div className="flex items-center gap-1 min-w-max">
           {STAGES.map((s, i) => {
-            const stageIds = STAGES.map(x => x.id);
+            const stageIds   = STAGES.map(x => x.id);
             const currentIdx = stageIds.indexOf(lead.stage as typeof STAGES[number]["id"]);
-            const isActive = lead.stage === s.id;
-            const isPast = i < currentIdx && !["nurture","lost"].includes(s.id);
+            const isActive   = lead.stage === s.id;
+            const isPast     = i < currentIdx && !["nurture", "lost"].includes(s.id);
             return (
               <button key={s.id} onClick={() => changeStage(s.id)}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-mono text-[10px] font-bold uppercase tracking-widest transition-all ${
@@ -377,7 +461,6 @@ export default function LeadDetailPage() {
                     </dd>
                   </div>
 
-                  {/* Remaining fields — only shown when present */}
                   {lead.title && (
                     <div className="flex gap-3">
                       <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0 mt-0.5">Title</dt>
@@ -441,6 +524,12 @@ export default function LeadDetailPage() {
                       {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                     </select>
                   </div>
+                  <div><label className={label}>Attach Artist</label>
+                    <select className={inp} value={editForm.artist_id ?? ""} onChange={e => setEditForm(f => ({...f, artist_id: e.target.value}))}>
+                      <option value="">— No artist —</option>
+                      {artists.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </div>
                   <div><label className={label}>Internal Notes</label>
                     <textarea className={`${inp} min-h-[72px] resize-none`} value={editForm.internal_summary ?? ""} onChange={e => setEditForm(f => ({...f, internal_summary: e.target.value}))} />
                   </div>
@@ -457,16 +546,24 @@ export default function LeadDetailPage() {
               ) : (
                 <dl className="space-y-2">
                   {[
-                    { k: "Stage",     v: stageInfo?.label },
-                    { k: "Priority",  v: lead.priority },
-                    { k: "Source",    v: lead.source?.replace(/_/g," ") },
-                    { k: "Org",       v: company },
+                    { k: "Stage",    v: stageInfo?.label },
+                    { k: "Priority", v: lead.priority },
+                    { k: "Source",   v: lead.source?.replace(/_/g," ") },
+                    { k: "Org",      v: company },
+                    { k: "Artist",   v: linkedArtist?.name,
+                      extra: linkedArtist ? (
+                        <Link href={`/artists/${linkedArtist.slug}`} target="_blank" rel="noopener noreferrer"
+                          className="font-mono text-[9px] text-aubergine/50 hover:text-aubergine transition-colors ml-1.5">↗</Link>
+                      ) : null },
                     { k: "Follow-up", v: lead.next_follow_up_at ? new Date(lead.next_follow_up_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null },
-                    { k: "Created",   v: new Date(lead.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
+                    { k: "Created",  v: new Date(lead.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
                   ].map(row => row.v && (
-                    <div key={row.k} className="flex gap-3">
+                    <div key={row.k} className="flex gap-3 items-baseline">
                       <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0 mt-0.5">{row.k}</dt>
-                      <dd className="font-ui text-[13px] text-ink/65">{row.v}</dd>
+                      <dd className="font-ui text-[13px] text-ink/65 flex items-center">
+                        {row.v}
+                        {"extra" in row && row.extra}
+                      </dd>
                     </div>
                   ))}
                   {lead.internal_summary && (
@@ -495,7 +592,6 @@ export default function LeadDetailPage() {
           {/* Add note */}
           <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-4">
             <p className="font-mono text-[10px] uppercase tracking-widest text-ink/35 mb-3">Log Activity</p>
-            {/* Type selector */}
             <div className="flex gap-1 flex-wrap mb-3">
               {NOTE_TYPES.map(nt => (
                 <button key={nt.id} onClick={() => setNoteType(nt.id)}
@@ -622,7 +718,6 @@ export default function LeadDetailPage() {
               </div>
             </div>
             <div className="p-4 space-y-3">
-              {/* Stage tag */}
               <div className="flex items-center gap-2">
                 <span className="font-mono text-[9px] text-ink/30">Template for:</span>
                 <span className="inline-flex items-center gap-1 font-mono text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ color: stageInfo?.color, backgroundColor: stageInfo?.bg }}>
@@ -649,7 +744,6 @@ export default function LeadDetailPage() {
                 </div>
                 <p className="font-mono text-[9px] text-ink/25 mt-1.5">Replace [Name], [Org Name], [Your Name] with real values</p>
               </div>
-              {/* Quick-browse other stages */}
               <div>
                 <p className={`${label} mb-2`}>Other stage templates</p>
                 <div className="flex flex-wrap gap-1">
@@ -694,6 +788,111 @@ export default function LeadDetailPage() {
 
         </div>
       </div>
+
+      {/* ── Past Events ──────────────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
+        <div className="px-5 py-3.5 border-b border-black/[0.05] flex items-center justify-between gap-4 flex-wrap">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-ink/35">
+              Past Events
+              {pastEvents.length > 0 && <span className="ml-2 text-ink/25">({pastEvents.length})</span>}
+            </p>
+            <p className="font-mono text-[9px] text-ink/25 mt-0.5">
+              {linkedArtist ? `Shows linked to ${linkedArtist.name}` : company ? `Events from ${company}` : "Link an org or artist to see events"}
+            </p>
+          </div>
+          <button onClick={() => { setShowQuickAdd(p => !p); setQaError(""); }}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-ui text-[12px] font-medium transition-all border border-black/10 text-ink/55 hover:text-ink/75 hover:border-black/20 bg-white shrink-0">
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+            Add Past Event
+          </button>
+        </div>
+
+        {/* Quick add form */}
+        {showQuickAdd && (
+          <div className="p-5 border-b border-black/[0.05] bg-black/[0.012]">
+            <p className="font-mono text-[9px] uppercase tracking-widest text-ink/35 mb-3">Quick Add</p>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+              <div className="col-span-2 sm:col-span-2">
+                <label className={label}>Event Title *</label>
+                <input className={inp} value={qaForm.title} onChange={e => setQaForm(f => ({...f, title: e.target.value}))} placeholder="Navratri Mahotsav 2024" />
+              </div>
+              <div>
+                <label className={label}>Date *</label>
+                <input className={inp} type="date" value={qaForm.start_date} onChange={e => setQaForm(f => ({...f, start_date: e.target.value}))} max={new Date().toISOString().split("T")[0]} />
+              </div>
+              <div>
+                <label className={label}>Venue</label>
+                <input className={inp} value={qaForm.venue_name} onChange={e => setQaForm(f => ({...f, venue_name: e.target.value}))} placeholder="NRG Arena" />
+              </div>
+              <div>
+                <label className={label}>City</label>
+                <input className={inp} value={qaForm.city} onChange={e => setQaForm(f => ({...f, city: e.target.value}))} placeholder="Houston" />
+              </div>
+              <div>
+                <label className={label}>State</label>
+                <input className={inp} value={qaForm.state} onChange={e => setQaForm(f => ({...f, state: e.target.value}))} placeholder="TX" />
+              </div>
+            </div>
+            {qaError && <p className="font-ui text-xs text-red-500 mb-2">{qaError}</p>}
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={addPastEvent} disabled={addingEvent}
+                className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-ui font-semibold text-[13px] text-white transition-all disabled:opacity-50"
+                style={{ backgroundColor: "#2E1B30" }}>
+                {addingEvent ? "Saving…" : "Save Event"}
+              </button>
+              <button onClick={() => { setShowQuickAdd(false); setQaForm({ title: "", start_date: "", city: "", state: "", venue_name: "" }); setQaError(""); }}
+                className="px-4 py-2 rounded-lg font-ui text-[13px] text-ink/45 hover:bg-black/5 transition-all">
+                Cancel
+              </button>
+              {(lead.artist_id || lead.org_id) && (
+                <p className="font-mono text-[9px] text-ink/25 ml-auto">
+                  Will link to {linkedArtist ? linkedArtist.name : company}&apos;s page
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Past events list */}
+        {pastEvents.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <p className="text-2xl mb-2">📅</p>
+            <p className="font-ui text-[13px] text-ink/40">No past events logged yet</p>
+            <p className="font-mono text-[9px] text-ink/25 mt-1">
+              {!lead.org_id && !lead.artist_id
+                ? "Link an org or artist first, then add past shows to build their history."
+                : "Use the button above to log past events — they'll show on the artist's public page."}
+            </p>
+          </div>
+        ) : (
+          <div className="divide-y divide-black/[0.04]">
+            {pastEvents.map(ev => {
+              const d = new Date(ev.start_date + "T00:00:00");
+              return (
+                <div key={ev.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-black/[0.01] transition-colors group">
+                  <div className="w-11 h-11 rounded-xl flex flex-col items-center justify-center shrink-0 bg-ink/[0.04]">
+                    <p className="font-display font-bold text-ink/55 text-sm leading-none">{d.getDate()}</p>
+                    <p className="font-mono text-[8px] uppercase tracking-wide text-ink/30">{d.toLocaleString("en-US", { month: "short" })}</p>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-ui text-[13px] font-medium text-ink/70 truncate">{ev.title}</p>
+                    <p className="font-mono text-[10px] text-ink/35 mt-0.5">
+                      {d.getFullYear()}
+                      {[ev.venue_name, ev.city, ev.state].filter(Boolean).length > 0 && " · " + [ev.venue_name, ev.city, ev.state].filter(Boolean).join(", ")}
+                    </p>
+                  </div>
+                  <Link href={`/events/${ev.id}`} target="_blank" rel="noopener noreferrer"
+                    className="text-ink/20 hover:text-aubergine transition-colors opacity-0 group-hover:opacity-100">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                  </Link>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
     </div>
   );
 }

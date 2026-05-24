@@ -208,6 +208,7 @@ const PAGE_TITLES: Array<{ test: (p: string) => boolean; title: string }> = [
   { test: (p) => p === "/admin/notifications",                    title: "Notifications" },
   { test: (p) => p === "/admin/platform",                         title: "Platform Settings" },
   { test: (p) => p === "/admin/pipeline",                         title: "Sales Pipeline" },
+  { test: (p) => p === "/admin/pipeline/new",                     title: "New Lead" },
   { test: (p) => /^\/admin\/pipeline\/[^/]+$/.test(p),           title: "Lead Detail" },
 ];
 

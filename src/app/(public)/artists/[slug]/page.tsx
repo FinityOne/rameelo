@@ -300,7 +300,7 @@ function EventRow({ event, heroColor, past = false }: { event: EventRow; heroCol
               <p className="font-mono text-[9px] uppercase tracking-wide text-ink-muted">from</p>
             </>
           ) : (
-            <p className="font-mono text-[9px] uppercase tracking-wide text-ink-muted">Free</p>
+            <p className="font-mono text-[9px] uppercase tracking-wide text-ink-muted">TBA</p>
           )}
         </div>
       )}
