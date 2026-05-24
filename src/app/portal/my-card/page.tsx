@@ -14,8 +14,7 @@ type Profile = {
   city:       string | null;
   state:      string | null;
   created_at: string;
-  avatar_url:   string | null;
-  avatar_color: string | null;
+  avatar_url: string | null;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -93,6 +92,7 @@ export default function GarbaPassportPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState(false);
   const [copied,  setCopied]  = useState(false);
   const [shared,  setShared]  = useState(false);
 
@@ -100,12 +100,12 @@ export default function GarbaPassportPage() {
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { router.push("/auth/signin"); return; }
-      const { data } = await supabase
+      const { data, error: qErr } = await supabase
         .from("profiles")
-        .select("id, first_name, last_name, city, state, created_at, avatar_url, avatar_color")
+        .select("id, first_name, last_name, city, state, created_at, avatar_url")
         .eq("id", user.id)
         .single();
-      if (data) setProfile(data as Profile);
+      if (qErr || !data) { setError(true); } else { setProfile(data as Profile); }
       setLoading(false);
     });
   }, [router]);
@@ -115,9 +115,17 @@ export default function GarbaPassportPage() {
       <div className="w-7 h-7 rounded-full border-2 border-black/10 border-t-aubergine animate-spin" />
     </div>
   );
-  if (!profile) return null;
+  if (error || !profile) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-center">
+      <p className="font-display font-bold text-ink/60 text-lg">Couldn't load your Passport</p>
+      <p className="font-ui text-sm text-ink-muted">Make sure your profile is complete and try refreshing.</p>
+      <Link href="/portal/profile" className="mt-2 px-5 py-2.5 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:opacity-90 transition-opacity">
+        Complete Profile
+      </Link>
+    </div>
+  );
 
-  const accent     = profile.avatar_color || colorFromId(profile.id);
+  const accent     = colorFromId(profile.id);
   const code       = memberCode(profile.id, profile.first_name, profile.last_name);
   const initials   = `${(profile.first_name[0] ?? "").toUpperCase()}${(profile.last_name[0] ?? "").toUpperCase()}`;
   const location   = [profile.city, profile.state].filter(Boolean).join(", ");
