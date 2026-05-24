@@ -23,7 +23,7 @@ type EventStamp = {
   city:       string | null;
   state:      string | null;
   start_date: string;
-  category:   string | null;
+  artist:     string | null;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -35,149 +35,137 @@ function memberCode(userId: string, first: string, last: string): string {
 }
 
 function memberSince(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  return new Date(iso).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
 function stampDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-const AVATAR_PALETTE = [
-  "#7C1F2C", "#0E8C7A", "#2E1B30", "#D4891B", "#5a1e7a", "#892240", "#1a4a5e",
+// Deterministic color from ID — rich ink colors for stamps
+const STAMP_COLORS = [
+  "#1B3A5C", // navy
+  "#1C3B2D", // forest green
+  "#6B1E3A", // burgundy
+  "#2E1B30", // aubergine
+  "#3B2200", // dark amber
+  "#1A3B3B", // teal ink
+  "#4A1942", // plum
 ];
 
-const STAMP_PALETTE = [
-  "#F5A623", "#0E8C7A", "#892240", "#5a1e7a", "#1a4a5e", "#D4891B", "#7C1F2C",
-];
-
-function colorFromId(id: string): string {
+function stampColor(id: string): string {
   const sum = id.split("").reduce((s, c) => s + c.charCodeAt(0), 0);
-  return AVATAR_PALETTE[sum % AVATAR_PALETTE.length];
-}
-
-function stampColorFromId(id: string): string {
-  const sum = id.split("").reduce((s, c) => s + c.charCodeAt(0), 0);
-  return STAMP_PALETTE[sum % STAMP_PALETTE.length];
+  return STAMP_COLORS[sum % STAMP_COLORS.length];
 }
 
 function stampRotation(id: string): number {
   const val = parseInt(id.replace(/-/g, "").slice(0, 4), 16);
-  const r = (val % 13) - 6; // -6 to +6 degrees
-  return r;
+  return (val % 11) - 5; // -5 to +5 degrees
 }
 
-// ── SVG Mandala (light — uses accent at low opacity on ivory) ─────────────────
-
-function GarbaMandala({ accent }: { accent: string }) {
-  const p8  = Array.from({ length: 8  }, (_, i) => i * 45);
-  const p16 = Array.from({ length: 16 }, (_, i) => i * 22.5);
-  return (
-    <svg viewBox="0 0 400 400" fill="none" className="w-full h-full">
-      {[185, 158, 130, 105].map((r, i) => (
-        <circle key={r} cx="200" cy="200" r={r}
-          stroke={accent} strokeOpacity={[0.06, 0.09, 0.1, 0.07][i]} strokeWidth="1" />
-      ))}
-      {p8.map(a => (
-        <ellipse key={a} cx="200" cy="110" rx="13" ry="46"
-          fill={accent} fillOpacity="0.055"
-          transform={`rotate(${a} 200 200)`} />
-      ))}
-      {p8.map(a => (
-        <ellipse key={`ac${a}`} cx="200" cy="104" rx="4" ry="10"
-          fill={accent} fillOpacity="0.18"
-          transform={`rotate(${a} 200 200)`} />
-      ))}
-      {[80, 58, 36].map((r, i) => (
-        <circle key={r} cx="200" cy="200" r={r}
-          stroke={accent} strokeOpacity={[0.08, 0.11, 0.13][i]} strokeWidth="1" />
-      ))}
-      {p16.map(a => (
-        <ellipse key={a} cx="200" cy="155" rx="5" ry="18"
-          fill={accent} fillOpacity="0.07"
-          transform={`rotate(${a} 200 200)`} />
-      ))}
-      {p8.map(a => (
-        <line key={`l${a}`} x1="200" y1="64" x2="200" y2="88"
-          stroke={accent} strokeOpacity="0.25" strokeWidth="1.5"
-          transform={`rotate(${a} 200 200)`} />
-      ))}
-      <circle cx="200" cy="200" r="5" fill={accent} fillOpacity="0.2" />
-      <circle cx="200" cy="200" r="2" fill={accent} fillOpacity="0.5" />
-    </svg>
-  );
+// Truncate artist/city to fit stamp
+function fitText(text: string, maxLen: number): string {
+  return text.length > maxLen ? text.slice(0, maxLen - 1) + "." : text;
 }
 
-// ── Passport Stamp ────────────────────────────────────────────────────────────
+// ── NPS-style Passport Stamp ──────────────────────────────────────────────────
 
 function PassportStamp({ stamp }: { stamp: EventStamp }) {
-  const color = stampColorFromId(stamp.id);
-  const rot   = stampRotation(stamp.id);
-  const city  = stamp.city ?? "US";
-  // Abbreviate long city names
-  const cityLabel = city.length > 10 ? city.slice(0, 9) + "." : city.toUpperCase();
-  const dateLabel = stampDate(stamp.start_date);
-  const titleWords = stamp.title.split(" ");
-  // Show up to 2 words of event title
-  const shortTitle = titleWords.slice(0, 2).join(" ").toUpperCase();
+  const color    = stampColor(stamp.id);
+  const rot      = stampRotation(stamp.id);
+  const artist   = stamp.artist ?? "Artist";
+  const city     = stamp.city ?? "";
+  const date     = stampDate(stamp.start_date);
+
+  // Artist name: up to 2 lines — split at space if long
+  const words     = artist.toUpperCase().split(" ");
+  const half      = Math.ceil(words.length / 2);
+  const line1     = words.slice(0, half).join(" ");
+  const line2     = words.slice(half).join(" ");
+  const singleLine = artist.length <= 11;
+
+  // City label for outer arc (bottom)
+  const cityLabel = city ? fitText(city.toUpperCase(), 14) : "";
+  const dateLabel = date;
 
   return (
-    <div
-      className="relative flex items-center justify-center"
-      style={{ transform: `rotate(${rot}deg)` }}
-    >
-      <svg viewBox="0 0 110 110" className="w-full h-full" fill="none">
-        {/* Outer dashed ring — classic passport stamp */}
-        <circle cx="55" cy="55" r="50" stroke={color} strokeWidth="2.5" strokeOpacity="0.9"
-          strokeDasharray="4 2.5" />
-        {/* Inner solid ring */}
-        <circle cx="55" cy="55" r="43" stroke={color} strokeWidth="1" strokeOpacity="0.5" />
-        {/* Inner thin ring */}
-        <circle cx="55" cy="55" r="38" stroke={color} strokeWidth="0.5" strokeOpacity="0.3" />
+    <div className="relative flex items-center justify-center"
+      style={{ transform: `rotate(${rot}deg)` }}>
+      <svg viewBox="0 0 120 120" className="w-full h-full drop-shadow-sm" fill="none">
+        {/* Outer thick ring */}
+        <circle cx="60" cy="60" r="56" stroke={color} strokeWidth="3" opacity="0.9" />
+        {/* Outer dashed ring */}
+        <circle cx="60" cy="60" r="50" stroke={color} strokeWidth="1" strokeDasharray="3.5 2.5" opacity="0.5" />
+        {/* Inner ring */}
+        <circle cx="60" cy="60" r="44" stroke={color} strokeWidth="0.75" opacity="0.3" />
 
-        {/* City — big */}
-        <text x="55" y="46" textAnchor="middle" dominantBaseline="middle"
-          fill={color} fontSize="13" fontFamily="monospace" fontWeight="700"
-          letterSpacing="2">
-          {cityLabel}
+        {/* Top bar label — event type */}
+        <rect x="22" y="19" width="76" height="11" rx="1" fill={color} opacity="0.08" />
+        <text x="60" y="26.5" textAnchor="middle" dominantBaseline="middle"
+          fill={color} fontSize="6" fontFamily="monospace" fontWeight="700"
+          letterSpacing="2.5" opacity="0.7">
+          GARBA NIGHT
         </text>
 
-        {/* Horizontal rule */}
-        <line x1="22" y1="53" x2="88" y2="53" stroke={color} strokeWidth="0.8" strokeOpacity="0.4" />
+        {/* Artist name — hero text */}
+        {singleLine ? (
+          <text x="60" y="58" textAnchor="middle" dominantBaseline="middle"
+            fill={color} fontSize="13.5" fontFamily="Georgia, serif" fontWeight="700"
+            letterSpacing="0.5">
+            {fitText(artist.toUpperCase(), 12)}
+          </text>
+        ) : (
+          <>
+            <text x="60" y="51" textAnchor="middle" dominantBaseline="middle"
+              fill={color} fontSize="12" fontFamily="Georgia, serif" fontWeight="700"
+              letterSpacing="0.5">
+              {fitText(line1, 12)}
+            </text>
+            <text x="60" y="64" textAnchor="middle" dominantBaseline="middle"
+              fill={color} fontSize="12" fontFamily="Georgia, serif" fontWeight="700"
+              letterSpacing="0.5">
+              {fitText(line2, 12)}
+            </text>
+          </>
+        )}
 
-        {/* Event short name */}
-        <text x="55" y="62" textAnchor="middle" dominantBaseline="middle"
-          fill={color} fontSize="7.5" fontFamily="monospace" fontWeight="500"
-          letterSpacing="1" opacity="0.75">
-          {shortTitle}
-        </text>
+        {/* Thin rule below artist name */}
+        <line x1="30" y1="73" x2="90" y2="73" stroke={color} strokeWidth="0.75" opacity="0.35" />
+
+        {/* City */}
+        {cityLabel && (
+          <text x="60" y="81" textAnchor="middle" dominantBaseline="middle"
+            fill={color} fontSize="7" fontFamily="monospace" fontWeight="600"
+            letterSpacing="1.5" opacity="0.7">
+            {cityLabel}
+          </text>
+        )}
 
         {/* Date */}
-        <text x="55" y="72" textAnchor="middle" dominantBaseline="middle"
-          fill={color} fontSize="7" fontFamily="monospace" fontWeight="400"
-          opacity="0.55">
+        <text x="60" y="91" textAnchor="middle" dominantBaseline="middle"
+          fill={color} fontSize="6.5" fontFamily="monospace"
+          letterSpacing="0.5" opacity="0.5">
           {dateLabel}
         </text>
 
-        {/* Garba symbol at top */}
-        <text x="55" y="26" textAnchor="middle" dominantBaseline="middle"
-          fontSize="10" opacity="0.6">
-          🪈
-        </text>
+        {/* Small decorative dots at 3/9 o'clock */}
+        <circle cx="8" cy="60" r="2" fill={color} opacity="0.2" />
+        <circle cx="112" cy="60" r="2" fill={color} opacity="0.2" />
       </svg>
     </div>
   );
 }
 
-// ── Placeholder stamp (empty slot) ───────────────────────────────────────────
+// ── Empty stamp slot ──────────────────────────────────────────────────────────
 
 function EmptyStamp() {
   return (
-    <div className="flex items-center justify-center opacity-25">
-      <svg viewBox="0 0 110 110" className="w-full h-full" fill="none">
-        <circle cx="55" cy="55" r="50" stroke="#2E1B30" strokeWidth="1.5" strokeDasharray="3 3" />
-        <circle cx="55" cy="55" r="38" stroke="#2E1B30" strokeWidth="0.5" />
-        <text x="55" y="58" textAnchor="middle" dominantBaseline="middle"
-          fill="#2E1B30" fontSize="22" opacity="0.4">?</text>
+    <div className="flex items-center justify-center opacity-[0.15]">
+      <svg viewBox="0 0 120 120" className="w-full h-full" fill="none">
+        <circle cx="60" cy="60" r="56" stroke="#2E1B30" strokeWidth="2" strokeDasharray="3 3" />
+        <circle cx="60" cy="60" r="44" stroke="#2E1B30" strokeWidth="0.75" />
+        <text x="60" y="62" textAnchor="middle" dominantBaseline="middle"
+          fill="#2E1B30" fontSize="24" fontFamily="Georgia, serif" opacity="0.5">?</text>
       </svg>
     </div>
   );
@@ -207,7 +195,7 @@ export default function GarbaPassportPage() {
           .single(),
         supabase
           .from("orders")
-          .select("event_id, events(id, title, city, state, start_date, category)")
+          .select("event_id, events(id, title, city, state, start_date, artist)")
           .eq("user_id", user.id)
           .eq("status", "confirmed"),
       ]);
@@ -215,7 +203,6 @@ export default function GarbaPassportPage() {
       if (pErr || !profileData) { setError(true); setLoading(false); return; }
       setProfile(profileData as Profile);
 
-      // Deduplicate by event_id and flatten
       if (ordersData) {
         const seen = new Set<string>();
         const deduped: EventStamp[] = [];
@@ -226,7 +213,6 @@ export default function GarbaPassportPage() {
             deduped.push(ev);
           }
         }
-        // Sort upcoming first, then past
         deduped.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
         setStamps(deduped);
       }
@@ -250,34 +236,30 @@ export default function GarbaPassportPage() {
     </div>
   );
 
-  const accent      = colorFromId(profile.id);
   const code        = memberCode(profile.id, profile.first_name, profile.last_name);
   const initials    = `${(profile.first_name[0] ?? "").toUpperCase()}${(profile.last_name[0] ?? "").toUpperCase()}`;
   const location    = [profile.city, profile.state].filter(Boolean).join(", ");
   const referralUrl = `https://rameelo.com/join?ref=${code}`;
   const fullName    = `${profile.first_name} ${profile.last_name}`;
 
-  // Always show at least 6 slots (3 per row × 2 rows)
-  const MIN_SLOTS = 6;
+  const MIN_SLOTS  = 6;
   const emptyCount = Math.max(0, MIN_SLOTS - stamps.length);
 
   const whatsappMsg = encodeURIComponent(
-    `Hey! I just joined Rameelo — the platform for garba & navratri events across the US 🪈\n\nJoin me: ${referralUrl}`
+    `Hey! I just joined Rameelo — the platform for garba & navratri events across the US 🪈\n\nCheck out my Garba Passport: ${referralUrl}`
   );
 
   async function handleNativeShare() {
     if (typeof navigator.share === "function") {
       try {
         await navigator.share({
-          title: `${fullName} is on Rameelo`,
-          text: `Hey! Join me on Rameelo — the platform for garba & navratri events in the US 🪈`,
+          title: `${fullName}'s Garba Passport`,
+          text: `I've been collecting garba stamps on Rameelo 🪈 Join me!`,
           url: referralUrl,
         });
         setShared(true);
         setTimeout(() => setShared(false), 3000);
-      } catch {
-        // user dismissed — no-op
-      }
+      } catch { /* dismissed */ }
     } else {
       navigator.clipboard.writeText(referralUrl);
       setCopied(true);
@@ -302,106 +284,135 @@ export default function GarbaPassportPage() {
           </svg>
         </Link>
         <div>
-          <p className="font-display font-bold text-ink/85 text-lg" style={{ letterSpacing: "-0.02em" }}>Your Garba Passport</p>
+          <p className="font-display font-bold text-ink/85 text-lg" style={{ letterSpacing: "-0.02em" }}>Garba Passport</p>
           <p className="font-mono text-[9px] uppercase tracking-widest text-ink/35">
-            {stamps.length > 0 ? `${stamps.length} stamp${stamps.length !== 1 ? "s" : ""} collected` : "Share your community identity"}
+            {stamps.length > 0 ? `${stamps.length} stamp${stamps.length !== 1 ? "s" : ""} collected` : "Collect stamps at every garba"}
           </p>
         </div>
       </div>
 
-      {/* ── THE CARD ─────────────────────────────────────────────────────── */}
-      <div
-        className="relative rounded-3xl overflow-hidden select-none shadow-lg"
-        style={{ background: `linear-gradient(150deg, #FFFDF7 0%, #FDF6E8 60%, #FAF0DC 100%)` }}
-      >
-        {/* Subtle accent stripe at top */}
-        <div className="absolute top-0 left-0 right-0 h-1 rounded-t-3xl"
-          style={{ background: `linear-gradient(90deg, ${accent}, #F5A623, ${accent})` }} />
+      {/* ── PASSPORT BOOK ─────────────────────────────────────────────────── */}
+      <div className="rounded-2xl overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.18)] select-none">
 
-        {/* Background mandala — very subtle */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-60">
-          <div className="w-[110%] h-[110%]">
-            <GarbaMandala accent={accent} />
+        {/* ── COVER ── forest green, like NPS passport cover */}
+        <div className="relative overflow-hidden" style={{ backgroundColor: "#1C3B2D" }}>
+
+          {/* Fine decorative border lines */}
+          <div className="absolute inset-x-0 top-0 h-px" style={{ background: "linear-gradient(90deg, transparent, #C9A84C55, #C9A84C, #C9A84C55, transparent)" }} />
+          <div className="absolute inset-x-3 top-2 h-px" style={{ backgroundColor: "#C9A84C25" }} />
+          <div className="absolute inset-x-0 bottom-0 h-px" style={{ background: "linear-gradient(90deg, transparent, #C9A84C55, #C9A84C, #C9A84C55, transparent)" }} />
+          <div className="absolute inset-x-3 bottom-2 h-px" style={{ backgroundColor: "#C9A84C25" }} />
+          <div className="absolute inset-y-0 left-0 w-px" style={{ background: "linear-gradient(180deg, transparent, #C9A84C55, #C9A84C, #C9A84C55, transparent)" }} />
+          <div className="absolute inset-y-3 left-2 w-px" style={{ backgroundColor: "#C9A84C25" }} />
+          <div className="absolute inset-y-0 right-0 w-px" style={{ background: "linear-gradient(180deg, transparent, #C9A84C55, #C9A84C, #C9A84C55, transparent)" }} />
+          <div className="absolute inset-y-3 right-2 w-px" style={{ backgroundColor: "#C9A84C25" }} />
+
+          {/* Background mandala watermark */}
+          <div className="absolute inset-0 flex items-center justify-center opacity-[0.07]">
+            <svg viewBox="0 0 300 300" className="w-full h-full" fill="none">
+              {Array.from({ length: 8 }, (_, i) => i * 45).map(a => (
+                <ellipse key={a} cx="150" cy="75" rx="12" ry="60"
+                  fill="#C9A84C" transform={`rotate(${a} 150 150)`} />
+              ))}
+              {[120, 90, 60, 35].map(r => (
+                <circle key={r} cx="150" cy="150" r={r} stroke="#C9A84C" strokeWidth="1.5" />
+              ))}
+            </svg>
+          </div>
+
+          {/* Cover content */}
+          <div className="relative px-7 py-7">
+
+            {/* Title block */}
+            <div className="text-center mb-6">
+              <p className="font-mono text-[8px] uppercase tracking-[0.3em] mb-1" style={{ color: "#C9A84C99" }}>
+                United States of Garba
+              </p>
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <div className="flex-1 h-px" style={{ backgroundColor: "#C9A84C30" }} />
+                <span style={{ color: "#C9A84C" }} className="text-base">🪈</span>
+                <div className="flex-1 h-px" style={{ backgroundColor: "#C9A84C30" }} />
+              </div>
+              <p className="font-display font-bold text-white text-[22px] tracking-[0.12em] uppercase"
+                style={{ letterSpacing: "0.15em", textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
+                Rameelo
+              </p>
+              <p className="font-mono font-bold text-[10px] tracking-[0.35em] uppercase mt-0.5"
+                style={{ color: "#C9A84Ccc" }}>
+                Garba Passport
+              </p>
+            </div>
+
+            {/* Portrait + identity */}
+            <div className="flex items-start gap-5">
+              {/* Portrait box — classic passport style */}
+              <div className="shrink-0">
+                <div className="w-[72px] h-[88px] rounded overflow-hidden border-2"
+                  style={{ borderColor: "#C9A84C50", backgroundColor: "#0e1e17" }}>
+                  {profile.avatar_url ? (
+                    <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <span className="font-display font-bold text-3xl" style={{ color: "#C9A84C" }}>{initials}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Identity fields */}
+              <div className="flex-1 min-w-0 space-y-2.5">
+                <div>
+                  <p className="font-mono text-[7px] uppercase tracking-widest mb-0.5" style={{ color: "#C9A84C60" }}>Surname / Given Name</p>
+                  <p className="font-display font-bold text-white text-base leading-tight truncate"
+                    style={{ letterSpacing: "-0.01em" }}>{fullName}</p>
+                </div>
+                {location && (
+                  <div>
+                    <p className="font-mono text-[7px] uppercase tracking-widest mb-0.5" style={{ color: "#C9A84C60" }}>City of Origin</p>
+                    <p className="font-mono text-[10px] text-white/70 uppercase tracking-wider">{location}</p>
+                  </div>
+                )}
+                <div className="grid grid-cols-2 gap-x-3 gap-y-2">
+                  <div>
+                    <p className="font-mono text-[7px] uppercase tracking-widest mb-0.5" style={{ color: "#C9A84C60" }}>Issue Date</p>
+                    <p className="font-mono text-[10px] text-white/70">{memberSince(profile.created_at)}</p>
+                  </div>
+                  <div>
+                    <p className="font-mono text-[7px] uppercase tracking-widest mb-0.5" style={{ color: "#C9A84C60" }}>Stamps</p>
+                    <p className="font-mono text-[10px] text-white/70">{stamps.length} collected</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Machine-readable zone (MRZ) style */}
+            <div className="mt-5 pt-3 border-t" style={{ borderColor: "#C9A84C20" }}>
+              <p className="font-mono text-[8px] tracking-[0.22em] leading-relaxed break-all"
+                style={{ color: "#C9A84C45" }}>
+                {`P<USA${profile.last_name.toUpperCase()}<<${profile.first_name.toUpperCase()}<<<<<<<<<<<<`}
+              </p>
+              <p className="font-mono text-[8px] tracking-[0.22em] break-all"
+                style={{ color: "#C9A84C45" }}>
+                {`${code}<<<<<<<<<<<<<<<<<<<<<<<<0`}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Soft color wash in corner */}
-        <div className="absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl opacity-15"
-          style={{ backgroundColor: accent }} />
-        <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full blur-3xl opacity-10"
-          style={{ backgroundColor: "#F5A623" }} />
+        {/* ── STAMP PAGES ── cream/parchment interior */}
+        <div style={{ backgroundColor: "#FDFAF2", backgroundImage: "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='%23F5EDD5'/%3E%3Crect x='0' y='0' width='1' height='1' fill='%23EDE3C8' opacity='0.4'/%3E%3C/svg%3E\")" }}>
 
-        {/* Content */}
-        <div className="relative flex flex-col px-6 pt-7 pb-6">
-
-          {/* Header row */}
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2">
-              <span className="text-lg">🪈</span>
-              <span className="font-display font-bold text-[11px] tracking-widest uppercase"
-                style={{ color: accent }}>RAMEELO</span>
-            </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border"
-              style={{ backgroundColor: `${accent}12`, borderColor: `${accent}30` }}>
-              <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accent }} />
-              <span className="font-mono text-[9px] uppercase tracking-widest" style={{ color: accent }}>Verified</span>
-            </div>
+          {/* Page header */}
+          <div className="px-5 pt-5 pb-3 flex items-center gap-3">
+            <div className="flex-1 h-px" style={{ backgroundColor: "#2E1B3020" }} />
+            <p className="font-mono text-[8px] uppercase tracking-[0.3em]" style={{ color: "#2E1B3055" }}>
+              Visas &amp; Stamps
+            </p>
+            <div className="flex-1 h-px" style={{ backgroundColor: "#2E1B3020" }} />
           </div>
 
-          {/* Avatar + name */}
-          <div className="flex items-center gap-4 mb-5">
-            <div className="relative shrink-0">
-              <div className="absolute -inset-1 rounded-full opacity-20 blur-sm"
-                style={{ backgroundColor: accent }} />
-              <div className="relative w-16 h-16 rounded-full overflow-hidden border-2"
-                style={{ backgroundColor: accent, borderColor: `${accent}50` }}>
-                {profile.avatar_url ? (
-                  <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <span className="font-display font-bold text-white text-xl">{initials}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <h2 className="font-display font-bold text-[#1a0a1f] text-lg leading-tight truncate"
-                style={{ letterSpacing: "-0.025em" }}>
-                {fullName}
-              </h2>
-              {location && (
-                <p className="font-mono text-[9px] uppercase tracking-widest text-[#1a0a1f]/45 mt-0.5">{location}</p>
-              )}
-              <div className="flex items-center gap-3 mt-2">
-                <div>
-                  <p className="font-mono text-[7px] uppercase tracking-widest text-[#1a0a1f]/30">Since</p>
-                  <p className="font-display font-bold text-[#1a0a1f] text-[11px]">{memberSince(profile.created_at)}</p>
-                </div>
-                <div className="w-px h-6 bg-[#1a0a1f]/10" />
-                <div>
-                  <p className="font-mono text-[7px] uppercase tracking-widest text-[#1a0a1f]/30">Code</p>
-                  <p className="font-display font-bold text-[11px]" style={{ color: accent }}>{code}</p>
-                </div>
-                <div className="w-px h-6 bg-[#1a0a1f]/10" />
-                <div>
-                  <p className="font-mono text-[7px] uppercase tracking-widest text-[#1a0a1f]/30">Stamps</p>
-                  <p className="font-display font-bold text-[#1a0a1f] text-[11px]">{stamps.length}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Divider */}
-          <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 h-px bg-[#1a0a1f]/10" />
-            <span style={{ color: accent }} className="text-xs">◆</span>
-            <span className="font-mono text-[8px] uppercase tracking-widest text-[#1a0a1f]/30">Garba Stamps</span>
-            <span style={{ color: accent }} className="text-xs">◆</span>
-            <div className="flex-1 h-px bg-[#1a0a1f]/10" />
-          </div>
-
-          {/* ── Stamps grid ── */}
-          <div className="grid grid-cols-3 gap-2 mb-5">
+          {/* Stamps grid */}
+          <div className="px-4 pb-5 grid grid-cols-3 gap-1.5">
             {stamps.map(s => (
               <PassportStamp key={s.id} stamp={s} />
             ))}
@@ -410,33 +421,35 @@ export default function GarbaPassportPage() {
             ))}
           </div>
 
-          {/* Footer URL strip */}
-          <div className="rounded-xl py-2 px-4 flex items-center justify-center"
-            style={{ backgroundColor: `${accent}10`, border: `1px solid ${accent}25` }}>
-            <span className="font-mono text-[9px] uppercase tracking-widest" style={{ color: `${accent}cc` }}>
-              rameelo.com/join?ref={code}
-            </span>
+          {/* Page footer — referral strip */}
+          <div className="mx-4 mb-5 rounded-lg py-2.5 px-4 flex items-center justify-between gap-2 border"
+            style={{ backgroundColor: "#1C3B2D0a", borderColor: "#1C3B2D18" }}>
+            <p className="font-mono text-[8px] uppercase tracking-widest" style={{ color: "#1C3B2D70" }}>
+              rameelo.com/join?ref=
+            </p>
+            <p className="font-mono text-[9px] font-bold" style={{ color: "#1C3B2D" }}>{code}</p>
           </div>
         </div>
       </div>
 
-      {/* Stamp count callout */}
+      {/* Stamp callout */}
       {stamps.length === 0 ? (
-        <div className="px-5 py-4 rounded-2xl border border-marigold/20 bg-marigold/5 text-center">
+        <div className="px-5 py-4 rounded-2xl border border-[#1C3B2D]/15 bg-[#1C3B2D]/5 text-center">
           <p className="font-display font-bold text-ink/70 text-sm mb-0.5" style={{ letterSpacing: "-0.01em" }}>No stamps yet</p>
-          <p className="font-ui text-xs text-ink-muted">Buy tickets to garba events — each one earns you a stamp on your Passport.</p>
-          <Link href="/events" className="inline-block mt-3 px-4 py-2 rounded-xl bg-aubergine text-white font-ui font-semibold text-xs hover:opacity-90 transition-opacity">
+          <p className="font-ui text-xs text-ink-muted mb-3">Buy a ticket to any garba event — each one earns you a stamp from that artist.</p>
+          <Link href="/events" className="inline-block px-5 py-2.5 rounded-xl text-white font-ui font-semibold text-sm hover:opacity-90 transition-opacity"
+            style={{ backgroundColor: "#1C3B2D" }}>
             Browse Events
           </Link>
         </div>
       ) : (
-        <div className="px-5 py-3.5 rounded-2xl border border-aubergine/15 bg-aubergine/5 flex items-center gap-3">
+        <div className="px-5 py-3.5 rounded-2xl border border-[#1C3B2D]/15 bg-[#1C3B2D]/5 flex items-center gap-3">
           <span className="text-xl">🎟️</span>
           <div>
             <p className="font-display font-bold text-ink/80 text-sm" style={{ letterSpacing: "-0.01em" }}>
-              {stamps.length} garba event{stamps.length !== 1 ? "s" : ""} collected
+              {stamps.length} garba event{stamps.length !== 1 ? "s" : ""} stamped
             </p>
-            <p className="font-ui text-xs text-ink-muted">Keep going — every event adds a new stamp to your Passport.</p>
+            <p className="font-ui text-xs text-ink-muted">Every event earns a new stamp — keep collecting.</p>
           </div>
         </div>
       )}
@@ -450,9 +463,7 @@ export default function GarbaPassportPage() {
           <svg className="w-5 h-5 shrink-0" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" />
           </svg>
-          <span className="flex-1 text-left">
-            {shared ? "Shared! 🎉" : "Share to Instagram Story"}
-          </span>
+          <span className="flex-1 text-left">{shared ? "Shared! 🎉" : "Share to Instagram Story"}</span>
           <svg className="w-4 h-4 opacity-60 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
           </svg>
@@ -487,19 +498,13 @@ export default function GarbaPassportPage() {
           <span className="flex-1 text-left font-mono text-[11px] truncate">
             {copied ? "Copied! Send to your friends 🎉" : referralUrl}
           </span>
-          {!copied && (
-            <span className="font-mono text-[9px] uppercase tracking-widest text-ink/35 shrink-0">Copy</span>
-          )}
+          {!copied && <span className="font-mono text-[9px] uppercase tracking-widest text-ink/35 shrink-0">Copy</span>}
         </button>
       </div>
 
-      {/* Bottom note */}
-      <div className="text-center space-y-1 pb-4">
-        <p className="font-display font-bold text-ink/60 text-sm" style={{ letterSpacing: "-0.01em" }}>
+      <div className="text-center pb-4">
+        <p className="font-display font-bold text-ink/50 text-sm" style={{ letterSpacing: "-0.01em" }}>
           The garba community grows when you share 🙏
-        </p>
-        <p className="font-mono text-[9px] uppercase tracking-widest text-ink/25">
-          Your code: <span className="font-bold">{code}</span>
         </p>
       </div>
 
