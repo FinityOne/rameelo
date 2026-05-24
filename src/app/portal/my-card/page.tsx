@@ -17,6 +17,15 @@ type Profile = {
   avatar_url: string | null;
 };
 
+type EventStamp = {
+  id:         string;
+  title:      string;
+  city:       string | null;
+  state:      string | null;
+  start_date: string;
+  category:   string | null;
+};
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function memberCode(userId: string, first: string, last: string): string {
@@ -29,8 +38,16 @@ function memberSince(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", year: "numeric" });
 }
 
+function stampDate(iso: string): string {
+  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "2-digit" });
+}
+
 const AVATAR_PALETTE = [
   "#7C1F2C", "#0E8C7A", "#2E1B30", "#D4891B", "#5a1e7a", "#892240", "#1a4a5e",
+];
+
+const STAMP_PALETTE = [
+  "#F5A623", "#0E8C7A", "#892240", "#5a1e7a", "#1a4a5e", "#D4891B", "#7C1F2C",
 ];
 
 function colorFromId(id: string): string {
@@ -38,51 +55,131 @@ function colorFromId(id: string): string {
   return AVATAR_PALETTE[sum % AVATAR_PALETTE.length];
 }
 
-// ── SVG Mandala — garba chakra pattern ───────────────────────────────────────
+function stampColorFromId(id: string): string {
+  const sum = id.split("").reduce((s, c) => s + c.charCodeAt(0), 0);
+  return STAMP_PALETTE[sum % STAMP_PALETTE.length];
+}
+
+function stampRotation(id: string): number {
+  const val = parseInt(id.replace(/-/g, "").slice(0, 4), 16);
+  const r = (val % 13) - 6; // -6 to +6 degrees
+  return r;
+}
+
+// ── SVG Mandala ───────────────────────────────────────────────────────────────
 
 function GarbaMandala({ accent }: { accent: string }) {
   const p8  = Array.from({ length: 8  }, (_, i) => i * 45);
   const p16 = Array.from({ length: 16 }, (_, i) => i * 22.5);
   return (
     <svg viewBox="0 0 400 400" fill="none" className="w-full h-full">
-      {/* Outer ring structure */}
       {[185, 158, 130, 105].map((r, i) => (
         <circle key={r} cx="200" cy="200" r={r}
           stroke="white" strokeOpacity={[0.04, 0.06, 0.07, 0.05][i]} strokeWidth="1" />
       ))}
-      {/* Outer petals */}
       {p8.map(a => (
         <ellipse key={a} cx="200" cy="110" rx="13" ry="46"
           fill="white" fillOpacity="0.035"
           transform={`rotate(${a} 200 200)`} />
       ))}
-      {/* Accent-colored petal tips */}
       {p8.map(a => (
         <ellipse key={`ac${a}`} cx="200" cy="104" rx="4" ry="10"
           fill={accent} fillOpacity="0.3"
           transform={`rotate(${a} 200 200)`} />
       ))}
-      {/* Inner ring */}
       {[80, 58, 36].map((r, i) => (
         <circle key={r} cx="200" cy="200" r={r}
           stroke="white" strokeOpacity={[0.06, 0.09, 0.1][i]} strokeWidth="1" />
       ))}
-      {/* Inner petals */}
       {p16.map(a => (
         <ellipse key={a} cx="200" cy="155" rx="5" ry="18"
           fill="white" fillOpacity="0.05"
           transform={`rotate(${a} 200 200)`} />
       ))}
-      {/* Radial spokes */}
       {p8.map(a => (
         <line key={`l${a}`} x1="200" y1="64" x2="200" y2="88"
           stroke={accent} strokeOpacity="0.2" strokeWidth="1.5"
           transform={`rotate(${a} 200 200)`} />
       ))}
-      {/* Centre dot */}
       <circle cx="200" cy="200" r="5" fill={accent} fillOpacity="0.25" />
       <circle cx="200" cy="200" r="2" fill={accent} fillOpacity="0.6" />
     </svg>
+  );
+}
+
+// ── Passport Stamp ────────────────────────────────────────────────────────────
+
+function PassportStamp({ stamp }: { stamp: EventStamp }) {
+  const color = stampColorFromId(stamp.id);
+  const rot   = stampRotation(stamp.id);
+  const city  = stamp.city ?? "US";
+  // Abbreviate long city names
+  const cityLabel = city.length > 10 ? city.slice(0, 9) + "." : city.toUpperCase();
+  const dateLabel = stampDate(stamp.start_date);
+  const titleWords = stamp.title.split(" ");
+  // Show up to 2 words of event title
+  const shortTitle = titleWords.slice(0, 2).join(" ").toUpperCase();
+
+  return (
+    <div
+      className="relative flex items-center justify-center"
+      style={{ transform: `rotate(${rot}deg)` }}
+    >
+      <svg viewBox="0 0 110 110" className="w-full h-full" fill="none">
+        {/* Outer dashed ring — classic passport stamp */}
+        <circle cx="55" cy="55" r="50" stroke={color} strokeWidth="2.5" strokeOpacity="0.9"
+          strokeDasharray="4 2.5" />
+        {/* Inner solid ring */}
+        <circle cx="55" cy="55" r="43" stroke={color} strokeWidth="1" strokeOpacity="0.5" />
+        {/* Inner thin ring */}
+        <circle cx="55" cy="55" r="38" stroke={color} strokeWidth="0.5" strokeOpacity="0.3" />
+
+        {/* City — big */}
+        <text x="55" y="46" textAnchor="middle" dominantBaseline="middle"
+          fill={color} fontSize="13" fontFamily="monospace" fontWeight="700"
+          letterSpacing="2">
+          {cityLabel}
+        </text>
+
+        {/* Horizontal rule */}
+        <line x1="22" y1="53" x2="88" y2="53" stroke={color} strokeWidth="0.8" strokeOpacity="0.4" />
+
+        {/* Event short name */}
+        <text x="55" y="62" textAnchor="middle" dominantBaseline="middle"
+          fill={color} fontSize="7.5" fontFamily="monospace" fontWeight="500"
+          letterSpacing="1" opacity="0.75">
+          {shortTitle}
+        </text>
+
+        {/* Date */}
+        <text x="55" y="72" textAnchor="middle" dominantBaseline="middle"
+          fill={color} fontSize="7" fontFamily="monospace" fontWeight="400"
+          opacity="0.55">
+          {dateLabel}
+        </text>
+
+        {/* Garba symbol at top */}
+        <text x="55" y="26" textAnchor="middle" dominantBaseline="middle"
+          fontSize="10" opacity="0.6">
+          🪈
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+// ── Placeholder stamp (empty slot) ───────────────────────────────────────────
+
+function EmptyStamp() {
+  return (
+    <div className="flex items-center justify-center opacity-20">
+      <svg viewBox="0 0 110 110" className="w-full h-full" fill="none">
+        <circle cx="55" cy="55" r="50" stroke="white" strokeWidth="1.5" strokeDasharray="3 3" />
+        <circle cx="55" cy="55" r="38" stroke="white" strokeWidth="0.5" />
+        <text x="55" y="58" textAnchor="middle" dominantBaseline="middle"
+          fill="white" fontSize="22" opacity="0.4">?</text>
+      </svg>
+    </div>
   );
 }
 
@@ -91,6 +188,7 @@ function GarbaMandala({ accent }: { accent: string }) {
 export default function GarbaPassportPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [stamps,  setStamps]  = useState<EventStamp[]>([]);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(false);
   const [copied,  setCopied]  = useState(false);
@@ -100,12 +198,39 @@ export default function GarbaPassportPage() {
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { router.push("/auth/signin"); return; }
-      const { data, error: qErr } = await supabase
-        .from("profiles")
-        .select("id, first_name, last_name, city, state, created_at, avatar_url")
-        .eq("id", user.id)
-        .single();
-      if (qErr || !data) { setError(true); } else { setProfile(data as Profile); }
+
+      const [{ data: profileData, error: pErr }, { data: ordersData }] = await Promise.all([
+        supabase
+          .from("profiles")
+          .select("id, first_name, last_name, city, state, created_at, avatar_url")
+          .eq("id", user.id)
+          .single(),
+        supabase
+          .from("orders")
+          .select("event_id, events(id, title, city, state, start_date, category)")
+          .eq("user_id", user.id)
+          .eq("status", "confirmed"),
+      ]);
+
+      if (pErr || !profileData) { setError(true); setLoading(false); return; }
+      setProfile(profileData as Profile);
+
+      // Deduplicate by event_id and flatten
+      if (ordersData) {
+        const seen = new Set<string>();
+        const deduped: EventStamp[] = [];
+        for (const row of ordersData) {
+          const ev = (row as unknown as { event_id: string; events: EventStamp | null }).events;
+          if (ev && !seen.has(ev.id)) {
+            seen.add(ev.id);
+            deduped.push(ev);
+          }
+        }
+        // Sort upcoming first, then past
+        deduped.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+        setStamps(deduped);
+      }
+
       setLoading(false);
     });
   }, [router]);
@@ -117,7 +242,7 @@ export default function GarbaPassportPage() {
   );
   if (error || !profile) return (
     <div className="flex flex-col items-center justify-center min-h-[60vh] gap-3 text-center">
-      <p className="font-display font-bold text-ink/60 text-lg">Couldn't load your Passport</p>
+      <p className="font-display font-bold text-ink/60 text-lg">Couldn&apos;t load your Passport</p>
       <p className="font-ui text-sm text-ink-muted">Make sure your profile is complete and try refreshing.</p>
       <Link href="/portal/profile" className="mt-2 px-5 py-2.5 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:opacity-90 transition-opacity">
         Complete Profile
@@ -125,12 +250,16 @@ export default function GarbaPassportPage() {
     </div>
   );
 
-  const accent     = colorFromId(profile.id);
-  const code       = memberCode(profile.id, profile.first_name, profile.last_name);
-  const initials   = `${(profile.first_name[0] ?? "").toUpperCase()}${(profile.last_name[0] ?? "").toUpperCase()}`;
-  const location   = [profile.city, profile.state].filter(Boolean).join(", ");
+  const accent      = colorFromId(profile.id);
+  const code        = memberCode(profile.id, profile.first_name, profile.last_name);
+  const initials    = `${(profile.first_name[0] ?? "").toUpperCase()}${(profile.last_name[0] ?? "").toUpperCase()}`;
+  const location    = [profile.city, profile.state].filter(Boolean).join(", ");
   const referralUrl = `https://rameelo.com/join?ref=${code}`;
-  const fullName   = `${profile.first_name} ${profile.last_name}`;
+  const fullName    = `${profile.first_name} ${profile.last_name}`;
+
+  // Always show at least 6 slots (3 per row × 2 rows)
+  const MIN_SLOTS = 6;
+  const emptyCount = Math.max(0, MIN_SLOTS - stamps.length);
 
   const whatsappMsg = encodeURIComponent(
     `Hey! I just joined Rameelo — the platform for garba & navratri events across the US 🪈\n\nJoin me: ${referralUrl}`
@@ -150,7 +279,6 @@ export default function GarbaPassportPage() {
         // user dismissed — no-op
       }
     } else {
-      // Desktop fallback: copy the link
       navigator.clipboard.writeText(referralUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 3000);
@@ -175,7 +303,9 @@ export default function GarbaPassportPage() {
         </Link>
         <div>
           <p className="font-display font-bold text-ink/85 text-lg" style={{ letterSpacing: "-0.02em" }}>Your Garba Passport</p>
-          <p className="font-mono text-[9px] uppercase tracking-widest text-ink/35">Share your community identity</p>
+          <p className="font-mono text-[9px] uppercase tracking-widest text-ink/35">
+            {stamps.length > 0 ? `${stamps.length} stamp${stamps.length !== 1 ? "s" : ""} collected` : "Share your community identity"}
+          </p>
         </div>
       </div>
 
@@ -184,11 +314,10 @@ export default function GarbaPassportPage() {
         className="relative rounded-3xl overflow-hidden select-none"
         style={{
           background: `linear-gradient(160deg, #0e0514 0%, #1e0e22 35%, #2E1B30 70%, #1a0a1f 100%)`,
-          aspectRatio: "3/4",
         }}
       >
         {/* Background mandala */}
-        <div className="absolute inset-0 flex items-center justify-center opacity-100">
+        <div className="absolute inset-0 flex items-center justify-center">
           <div className="w-[110%] h-[110%]">
             <GarbaMandala accent={accent} />
           </div>
@@ -201,10 +330,10 @@ export default function GarbaPassportPage() {
           style={{ backgroundColor: "#F5A623" }} />
 
         {/* Content */}
-        <div className="relative h-full flex flex-col px-7 py-7">
+        <div className="relative flex flex-col px-6 py-6">
 
           {/* Header row */}
-          <div className="flex items-center justify-between mb-auto">
+          <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-2">
               <span className="text-lg">🪈</span>
               <span className="font-display font-bold text-white text-base tracking-tight">RAMEELO</span>
@@ -215,62 +344,70 @@ export default function GarbaPassportPage() {
             </div>
           </div>
 
-          {/* Avatar */}
-          <div className="flex flex-col items-center mt-6 mb-5">
-            <div className="relative mb-4">
-              {/* Outer glow ring */}
-              <div className="absolute -inset-2 rounded-full opacity-30 blur-md"
+          {/* Avatar + name */}
+          <div className="flex items-center gap-4 mb-5">
+            <div className="relative shrink-0">
+              <div className="absolute -inset-1.5 rounded-full opacity-30 blur-md"
                 style={{ backgroundColor: accent }} />
-              <div className="relative w-20 h-20 rounded-full overflow-hidden border-2 border-white/20"
+              <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-white/20"
                 style={{ backgroundColor: accent }}>
                 {profile.avatar_url ? (
                   <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center">
-                    <span className="font-display font-bold text-white text-2xl">{initials}</span>
+                    <span className="font-display font-bold text-white text-xl">{initials}</span>
                   </div>
                 )}
               </div>
             </div>
-
-            <h2 className="font-display font-bold text-white text-xl text-center leading-tight"
-              style={{ letterSpacing: "-0.025em" }}>
-              {fullName}
-            </h2>
-            {location && (
-              <p className="font-mono text-[10px] uppercase tracking-widest text-white/40 mt-1">{location}</p>
-            )}
+            <div className="flex-1 min-w-0">
+              <h2 className="font-display font-bold text-white text-lg leading-tight truncate"
+                style={{ letterSpacing: "-0.025em" }}>
+                {fullName}
+              </h2>
+              {location && (
+                <p className="font-mono text-[9px] uppercase tracking-widest text-white/40 mt-0.5">{location}</p>
+              )}
+              <div className="flex items-center gap-3 mt-2">
+                <div>
+                  <p className="font-mono text-[7px] uppercase tracking-widest text-white/25">Since</p>
+                  <p className="font-display font-bold text-white text-[11px]">{memberSince(profile.created_at)}</p>
+                </div>
+                <div className="w-px h-6 bg-white/10" />
+                <div>
+                  <p className="font-mono text-[7px] uppercase tracking-widest text-white/25">Code</p>
+                  <p className="font-display font-bold text-[11px]" style={{ color: accent }}>{code}</p>
+                </div>
+                <div className="w-px h-6 bg-white/10" />
+                <div>
+                  <p className="font-mono text-[7px] uppercase tracking-widest text-white/25">Stamps</p>
+                  <p className="font-display font-bold text-white text-[11px]">{stamps.length}</p>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* Divider */}
-          <div className="flex items-center gap-3 my-4">
+          <div className="flex items-center gap-3 mb-4">
             <div className="flex-1 h-px bg-white/10" />
-            <span style={{ color: accent }} className="text-base">◆</span>
+            <span style={{ color: accent }} className="text-xs">◆</span>
+            <span className="font-mono text-[8px] uppercase tracking-widest text-white/30">Garba Stamps</span>
+            <span style={{ color: accent }} className="text-xs">◆</span>
             <div className="flex-1 h-px bg-white/10" />
           </div>
 
-          {/* Identity block */}
-          <div className="space-y-3 mb-5">
-            <div className="rounded-2xl bg-white/[0.05] border border-white/8 px-4 py-3">
-              <p className="font-mono text-[8px] uppercase tracking-widest text-white/25 mb-1">Community</p>
-              <p className="font-display font-bold text-white text-sm" style={{ letterSpacing: "-0.01em" }}>
-                Navratri 2026 Member
-              </p>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-xl bg-white/[0.05] border border-white/8 px-3 py-2.5">
-                <p className="font-mono text-[8px] uppercase tracking-widest text-white/25 mb-0.5">Member Since</p>
-                <p className="font-display font-bold text-white text-xs">{memberSince(profile.created_at)}</p>
-              </div>
-              <div className="rounded-xl bg-white/[0.05] border border-white/8 px-3 py-2.5">
-                <p className="font-mono text-[8px] uppercase tracking-widest text-white/25 mb-0.5">Member Code</p>
-                <p className="font-display font-bold text-xs" style={{ color: accent }}>{code}</p>
-              </div>
-            </div>
+          {/* ── Stamps grid ── */}
+          <div className="grid grid-cols-3 gap-2 mb-5">
+            {stamps.map(s => (
+              <PassportStamp key={s.id} stamp={s} />
+            ))}
+            {Array.from({ length: emptyCount }).map((_, i) => (
+              <EmptyStamp key={`empty-${i}`} />
+            ))}
           </div>
 
           {/* Footer URL strip */}
-          <div className="rounded-xl py-2.5 px-4 flex items-center justify-center gap-2"
+          <div className="rounded-xl py-2 px-4 flex items-center justify-center"
             style={{ backgroundColor: `${accent}18`, border: `1px solid ${accent}30` }}>
             <span className="font-mono text-[9px] uppercase tracking-widest" style={{ color: `${accent}aa` }}>
               rameelo.com/join?ref={code}
@@ -279,10 +416,30 @@ export default function GarbaPassportPage() {
         </div>
       </div>
 
+      {/* Stamp count callout */}
+      {stamps.length === 0 ? (
+        <div className="px-5 py-4 rounded-2xl border border-marigold/20 bg-marigold/5 text-center">
+          <p className="font-display font-bold text-ink/70 text-sm mb-0.5" style={{ letterSpacing: "-0.01em" }}>No stamps yet</p>
+          <p className="font-ui text-xs text-ink-muted">Buy tickets to garba events — each one earns you a stamp on your Passport.</p>
+          <Link href="/events" className="inline-block mt-3 px-4 py-2 rounded-xl bg-aubergine text-white font-ui font-semibold text-xs hover:opacity-90 transition-opacity">
+            Browse Events
+          </Link>
+        </div>
+      ) : (
+        <div className="px-5 py-3.5 rounded-2xl border border-aubergine/15 bg-aubergine/5 flex items-center gap-3">
+          <span className="text-xl">🎟️</span>
+          <div>
+            <p className="font-display font-bold text-ink/80 text-sm" style={{ letterSpacing: "-0.01em" }}>
+              {stamps.length} garba event{stamps.length !== 1 ? "s" : ""} collected
+            </p>
+            <p className="font-ui text-xs text-ink-muted">Keep going — every event adds a new stamp to your Passport.</p>
+          </div>
+        </div>
+      )}
+
       {/* ── Share buttons ─────────────────────────────────────────────────── */}
       <div className="space-y-3">
 
-        {/* Instagram / Native Share — primary CTA */}
         <button onClick={handleNativeShare}
           className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl font-ui font-bold text-[14px] text-white transition-all hover:opacity-90 active:scale-[0.98]"
           style={{ background: "linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%)" }}>
@@ -297,14 +454,12 @@ export default function GarbaPassportPage() {
           </svg>
         </button>
 
-        {/* Instagram tip */}
         <div className="px-4 py-2.5 rounded-xl bg-black/[0.03] border border-black/[0.06]">
           <p className="font-mono text-[9px] text-ink/35 text-center">
-            📱 On mobile — tap above to share directly. Or screenshot your Passport above and paste into your Instagram Story.
+            📱 On mobile — tap above to share directly. Or screenshot your Passport and paste into your Instagram Story.
           </p>
         </div>
 
-        {/* WhatsApp */}
         <a href={`https://wa.me/?text=${whatsappMsg}`} target="_blank" rel="noopener noreferrer"
           className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl font-ui font-bold text-[14px] text-white transition-all hover:opacity-90 active:scale-[0.98]"
           style={{ backgroundColor: "#25D366" }}>
@@ -317,7 +472,6 @@ export default function GarbaPassportPage() {
           </svg>
         </a>
 
-        {/* Copy link */}
         <button onClick={handleCopy}
           className={`w-full flex items-center gap-3 px-5 py-3.5 rounded-2xl font-ui font-semibold text-[13px] border transition-all ${copied ? "bg-emerald-50 border-emerald-200 text-emerald-700" : "bg-white border-black/10 text-ink/65 hover:border-black/20 hover:text-ink/80"}`}>
           <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
