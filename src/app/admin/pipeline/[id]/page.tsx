@@ -13,7 +13,6 @@ type Lead = {
   email: string | null; phone: string | null; title: string | null;
   city: string | null; state: string | null; linkedin_url: string | null;
   organization_name: string | null; org_id: string | null; platform_user_id: string | null;
-  artist_id: string | null;
   stage: string; priority: string; source: string | null;
   assigned_to: string | null; next_follow_up_at: string | null;
   est_events_per_year: number | null; est_avg_attendance: number | null; est_avg_ticket_price: number | null;
@@ -28,11 +27,15 @@ type Note = {
   author?: { first_name: string; last_name: string } | null;
 };
 
-type Doc = { id: string; file_name: string; file_url: string; file_size_bytes: number | null; mime_type: string | null; created_at: string };
+type Doc         = { id: string; file_name: string; file_url: string; file_size_bytes: number | null; mime_type: string | null; created_at: string };
 type AdminProfile = { id: string; first_name: string; last_name: string };
 type OrgOption    = { id: string; name: string };
 type ArtistOption = { id: string; name: string; slug: string };
-type PastEvent    = { id: string; title: string; start_date: string; city: string | null; state: string | null; venue_name: string | null };
+type PastEvent    = {
+  id: string; title: string; start_date: string;
+  city: string | null; state: string | null; venue_name: string | null;
+  artist_id: string | null;
+};
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -46,13 +49,12 @@ const NOTE_TYPES = [
 ];
 
 const PRIORITY_META = {
-  hot:    { label: "HOT",    cls: "bg-red-50 text-red-600 border border-red-200" },
-  high:   { label: "HIGH",   cls: "bg-orange-50 text-orange-600 border border-orange-200" },
-  medium: { label: "MED",    cls: "bg-blue-50 text-blue-600 border border-blue-200" },
-  low:    { label: "LOW",    cls: "bg-slate-50 text-slate-500 border border-slate-200" },
+  hot:    { label: "HOT",  cls: "bg-red-50 text-red-600 border border-red-200" },
+  high:   { label: "HIGH", cls: "bg-orange-50 text-orange-600 border border-orange-200" },
+  medium: { label: "MED",  cls: "bg-blue-50 text-blue-600 border border-blue-200" },
+  low:    { label: "LOW",  cls: "bg-slate-50 text-slate-500 border border-slate-200" },
 };
 
-// Stage-specific message templates
 const TEMPLATES: Record<string, { subject: string; sms: string; email: string }> = {
   new_lead: {
     subject: "Grow your garba event with Rameelo",
@@ -139,30 +141,32 @@ export default function LeadDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router  = useRouter();
 
-  const [lead,   setLead]   = useState<Lead | null>(null);
-  const [notes,  setNotes]  = useState<Note[]>([]);
-  const [docs,   setDocs]   = useState<Doc[]>([]);
-  const [admins, setAdmins] = useState<AdminProfile[]>([]);
-  const [orgs,   setOrgs]   = useState<OrgOption[]>([]);
-  const [artists, setArtists] = useState<ArtistOption[]>([]);
+  const [lead,       setLead]       = useState<Lead | null>(null);
+  const [notes,      setNotes]      = useState<Note[]>([]);
+  const [docs,       setDocs]       = useState<Doc[]>([]);
+  const [admins,     setAdmins]     = useState<AdminProfile[]>([]);
+  const [orgs,       setOrgs]       = useState<OrgOption[]>([]);
+  const [artists,    setArtists]    = useState<ArtistOption[]>([]);
   const [pastEvents, setPastEvents] = useState<PastEvent[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading,    setLoading]    = useState(true);
 
   const [editing,  setEditing]  = useState(false);
   const [editForm, setEditForm] = useState<Partial<Lead>>({});
   const [saving,   setSaving]   = useState(false);
 
-  const [noteBody,    setNoteBody]    = useState("");
-  const [noteType,    setNoteType]    = useState("note");
-  const [addingNote,  setAddingNote]  = useState(false);
+  const [noteBody,   setNoteBody]   = useState("");
+  const [noteType,   setNoteType]   = useState("note");
+  const [addingNote, setAddingNote] = useState(false);
 
-  // Past events quick-add
-  const [showQuickAdd,  setShowQuickAdd]  = useState(false);
-  const [qaForm, setQaForm] = useState({ title: "", start_date: "", city: "", state: "", venue_name: "" });
+  // Past event quick-add
+  const [showQuickAdd, setShowQuickAdd] = useState(false);
+  const [qaForm, setQaForm] = useState({
+    title: "", start_date: "", city: "", state: "", venue_name: "", artist_id: "",
+  });
   const [addingEvent, setAddingEvent] = useState(false);
   const [qaError,     setQaError]     = useState("");
 
-  // Revenue calculator state (what-if)
+  // Revenue calculator (what-if)
   const [calcEvents, setCalcEvents] = useState("");
   const [calcAtt,    setCalcAtt]    = useState("");
   const [calcPrice,  setCalcPrice]  = useState("");
@@ -171,7 +175,6 @@ export default function LeadDetailPage() {
 
   const fetchData = useCallback(async () => {
     const supabase = createClient();
-    const today    = new Date().toISOString().split("T")[0];
 
     const [leadRes, notesRes, docsRes, adminsRes, orgsRes, artistsRes] = await Promise.all([
       supabase.from("sales_leads").select("*").eq("id", id).single(),
@@ -196,20 +199,16 @@ export default function LeadDetailPage() {
     setOrgs((orgsRes.data ?? []) as OrgOption[]);
     setArtists((artistsRes.data ?? []) as ArtistOption[]);
 
-    // Fetch past events linked via org or artist
-    const filters: string[] = [];
-    if (l.org_id)    filters.push(`org_id.eq.${l.org_id}`);
-    if (l.artist_id) filters.push(`artist_id.eq.${l.artist_id}`);
-    if (filters.length > 0) {
-      const { data: evData } = await supabase
-        .from("events")
-        .select("id, title, start_date, city, state, venue_name")
-        .or(filters.join(","))
-        .lt("start_date", today)
-        .order("start_date", { ascending: false })
-        .limit(30);
-      setPastEvents((evData ?? []) as PastEvent[]);
-    }
+    // Past events linked directly to this lead via lead_id
+    const today = new Date().toISOString().split("T")[0];
+    const { data: evData } = await supabase
+      .from("events")
+      .select("id, title, start_date, city, state, venue_name, artist_id")
+      .eq("lead_id", id)
+      .lt("start_date", today)
+      .order("start_date", { ascending: false })
+      .limit(50);
+    setPastEvents((evData ?? []) as PastEvent[]);
 
     setLoading(false);
   }, [id, router]);
@@ -227,7 +226,6 @@ export default function LeadDetailPage() {
       state: editForm.state || null, linkedin_url: editForm.linkedin_url || null,
       organization_name: editForm.organization_name || null,
       org_id: editForm.org_id || null,
-      artist_id: editForm.artist_id || null,
       priority: editForm.priority, source: editForm.source || null,
       assigned_to: editForm.assigned_to || null,
       next_follow_up_at: editForm.next_follow_up_at || null,
@@ -239,25 +237,6 @@ export default function LeadDetailPage() {
     setLead(prev => prev ? { ...prev, ...editForm } as Lead : null);
     setEditing(false);
     setSaving(false);
-    // Re-fetch past events if org/artist changed
-    if (editForm.org_id !== lead.org_id || editForm.artist_id !== lead.artist_id) {
-      const today   = new Date().toISOString().split("T")[0];
-      const supabase2 = createClient();
-      const filters: string[] = [];
-      if (editForm.org_id)    filters.push(`org_id.eq.${editForm.org_id}`);
-      if (editForm.artist_id) filters.push(`artist_id.eq.${editForm.artist_id}`);
-      if (filters.length > 0) {
-        const { data } = await supabase2.from("events")
-          .select("id, title, start_date, city, state, venue_name")
-          .or(filters.join(","))
-          .lt("start_date", today)
-          .order("start_date", { ascending: false })
-          .limit(30);
-        setPastEvents((data ?? []) as PastEvent[]);
-      } else {
-        setPastEvents([]);
-      }
-    }
   }
 
   async function changeStage(newStage: string) {
@@ -307,15 +286,16 @@ export default function LeadDetailPage() {
       city:       qaForm.city       || null,
       state:      qaForm.state      || null,
       venue_name: qaForm.venue_name || null,
-      org_id:     lead?.org_id    || null,
-      artist_id:  lead?.artist_id || null,
+      artist_id:  qaForm.artist_id  || null,
+      org_id:     lead?.org_id      || null,
+      lead_id:    id,
       status:             "published",
       selling_on_rameelo: false,
       category:           "garba",
-    }).select("id, title, start_date, city, state, venue_name").single();
+    }).select("id, title, start_date, city, state, venue_name, artist_id").single();
     if (error) { setQaError(error.message); setAddingEvent(false); return; }
     setPastEvents(prev => [data as PastEvent, ...prev]);
-    setQaForm({ title: "", start_date: "", city: "", state: "", venue_name: "" });
+    setQaForm({ title: "", start_date: "", city: "", state: "", venue_name: "", artist_id: "" });
     setQaError("");
     setShowQuickAdd(false);
     setAddingEvent(false);
@@ -330,7 +310,6 @@ export default function LeadDetailPage() {
   const template    = TEMPLATES[lead?.stage ?? "new_lead"];
   const displayName = lead ? `${lead.first_name} ${lead.last_name}` : "";
   const company     = lead?.organization_name || (orgs.find(o => o.id === lead?.org_id)?.name);
-  const linkedArtist = artists.find(a => a.id === lead?.artist_id);
 
   const inp   = "w-full rounded-lg border border-black/10 bg-white px-3 py-2 font-ui text-[13px] text-ink/80 placeholder-ink/25 focus:outline-none focus:ring-2 focus:ring-aubergine/15 focus:border-aubergine/30 transition-all";
   const label = "block font-mono text-[9px] uppercase tracking-widest text-ink/35 mb-1";
@@ -344,6 +323,7 @@ export default function LeadDetailPage() {
 
   return (
     <div className="space-y-5 max-w-7xl">
+
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="flex items-start gap-4 flex-wrap">
         <Link href="/admin/pipeline" className="mt-1 text-ink/30 hover:text-ink/60 transition-colors">
@@ -356,17 +336,16 @@ export default function LeadDetailPage() {
             <h1 className="font-display font-black text-ink/85 text-2xl" style={{ letterSpacing: "-0.03em" }}>{displayName}</h1>
             {company && <span className="font-ui text-ink/40 text-sm">· {company}</span>}
             {lead.title && <span className="font-ui text-ink/35 text-sm">{lead.title}</span>}
-            {linkedArtist && (
-              <Link href={`/artists/${linkedArtist.slug}`} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-mono text-[9px] font-bold uppercase tracking-widest bg-aubergine/8 text-aubergine/70 border border-aubergine/15 hover:bg-aubergine/12 transition-colors">
-                🎵 {linkedArtist.name}
-              </Link>
-            )}
             <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-mono text-[9px] font-bold uppercase tracking-widest border ${lead.platform_user_id ? "bg-emerald-50 text-emerald-700 border-emerald-200" : "bg-slate-50 text-slate-500 border-slate-200"}`}>
               <span className={`w-1.5 h-1.5 rounded-full ${lead.platform_user_id ? "bg-emerald-400" : "bg-slate-300"}`} />
               {lead.platform_user_id ? "On Platform" : "External Lead"}
             </span>
             <span className={`font-mono text-[9px] font-bold px-2 py-0.5 rounded ${prio.cls}`}>{prio.label}</span>
+            {pastEvents.length > 0 && (
+              <span className="inline-flex items-center gap-1 font-mono text-[9px] px-2 py-0.5 rounded-full bg-peacock/8 text-peacock/70 border border-peacock/15">
+                {pastEvents.length} past event{pastEvents.length !== 1 ? "s" : ""} logged
+              </span>
+            )}
           </div>
         </div>
         <button onClick={() => setEditing(!editing)}
@@ -401,7 +380,7 @@ export default function LeadDetailPage() {
       {/* ── Three-column body ─────────────────────────────────────── */}
       <div className="grid lg:grid-cols-3 gap-5 items-start">
 
-        {/* ── LEFT: Contact + Pipeline info ─────────────────────── */}
+        {/* ── LEFT ─────────────────────────────────────────────── */}
         <div className="space-y-4">
 
           {/* Contact card */}
@@ -427,58 +406,38 @@ export default function LeadDetailPage() {
                 </>
               ) : (
                 <dl className="space-y-3">
-                  {/* Email — always visible */}
                   <div className="flex items-center gap-3">
                     <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0">Email</dt>
                     <dd className="flex-1 min-w-0">
                       {lead.email ? (
                         <div className="flex items-center gap-2 min-w-0">
-                          <a href={`mailto:${lead.email}`} className="font-ui text-[13px] text-aubergine/70 hover:text-aubergine transition-colors truncate">
-                            {lead.email}
-                          </a>
+                          <a href={`mailto:${lead.email}`} className="font-ui text-[13px] text-aubergine/70 hover:text-aubergine transition-colors truncate">{lead.email}</a>
                           <CopyButton text={lead.email} />
                         </div>
-                      ) : (
-                        <span className="font-ui text-[12px] text-ink/28 italic">Not added</span>
-                      )}
+                      ) : <span className="font-ui text-[12px] text-ink/28 italic">Not added</span>}
                     </dd>
                   </div>
-
-                  {/* Phone — always visible */}
                   <div className="flex items-center gap-3">
                     <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0">Phone</dt>
                     <dd className="flex-1 min-w-0">
                       {lead.phone ? (
                         <div className="flex items-center gap-2">
-                          <a href={`tel:${lead.phone}`} className="font-ui text-[13px] text-aubergine/70 hover:text-aubergine transition-colors">
-                            {lead.phone}
-                          </a>
+                          <a href={`tel:${lead.phone}`} className="font-ui text-[13px] text-aubergine/70 hover:text-aubergine transition-colors">{lead.phone}</a>
                           <CopyButton text={lead.phone} />
                         </div>
-                      ) : (
-                        <span className="font-ui text-[12px] text-ink/28 italic">Not added</span>
-                      )}
+                      ) : <span className="font-ui text-[12px] text-ink/28 italic">Not added</span>}
                     </dd>
                   </div>
-
                   {lead.title && (
-                    <div className="flex gap-3">
-                      <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0 mt-0.5">Title</dt>
-                      <dd className="font-ui text-[13px] text-ink/65">{lead.title}</dd>
-                    </div>
+                    <div className="flex gap-3"><dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0 mt-0.5">Title</dt><dd className="font-ui text-[13px] text-ink/65">{lead.title}</dd></div>
                   )}
-                  {([lead.city, lead.state].filter(Boolean).length > 0) && (
-                    <div className="flex gap-3">
-                      <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0 mt-0.5">Location</dt>
-                      <dd className="font-ui text-[13px] text-ink/65">{[lead.city, lead.state].filter(Boolean).join(", ")}</dd>
-                    </div>
+                  {[lead.city, lead.state].filter(Boolean).length > 0 && (
+                    <div className="flex gap-3"><dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0 mt-0.5">Location</dt><dd className="font-ui text-[13px] text-ink/65">{[lead.city, lead.state].filter(Boolean).join(", ")}</dd></div>
                   )}
                   {lead.linkedin_url && (
                     <div className="flex gap-3">
                       <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0 mt-0.5">LinkedIn</dt>
-                      <dd className="font-ui text-[13px] text-ink/65">
-                        <a href={lead.linkedin_url} target="_blank" rel="noopener noreferrer" className="text-aubergine/70 hover:text-aubergine transition-colors">View Profile</a>
-                      </dd>
+                      <dd><a href={lead.linkedin_url} target="_blank" rel="noopener noreferrer" className="font-ui text-[13px] text-aubergine/70 hover:text-aubergine transition-colors">View Profile</a></dd>
                     </div>
                   )}
                 </dl>
@@ -486,7 +445,7 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
-          {/* Pipeline info card */}
+          {/* Pipeline card */}
           <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-black/[0.05]">
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink/35">Pipeline</p>
@@ -524,12 +483,6 @@ export default function LeadDetailPage() {
                       {orgs.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                     </select>
                   </div>
-                  <div><label className={label}>Attach Artist</label>
-                    <select className={inp} value={editForm.artist_id ?? ""} onChange={e => setEditForm(f => ({...f, artist_id: e.target.value}))}>
-                      <option value="">— No artist —</option>
-                      {artists.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-                    </select>
-                  </div>
                   <div><label className={label}>Internal Notes</label>
                     <textarea className={`${inp} min-h-[72px] resize-none`} value={editForm.internal_summary ?? ""} onChange={e => setEditForm(f => ({...f, internal_summary: e.target.value}))} />
                   </div>
@@ -546,24 +499,16 @@ export default function LeadDetailPage() {
               ) : (
                 <dl className="space-y-2">
                   {[
-                    { k: "Stage",    v: stageInfo?.label },
-                    { k: "Priority", v: lead.priority },
-                    { k: "Source",   v: lead.source?.replace(/_/g," ") },
-                    { k: "Org",      v: company },
-                    { k: "Artist",   v: linkedArtist?.name,
-                      extra: linkedArtist ? (
-                        <Link href={`/artists/${linkedArtist.slug}`} target="_blank" rel="noopener noreferrer"
-                          className="font-mono text-[9px] text-aubergine/50 hover:text-aubergine transition-colors ml-1.5">↗</Link>
-                      ) : null },
+                    { k: "Stage",     v: stageInfo?.label },
+                    { k: "Priority",  v: lead.priority },
+                    { k: "Source",    v: lead.source?.replace(/_/g," ") },
+                    { k: "Org",       v: company },
                     { k: "Follow-up", v: lead.next_follow_up_at ? new Date(lead.next_follow_up_at).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : null },
-                    { k: "Created",  v: new Date(lead.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
+                    { k: "Created",   v: new Date(lead.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) },
                   ].map(row => row.v && (
-                    <div key={row.k} className="flex gap-3 items-baseline">
+                    <div key={row.k} className="flex gap-3">
                       <dt className="font-mono text-[9px] uppercase tracking-widest text-ink/30 w-16 shrink-0 mt-0.5">{row.k}</dt>
-                      <dd className="font-ui text-[13px] text-ink/65 flex items-center">
-                        {row.v}
-                        {"extra" in row && row.extra}
-                      </dd>
+                      <dd className="font-ui text-[13px] text-ink/65">{row.v}</dd>
                     </div>
                   ))}
                   {lead.internal_summary && (
@@ -577,7 +522,6 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
-          {/* Tags */}
           {lead.tags && lead.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {lead.tags.map(t => (
@@ -587,9 +531,8 @@ export default function LeadDetailPage() {
           )}
         </div>
 
-        {/* ── CENTER: Activity feed ─────────────────────────────── */}
+        {/* ── CENTER: Activity ─────────────────────────────────── */}
         <div className="space-y-4">
-          {/* Add note */}
           <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-4">
             <p className="font-mono text-[10px] uppercase tracking-widest text-ink/35 mb-3">Log Activity</p>
             <div className="flex gap-1 flex-wrap mb-3">
@@ -600,13 +543,10 @@ export default function LeadDetailPage() {
                 </button>
               ))}
             </div>
-            <textarea
-              value={noteBody}
-              onChange={e => setNoteBody(e.target.value)}
+            <textarea value={noteBody} onChange={e => setNoteBody(e.target.value)}
               placeholder={`Add a ${NOTE_TYPES.find(n => n.id === noteType)?.label.toLowerCase()}…`}
               className="w-full rounded-xl border border-black/10 bg-black/[0.02] px-3 py-2.5 font-ui text-[13px] text-ink/75 placeholder-ink/25 focus:outline-none focus:ring-2 focus:ring-aubergine/15 min-h-[88px] resize-none transition-all"
-              onKeyDown={e => { if (e.key === "Enter" && e.metaKey) addNote(); }}
-            />
+              onKeyDown={e => { if (e.key === "Enter" && e.metaKey) addNote(); }} />
             <div className="flex items-center justify-between mt-2">
               <span className="font-mono text-[9px] text-ink/20">⌘ + Enter to save</span>
               <button onClick={addNote} disabled={addingNote || !noteBody.trim()}
@@ -617,7 +557,6 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
-          {/* Activity feed */}
           <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-black/[0.05]">
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink/35">Activity <span className="ml-1 text-ink/25">({notes.length})</span></p>
@@ -658,26 +597,14 @@ export default function LeadDetailPage() {
 
         {/* ── RIGHT: Calculator + Templates + Docs ─────────────── */}
         <div className="space-y-4">
-
-          {/* Revenue calculator */}
           <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-black/[0.05]">
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink/35">Revenue Calculator</p>
             </div>
             <div className="p-4 space-y-3">
-              <div>
-                <label className={label}>Events per year</label>
-                <input className={inp} type="number" min="0" value={calcEvents} onChange={e => setCalcEvents(e.target.value)} placeholder="3" />
-              </div>
-              <div>
-                <label className={label}>Avg attendance per event</label>
-                <input className={inp} type="number" min="0" value={calcAtt} onChange={e => setCalcAtt(e.target.value)} placeholder="500" />
-              </div>
-              <div>
-                <label className={label}>Avg ticket price ($)</label>
-                <input className={inp} type="number" min="0" step="0.01" value={calcPrice} onChange={e => setCalcPrice(e.target.value)} placeholder="25" />
-              </div>
-
+              <div><label className={label}>Events per year</label><input className={inp} type="number" min="0" value={calcEvents} onChange={e => setCalcEvents(e.target.value)} placeholder="3" /></div>
+              <div><label className={label}>Avg attendance per event</label><input className={inp} type="number" min="0" value={calcAtt} onChange={e => setCalcAtt(e.target.value)} placeholder="500" /></div>
+              <div><label className={label}>Avg ticket price ($)</label><input className={inp} type="number" min="0" step="0.01" value={calcPrice} onChange={e => setCalcPrice(e.target.value)} placeholder="25" /></div>
               {calcArr != null ? (
                 <div className="rounded-xl p-4 space-y-2.5 mt-1" style={{ background: "linear-gradient(135deg, rgba(46,27,48,0.06), rgba(46,27,48,0.03))", border: "1px solid rgba(46,27,48,0.1)" }}>
                   <div className="flex justify-between items-baseline">
@@ -704,7 +631,6 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
-          {/* Message templates */}
           <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-black/[0.05] flex items-center justify-between">
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink/35">Outreach Templates</p>
@@ -750,8 +676,7 @@ export default function LeadDetailPage() {
                   {STAGES.filter(s => s.id !== lead.stage).map(s => (
                     <button key={s.id} onClick={() => changeStage(s.id)}
                       className="font-mono text-[9px] px-2 py-0.5 rounded-full border transition-all hover:opacity-80"
-                      style={{ color: s.color, borderColor: s.color + "44", backgroundColor: s.bg }}
-                      title={`Move to ${s.label} and see template`}>
+                      style={{ color: s.color, borderColor: s.color + "44", backgroundColor: s.bg }}>
                       {s.label}
                     </button>
                   ))}
@@ -760,7 +685,6 @@ export default function LeadDetailPage() {
             </div>
           </div>
 
-          {/* Documents */}
           <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
             <div className="px-4 py-3 border-b border-black/[0.05]">
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink/35">Documents <span className="text-ink/25">({docs.length})</span></p>
@@ -782,115 +706,135 @@ export default function LeadDetailPage() {
                   ))}
                 </div>
               )}
-              <p className="font-mono text-[9px] text-ink/20 mt-3 text-center">Document upload via Supabase Storage coming soon</p>
+              <p className="font-mono text-[9px] text-ink/20 mt-3 text-center">Document upload coming soon</p>
             </div>
           </div>
-
         </div>
       </div>
 
       {/* ── Past Events ──────────────────────────────────────────── */}
       <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
-        <div className="px-5 py-3.5 border-b border-black/[0.05] flex items-center justify-between gap-4 flex-wrap">
+        <div className="px-5 py-4 border-b border-black/[0.05] flex items-center justify-between gap-4 flex-wrap">
           <div>
             <p className="font-mono text-[10px] uppercase tracking-widest text-ink/35">
-              Past Events
-              {pastEvents.length > 0 && <span className="ml-2 text-ink/25">({pastEvents.length})</span>}
+              Past Events {pastEvents.length > 0 && <span className="ml-1 text-ink/25">· {pastEvents.length} logged</span>}
             </p>
-            <p className="font-mono text-[9px] text-ink/25 mt-0.5">
-              {linkedArtist ? `Shows linked to ${linkedArtist.name}` : company ? `Events from ${company}` : "Link an org or artist to see events"}
+            <p className="font-ui text-[12px] text-ink/40 mt-0.5">
+              Events this organizer has run. Each can have the artist who performed.
             </p>
           </div>
           <button onClick={() => { setShowQuickAdd(p => !p); setQaError(""); }}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg font-ui text-[12px] font-medium transition-all border border-black/10 text-ink/55 hover:text-ink/75 hover:border-black/20 bg-white shrink-0">
+            className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-ui font-semibold text-[13px] text-white transition-all hover:opacity-90 shrink-0"
+            style={{ backgroundColor: "#2E1B30" }}>
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
             Add Past Event
           </button>
         </div>
 
-        {/* Quick add form */}
+        {/* Quick-add form */}
         {showQuickAdd && (
-          <div className="p-5 border-b border-black/[0.05] bg-black/[0.012]">
-            <p className="font-mono text-[9px] uppercase tracking-widest text-ink/35 mb-3">Quick Add</p>
+          <div className="p-5 border-b border-black/[0.05] bg-black/[0.015]">
+            <p className="font-mono text-[9px] uppercase tracking-widest text-ink/30 mb-3">New Past Event</p>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-3">
+              {/* Title spans full width on sm, 2 cols on larger */}
               <div className="col-span-2 sm:col-span-2">
-                <label className={label}>Event Title *</label>
+                <label className="block font-mono text-[9px] uppercase tracking-widest text-ink/35 mb-1">Event Name *</label>
                 <input className={inp} value={qaForm.title} onChange={e => setQaForm(f => ({...f, title: e.target.value}))} placeholder="Navratri Mahotsav 2024" />
               </div>
               <div>
-                <label className={label}>Date *</label>
+                <label className="block font-mono text-[9px] uppercase tracking-widest text-ink/35 mb-1">Date *</label>
                 <input className={inp} type="date" value={qaForm.start_date} onChange={e => setQaForm(f => ({...f, start_date: e.target.value}))} max={new Date().toISOString().split("T")[0]} />
               </div>
               <div>
-                <label className={label}>Venue</label>
-                <input className={inp} value={qaForm.venue_name} onChange={e => setQaForm(f => ({...f, venue_name: e.target.value}))} placeholder="NRG Arena" />
-              </div>
-              <div>
-                <label className={label}>City</label>
+                <label className="block font-mono text-[9px] uppercase tracking-widest text-ink/35 mb-1">City</label>
                 <input className={inp} value={qaForm.city} onChange={e => setQaForm(f => ({...f, city: e.target.value}))} placeholder="Houston" />
               </div>
               <div>
-                <label className={label}>State</label>
+                <label className="block font-mono text-[9px] uppercase tracking-widest text-ink/35 mb-1">State</label>
                 <input className={inp} value={qaForm.state} onChange={e => setQaForm(f => ({...f, state: e.target.value}))} placeholder="TX" />
+              </div>
+              <div>
+                <label className="block font-mono text-[9px] uppercase tracking-widest text-ink/35 mb-1">Venue</label>
+                <input className={inp} value={qaForm.venue_name} onChange={e => setQaForm(f => ({...f, venue_name: e.target.value}))} placeholder="NRG Arena" />
+              </div>
+              <div className="col-span-2">
+                <label className="block font-mono text-[9px] uppercase tracking-widest text-ink/35 mb-1">Artist Who Performed</label>
+                <select className={inp} value={qaForm.artist_id} onChange={e => setQaForm(f => ({...f, artist_id: e.target.value}))}>
+                  <option value="">— Select artist (optional) —</option>
+                  {artists.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
+                </select>
               </div>
             </div>
             {qaError && <p className="font-ui text-xs text-red-500 mb-2">{qaError}</p>}
             <div className="flex items-center gap-2 flex-wrap">
               <button onClick={addPastEvent} disabled={addingEvent}
-                className="flex items-center gap-1.5 px-4 py-2 rounded-lg font-ui font-semibold text-[13px] text-white transition-all disabled:opacity-50"
+                className="flex items-center gap-1.5 px-5 py-2 rounded-lg font-ui font-semibold text-[13px] text-white transition-all disabled:opacity-50"
                 style={{ backgroundColor: "#2E1B30" }}>
                 {addingEvent ? "Saving…" : "Save Event"}
               </button>
-              <button onClick={() => { setShowQuickAdd(false); setQaForm({ title: "", start_date: "", city: "", state: "", venue_name: "" }); setQaError(""); }}
+              <button onClick={() => { setShowQuickAdd(false); setQaForm({ title: "", start_date: "", city: "", state: "", venue_name: "", artist_id: "" }); setQaError(""); }}
                 className="px-4 py-2 rounded-lg font-ui text-[13px] text-ink/45 hover:bg-black/5 transition-all">
                 Cancel
               </button>
-              {(lead.artist_id || lead.org_id) && (
-                <p className="font-mono text-[9px] text-ink/25 ml-auto">
-                  Will link to {linkedArtist ? linkedArtist.name : company}&apos;s page
-                </p>
-              )}
+              <p className="font-mono text-[9px] text-ink/25 ml-auto">
+                If an artist is selected, this event will appear on their public profile
+              </p>
             </div>
           </div>
         )}
 
         {/* Past events list */}
-        {pastEvents.length === 0 ? (
-          <div className="px-5 py-10 text-center">
-            <p className="text-2xl mb-2">📅</p>
-            <p className="font-ui text-[13px] text-ink/40">No past events logged yet</p>
-            <p className="font-mono text-[9px] text-ink/25 mt-1">
-              {!lead.org_id && !lead.artist_id
-                ? "Link an org or artist first, then add past shows to build their history."
-                : "Use the button above to log past events — they'll show on the artist's public page."}
+        {pastEvents.length === 0 && !showQuickAdd ? (
+          <div className="px-5 py-12 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-ink/[0.04] flex items-center justify-center mx-auto mb-3">
+              <svg className="w-5 h-5 text-ink/25" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <p className="font-ui text-[13px] text-ink/40 font-medium">No past events logged yet</p>
+            <p className="font-mono text-[9px] text-ink/25 mt-1 max-w-xs mx-auto">
+              Got a flyer? Log their past shows above — event name + date is all you need. Add the artist if you know who performed.
             </p>
           </div>
-        ) : (
+        ) : pastEvents.length > 0 ? (
           <div className="divide-y divide-black/[0.04]">
             {pastEvents.map(ev => {
               const d = new Date(ev.start_date + "T00:00:00");
+              const artist = ev.artist_id ? artists.find(a => a.id === ev.artist_id) : null;
               return (
                 <div key={ev.id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-black/[0.01] transition-colors group">
-                  <div className="w-11 h-11 rounded-xl flex flex-col items-center justify-center shrink-0 bg-ink/[0.04]">
+                  <div className="w-12 h-12 rounded-xl flex flex-col items-center justify-center shrink-0 bg-ink/[0.04]">
                     <p className="font-display font-bold text-ink/55 text-sm leading-none">{d.getDate()}</p>
-                    <p className="font-mono text-[8px] uppercase tracking-wide text-ink/30">{d.toLocaleString("en-US", { month: "short" })}</p>
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-ui text-[13px] font-medium text-ink/70 truncate">{ev.title}</p>
-                    <p className="font-mono text-[10px] text-ink/35 mt-0.5">
-                      {d.getFullYear()}
-                      {[ev.venue_name, ev.city, ev.state].filter(Boolean).length > 0 && " · " + [ev.venue_name, ev.city, ev.state].filter(Boolean).join(", ")}
+                    <p className="font-mono text-[8px] uppercase tracking-wide text-ink/30">
+                      {d.toLocaleString("en-US", { month: "short" })} {d.getFullYear()}
                     </p>
                   </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-ui text-[13px] font-semibold text-ink/75 truncate">{ev.title}</p>
+                    <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                      {[ev.venue_name, ev.city, ev.state].filter(Boolean).length > 0 && (
+                        <p className="font-mono text-[10px] text-ink/35">{[ev.venue_name, ev.city, ev.state].filter(Boolean).join(" · ")}</p>
+                      )}
+                      {artist && (
+                        <>
+                          <span className="text-ink/20">·</span>
+                          <Link href={`/artists/${artist.slug}`} target="_blank" rel="noopener noreferrer"
+                            className="font-mono text-[9px] text-aubergine/55 hover:text-aubergine transition-colors">
+                            🎵 {artist.name}
+                          </Link>
+                        </>
+                      )}
+                    </div>
+                  </div>
                   <Link href={`/events/${ev.id}`} target="_blank" rel="noopener noreferrer"
-                    className="text-ink/20 hover:text-aubergine transition-colors opacity-0 group-hover:opacity-100">
+                    className="text-ink/20 hover:text-aubergine transition-colors opacity-0 group-hover:opacity-100 shrink-0">
                     <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                   </Link>
                 </div>
               );
             })}
           </div>
-        )}
+        ) : null}
       </div>
 
     </div>

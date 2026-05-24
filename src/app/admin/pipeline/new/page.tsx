@@ -14,7 +14,6 @@ const SOURCE_LABELS: Record<string, string> = {
 
 type AdminProfile = { id: string; first_name: string; last_name: string };
 type OrgOption    = { id: string; name: string };
-type ArtistOption = { id: string; name: string; slug: string };
 
 function fmtMoney(n: number) {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
@@ -24,17 +23,15 @@ function fmtMoney(n: number) {
 
 export default function NewLeadPage() {
   const router = useRouter();
-  const [admins,  setAdmins]  = useState<AdminProfile[]>([]);
-  const [orgs,    setOrgs]    = useState<OrgOption[]>([]);
-  const [artists, setArtists] = useState<ArtistOption[]>([]);
-  const [saving,  setSaving]  = useState(false);
-  const [error,   setError]   = useState("");
+  const [admins, setAdmins] = useState<AdminProfile[]>([]);
+  const [orgs,   setOrgs]   = useState<OrgOption[]>([]);
+  const [saving, setSaving] = useState(false);
+  const [error,  setError]  = useState("");
 
   const [form, setForm] = useState({
     first_name: "", last_name: "", email: "", phone: "", title: "",
     city: "", state: "", linkedin_url: "",
     organization_name: "", org_id: "",
-    artist_id: "",
     stage: "new_lead", priority: "medium", source: "",
     assigned_to: "", next_follow_up_at: "",
     est_events_per_year: "", est_avg_attendance: "", est_avg_ticket_price: "",
@@ -46,11 +43,9 @@ export default function NewLeadPage() {
     Promise.all([
       supabase.from("profiles").select("id, first_name, last_name").eq("role", "admin"),
       supabase.from("organizations").select("id, name").order("name"),
-      supabase.from("artists").select("id, name, slug").eq("is_active", true).order("name"),
-    ]).then(([adminsRes, orgsRes, artistsRes]) => {
+    ]).then(([adminsRes, orgsRes]) => {
       setAdmins((adminsRes.data ?? []) as AdminProfile[]);
       setOrgs((orgsRes.data ?? []) as OrgOption[]);
-      setArtists((artistsRes.data ?? []) as ArtistOption[]);
     });
   }, []);
 
@@ -80,8 +75,7 @@ export default function NewLeadPage() {
       state:      form.state || null,
       linkedin_url:      form.linkedin_url || null,
       organization_name: form.organization_name || null,
-      org_id:     form.org_id    || null,
-      artist_id:  form.artist_id || null,
+      org_id:     form.org_id || null,
       stage:      form.stage,
       priority:   form.priority,
       source:     form.source       || null,
@@ -103,8 +97,6 @@ export default function NewLeadPage() {
   const label = "block font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-1.5";
   const sec   = "font-mono text-[9px] uppercase tracking-widest text-ink/30 pb-1.5 border-b border-black/[0.05] mb-4";
 
-  const selectedArtist = artists.find(a => a.id === form.artist_id);
-
   return (
     <div className="max-w-5xl space-y-6">
 
@@ -117,7 +109,7 @@ export default function NewLeadPage() {
         </Link>
         <div>
           <h1 className="font-display font-black text-ink/85 text-2xl" style={{ letterSpacing: "-0.03em" }}>New Lead</h1>
-          <p className="font-ui text-[13px] text-ink/40 mt-0.5">Add an organizer or artist to your sales pipeline</p>
+          <p className="font-ui text-[13px] text-ink/40 mt-0.5">Step 1 of 2 — contact info &amp; pipeline setup. Add their past events after.</p>
         </div>
       </div>
 
@@ -153,7 +145,7 @@ export default function NewLeadPage() {
             <p className={sec}>Organization</p>
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className={label}>Org Name (external)</label>
+                <label className={label}>Org Name</label>
                 <input className={inp} value={form.organization_name} onChange={e => setForm(f => ({...f, organization_name: e.target.value}))} placeholder="Houston Garba Association" />
               </div>
               <div>
@@ -239,8 +231,8 @@ export default function NewLeadPage() {
                   <div className="space-y-1.5 pt-1">
                     {[
                       { label: "Gross ticket revenue", val: fmtMoney(gross!) },
-                      { label: "5-yr Rameelo value",  val: fmtMoney(arr * 5)  },
-                      { label: "10-yr Rameelo value", val: fmtMoney(arr * 10) },
+                      { label: "5-yr Rameelo value",   val: fmtMoney(arr * 5)  },
+                      { label: "10-yr Rameelo value",  val: fmtMoney(arr * 10) },
                     ].map(row => (
                       <div key={row.label} className="flex justify-between items-baseline">
                         <span className="font-mono text-[9px] uppercase tracking-widest text-ink/30">{row.label}</span>
@@ -252,27 +244,10 @@ export default function NewLeadPage() {
               ) : (
                 <div className="text-center py-4">
                   <p className="text-2xl mb-2">💰</p>
-                  <p className="font-ui text-[12px] text-ink/30">Fill in the revenue estimate section to see projections</p>
+                  <p className="font-ui text-[12px] text-ink/30">Fill in the revenue estimate to see projections</p>
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Artist */}
-          <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-4">
-            <label className={label}>Attach Artist</label>
-            <select className={inp} value={form.artist_id} onChange={e => setForm(f => ({...f, artist_id: e.target.value}))}>
-              <option value="">— No artist —</option>
-              {artists.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
-            </select>
-            {selectedArtist && (
-              <a href={`/artists/${selectedArtist.slug}`} target="_blank" rel="noopener noreferrer"
-                className="mt-2 inline-flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-aubergine/60 hover:text-aubergine transition-colors">
-                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                View artist page
-              </a>
-            )}
-            <p className="font-mono text-[9px] text-ink/20 mt-2">Links past events to this artist's public page</p>
           </div>
 
           {/* Tags & Notes */}
@@ -285,6 +260,14 @@ export default function NewLeadPage() {
               <label className={label}>Internal Notes</label>
               <textarea className={`${inp} min-h-[80px] resize-none`} value={form.internal_summary} onChange={e => setForm(f => ({...f, internal_summary: e.target.value}))} placeholder="Context, referral source, relationship history…" />
             </div>
+          </div>
+
+          {/* What's next callout */}
+          <div className="rounded-xl px-4 py-3.5 border" style={{ backgroundColor: "rgba(245,166,35,0.06)", borderColor: "rgba(245,166,35,0.2)" }}>
+            <p className="font-mono text-[9px] uppercase tracking-widest text-ink/40 mb-1.5">After you create</p>
+            <p className="font-ui text-[12px] text-ink/60 leading-relaxed">
+              You&apos;ll be taken to the lead detail page where you can log the past events this organizer has run — each with the artist who performed.
+            </p>
           </div>
 
           {/* Error + CTA */}
@@ -305,11 +288,10 @@ export default function NewLeadPage() {
               ) : (
                 <>
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-                  Create Lead
+                  Create Lead →
                 </>
               )}
             </button>
-            <p className="font-mono text-[9px] text-ink/25 text-center">Redirects to lead detail after creation</p>
           </div>
 
         </div>

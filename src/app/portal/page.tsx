@@ -648,6 +648,20 @@ export default function PortalDashboard() {
       {/* ── Hype bar ── */}
       {!loading && <HypeBar stats={platformStats} />}
 
+      {/* ── Garba Passport promo ── */}
+      {!loading && (
+        <Link href="/portal/my-card" className="flex items-center gap-4 px-5 py-4 rounded-2xl border border-aubergine/30 bg-gradient-to-r from-aubergine/10 via-marigold/5 to-aubergine/8 hover:from-aubergine/15 hover:to-aubergine/12 transition-all group">
+          <div className="w-10 h-10 rounded-xl bg-aubergine flex items-center justify-center shrink-0 text-xl">🪪</div>
+          <div className="flex-1 min-w-0">
+            <p className="font-display font-bold text-ink text-sm" style={{ letterSpacing: "-0.01em" }}>
+              Your Garba Passport is ready ✨
+            </p>
+            <p className="font-ui text-xs text-ink-muted">Share your unique card on Instagram or WhatsApp and invite friends to join Rameelo.</p>
+          </div>
+          <svg className="w-5 h-5 text-aubergine/60 group-hover:translate-x-0.5 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </Link>
+      )}
+
       {/* ── Transfer alert ── */}
       {!loading && incomingTransfers.length > 0 && (
         <Link href="/portal/tickets" className="flex items-center gap-4 px-5 py-4 rounded-2xl border-2 border-marigold/40 bg-marigold/8 hover:bg-marigold/12 transition-all group">
