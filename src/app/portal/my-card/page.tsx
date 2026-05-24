@@ -66,7 +66,7 @@ function stampRotation(id: string): number {
   return r;
 }
 
-// ── SVG Mandala ───────────────────────────────────────────────────────────────
+// ── SVG Mandala (light — uses accent at low opacity on ivory) ─────────────────
 
 function GarbaMandala({ accent }: { accent: string }) {
   const p8  = Array.from({ length: 8  }, (_, i) => i * 45);
@@ -75,34 +75,34 @@ function GarbaMandala({ accent }: { accent: string }) {
     <svg viewBox="0 0 400 400" fill="none" className="w-full h-full">
       {[185, 158, 130, 105].map((r, i) => (
         <circle key={r} cx="200" cy="200" r={r}
-          stroke="white" strokeOpacity={[0.04, 0.06, 0.07, 0.05][i]} strokeWidth="1" />
+          stroke={accent} strokeOpacity={[0.06, 0.09, 0.1, 0.07][i]} strokeWidth="1" />
       ))}
       {p8.map(a => (
         <ellipse key={a} cx="200" cy="110" rx="13" ry="46"
-          fill="white" fillOpacity="0.035"
+          fill={accent} fillOpacity="0.055"
           transform={`rotate(${a} 200 200)`} />
       ))}
       {p8.map(a => (
         <ellipse key={`ac${a}`} cx="200" cy="104" rx="4" ry="10"
-          fill={accent} fillOpacity="0.3"
+          fill={accent} fillOpacity="0.18"
           transform={`rotate(${a} 200 200)`} />
       ))}
       {[80, 58, 36].map((r, i) => (
         <circle key={r} cx="200" cy="200" r={r}
-          stroke="white" strokeOpacity={[0.06, 0.09, 0.1][i]} strokeWidth="1" />
+          stroke={accent} strokeOpacity={[0.08, 0.11, 0.13][i]} strokeWidth="1" />
       ))}
       {p16.map(a => (
         <ellipse key={a} cx="200" cy="155" rx="5" ry="18"
-          fill="white" fillOpacity="0.05"
+          fill={accent} fillOpacity="0.07"
           transform={`rotate(${a} 200 200)`} />
       ))}
       {p8.map(a => (
         <line key={`l${a}`} x1="200" y1="64" x2="200" y2="88"
-          stroke={accent} strokeOpacity="0.2" strokeWidth="1.5"
+          stroke={accent} strokeOpacity="0.25" strokeWidth="1.5"
           transform={`rotate(${a} 200 200)`} />
       ))}
-      <circle cx="200" cy="200" r="5" fill={accent} fillOpacity="0.25" />
-      <circle cx="200" cy="200" r="2" fill={accent} fillOpacity="0.6" />
+      <circle cx="200" cy="200" r="5" fill={accent} fillOpacity="0.2" />
+      <circle cx="200" cy="200" r="2" fill={accent} fillOpacity="0.5" />
     </svg>
   );
 }
@@ -172,12 +172,12 @@ function PassportStamp({ stamp }: { stamp: EventStamp }) {
 
 function EmptyStamp() {
   return (
-    <div className="flex items-center justify-center opacity-20">
+    <div className="flex items-center justify-center opacity-25">
       <svg viewBox="0 0 110 110" className="w-full h-full" fill="none">
-        <circle cx="55" cy="55" r="50" stroke="white" strokeWidth="1.5" strokeDasharray="3 3" />
-        <circle cx="55" cy="55" r="38" stroke="white" strokeWidth="0.5" />
+        <circle cx="55" cy="55" r="50" stroke="#2E1B30" strokeWidth="1.5" strokeDasharray="3 3" />
+        <circle cx="55" cy="55" r="38" stroke="#2E1B30" strokeWidth="0.5" />
         <text x="55" y="58" textAnchor="middle" dominantBaseline="middle"
-          fill="white" fontSize="22" opacity="0.4">?</text>
+          fill="#2E1B30" fontSize="22" opacity="0.4">?</text>
       </svg>
     </div>
   );
@@ -311,46 +311,50 @@ export default function GarbaPassportPage() {
 
       {/* ── THE CARD ─────────────────────────────────────────────────────── */}
       <div
-        className="relative rounded-3xl overflow-hidden select-none"
-        style={{
-          background: `linear-gradient(160deg, #0e0514 0%, #1e0e22 35%, #2E1B30 70%, #1a0a1f 100%)`,
-        }}
+        className="relative rounded-3xl overflow-hidden select-none shadow-lg"
+        style={{ background: `linear-gradient(150deg, #FFFDF7 0%, #FDF6E8 60%, #FAF0DC 100%)` }}
       >
-        {/* Background mandala */}
-        <div className="absolute inset-0 flex items-center justify-center">
+        {/* Subtle accent stripe at top */}
+        <div className="absolute top-0 left-0 right-0 h-1 rounded-t-3xl"
+          style={{ background: `linear-gradient(90deg, ${accent}, #F5A623, ${accent})` }} />
+
+        {/* Background mandala — very subtle */}
+        <div className="absolute inset-0 flex items-center justify-center opacity-60">
           <div className="w-[110%] h-[110%]">
             <GarbaMandala accent={accent} />
           </div>
         </div>
 
-        {/* Glow blobs */}
-        <div className="absolute top-0 right-0 w-48 h-48 rounded-full blur-3xl opacity-20"
+        {/* Soft color wash in corner */}
+        <div className="absolute top-0 right-0 w-40 h-40 rounded-full blur-3xl opacity-15"
           style={{ backgroundColor: accent }} />
-        <div className="absolute bottom-8 left-4 w-32 h-32 rounded-full blur-2xl opacity-10"
+        <div className="absolute bottom-0 left-0 w-32 h-32 rounded-full blur-3xl opacity-10"
           style={{ backgroundColor: "#F5A623" }} />
 
         {/* Content */}
-        <div className="relative flex flex-col px-6 py-6">
+        <div className="relative flex flex-col px-6 pt-7 pb-6">
 
           {/* Header row */}
           <div className="flex items-center justify-between mb-5">
             <div className="flex items-center gap-2">
               <span className="text-lg">🪈</span>
-              <span className="font-display font-bold text-white text-base tracking-tight">RAMEELO</span>
+              <span className="font-display font-bold text-[11px] tracking-widest uppercase"
+                style={{ color: accent }}>RAMEELO</span>
             </div>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/8 border border-white/10">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border"
+              style={{ backgroundColor: `${accent}12`, borderColor: `${accent}30` }}>
               <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: accent }} />
-              <span className="font-mono text-[9px] uppercase tracking-widest text-white/50">Verified</span>
+              <span className="font-mono text-[9px] uppercase tracking-widest" style={{ color: accent }}>Verified</span>
             </div>
           </div>
 
           {/* Avatar + name */}
           <div className="flex items-center gap-4 mb-5">
             <div className="relative shrink-0">
-              <div className="absolute -inset-1.5 rounded-full opacity-30 blur-md"
+              <div className="absolute -inset-1 rounded-full opacity-20 blur-sm"
                 style={{ backgroundColor: accent }} />
-              <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-white/20"
-                style={{ backgroundColor: accent }}>
+              <div className="relative w-16 h-16 rounded-full overflow-hidden border-2"
+                style={{ backgroundColor: accent, borderColor: `${accent}50` }}>
                 {profile.avatar_url ? (
                   <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -361,27 +365,27 @@ export default function GarbaPassportPage() {
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <h2 className="font-display font-bold text-white text-lg leading-tight truncate"
+              <h2 className="font-display font-bold text-[#1a0a1f] text-lg leading-tight truncate"
                 style={{ letterSpacing: "-0.025em" }}>
                 {fullName}
               </h2>
               {location && (
-                <p className="font-mono text-[9px] uppercase tracking-widest text-white/40 mt-0.5">{location}</p>
+                <p className="font-mono text-[9px] uppercase tracking-widest text-[#1a0a1f]/45 mt-0.5">{location}</p>
               )}
               <div className="flex items-center gap-3 mt-2">
                 <div>
-                  <p className="font-mono text-[7px] uppercase tracking-widest text-white/25">Since</p>
-                  <p className="font-display font-bold text-white text-[11px]">{memberSince(profile.created_at)}</p>
+                  <p className="font-mono text-[7px] uppercase tracking-widest text-[#1a0a1f]/30">Since</p>
+                  <p className="font-display font-bold text-[#1a0a1f] text-[11px]">{memberSince(profile.created_at)}</p>
                 </div>
-                <div className="w-px h-6 bg-white/10" />
+                <div className="w-px h-6 bg-[#1a0a1f]/10" />
                 <div>
-                  <p className="font-mono text-[7px] uppercase tracking-widest text-white/25">Code</p>
+                  <p className="font-mono text-[7px] uppercase tracking-widest text-[#1a0a1f]/30">Code</p>
                   <p className="font-display font-bold text-[11px]" style={{ color: accent }}>{code}</p>
                 </div>
-                <div className="w-px h-6 bg-white/10" />
+                <div className="w-px h-6 bg-[#1a0a1f]/10" />
                 <div>
-                  <p className="font-mono text-[7px] uppercase tracking-widest text-white/25">Stamps</p>
-                  <p className="font-display font-bold text-white text-[11px]">{stamps.length}</p>
+                  <p className="font-mono text-[7px] uppercase tracking-widest text-[#1a0a1f]/30">Stamps</p>
+                  <p className="font-display font-bold text-[#1a0a1f] text-[11px]">{stamps.length}</p>
                 </div>
               </div>
             </div>
@@ -389,11 +393,11 @@ export default function GarbaPassportPage() {
 
           {/* Divider */}
           <div className="flex items-center gap-3 mb-4">
-            <div className="flex-1 h-px bg-white/10" />
+            <div className="flex-1 h-px bg-[#1a0a1f]/10" />
             <span style={{ color: accent }} className="text-xs">◆</span>
-            <span className="font-mono text-[8px] uppercase tracking-widest text-white/30">Garba Stamps</span>
+            <span className="font-mono text-[8px] uppercase tracking-widest text-[#1a0a1f]/30">Garba Stamps</span>
             <span style={{ color: accent }} className="text-xs">◆</span>
-            <div className="flex-1 h-px bg-white/10" />
+            <div className="flex-1 h-px bg-[#1a0a1f]/10" />
           </div>
 
           {/* ── Stamps grid ── */}
@@ -408,8 +412,8 @@ export default function GarbaPassportPage() {
 
           {/* Footer URL strip */}
           <div className="rounded-xl py-2 px-4 flex items-center justify-center"
-            style={{ backgroundColor: `${accent}18`, border: `1px solid ${accent}30` }}>
-            <span className="font-mono text-[9px] uppercase tracking-widest" style={{ color: `${accent}aa` }}>
+            style={{ backgroundColor: `${accent}10`, border: `1px solid ${accent}25` }}>
+            <span className="font-mono text-[9px] uppercase tracking-widest" style={{ color: `${accent}cc` }}>
               rameelo.com/join?ref={code}
             </span>
           </div>
