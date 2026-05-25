@@ -74,7 +74,7 @@ function fitText(text: string, maxLen: number): string {
 function PassportStamp({ stamp }: { stamp: EventStamp }) {
   const color    = stampColor(stamp.id);
   const rot      = stampRotation(stamp.id);
-  const artist   = stamp.artists?.name ?? stamp.artist ?? "Artist";
+  const artist   = stamp.artist ?? stamp.artists?.name ?? "Artist";
   const city     = stamp.city ?? "";
   const date     = stampDate(stamp.start_date);
 
@@ -196,7 +196,7 @@ export default function GarbaPassportPage() {
           .single(),
         supabase
           .from("orders")
-          .select("event_id, events(id, title, city, state, start_date, artist, artists(name))")
+          .select("event_id")
           .eq("user_id", user.id)
           .eq("status", "confirmed"),
       ]);
@@ -204,18 +204,23 @@ export default function GarbaPassportPage() {
       if (pErr || !profileData) { setError(true); setLoading(false); return; }
       setProfile(profileData as Profile);
 
-      if (ordersData) {
-        const seen = new Set<string>();
-        const deduped: EventStamp[] = [];
-        for (const row of ordersData) {
-          const ev = (row as unknown as { event_id: string; events: EventStamp | null }).events;
-          if (ev && !seen.has(ev.id)) {
-            seen.add(ev.id);
-            deduped.push(ev);
-          }
+      // Deduplicate event IDs, then fetch events + artist in one clean query
+      if (ordersData && ordersData.length > 0) {
+        const eventIds = [...new Set(ordersData.map(o => o.event_id).filter(Boolean))];
+        const { data: eventsData } = await supabase
+          .from("events")
+          .select("id, title, city, state, start_date, artist, artists(name)")
+          .in("id", eventIds);
+
+        if (eventsData) {
+          const stamps = eventsData.map(ev => ({
+            ...ev,
+            // artists may come back as array or object depending on Supabase version
+            artists: Array.isArray(ev.artists) ? (ev.artists[0] ?? null) : ev.artists,
+          })) as EventStamp[];
+          stamps.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+          setStamps(stamps);
         }
-        deduped.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
-        setStamps(deduped);
       }
 
       setLoading(false);
