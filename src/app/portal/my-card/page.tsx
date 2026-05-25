@@ -329,8 +329,8 @@ export default function GarbaPassportPage() {
 
             {/* "United States of Garba" header */}
             <p className="text-center font-mono text-[7.5px] uppercase tracking-[0.38em] mb-3"
-              style={{ color: "#C9A84C80" }}>
-              United States of Garba
+              style={{ color: "#C9A84C90" }}>
+              United&nbsp;States&nbsp;of&nbsp;Garba
             </p>
 
             {/* Seal — circular emblem */}
@@ -351,21 +351,19 @@ export default function GarbaPassportPage() {
                 {/* Inner rings */}
                 <circle cx="55" cy="55" r="22" stroke="#C9A84C" strokeWidth="0.75" opacity="0.3" />
                 <circle cx="55" cy="55" r="13" stroke="#C9A84C" strokeWidth="0.75" opacity="0.4" />
-                {/* RAMEELO in center */}
-                <text x="55" y="56" textAnchor="middle" dominantBaseline="middle"
-                  fill="#C9A84C" fontSize="7" fontFamily="Georgia, serif" fontWeight="700"
-                  letterSpacing="2.5" opacity="0.85">
-                  RAMEELO
-                </text>
                 {/* Center dot */}
-                <circle cx="55" cy="55" r="2.5" fill="#C9A84C" opacity="0.6" />
+                <circle cx="55" cy="55" r="3" fill="#C9A84C" opacity="0.5" />
               </svg>
             </div>
 
             {/* PASSPORT title */}
             <div className="text-center mb-5">
-              <p className="font-display font-bold text-white tracking-[0.28em] uppercase"
-                style={{ fontSize: "21px", textShadow: "0 1px 12px rgba(0,0,0,0.4)" }}>
+              <p className="font-display font-bold text-white text-base mb-0.5"
+                style={{ letterSpacing: "0.18em", textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
+                RAMEELO
+              </p>
+              <p className="font-mono font-bold tracking-[0.28em] uppercase"
+                style={{ fontSize: "13px", color: "#C9A84Ccc", letterSpacing: "0.35em" }}>
                 PASSPORT
               </p>
               <div className="flex items-center justify-center gap-2 mt-1.5">
