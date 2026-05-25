@@ -46,9 +46,9 @@ function stampDate(iso: string): string {
 // Deterministic color from ID — rich ink colors for stamps
 const STAMP_COLORS = [
   "#1B3A5C", // navy
-  "#2E1B30", // forest green
+  "#1B2F5E", // forest green
   "#6B1E3A", // burgundy
-  "#2E1B30", // aubergine
+  "#1B2F5E", // aubergine
   "#3B2200", // dark amber
   "#1A3B3B", // teal ink
   "#4A1942", // plum
@@ -163,10 +163,10 @@ function EmptyStamp() {
   return (
     <div className="flex items-center justify-center opacity-[0.15]">
       <svg viewBox="0 0 120 120" className="w-full h-full" fill="none">
-        <circle cx="60" cy="60" r="56" stroke="#2E1B30" strokeWidth="2" strokeDasharray="3 3" />
-        <circle cx="60" cy="60" r="44" stroke="#2E1B30" strokeWidth="0.75" />
+        <circle cx="60" cy="60" r="56" stroke="#1B2F5E" strokeWidth="2" strokeDasharray="3 3" />
+        <circle cx="60" cy="60" r="44" stroke="#1B2F5E" strokeWidth="0.75" />
         <text x="60" y="62" textAnchor="middle" dominantBaseline="middle"
-          fill="#2E1B30" fontSize="24" fontFamily="Georgia, serif" opacity="0.5">?</text>
+          fill="#1B2F5E" fontSize="24" fontFamily="Georgia, serif" opacity="0.5">?</text>
       </svg>
     </div>
   );
@@ -295,104 +295,107 @@ export default function GarbaPassportPage() {
       {/* ── PASSPORT BOOK ─────────────────────────────────────────────────── */}
       <div className="rounded-2xl overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.18)] select-none">
 
-        {/* ── COVER ── aubergine, Rameelo brand color */}
-        <div className="relative overflow-hidden" style={{ backgroundColor: "#2E1B30" }}>
+        {/* ── COVER ── USA passport navy blue */}
+        <div className="relative overflow-hidden" style={{ backgroundColor: "#1B2F5E" }}>
 
           {/* Subtle texture overlay */}
-          <div className="absolute inset-0 opacity-[0.04]"
-            style={{ backgroundImage: "repeating-linear-gradient(45deg, #F5A623 0px, #F5A623 1px, transparent 1px, transparent 8px)" }} />
+          <div className="absolute inset-0 opacity-[0.03]"
+            style={{ backgroundImage: "repeating-linear-gradient(45deg, #C9A84C 0px, #C9A84C 1px, transparent 1px, transparent 8px)" }} />
 
           {/* Fine gold decorative border */}
-          <div className="absolute inset-x-0 top-0 h-[1.5px]" style={{ background: "linear-gradient(90deg, transparent, #F5A62360, #F5A623, #F5A62360, transparent)" }} />
-          <div className="absolute inset-x-4 top-[5px] h-px" style={{ backgroundColor: "#F5A62320" }} />
-          <div className="absolute inset-x-0 bottom-0 h-[1.5px]" style={{ background: "linear-gradient(90deg, transparent, #F5A62360, #F5A623, #F5A62360, transparent)" }} />
-          <div className="absolute inset-x-4 bottom-[5px] h-px" style={{ backgroundColor: "#F5A62320" }} />
-          <div className="absolute inset-y-0 left-0 w-[1.5px]" style={{ background: "linear-gradient(180deg, transparent, #F5A62360, #F5A623, #F5A62360, transparent)" }} />
-          <div className="absolute inset-y-4 left-[5px] w-px" style={{ backgroundColor: "#F5A62320" }} />
-          <div className="absolute inset-y-0 right-0 w-[1.5px]" style={{ background: "linear-gradient(180deg, transparent, #F5A62360, #F5A623, #F5A62360, transparent)" }} />
-          <div className="absolute inset-y-4 right-[5px] w-px" style={{ backgroundColor: "#F5A62320" }} />
+          <div className="absolute inset-x-0 top-0 h-[1.5px]" style={{ background: "linear-gradient(90deg, transparent, #C9A84C60, #C9A84C, #C9A84C60, transparent)" }} />
+          <div className="absolute inset-x-4 top-[5px] h-px" style={{ backgroundColor: "#C9A84C22" }} />
+          <div className="absolute inset-x-0 bottom-0 h-[1.5px]" style={{ background: "linear-gradient(90deg, transparent, #C9A84C60, #C9A84C, #C9A84C60, transparent)" }} />
+          <div className="absolute inset-x-4 bottom-[5px] h-px" style={{ backgroundColor: "#C9A84C22" }} />
+          <div className="absolute inset-y-0 left-0 w-[1.5px]" style={{ background: "linear-gradient(180deg, transparent, #C9A84C60, #C9A84C, #C9A84C60, transparent)" }} />
+          <div className="absolute inset-y-4 left-[5px] w-px" style={{ backgroundColor: "#C9A84C22" }} />
+          <div className="absolute inset-y-0 right-0 w-[1.5px]" style={{ background: "linear-gradient(180deg, transparent, #C9A84C60, #C9A84C, #C9A84C60, transparent)" }} />
+          <div className="absolute inset-y-4 right-[5px] w-px" style={{ backgroundColor: "#C9A84C22" }} />
 
           {/* Garba mandala watermark */}
           <div className="absolute inset-0 flex items-center justify-center opacity-[0.06]">
             <svg viewBox="0 0 300 300" className="w-[140%] h-[140%]" fill="none">
               {Array.from({ length: 12 }, (_, i) => i * 30).map(a => (
-                <ellipse key={a} cx="150" cy="70" rx="10" ry="55" fill="#F5A623" transform={`rotate(${a} 150 150)`} />
+                <ellipse key={a} cx="150" cy="70" rx="10" ry="55" fill="#C9A84C" transform={`rotate(${a} 150 150)`} />
               ))}
               {[130, 100, 72, 48, 26].map(r => (
-                <circle key={r} cx="150" cy="150" r={r} stroke="#F5A623" strokeWidth="1.5" />
+                <circle key={r} cx="150" cy="150" r={r} stroke="#C9A84C" strokeWidth="1.5" />
               ))}
             </svg>
           </div>
 
           {/* Cover content */}
-          <div className="relative px-6 pt-8 pb-6">
+          <div className="relative px-6 pt-7 pb-6">
 
-            {/* Seal — circular emblem at top center */}
-            <div className="flex justify-center mb-4">
-              <svg viewBox="0 0 100 100" className="w-20 h-20" fill="none">
-                {/* Outer ring */}
-                <circle cx="50" cy="50" r="47" stroke="#F5A623" strokeWidth="1.5" opacity="0.7" />
-                <circle cx="50" cy="50" r="42" stroke="#F5A623" strokeWidth="0.75" opacity="0.35" strokeDasharray="2 2" />
-                {/* Inner petals — garba chakra */}
+            {/* "United States of Garba" header */}
+            <p className="text-center font-mono text-[7.5px] uppercase tracking-[0.38em] mb-3"
+              style={{ color: "#C9A84C80" }}>
+              United States of Garba
+            </p>
+
+            {/* Seal — circular emblem */}
+            <div className="flex justify-center mb-3">
+              <svg viewBox="0 0 110 110" className="w-[88px] h-[88px]" fill="none">
+                {/* Outer rings */}
+                <circle cx="55" cy="55" r="52" stroke="#C9A84C" strokeWidth="1.5" opacity="0.65" />
+                <circle cx="55" cy="55" r="46" stroke="#C9A84C" strokeWidth="0.75" opacity="0.3" strokeDasharray="2.5 2" />
+                {/* Garba petals */}
                 {Array.from({ length: 8 }, (_, i) => i * 45).map(a => (
-                  <ellipse key={a} cx="50" cy="24" rx="4.5" ry="14"
-                    fill="#F5A623" fillOpacity="0.25" transform={`rotate(${a} 50 50)`} />
+                  <ellipse key={`op${a}`} cx="55" cy="26" rx="5" ry="16"
+                    fill="#C9A84C" fillOpacity="0.2" transform={`rotate(${a} 55 55)`} />
                 ))}
                 {Array.from({ length: 8 }, (_, i) => i * 45).map(a => (
-                  <ellipse key={a} cx="50" cy="27" rx="2" ry="5"
-                    fill="#F5A623" fillOpacity="0.6" transform={`rotate(${a} 50 50)`} />
+                  <ellipse key={`ip${a}`} cx="55" cy="29" rx="2.5" ry="6"
+                    fill="#C9A84C" fillOpacity="0.55" transform={`rotate(${a} 55 55)`} />
                 ))}
-                {/* Center rings */}
-                <circle cx="50" cy="50" r="20" stroke="#F5A623" strokeWidth="0.75" opacity="0.3" />
-                <circle cx="50" cy="50" r="12" stroke="#F5A623" strokeWidth="0.75" opacity="0.4" />
-                {/* Center dot */}
-                <circle cx="50" cy="50" r="3" fill="#F5A623" opacity="0.7" />
-                {/* RAMEELO text around top arc */}
-                <text x="50" y="57" textAnchor="middle" dominantBaseline="middle"
-                  fill="#F5A623" fontSize="7.5" fontFamily="Georgia, serif" fontWeight="700"
-                  letterSpacing="3" opacity="0.9">
+                {/* Inner rings */}
+                <circle cx="55" cy="55" r="22" stroke="#C9A84C" strokeWidth="0.75" opacity="0.3" />
+                <circle cx="55" cy="55" r="13" stroke="#C9A84C" strokeWidth="0.75" opacity="0.4" />
+                {/* RAMEELO in center */}
+                <text x="55" y="56" textAnchor="middle" dominantBaseline="middle"
+                  fill="#C9A84C" fontSize="7" fontFamily="Georgia, serif" fontWeight="700"
+                  letterSpacing="2.5" opacity="0.85">
                   RAMEELO
                 </text>
+                {/* Center dot */}
+                <circle cx="55" cy="55" r="2.5" fill="#C9A84C" opacity="0.6" />
               </svg>
             </div>
 
             {/* PASSPORT title */}
-            <div className="text-center mb-6">
-              <p className="font-mono text-[7px] uppercase tracking-[0.4em] mb-1.5" style={{ color: "#F5A62370" }}>
-                Community of Garba
-              </p>
-              <p className="font-display font-bold text-white tracking-[0.25em] uppercase"
-                style={{ fontSize: "20px", letterSpacing: "0.28em", textShadow: "0 1px 12px rgba(0,0,0,0.5)" }}>
+            <div className="text-center mb-5">
+              <p className="font-display font-bold text-white tracking-[0.28em] uppercase"
+                style={{ fontSize: "21px", textShadow: "0 1px 12px rgba(0,0,0,0.4)" }}>
                 PASSPORT
               </p>
-              <div className="flex items-center justify-center gap-2 mt-2">
-                <div className="h-px flex-1" style={{ backgroundColor: "#F5A62325" }} />
-                <span className="font-mono text-[7px] tracking-widest uppercase" style={{ color: "#F5A62350" }}>Navratri 2026</span>
-                <div className="h-px flex-1" style={{ backgroundColor: "#F5A62325" }} />
+              <div className="flex items-center justify-center gap-2 mt-1.5">
+                <div className="h-px flex-1" style={{ backgroundColor: "#C9A84C25" }} />
+                <span className="font-mono text-[7px] tracking-widest uppercase" style={{ color: "#C9A84C55" }}>Navratri 2026</span>
+                <div className="h-px flex-1" style={{ backgroundColor: "#C9A84C25" }} />
               </div>
             </div>
 
             {/* Portrait + identity fields */}
             <div className="flex items-start gap-4 mb-5">
-              {/* Portrait — classic passport proportion */}
+              {/* Portrait */}
               <div className="shrink-0 flex flex-col items-center gap-1">
                 <div className="w-[68px] h-[84px] rounded-sm overflow-hidden border"
-                  style={{ borderColor: "#F5A62340", backgroundColor: "#1a0e1c" }}>
+                  style={{ borderColor: "#C9A84C40", backgroundColor: "#0d1a3a" }}>
                   {profile.avatar_url ? (
                     <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <span className="font-display font-bold text-[28px]" style={{ color: "#F5A623" }}>{initials}</span>
+                      <span className="font-display font-bold text-[28px]" style={{ color: "#C9A84C" }}>{initials}</span>
                     </div>
                   )}
                 </div>
-                <p className="font-mono text-[6px] uppercase tracking-widest" style={{ color: "#F5A62345" }}>Photo</p>
+                <p className="font-mono text-[6px] uppercase tracking-widest" style={{ color: "#C9A84C45" }}>Photo</p>
               </div>
 
-              {/* Identity fields — passport data page layout */}
+              {/* Identity fields */}
               <div className="flex-1 min-w-0 space-y-3">
-                <div className="pb-2 border-b" style={{ borderColor: "#F5A62315" }}>
-                  <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: "#F5A62355" }}>
+                <div className="pb-2 border-b" style={{ borderColor: "#C9A84C18" }}>
+                  <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: "#C9A84C55" }}>
                     Surname / Nom
                   </p>
                   <p className="font-display font-bold text-white text-sm leading-tight truncate"
@@ -400,8 +403,8 @@ export default function GarbaPassportPage() {
                     {profile.last_name.toUpperCase()}
                   </p>
                 </div>
-                <div className="pb-2 border-b" style={{ borderColor: "#F5A62315" }}>
-                  <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: "#F5A62355" }}>
+                <div className="pb-2 border-b" style={{ borderColor: "#C9A84C18" }}>
+                  <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: "#C9A84C55" }}>
                     Given Names / Prénoms
                   </p>
                   <p className="font-display font-bold text-white text-sm leading-tight truncate"
@@ -411,26 +414,26 @@ export default function GarbaPassportPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-x-3">
                   <div>
-                    <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: "#F5A62355" }}>Issue Date</p>
+                    <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: "#C9A84C55" }}>Issue Date</p>
                     <p className="font-mono text-[9px] text-white/65">{memberSince(profile.created_at)}</p>
                   </div>
                   <div>
-                    <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: "#F5A62355" }}>Nationality</p>
+                    <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: "#C9A84C55" }}>Place of Origin</p>
                     <p className="font-mono text-[9px] text-white/65 uppercase">{location || "USA"}</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* MRZ — machine readable zone */}
+            {/* MRZ */}
             <div className="rounded px-3 py-2.5" style={{ backgroundColor: "#00000030" }}>
               <p className="font-mono text-[8px] tracking-[0.18em] leading-5 break-all select-all"
-                style={{ color: "#F5A62340" }}>
+                style={{ color: "#C9A84C40" }}>
                 {`P<RML${profile.last_name.replace(/\s/g,"").toUpperCase().slice(0,8)}<<${profile.first_name.replace(/\s/g,"").toUpperCase().slice(0,8)}<<<<<<`}
               </p>
               <p className="font-mono text-[8px] tracking-[0.18em] break-all select-all"
-                style={{ color: "#F5A62440" }}>
-                {`${code}0RML26${stamps.toString().padStart(2,"0")}<<<<<<<<<<<<<<<<<<`}
+                style={{ color: "#C9A84C40" }}>
+                {`${code}0RML26${stamps.length.toString().padStart(2,"0")}<<<<<<<<<<<<<<<<<<`}
               </p>
             </div>
           </div>
@@ -441,11 +444,11 @@ export default function GarbaPassportPage() {
 
           {/* Page header */}
           <div className="px-5 pt-5 pb-3 flex items-center gap-3">
-            <div className="flex-1 h-px" style={{ backgroundColor: "#2E1B3020" }} />
-            <p className="font-mono text-[8px] uppercase tracking-[0.3em]" style={{ color: "#2E1B3055" }}>
+            <div className="flex-1 h-px" style={{ backgroundColor: "#1B2F5E20" }} />
+            <p className="font-mono text-[8px] uppercase tracking-[0.3em]" style={{ color: "#1B2F5E55" }}>
               Visas &amp; Stamps
             </p>
-            <div className="flex-1 h-px" style={{ backgroundColor: "#2E1B3020" }} />
+            <div className="flex-1 h-px" style={{ backgroundColor: "#1B2F5E20" }} />
           </div>
 
           {/* Stamps grid */}
@@ -460,27 +463,27 @@ export default function GarbaPassportPage() {
 
           {/* Page footer — referral strip */}
           <div className="mx-4 mb-5 rounded-lg py-2.5 px-4 flex items-center justify-between gap-2 border"
-            style={{ backgroundColor: "#2E1B300a", borderColor: "#2E1B3018" }}>
-            <p className="font-mono text-[8px] uppercase tracking-widest" style={{ color: "#2E1B3070" }}>
+            style={{ backgroundColor: "#1B2F5E0a", borderColor: "#1B2F5E18" }}>
+            <p className="font-mono text-[8px] uppercase tracking-widest" style={{ color: "#1B2F5E70" }}>
               rameelo.com/join?ref=
             </p>
-            <p className="font-mono text-[9px] font-bold" style={{ color: "#2E1B30" }}>{code}</p>
+            <p className="font-mono text-[9px] font-bold" style={{ color: "#1B2F5E" }}>{code}</p>
           </div>
         </div>
       </div>
 
       {/* Stamp callout */}
       {stamps.length === 0 ? (
-        <div className="px-5 py-4 rounded-2xl border border-[#2E1B30]/15 bg-[#2E1B30]/5 text-center">
+        <div className="px-5 py-4 rounded-2xl border border-[#1B2F5E]/15 bg-[#1B2F5E]/5 text-center">
           <p className="font-display font-bold text-ink/70 text-sm mb-0.5" style={{ letterSpacing: "-0.01em" }}>No stamps yet</p>
           <p className="font-ui text-xs text-ink-muted mb-3">Buy a ticket to any garba event — each one earns you a stamp from that artist.</p>
           <Link href="/events" className="inline-block px-5 py-2.5 rounded-xl text-white font-ui font-semibold text-sm hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: "#2E1B30" }}>
+            style={{ backgroundColor: "#1B2F5E" }}>
             Browse Events
           </Link>
         </div>
       ) : (
-        <div className="px-5 py-3.5 rounded-2xl border border-[#2E1B30]/15 bg-[#2E1B30]/5 flex items-center gap-3">
+        <div className="px-5 py-3.5 rounded-2xl border border-[#1B2F5E]/15 bg-[#1B2F5E]/5 flex items-center gap-3">
           <span className="text-xl">🎟️</span>
           <div>
             <p className="font-display font-bold text-ink/80 text-sm" style={{ letterSpacing: "-0.01em" }}>
