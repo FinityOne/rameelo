@@ -333,29 +333,6 @@ export default function GarbaPassportPage() {
               United&nbsp;States&nbsp;of&nbsp;Garba
             </p>
 
-            {/* Seal — circular emblem */}
-            <div className="flex justify-center mb-3">
-              <svg viewBox="0 0 110 110" className="w-[88px] h-[88px]" fill="none">
-                {/* Outer rings */}
-                <circle cx="55" cy="55" r="52" stroke="#C9A84C" strokeWidth="1.5" opacity="0.65" />
-                <circle cx="55" cy="55" r="46" stroke="#C9A84C" strokeWidth="0.75" opacity="0.3" strokeDasharray="2.5 2" />
-                {/* Garba petals */}
-                {Array.from({ length: 8 }, (_, i) => i * 45).map(a => (
-                  <ellipse key={`op${a}`} cx="55" cy="26" rx="5" ry="16"
-                    fill="#C9A84C" fillOpacity="0.2" transform={`rotate(${a} 55 55)`} />
-                ))}
-                {Array.from({ length: 8 }, (_, i) => i * 45).map(a => (
-                  <ellipse key={`ip${a}`} cx="55" cy="29" rx="2.5" ry="6"
-                    fill="#C9A84C" fillOpacity="0.55" transform={`rotate(${a} 55 55)`} />
-                ))}
-                {/* Inner rings */}
-                <circle cx="55" cy="55" r="22" stroke="#C9A84C" strokeWidth="0.75" opacity="0.3" />
-                <circle cx="55" cy="55" r="13" stroke="#C9A84C" strokeWidth="0.75" opacity="0.4" />
-                {/* Center dot */}
-                <circle cx="55" cy="55" r="3" fill="#C9A84C" opacity="0.5" />
-              </svg>
-            </div>
-
             {/* PASSPORT title */}
             <div className="text-center mb-5">
               <p className="font-display font-bold text-white text-base mb-0.5"
