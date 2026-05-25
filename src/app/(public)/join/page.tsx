@@ -1,229 +1,377 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { createUser, saveUser } from "@/lib/auth";
 
-// ── Inner component (needs useSearchParams inside Suspense) ───────────────────
+// ── Constants ─────────────────────────────────────────────────────────────────
+
+const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
+
+const STATE_NAME_TO_ABBR: Record<string, string> = {
+  "Alabama":"AL","Alaska":"AK","Arizona":"AZ","Arkansas":"AR","California":"CA",
+  "Colorado":"CO","Connecticut":"CT","Delaware":"DE","Florida":"FL","Georgia":"GA",
+  "Hawaii":"HI","Idaho":"ID","Illinois":"IL","Indiana":"IN","Iowa":"IA","Kansas":"KS",
+  "Kentucky":"KY","Louisiana":"LA","Maine":"ME","Maryland":"MD","Massachusetts":"MA",
+  "Michigan":"MI","Minnesota":"MN","Mississippi":"MS","Missouri":"MO","Montana":"MT",
+  "Nebraska":"NE","Nevada":"NV","New Hampshire":"NH","New Jersey":"NJ","New Mexico":"NM",
+  "New York":"NY","North Carolina":"NC","North Dakota":"ND","Ohio":"OH","Oklahoma":"OK",
+  "Oregon":"OR","Pennsylvania":"PA","Rhode Island":"RI","South Carolina":"SC",
+  "South Dakota":"SD","Tennessee":"TN","Texas":"TX","Utah":"UT","Vermont":"VT",
+  "Virginia":"VA","Washington":"WA","West Virginia":"WV","Wisconsin":"WI","Wyoming":"WY",
+};
+
+const inputCls  = "w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3.5 font-ui text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-marigold/50 focus:border-marigold/50 transition-all";
+const labelCls  = "font-mono text-[10px] uppercase tracking-widest text-white/40 mb-1.5 block";
+
+// ── Inner component ───────────────────────────────────────────────────────────
 
 function JoinPageInner() {
-  const router       = useRouter();
-  const searchParams = useSearchParams();
-  const ref          = searchParams.get("ref") ?? "";
+  const router           = useRouter();
+  const searchParams     = useSearchParams();
+  const ref              = searchParams.get("ref") ?? "";
 
-  const [firstName, setFirstName] = useState("");
-  const [lastName,  setLastName]  = useState("");
-  const [email,     setEmail]     = useState("");
-  const [password,  setPassword]  = useState("");
-  const [loading,   setLoading]   = useState(false);
-  const [error,     setError]     = useState("");
-  const [done,      setDone]      = useState(false);
+  const [step, setStep]  = useState<1 | 2>(1);
 
+  const [firstName, setFirstName]   = useState("");
+  const [lastName,  setLastName]    = useState("");
+  const [email,     setEmail]       = useState("");
+  const [phone,     setPhone]       = useState("");
+  const [city,      setCity]        = useState("");
+  const [state,     setState]       = useState("NJ");
+  const [password,  setPassword]    = useState("");
+  const [loading,   setLoading]     = useState(false);
+  const [error,     setError]       = useState("");
+  const [emailSent, setEmailSent]   = useState(false);
+
+  const stateEditedByUser = useRef(false);
+  const cityEditedByUser  = useRef(false);
+
+  useEffect(() => { document.title = "Join Rameelo — Garba & Navratri Events"; }, []);
+
+  // Geolocation auto-fill — same as signup page
   useEffect(() => {
-    document.title = "Join Rameelo — The Garba Community";
+    if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/reverse?lat=${pos.coords.latitude}&lon=${pos.coords.longitude}&format=json`,
+          { headers: { "User-Agent": "Rameelo/1.0 (heran@finityone.com)" } }
+        );
+        const data = await res.json();
+        const addr = data.address ?? {};
+        const stateName: string = addr.state ?? "";
+        const cityName: string  = addr.city || addr.town || addr.village || addr.suburb || "";
+        const abbr = STATE_NAME_TO_ABBR[stateName];
+        if (abbr && !stateEditedByUser.current) setState(abbr);
+        if (cityName && !cityEditedByUser.current) setCity(cityName);
+      } catch { /* silent */ }
+    });
   }, []);
+
+  function formatPhone(digits: string): string {
+    const d = digits.replace(/\D/g, "").slice(0, 10);
+    if (d.length <= 3) return d;
+    if (d.length <= 6) return `(${d.slice(0, 3)}) ${d.slice(3)}`;
+    return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
+  }
+
+  const step1Valid = !!(firstName && lastName && email.includes("@") && phone.length === 10);
+  const step2Valid = password.length >= 8;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!firstName || !lastName || !email || !password) {
-      setError("Please fill in all fields.");
-      return;
-    }
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters.");
-      return;
-    }
+    if (step === 1) { setStep(2); return; }
     setLoading(true);
     setError("");
-    try {
-      const supabase = createClient();
-      const { data, error: authErr } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: { firstName, lastName, referredBy: ref || undefined },
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-      if (authErr) { setError(authErr.message); setLoading(false); return; }
 
-      if (data.user) {
-        // Upsert profile row — include referred_by code
-        await supabase.from("profiles").upsert({
-          id:         data.user.id,
-          first_name: firstName,
-          last_name:  lastName,
-          email,
-        }, { onConflict: "id" });
+    const supabase = createClient();
+    const { data, error: authError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { firstName, lastName, phone, city, state, referredBy: ref || undefined },
+        emailRedirectTo: `${location.origin}/auth/callback`,
+      },
+    });
+
+    if (authError) {
+      // Supabase returns a generic "User already registered" message
+      if (authError.message.toLowerCase().includes("already registered") ||
+          authError.message.toLowerCase().includes("already exists")) {
+        setError("__existing_user__");
+      } else {
+        setError(authError.message);
       }
+      setLoading(false);
+      return;
+    }
 
-      setDone(true);
-    } catch {
-      setError("Something went wrong. Please try again.");
-    } finally {
+    const user = createUser({ firstName, lastName, email, phone, city, state });
+    saveUser(user);
+
+    fetch("/api/send-welcome", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ firstName, email }),
+    }).catch(() => {});
+
+    if (data.session) {
+      router.push("/portal");
+      router.refresh();
+    } else {
+      setEmailSent(true);
       setLoading(false);
     }
   }
 
-  if (done) {
+  // ── Email sent screen ──────────────────────────────────────────────────────
+  if (emailSent) {
     return (
-      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: "#FCF9F2" }}>
-        <div className="max-w-sm w-full text-center space-y-5">
-          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto text-3xl"
-            style={{ backgroundColor: "#1B2F5E15" }}>🎉</div>
+      <div className="min-h-screen flex items-center justify-center px-6" style={{ backgroundColor: "#2E1B30" }}>
+        <div className="w-full max-w-sm text-center space-y-6">
+          <div className="w-16 h-16 rounded-2xl bg-marigold/15 border border-marigold/30 flex items-center justify-center mx-auto text-3xl">
+            📬
+          </div>
           <div>
-            <h2 className="font-display font-bold text-2xl text-ink" style={{ letterSpacing: "-0.02em" }}>
-              Welcome to Rameelo!
-            </h2>
-            <p className="font-ui text-sm text-ink-muted mt-2">
-              Check your inbox — we sent a confirmation link to <span className="font-semibold text-ink">{email}</span>.
+            <h1 className="font-display font-bold text-white text-2xl mb-2">Check your email</h1>
+            <p className="font-ui text-white/50 text-sm">
+              We sent a confirmation link to <span className="text-marigold font-medium">{email}</span>. Click it to activate your account.
             </p>
           </div>
-          <p className="font-ui text-xs text-ink/40">Once confirmed, you can sign in and collect your first Garba stamp.</p>
-          <Link href="/auth/signin"
-            className="inline-block w-full py-3.5 rounded-xl font-ui font-bold text-white text-sm text-center transition-opacity hover:opacity-90"
-            style={{ backgroundColor: "#1B2F5E" }}>
-            Sign In
+          <Link href="/auth/signin" className="block font-ui text-sm text-white/40 hover:text-white/60 transition-colors">
+            ← Back to sign in
           </Link>
         </div>
       </div>
     );
   }
 
+  // ── Main form ──────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen flex flex-col" style={{ backgroundColor: "#FCF9F2" }}>
+    <div className="min-h-screen flex" style={{ backgroundColor: "#2E1B30" }}>
 
-      {/* Minimal nav */}
-      <div className="px-6 py-5 flex items-center justify-between">
-        <Link href="/" className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>
+      {/* Left decorative panel — same as signup */}
+      <div className="hidden lg:flex lg:w-5/12 relative flex-col justify-between p-12 overflow-hidden">
+        <div className="absolute inset-0 opacity-20"
+          style={{ backgroundImage: "radial-gradient(circle at 40% 60%, #F5A623 0%, transparent 55%), radial-gradient(circle at 75% 25%, #0E8C7A 0%, transparent 50%)" }} />
+        <span className="relative font-display font-bold text-white text-2xl" style={{ letterSpacing: "-0.01em" }}>
           Rameelo
-        </Link>
-        <Link href="/auth/signin" className="font-ui text-sm text-ink/50 hover:text-ink transition-colors">
-          Sign in
-        </Link>
+        </span>
+
+        <div className="relative">
+          {ref && (
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-marigold/15 border border-marigold/25 mb-5">
+              <span className="text-sm">🪈</span>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-marigold">
+                Invite code: {ref}
+              </span>
+            </div>
+          )}
+          <p className="font-mono text-[10px] uppercase tracking-widest text-marigold mb-4">Join the community</p>
+          <h2 className="font-display font-bold text-white text-3xl leading-snug mb-6">
+            The home of<br /><span className="text-marigold">Raas Garba</span><br />in America.
+          </h2>
+          <div className="grid grid-cols-2 gap-3">
+            {[
+              { value: "80K+", label: "Members" },
+              { value: "500+", label: "Events" },
+              { value: "120+", label: "Cities" },
+              { value: "2M+",  label: "Tickets sold" },
+            ].map((s) => (
+              <div key={s.label} className="bg-white/5 rounded-xl p-3 border border-white/8">
+                <p className="font-display font-bold text-white text-xl">{s.value}</p>
+                <p className="font-mono text-[10px] uppercase tracking-wide text-white/40">{s.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <p className="relative font-ui text-white/30 text-xs">
+          Already have an account?{" "}
+          <Link href="/auth/signin" className="text-marigold hover:text-marigold-dark transition-colors">Sign in →</Link>
+        </p>
       </div>
 
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
-        <div className="max-w-sm w-full space-y-8">
+      {/* Form panel */}
+      <div className="flex-1 flex items-center justify-center px-6 py-12">
+        <div className="w-full max-w-sm">
 
-          {/* Hero */}
-          <div className="text-center space-y-3">
-            {ref && (
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-mono"
-                style={{ borderColor: "#1B2F5E25", backgroundColor: "#1B2F5E08", color: "#1B2F5E99" }}>
-                <span>🪈</span>
-                <span>Invited by code <span className="font-bold text-[#1B2F5E]">{ref}</span></span>
-              </div>
-            )}
-            <h1 className="font-display font-bold text-3xl text-ink" style={{ letterSpacing: "-0.03em" }}>
-              Join the garba community
-            </h1>
-            <p className="font-ui text-sm text-ink-muted leading-relaxed">
-              Rameelo connects you with garba & navratri events across the US. Buy tickets, find your crew, and collect stamps at every event.
-            </p>
+          {/* Mobile logo */}
+          <div className="lg:hidden mb-8">
+            <span className="font-display font-bold text-white text-xl" style={{ letterSpacing: "-0.01em" }}>Rameelo</span>
           </div>
 
-          {/* Signup form */}
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-1.5">First Name</label>
-                <input
-                  type="text"
-                  value={firstName}
-                  onChange={e => setFirstName(e.target.value)}
-                  placeholder="Priya"
-                  autoComplete="given-name"
-                  className="w-full px-4 py-3 rounded-xl border border-ivory-300 bg-white font-ui text-sm text-ink placeholder-ink/25 focus:outline-none focus:border-[#1B2F5E]/40 focus:ring-2 focus:ring-[#1B2F5E]/10 transition-all"
-                />
-              </div>
-              <div>
-                <label className="block font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-1.5">Last Name</label>
-                <input
-                  type="text"
-                  value={lastName}
-                  onChange={e => setLastName(e.target.value)}
-                  placeholder="Shah"
-                  autoComplete="family-name"
-                  className="w-full px-4 py-3 rounded-xl border border-ivory-300 bg-white font-ui text-sm text-ink placeholder-ink/25 focus:outline-none focus:border-[#1B2F5E]/40 focus:ring-2 focus:ring-[#1B2F5E]/10 transition-all"
-                />
-              </div>
+          {/* Ref badge — mobile only */}
+          {ref && (
+            <div className="lg:hidden flex items-center gap-2 px-3 py-2 rounded-full bg-marigold/12 border border-marigold/20 mb-5 w-fit">
+              <span className="text-sm">🪈</span>
+              <span className="font-mono text-[10px] uppercase tracking-widest text-marigold">
+                Invite code: {ref}
+              </span>
             </div>
+          )}
 
-            <div>
-              <label className="block font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-1.5">Email</label>
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                autoComplete="email"
-                className="w-full px-4 py-3 rounded-xl border border-ivory-300 bg-white font-ui text-sm text-ink placeholder-ink/25 focus:outline-none focus:border-[#1B2F5E]/40 focus:ring-2 focus:ring-[#1B2F5E]/10 transition-all"
-              />
-            </div>
-
-            <div>
-              <label className="block font-mono text-[10px] uppercase tracking-widest text-ink/40 mb-1.5">Password</label>
-              <input
-                type="password"
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="8+ characters"
-                autoComplete="new-password"
-                className="w-full px-4 py-3 rounded-xl border border-ivory-300 bg-white font-ui text-sm text-ink placeholder-ink/25 focus:outline-none focus:border-[#1B2F5E]/40 focus:ring-2 focus:ring-[#1B2F5E]/10 transition-all"
-              />
-            </div>
-
-            {error && (
-              <p className="font-ui text-xs text-durga bg-durga/5 border border-durga/15 rounded-xl px-4 py-3">
-                {error}
-              </p>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 rounded-xl font-ui font-bold text-white text-sm transition-all hover:opacity-90 active:scale-[0.99] disabled:opacity-50"
-              style={{ backgroundColor: "#1B2F5E" }}>
-              {loading ? "Creating account…" : "Create my Garba Passport →"}
-            </button>
-
-            <p className="font-ui text-[11px] text-ink/30 text-center leading-relaxed">
-              By joining you agree to our{" "}
-              <Link href="/help" className="underline underline-offset-2 hover:text-ink/50">Terms</Link>
-              {" & "}
-              <Link href="/help" className="underline underline-offset-2 hover:text-ink/50">Privacy Policy</Link>.
-            </p>
-          </form>
-
-          {/* 3 value props */}
-          <div className="grid grid-cols-3 gap-3 pt-2">
-            {[
-              { icon: "🎟️", label: "Buy tickets to any garba event" },
-              { icon: "🪪", label: "Collect stamps at every event" },
-              { icon: "👯", label: "Go with your crew — group discounts" },
-            ].map(({ icon, label }) => (
-              <div key={label} className="text-center space-y-1.5">
-                <div className="text-xl">{icon}</div>
-                <p className="font-ui text-[10px] text-ink/45 leading-snug">{label}</p>
+          {/* Step indicator */}
+          <div className="flex items-center gap-2 mb-6">
+            {[1, 2].map((s) => (
+              <div key={s} className="flex items-center gap-2">
+                {s > 1 && <div className="w-8 h-px bg-white/15" />}
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold transition-all ${step > s ? "bg-peacock text-white" : step === s ? "bg-marigold text-aubergine" : "bg-white/10 text-white/30"}`}>
+                  {step > s ? "✓" : s}
+                </div>
+                <span className={`font-mono text-[10px] uppercase tracking-wide ${step === s ? "text-white/60" : "text-white/25"}`}>
+                  {s === 1 ? "Your info" : "Secure it"}
+                </span>
               </div>
             ))}
           </div>
 
+          {/* Heading */}
+          <div className="mb-6">
+            <h1 className="font-display font-bold text-white text-3xl mb-1">
+              {step === 1 ? "Create account" : "Almost there"}
+            </h1>
+            <p className="font-ui text-white/50 text-sm">
+              {step === 1 ? (
+                <>Already a member?{" "}
+                  <Link href="/auth/signin" className="text-marigold font-semibold hover:text-marigold-dark">Sign in →</Link>
+                </>
+              ) : (
+                "Choose a password to secure your account."
+              )}
+            </p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {step === 1 ? (
+              <>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>First name</label>
+                    <input type="text" autoComplete="given-name" value={firstName} onChange={e => setFirstName(e.target.value)} placeholder="Priya" className={inputCls} required />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Last name</label>
+                    <input type="text" autoComplete="family-name" value={lastName} onChange={e => setLastName(e.target.value)} placeholder="Patel" className={inputCls} required />
+                  </div>
+                </div>
+                <div>
+                  <label className={labelCls}>Email</label>
+                  <input type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="priya@example.com" className={inputCls} required />
+                </div>
+                <div>
+                  <label className={labelCls}>Phone</label>
+                  <div className="flex items-center">
+                    <div className="flex items-center gap-1.5 px-3 py-3.5 rounded-l-xl border border-r-0 border-white/15 bg-white/8 shrink-0">
+                      <span className="text-base leading-none">🇺🇸</span>
+                      <span className="font-ui text-sm text-white/60 font-medium">+1</span>
+                    </div>
+                    <input
+                      type="tel"
+                      autoComplete="tel-national"
+                      value={formatPhone(phone)}
+                      onChange={e => setPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                      placeholder="(555) 867-5309"
+                      maxLength={14}
+                      className="flex-1 rounded-r-xl rounded-l-none border border-white/15 bg-white/10 px-4 py-3.5 font-ui text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-marigold/50 focus:border-marigold/50 transition-all"
+                      required
+                    />
+                  </div>
+                  {phone.length > 0 && phone.length < 10 && (
+                    <p className="font-mono text-[9px] text-marigold/70 mt-1">{10 - phone.length} more digits needed</p>
+                  )}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>City</label>
+                    <input type="text" autoComplete="address-level2" value={city} onChange={e => { cityEditedByUser.current = true; setCity(e.target.value); }} placeholder="Edison" className={inputCls} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>State</label>
+                    <select value={state} onChange={e => { stateEditedByUser.current = true; setState(e.target.value); }} className={`${inputCls} cursor-pointer`}>
+                      {US_STATES.map(s => <option key={s} value={s} style={{ backgroundColor: "#2E1B30" }}>{s}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <button type="submit" disabled={!step1Valid}
+                  className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all mt-2 ${step1Valid ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-lg" : "bg-white/10 text-white/30 cursor-not-allowed"}`}>
+                  Continue →
+                </button>
+              </>
+            ) : (
+              <>
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className={labelCls}>Password</label>
+                    {password.length > 0 && (
+                      <span className={`font-mono text-[10px] ${password.length >= 8 ? "text-peacock" : "text-marigold"}`}>
+                        {password.length >= 8 ? "Strong ✓" : `${8 - password.length} more chars`}
+                      </span>
+                    )}
+                  </div>
+                  <input type="password" autoComplete="new-password" value={password} onChange={e => setPassword(e.target.value)} placeholder="At least 8 characters" className={inputCls} required />
+                </div>
+
+                {/* Account summary */}
+                <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-1.5">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-white/30 mb-2">Account summary</p>
+                  <p className="font-ui text-sm text-white font-medium">{firstName} {lastName}</p>
+                  <p className="font-ui text-xs text-white/50">{email}</p>
+                  {city && <p className="font-ui text-xs text-white/50">{city}, {state}</p>}
+                  {ref && (
+                    <p className="font-ui text-xs text-marigold/70">🪈 Invited with code {ref}</p>
+                  )}
+                </div>
+
+                {/* Error handling */}
+                {error === "__existing_user__" ? (
+                  <div className="rounded-xl border border-marigold/30 bg-marigold/10 px-4 py-4 space-y-2">
+                    <p className="font-ui text-sm text-white font-semibold">Looks like you already have an account!</p>
+                    <p className="font-ui text-xs text-white/60">Sign in with your existing credentials instead.</p>
+                    <Link href={`/auth/signin?email=${encodeURIComponent(email)}`}
+                      className="inline-block mt-1 px-4 py-2 rounded-xl bg-marigold text-aubergine font-ui font-bold text-xs hover:bg-marigold-dark transition-colors">
+                      Sign in →
+                    </Link>
+                  </div>
+                ) : error ? (
+                  <div className="rounded-xl bg-durga/20 border border-durga/30 px-4 py-3">
+                    <p className="font-ui text-sm text-white/80">{error}</p>
+                  </div>
+                ) : null}
+
+                <button type="submit" disabled={loading || !step2Valid}
+                  className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all flex items-center justify-center gap-2 ${step2Valid && !loading ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-lg" : "bg-white/10 text-white/30 cursor-not-allowed"}`}>
+                  {loading
+                    ? <><div className="w-4 h-4 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" />Creating account…</>
+                    : "Create My Account →"}
+                </button>
+                <button type="button" onClick={() => { setStep(1); setError(""); }}
+                  className="w-full py-2.5 text-white/40 font-ui text-sm hover:text-white/60 transition-colors">
+                  ← Back
+                </button>
+              </>
+            )}
+          </form>
+
+          <p className="mt-6 text-center font-mono text-[10px] text-white/25">
+            By creating an account you agree to our Terms &amp; Privacy Policy
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Export with Suspense (required for useSearchParams) ───────────────────────
+// ── Export with Suspense boundary (required for useSearchParams) ──────────────
 
 export default function JoinPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#FCF9F2" }}>
-        <div className="w-7 h-7 rounded-full border-2 border-ivory-200 border-t-[#1B2F5E] animate-spin" />
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#2E1B30" }}>
+        <div className="w-8 h-8 rounded-full border-4 border-white/10 border-t-marigold animate-spin" />
       </div>
     }>
       <JoinPageInner />
