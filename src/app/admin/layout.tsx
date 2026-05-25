@@ -157,6 +157,15 @@ const SECTIONS: NavSection[] = [
           </svg>
         ),
       },
+      {
+        href: "/admin/passport",
+        label: "Passport Generator",
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0" />
+          </svg>
+        ),
+      },
     ],
   },
   {
