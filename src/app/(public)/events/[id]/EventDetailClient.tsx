@@ -1372,7 +1372,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                       <div className="rounded-xl bg-ivory p-4 space-y-2">
                         <div className="flex justify-between text-sm">
                           <span className="font-ui text-ink-muted">{qty} × ${unitPrice.toFixed(2)}</span>
-                          <span className="font-ui text-ink">${subtotal.toLocaleString()}</span>
+                          <span className="font-ui text-ink">${subtotal.toFixed(2)}</span>
                         </div>
                         {discountAmount > 0 && (
                           <div className="flex justify-between text-sm">
@@ -1393,7 +1393,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                         </div>
                         <div className="border-t border-ivory-200 pt-2 flex justify-between">
                           <span className="font-display font-bold text-ink">Total</span>
-                          <span className="font-display font-bold text-ink text-lg">${grandTotal.toLocaleString()}</span>
+                          <span className="font-display font-bold text-ink text-lg">${grandTotal.toFixed(2)}</span>
                         </div>
                       </div>
                     )}
