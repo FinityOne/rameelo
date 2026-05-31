@@ -43,6 +43,8 @@ export interface GroupOrder {
     id: string;
     name: string;
     price: number;
+    group_discount_mode: "simple" | "scaling" | null;
+    group_discount_min_qty: number | null;
   };
 }
 
@@ -128,7 +130,7 @@ export async function loadGroupOrder(groupId: string): Promise<GroupOrder | null
         venue_name, cover_gradient, cover_image_url, category,
         artists (name, profile_image_url)
       ),
-      ticket_tiers (id, name, price)
+      ticket_tiers (id, name, price, group_discount_mode, group_discount_min_qty)
     `)
     .eq("id", groupId)
     .single();

@@ -502,7 +502,7 @@ export default function EventDashboardPage() {
                         <div className="min-w-0">
                           <p className="font-ui text-sm font-semibold text-ink truncate">{tier.name}</p>
                           <p className="font-mono text-[9px] text-ink-muted">
-                            ${tier.price}/ticket · {tier.quantity_sold} sold of {tier.quantity}
+                            ${tier.price.toFixed(2)}/ticket · {tier.quantity_sold} sold of {tier.quantity}
                           </p>
                         </div>
                       </div>

@@ -189,8 +189,8 @@ function CreateGroupInner() {
       unitPrice: discountedPrice,
       discount,
       discountAmount: unitPrice - discountedPrice,
-      serviceFee: Math.round(discountedPrice * 0.049),
-      grandTotal: discountedPrice + Math.round(discountedPrice * 0.049),
+      serviceFee: Math.round(discountedPrice * 0.05),
+      grandTotal: discountedPrice + Math.round(discountedPrice * 0.05),
       groupId,
       groupEmail: email,
     };
@@ -373,7 +373,7 @@ function CreateGroupInner() {
                     >
                       <div className="flex items-center justify-between">
                         <p className={`font-display font-bold text-sm ${selectedTierId === tier.id ? "text-aubergine" : "text-ink"}`}>{tier.name}</p>
-                        <p className="font-mono text-xs text-ink-muted">${tier.price} / person</p>
+                        <p className="font-mono text-xs text-ink-muted">${tier.price.toFixed(2)} / person</p>
                       </div>
                     </button>
                   ))}
@@ -433,7 +433,7 @@ function CreateGroupInner() {
                   Your group saves ${totalSavings.toLocaleString()} total
                 </p>
                 <p className="font-ui text-xs text-ink-muted">
-                  {targetSize} people × ${unitPrice} → ${discountedPrice} each ({discount}% off)
+                  {targetSize} people × ${unitPrice.toFixed(2)} → ${discountedPrice.toFixed(2)} each ({discount}% off)
                 </p>
               </div>
             )}
@@ -469,7 +469,7 @@ function CreateGroupInner() {
               <p className="font-ui text-ink-muted text-sm">
                 {tierHasDiscount && discount > 0
                   ? <>Share this with your crew. When {targetSize} people join, everyone pays <strong className="text-ink">${discountedPrice}</strong> per ticket ({discount}% off).</>
-                  : <>Share this with your crew. When {targetSize} people join, everyone can buy their ticket at <strong className="text-ink">${unitPrice}</strong> together.</>
+                  : <>Share this with your crew. When {targetSize} people join, everyone can buy their ticket at <strong className="text-ink">${unitPrice.toFixed(2)}</strong> together.</>
                 }
               </p>
             </div>

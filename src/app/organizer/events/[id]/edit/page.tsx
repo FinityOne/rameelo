@@ -63,9 +63,8 @@ type OrgOption = { id: string; name: string };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const PLATFORM_FEE = 0.03;
-const PAYMENT_PCT  = 0.029;
-const PAYMENT_FLAT = 0.30;
+const PLATFORM_FEE  = 0.03;
+const CARD_FEE_PCT  = 0.05;
 
 const STATUS_META: Record<string, { label: string; pillCls: string; bannerCls: string; icon: string; msg: string }> = {
   draft:          { label: "Draft",     pillCls: "bg-ivory-200 text-ink-muted",   bannerCls: "bg-ivory border-ivory-200",        icon: "📝", msg: "This event is a draft. Submit it for review when ready." },
@@ -92,7 +91,7 @@ const NIGHTS = Array.from({ length: 9 }, (_, i) => i + 1);
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function buyerTotal(price: number) {
-  return +(price + price * PLATFORM_FEE + price * PAYMENT_PCT + PAYMENT_FLAT).toFixed(2);
+  return +(price + price * PLATFORM_FEE + price * CARD_FEE_PCT).toFixed(2);
 }
 
 function fmtDate(d: string | null) {

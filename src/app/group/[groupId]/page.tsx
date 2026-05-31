@@ -159,6 +159,16 @@ export default function GroupLandingPage() {
   const activeTierPrice = (activeTier as { price: number }).price;
   const activeDiscountedPrice = discount > 0 ? Math.round(activeTierPrice * (1 - discount / 100)) : activeTierPrice;
 
+  // Payment model: if the tier has a min-qty group discount, all tickets must be
+  // paid for together in one transaction (splitting would lose the discount).
+  const isMinQtyDiscount =
+    !!tier.group_discount_mode &&
+    (tier.group_discount_mode === "scaling" ||
+      (tier.group_discount_mode === "simple" && !!tier.group_discount_min_qty));
+
+  // Total cost for paying for the whole group
+  const groupPayTotal = discountedPrice * totalTickets;
+
   // My member record (if already joined)
   const myMember = myEmail ? group.members.find(m => m.email === myEmail) : null;
 
@@ -237,10 +247,36 @@ export default function GroupLandingPage() {
       unitPrice: discountedCheckoutPrice,
       discount,
       discountAmount: chosenPrice - discountedCheckoutPrice,
-      serviceFee: Math.round(discountedCheckoutPrice * 0.049),
-      grandTotal: discountedCheckoutPrice + Math.round(discountedCheckoutPrice * 0.049),
+      serviceFee: Math.round(discountedCheckoutPrice * 0.05),
+      grandTotal: discountedCheckoutPrice + Math.round(discountedCheckoutPrice * 0.05),
       groupId,
       groupEmail: checkoutEmail,
+    };
+    localStorage.setItem("rameelo_checkout", JSON.stringify(payload));
+    router.push("/checkout");
+  }
+
+  // Pay for everyone in a single transaction (required for min-qty discounts)
+  function handleGroupCheckout(payerEmail: string) {
+    const payload = {
+      eventId: ev.id,
+      tierId: tier.id,
+      tierName: tier.name,
+      eventTitle: ev.title,
+      eventDate: fmtDate(ev.start_date),
+      eventVenue: ev.venue_name,
+      eventCity: ev.city,
+      eventState: ev.state,
+      artistName: ev.artists?.name ?? null,
+      qty: totalTickets,
+      unitPrice: discountedPrice,
+      discount,
+      discountAmount: unitPrice - discountedPrice,
+      serviceFee: Math.round(discountedPrice * 0.05),
+      grandTotal: discountedPrice * totalTickets + Math.round(discountedPrice * totalTickets * 0.05),
+      groupId,
+      groupEmail: payerEmail,
+      isGroupPay: true,
     };
     localStorage.setItem("rameelo_checkout", JSON.stringify(payload));
     router.push("/checkout");
@@ -516,29 +552,19 @@ export default function GroupLandingPage() {
         {/* ── View mode — main CTA ── */}
         {!isExpired && mode === "view" && (
           <div className="space-y-3">
-            {myMember && !myMember.paid ? (
-              /* Already in group but haven't paid — show pay CTA */
-              <div className="rounded-2xl border-2 border-marigold bg-marigold/5 p-5 space-y-3">
-                <div>
-                  <p className="font-mono text-[9px] uppercase tracking-widest text-marigold font-bold mb-1">You&apos;re in the group!</p>
-                  <p className="font-display font-bold text-ink text-base">Ready to secure your ticket?</p>
-                  <p className="font-ui text-sm text-ink-muted mt-0.5">
-                    {myMember.qty} ticket{myMember.qty !== 1 ? "s" : ""} · {(activeTier as {name:string}).name}
-                    {discount > 0 && <span className="text-peacock ml-1">· {discount}% group rate</span>}
-                  </p>
-                </div>
-                <button
-                  onClick={() => handleCheckout(myEmail!, myMember.qty, myMember.tierId ?? joinTierId ?? tier.id)}
-                  className="w-full py-3.5 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-sm"
-                >
-                  Pay for my {myMember.qty} ticket{myMember.qty !== 1 ? "s" : ""} · ${(discount > 0 ? Math.round((myMember.tierId ? (eventTiers.find(t=>t.id===myMember.tierId)?.price ?? activeTierPrice) : activeTierPrice) * (1 - discount/100)) : activeTierPrice) * myMember.qty} →
-                </button>
-                <button onClick={() => setMode("join")} className="w-full py-2 font-ui text-sm text-ink-muted hover:text-aubergine transition-colors">
-                  Change tickets or notes
-                </button>
+
+            {/* Min-qty discount: banner explaining one-payer model */}
+            {isMinQtyDiscount && totalTickets > 0 && (
+              <div className="rounded-2xl border border-aubergine/20 bg-aubergine/5 px-4 py-3 flex items-start gap-3">
+                <svg className="w-4 h-4 text-aubergine mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <p className="font-ui text-sm text-aubergine/80 leading-relaxed">
+                  This group uses a <strong className="text-aubergine">minimum-quantity discount</strong> — all {totalTickets} tickets must be purchased together in one transaction to unlock the {discount}% savings. One person pays for the whole group.
+                </p>
               </div>
-            ) : !myMember ? (
-              /* Not in group yet */
+            )}
+
+            {/* Not yet in group */}
+            {!myMember && (
               <button
                 onClick={() => setMode("join")}
                 className="w-full rounded-2xl bg-marigold text-aubergine p-5 text-left hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-sm"
@@ -546,16 +572,86 @@ export default function GroupLandingPage() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <p className="font-display font-bold text-lg mb-0.5">Join this group →</p>
-                    <p className="font-ui text-sm text-aubergine/70">Add your name, pick tickets, pay when ready.</p>
+                    <p className="font-ui text-sm text-aubergine/70">
+                      {isMinQtyDiscount
+                        ? "Add your name and tickets — one person will pay for everyone."
+                        : "Add your name, pick tickets, pay when ready."}
+                    </p>
                   </div>
                   <div className="text-right shrink-0">
-                    <p className="font-display font-bold text-2xl">${activeDiscountedPrice}</p>
-                    {discount > 0 && <p className="font-mono text-[10px] text-aubergine/60 line-through">${activeTierPrice}</p>}
+                    <p className="font-display font-bold text-2xl">${activeDiscountedPrice.toFixed(2)}</p>
+                    {discount > 0 && <p className="font-mono text-[10px] text-aubergine/60 line-through">${activeTierPrice.toFixed(2)}</p>}
                     <p className="font-mono text-[10px] text-aubergine/60">per ticket</p>
                   </div>
                 </div>
               </button>
-            ) : null /* already paid — no CTA */}
+            )}
+
+            {/* Already in group, not paid */}
+            {myMember && !myMember.paid && !isMinQtyDiscount && (
+              <div className="rounded-2xl border-2 border-marigold bg-marigold/5 p-5 space-y-3">
+                <div>
+                  <p className="font-mono text-[9px] uppercase tracking-widest text-marigold font-bold mb-1">You&apos;re in the group!</p>
+                  <p className="font-display font-bold text-ink text-base">Ready to secure your ticket?</p>
+                  <p className="font-ui text-sm text-ink-muted mt-0.5">
+                    {myMember.qty} ticket{myMember.qty !== 1 ? "s" : ""}
+                    {discount > 0 && <span className="text-peacock ml-1">· {discount}% group rate</span>}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleCheckout(myEmail!, myMember.qty, myMember.tierId ?? joinTierId ?? tier.id)}
+                  className="w-full py-3.5 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-sm"
+                >
+                  Pay for my {myMember.qty} ticket{myMember.qty !== 1 ? "s" : ""} · ${(activeDiscountedPrice * myMember.qty).toFixed(2)} →
+                </button>
+                <button onClick={() => setMode("join")} className="w-full py-2 font-ui text-sm text-ink-muted hover:text-aubergine transition-colors">
+                  Change tickets or notes
+                </button>
+              </div>
+            )}
+
+            {/* Min-qty discount: pay for everyone (shown to all members) */}
+            {isMinQtyDiscount && totalTickets > 0 && (
+              <div className="rounded-2xl border border-ivory-200 bg-white p-5 space-y-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted font-bold mb-1">Group payment</p>
+                    <p className="font-display font-bold text-ink text-base">Pay for all {totalTickets} tickets</p>
+                    <p className="font-ui text-sm text-ink-muted mt-0.5">
+                      {memberCount} {memberCount === 1 ? "person" : "people"} · {discount > 0 ? `${discount}% off applied` : "standard rate"}
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <p className="font-display font-bold text-peacock text-2xl">${groupPayTotal.toFixed(2)}</p>
+                    {discount > 0 && (
+                      <p className="font-mono text-[10px] text-ink-muted line-through">${(unitPrice * totalTickets).toFixed(2)}</p>
+                    )}
+                    <p className="font-mono text-[10px] text-ink-muted">total</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => handleGroupCheckout(myEmail ?? group.organizerEmail)}
+                  className="w-full py-3.5 rounded-2xl bg-aubergine text-white font-display font-bold text-base hover:bg-aubergine-light active:scale-[0.98] transition-all shadow-sm"
+                >
+                  I&apos;ll pay for the whole group →
+                </button>
+                {remaining > 0 && (
+                  <p className="font-mono text-[10px] text-ink-muted text-center">
+                    {remaining} spot{remaining !== 1 ? "s" : ""} still open — share the link so everyone joins first
+                  </p>
+                )}
+              </div>
+            )}
+
+            {/* No discount: optional "pay for everyone" */}
+            {!isMinQtyDiscount && totalTickets > 0 && (
+              <button
+                onClick={() => handleGroupCheckout(myEmail ?? group.organizerEmail)}
+                className="w-full py-3 rounded-2xl border border-aubergine/25 text-aubergine font-ui font-semibold text-sm hover:bg-aubergine/5 active:scale-[0.98] transition-all flex items-center justify-center gap-2"
+              >
+                Or pay for everyone · ${groupPayTotal.toFixed(2)} total
+              </button>
+            )}
 
             {/* Share nudge */}
             <div className="rounded-2xl border border-ivory-200 bg-white p-4">
@@ -688,7 +784,11 @@ export default function GroupLandingPage() {
                 className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all ${!joining && firstName && lastName && joinEmail.includes("@") ? "bg-aubergine text-white hover:bg-aubergine-light active:scale-[0.98] shadow-sm" : "bg-ivory-200 text-ink-muted cursor-not-allowed"}`}>
                 {joining ? "Joining…" : "Join the group →"}
               </button>
-              <p className="font-mono text-[10px] text-ink-muted text-center">No payment yet — you&apos;ll pay when you&apos;re ready</p>
+              <p className="font-mono text-[10px] text-ink-muted text-center">
+                {isMinQtyDiscount
+                  ? "No payment from you — the host covers everyone in one transaction"
+                  : "No payment yet — you'll pay when you're ready"}
+              </p>
             </div>
           </form>
         )}
@@ -702,25 +802,49 @@ export default function GroupLandingPage() {
               </div>
               <p className="font-display font-bold text-ink text-xl mb-1">You&apos;re in, {firstName}!</p>
               <p className="font-ui text-sm text-ink-muted leading-relaxed">
-                You&apos;re now showing in the group.{" "}
-                {joinQty > 1 ? `${joinQty} tickets reserved for you.` : "Your spot is reserved."}
-                {" "}Pay whenever you&apos;re ready — no rush.
+                {isMinQtyDiscount
+                  ? <>Your {joinQty > 1 ? `${joinQty} tickets are` : "spot is"} reserved. The group host will pay for everyone in one transaction once everyone&apos;s joined — no action needed from you right now.</>
+                  : <>{joinQty > 1 ? `${joinQty} tickets reserved for you.` : "Your spot is reserved."} Pay whenever you&apos;re ready — no rush.</>
+                }
               </p>
             </div>
 
             <div className="p-5 space-y-3">
-              <button
-                onClick={() => handleCheckout(joinEmail, joinQty, joinTierId ?? tier.id)}
-                className="w-full py-4 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-sm"
-              >
-                Pay for my {joinQty} ticket{joinQty !== 1 ? "s" : ""} now →
-              </button>
-              <button
-                onClick={() => setMode("view")}
-                className="w-full py-3 rounded-2xl border border-ivory-200 font-ui font-semibold text-sm text-ink-muted hover:text-ink hover:border-aubergine/30 transition-all"
-              >
-                I&apos;ll pay later — back to group
-              </button>
+              {isMinQtyDiscount ? (
+                <>
+                  <button
+                    onClick={() => handleGroupCheckout(joinEmail)}
+                    className="w-full py-4 rounded-2xl bg-aubergine text-white font-display font-bold text-base hover:bg-aubergine-light active:scale-[0.98] transition-all shadow-sm"
+                  >
+                    I&apos;ll pay for the whole group · ${groupPayTotal.toFixed(2)} →
+                  </button>
+                  <button onClick={() => setMode("view")}
+                    className="w-full py-3 rounded-2xl border border-ivory-200 font-ui font-semibold text-sm text-ink-muted hover:text-ink hover:border-aubergine/30 transition-all">
+                    Back to group — let someone else pay
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => handleCheckout(joinEmail, joinQty, joinTierId ?? tier.id)}
+                    className="w-full py-4 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-sm"
+                  >
+                    Pay for my {joinQty} ticket{joinQty !== 1 ? "s" : ""} · ${(activeDiscountedPrice * joinQty).toFixed(2)} →
+                  </button>
+                  <button
+                    onClick={() => handleGroupCheckout(joinEmail)}
+                    className="w-full py-3 rounded-2xl border border-aubergine/25 text-aubergine font-ui font-semibold text-sm hover:bg-aubergine/5 transition-all"
+                  >
+                    Or pay for everyone · ${groupPayTotal.toFixed(2)} total
+                  </button>
+                  <button
+                    onClick={() => setMode("view")}
+                    className="w-full py-3 rounded-2xl border border-ivory-200 font-ui font-semibold text-sm text-ink-muted hover:text-ink hover:border-aubergine/30 transition-all"
+                  >
+                    I&apos;ll pay later — back to group
+                  </button>
+                </>
+              )}
               <p className="font-mono text-[10px] text-ink-muted text-center">
                 We&apos;ll send a reminder to {joinEmail}
               </p>
@@ -734,31 +858,41 @@ export default function GroupLandingPage() {
         <div className="fixed bottom-0 left-0 right-0 z-40 p-3 pb-4"
           style={{ background: "linear-gradient(to top, rgba(252,249,242,1) 70%, rgba(252,249,242,0))" }}>
           {!myMember ? (
-            <button
-              onClick={() => setMode("join")}
-              className="w-full flex items-center justify-between gap-3 bg-marigold text-aubergine px-5 py-4 rounded-2xl shadow-xl shadow-marigold/25 font-display font-bold active:scale-[0.98] transition-all"
-            >
+            /* Not joined yet */
+            <button onClick={() => setMode("join")}
+              className="w-full flex items-center justify-between gap-3 bg-marigold text-aubergine px-5 py-4 rounded-2xl shadow-xl shadow-marigold/25 font-display font-bold active:scale-[0.98] transition-all">
               <div className="flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-aubergine/15 flex items-center justify-center shrink-0">
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                 </div>
                 <div className="text-left">
                   <p className="text-base font-bold leading-tight">Join this group</p>
-                  <p className="font-ui text-xs text-aubergine/70 font-normal">No payment needed yet</p>
+                  <p className="font-ui text-xs text-aubergine/70 font-normal">
+                    {isMinQtyDiscount ? "Declare your tickets — one person pays" : "No payment needed yet"}
+                  </p>
                 </div>
               </div>
               <span className="text-lg">→</span>
             </button>
+          ) : !myMember.paid && isMinQtyDiscount ? (
+            /* Min-qty discount: one person pays for everyone */
+            <button onClick={() => handleGroupCheckout(myEmail ?? group.organizerEmail)}
+              className="w-full flex items-center justify-between gap-3 bg-aubergine text-white px-5 py-4 rounded-2xl shadow-xl shadow-aubergine/20 font-display font-bold active:scale-[0.98] transition-all">
+              <div className="text-left">
+                <p className="text-base font-bold leading-tight">Pay for the whole group</p>
+                <p className="font-ui text-xs text-white/70 font-normal">{totalTickets} tickets · {discount}% off</p>
+              </div>
+              <p className="text-xl font-bold">${groupPayTotal.toFixed(2)} →</p>
+            </button>
           ) : !myMember.paid ? (
-            <button
-              onClick={() => handleCheckout(myEmail!, myMember.qty, myMember.tierId ?? joinTierId ?? tier.id)}
-              className="w-full flex items-center justify-between gap-3 bg-marigold text-aubergine px-5 py-4 rounded-2xl shadow-xl shadow-marigold/25 font-display font-bold active:scale-[0.98] transition-all"
-            >
+            /* No min-qty discount: individual pay CTA */
+            <button onClick={() => handleCheckout(myEmail!, myMember.qty, myMember.tierId ?? joinTierId ?? tier.id)}
+              className="w-full flex items-center justify-between gap-3 bg-marigold text-aubergine px-5 py-4 rounded-2xl shadow-xl shadow-marigold/25 font-display font-bold active:scale-[0.98] transition-all">
               <div className="text-left">
                 <p className="text-base font-bold leading-tight">Pay for my tickets</p>
                 <p className="font-ui text-xs text-aubergine/70 font-normal">{myMember.qty} ticket{myMember.qty !== 1 ? "s" : ""} reserved</p>
               </div>
-              <p className="text-xl font-bold">${activeDiscountedPrice * myMember.qty} →</p>
+              <p className="text-xl font-bold">${(activeDiscountedPrice * myMember.qty).toFixed(2)} →</p>
             </button>
           ) : null}
         </div>

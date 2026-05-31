@@ -489,7 +489,7 @@ function TierAvailabilityBar({ tier, isSelected, onClick, isBestDeal, isMostPopu
         </div>
         <div className="text-right shrink-0">
           <p className={`font-display font-bold text-base ${isSelected && !disabled ? "text-aubergine" : "text-ink"}`}>
-            {tier.price === 0 ? "Complimentary" : `$${tier.price}`}
+            {tier.price === 0 ? "Complimentary" : `$${tier.price.toFixed(2)}`}
           </p>
         </div>
       </div>
@@ -572,8 +572,8 @@ export default function EventDetailClient({ id }: { id: string }) {
     setTimeout(() => setLinkCopied(false), 2000);
   }
 
-  // Existing group order (logged-in organizer)
-  const [existingGroup, setExistingGroup] = useState<{ id: string; joined: number; target: number } | null>(null);
+  // Existing group orders (logged-in host — could have started multiple)
+  const [existingGroups, setExistingGroups] = useState<{ id: string; joined: number; target: number }[]>([]);
 
   // Invite group — arrived via /events/[id]?groupId=RM-XXXXX
   const [inviteGroup, setInviteGroup] = useState<{ id: string; hostName: string; joined: number; discount: number } | null>(null);
@@ -651,27 +651,28 @@ export default function EventDetailClient({ id }: { id: string }) {
       });
   }, []);
 
-  // Check if logged-in user already has an open group order for this event
+  // Check all open group orders this logged-in user has started for this event
   useEffect(() => {
     if (!event) return;
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
-      const { data: groupData } = await supabase
+      const { data: rows } = await supabase
         .from("group_orders")
         .select("id, target_size")
         .eq("organizer_user_id", user.id)
         .eq("event_id", event.id)
         .eq("status", "open")
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .single();
-      if (!groupData) return;
-      const { count } = await supabase
-        .from("group_order_members")
-        .select("*", { count: "exact", head: true })
-        .eq("group_id", groupData.id);
-      setExistingGroup({ id: groupData.id, joined: count ?? 0, target: groupData.target_size });
+        .order("created_at", { ascending: false });
+      if (!rows?.length) return;
+      const groups = await Promise.all(rows.map(async g => {
+        const { count } = await supabase
+          .from("group_order_members")
+          .select("*", { count: "exact", head: true })
+          .eq("group_id", g.id);
+        return { id: g.id, joined: count ?? 0, target: g.target_size };
+      }));
+      setExistingGroups(groups);
     });
   }, [event]);
 
@@ -722,7 +723,7 @@ export default function EventDetailClient({ id }: { id: string }) {
   const discountPct = getTierDiscount(selectedTier, qty);
   const afterDiscount = subtotal - discountAmount;
   const RAMEELO_FEE_PCT = 0.03;
-  const CARD_FEE_PCT   = 0.035;
+  const CARD_FEE_PCT   = 0.05;
   const rameeloFee   = Math.round(afterDiscount * RAMEELO_FEE_PCT * 100) / 100;
   const processingFee = Math.round(afterDiscount * CARD_FEE_PCT * 100) / 100;
   const serviceFee   = rameeloFee + processingFee; // kept for backward compat
@@ -1370,7 +1371,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                     {unitPrice > 0 && (
                       <div className="rounded-xl bg-ivory p-4 space-y-2">
                         <div className="flex justify-between text-sm">
-                          <span className="font-ui text-ink-muted">{qty} × ${unitPrice}</span>
+                          <span className="font-ui text-ink-muted">{qty} × ${unitPrice.toFixed(2)}</span>
                           <span className="font-ui text-ink">${subtotal.toLocaleString()}</span>
                         </div>
                         {discountAmount > 0 && (
@@ -1405,18 +1406,18 @@ export default function EventDetailClient({ id }: { id: string }) {
                       {unitPrice === 0 ? `Reserve ${qty} Free Ticket${qty > 1 ? "s" : ""} →` : `Continue to Checkout →`}
                     </button>
 
-                    {/* Group order CTA */}
-                    {existingGroup && (
-                      <div className="rounded-2xl border border-aubergine/20 bg-aubergine/5 p-4">
+                    {/* Group order CTAs — one card per active group */}
+                    {existingGroups.map(eg => (
+                      <div key={eg.id} className="rounded-2xl border border-aubergine/20 bg-aubergine/5 p-4">
                         <div className="flex items-center justify-between gap-3 mb-3">
                           <div>
-                            <p className="font-mono text-[9px] uppercase tracking-widest text-aubergine font-bold mb-0.5">Your active group</p>
+                            <p className="font-mono text-[9px] uppercase tracking-widest text-aubergine font-bold mb-0.5">Your active group · {eg.id}</p>
                             <p className="font-display font-bold text-ink text-sm">
-                              {existingGroup.joined} of {existingGroup.target} people joined
+                              {eg.joined} of {eg.target} tickets
                             </p>
                           </div>
                           <Link
-                            href={`/group/${existingGroup.id}`}
+                            href={`/group/${eg.id}`}
                             className="shrink-0 px-4 py-2 rounded-xl bg-aubergine text-white font-ui font-semibold text-xs hover:bg-aubergine-light transition-colors"
                           >
                             Manage →
@@ -1425,20 +1426,20 @@ export default function EventDetailClient({ id }: { id: string }) {
                         <div className="h-1.5 bg-white rounded-full overflow-hidden">
                           <div
                             className="h-full bg-marigold rounded-full transition-all"
-                            style={{ width: `${Math.min(100, (existingGroup.joined / existingGroup.target) * 100)}%` }}
+                            style={{ width: `${Math.min(100, (eg.joined / eg.target) * 100)}%` }}
                           />
                         </div>
                         <p className="font-mono text-[10px] text-aubergine/60 mt-2">
                           Share your group link to bring more people in
                         </p>
                       </div>
-                    )}
+                    ))}
                     <Link
                       href={`/group/create?eventId=${event.id}`}
                       className="w-full py-3 rounded-2xl border border-aubergine/25 text-aubergine font-ui font-semibold text-sm hover:bg-aubergine/5 transition-all flex items-center justify-center gap-2"
                     >
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                      {existingGroup
+                      {existingGroups.length > 0
                         ? "Start a new group"
                         : selectedTier?.group_discount_mode === 'scaling'
                           ? "Start a Group Order — Save up to 15%"

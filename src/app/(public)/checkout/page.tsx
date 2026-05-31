@@ -31,7 +31,7 @@ interface CheckoutPayload {
 type PaymentMethod = "card" | "ach";
 
 const RAMEELO_FEE_PCT  = 0.03;
-const CARD_FEE_PCT     = 0.035;
+const CARD_FEE_PCT     = 0.05;
 
 function calcFees(subtotalAfterDiscount: number, method: PaymentMethod) {
   const rameeloFee    = Math.round(subtotalAfterDiscount * RAMEELO_FEE_PCT * 100) / 100;

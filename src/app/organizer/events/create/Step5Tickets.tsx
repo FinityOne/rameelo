@@ -4,12 +4,11 @@ import type { EventFormData, TicketTier } from "./types";
 import { EMPTY_TIER } from "./types";
 
 const PLATFORM_FEE_PCT = 0.03;
-const PAYMENT_FEE_PCT = 0.029;
-const PAYMENT_FEE_FLAT = 0.30;
+const CARD_FEE_PCT     = 0.05;
 
 function feeBreakdown(price: number) {
   const platform = +(price * PLATFORM_FEE_PCT).toFixed(2);
-  const payment = +(price * PAYMENT_FEE_PCT + PAYMENT_FEE_FLAT).toFixed(2);
+  const payment  = +(price * CARD_FEE_PCT).toFixed(2);
   return { platform, payment, total: +(platform + payment).toFixed(2), buyerPays: +(price + platform + payment).toFixed(2) };
 }
 
