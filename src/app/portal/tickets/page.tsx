@@ -649,10 +649,11 @@ function TicketCard({ orderId, seat, total, eventTitle, tierName, transfer, onTr
 }
 
 // ── Order Card ─────────────────────────────────────────────────────────────────
-function OrderCard({ order, userId, userEmail, onRefresh }: {
+function OrderCard({ order, userId, userEmail, isIOS, onRefresh }: {
   order: PortalOrderRow;
   userId: string;
   userEmail: string;
+  isIOS: boolean;
   onRefresh: () => void;
 }) {
   const dateISO = order.eventDate;
@@ -782,7 +783,7 @@ function OrderCard({ order, userId, userEmail, onRefresh }: {
                 <GroupMembersPanel members={order.groupMembers} groupId={order.groupId} />
               )}
 
-              <div className="flex items-center justify-between pt-2 border-t border-ivory-200">
+              <div className="flex items-center justify-between pt-2 border-t border-ivory-200 gap-3 flex-wrap">
                 <div>
                   <p className="font-mono text-[10px] text-ink-muted">Total paid · #{order.orderId.slice(-6).toUpperCase()}</p>
                   <Link href={`/portal/tickets/${order.orderId}`} className="font-mono text-[10px] text-aubergine hover:underline flex items-center gap-1 mt-0.5">
@@ -790,7 +791,20 @@ function OrderCard({ order, userId, userEmail, onRefresh }: {
                     View receipt
                   </Link>
                 </div>
-                <p className="font-display font-bold text-ink">${order.grandTotal.toLocaleString()}</p>
+                <div className="flex items-center gap-2">
+                  {isIOS && (
+                    <a
+                      href={`/api/wallet/pass/${order.orderId}`}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-black text-white font-ui text-xs font-medium hover:bg-zinc-800 active:scale-95 transition-all"
+                    >
+                      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+                      </svg>
+                      Wallet
+                    </a>
+                  )}
+                  <p className="font-display font-bold text-ink">${order.grandTotal.toFixed(2)}</p>
+                </div>
               </div>
             </div>
           </>
@@ -809,7 +823,12 @@ export default function TicketsPage() {
   const [filter, setFilter] = useState<"all" | "upcoming" | "past">("upcoming");
   const [userId, setUserId] = useState("");
   const [userEmail, setUserEmail] = useState("");
+  const [isIOS, setIsIOS] = useState(false);
   const today = new Date().toISOString().slice(0, 10);
+
+  useEffect(() => {
+    setIsIOS(/iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+  }, []);
 
   async function loadAll(uid: string, email: string) {
     const [ordersData, incoming, received] = await Promise.all([
@@ -935,6 +954,7 @@ export default function TicketsPage() {
                   order={order}
                   userId={userId}
                   userEmail={userEmail}
+                  isIOS={isIOS}
                   onRefresh={() => loadAll(userId, userEmail)}
                 />
               ))}
