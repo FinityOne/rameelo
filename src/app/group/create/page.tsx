@@ -12,12 +12,6 @@ import {
   createGroupOrder,
 } from "@/lib/group-orders";
 
-const TARGET_OPTIONS = [
-  { value: 5,  label: "5 people",   sub: "10% off unlocked" },
-  { value: 8,  label: "8 people",   sub: "12% off unlocked" },
-  { value: 10, label: "10 people",  sub: "15% off — best deal" },
-  { value: 15, label: "15+ people", sub: "15% off — max savings" },
-];
 
 function formatPhone(digits: string): string {
   const d = digits.replace(/\D/g, "").slice(0, 10);
@@ -36,7 +30,7 @@ type EventSummary = {
   start_date: string;
   city: string;
   state: string;
-  ticket_tiers: { id: string; name: string; price: number; quantity: number; quantity_sold: number; is_visible: boolean; sort_order: number }[];
+  ticket_tiers: { id: string; name: string; price: number; quantity: number; quantity_sold: number; is_visible: boolean; sort_order: number; sale_start_date: string | null; sale_end_date: string | null; group_discount_mode: string | null }[];
   artists: { name: string; profile_image_url: string | null } | null;
 };
 
@@ -67,6 +61,8 @@ function CreateGroupInner() {
   const [phoneDigits, setPhoneDigits] = useState("");
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
   const [targetSize, setTargetSize] = useState(10);
+  const [hostQty, setHostQty]       = useState(1);
+  const [hostNotes, setHostNotes]   = useState("");
   const [groupId, setGroupId]       = useState("");
   const [copied, setCopied]         = useState(false);
 
@@ -81,7 +77,7 @@ function CreateGroupInner() {
         .select(`
           id, title, start_date, city, state,
           artists:artists!events_artist_id_fkey (name, profile_image_url),
-          ticket_tiers (id, name, price, quantity, quantity_sold, is_visible, sort_order)
+          ticket_tiers (id, name, price, quantity, quantity_sold, is_visible, sort_order, sale_start_date, sale_end_date, group_discount_mode)
         `)
         .eq("id", eventId)
         .eq("status", "published")
@@ -90,8 +86,15 @@ function CreateGroupInner() {
     ]).then(([{ data: evData }, { data: { user } }]) => {
       if (evData) {
         const ev = evData as unknown as EventSummary;
+        const now = new Date();
         ev.ticket_tiers = ev.ticket_tiers
-          .filter(t => t.is_visible && t.quantity > t.quantity_sold)
+          .filter(t => {
+            if (!t.is_visible) return false;
+            if (t.quantity_sold >= t.quantity) return false;
+            if (t.sale_start_date && new Date(t.sale_start_date + "T00:00:00") > now) return false;
+            if (t.sale_end_date && new Date(t.sale_end_date + "T23:59:59") < now) return false;
+            return true;
+          })
           .sort((a, b) => a.sort_order - b.sort_order || a.price - b.price);
         setEvent(ev);
         if (ev.ticket_tiers.length > 0) setSelectedTierId(ev.ticket_tiers[0].id);
@@ -118,9 +121,10 @@ function CreateGroupInner() {
   }, [eventId]);
 
   const selectedTier = event?.ticket_tiers.find(t => t.id === selectedTierId) ?? null;
-  const discount = discountForTarget(targetSize);
+  const tierHasDiscount = !!selectedTier?.group_discount_mode;
+  const discount = tierHasDiscount ? discountForTarget(targetSize) : 0;
   const unitPrice = selectedTier?.price ?? 0;
-  const discountedPrice = Math.round(unitPrice * (1 - discount / 100));
+  const discountedPrice = tierHasDiscount ? Math.round(unitPrice * (1 - discount / 100)) : unitPrice;
   const totalSavings = (unitPrice - discountedPrice) * targetSize;
   const shareUrl = groupId ? `${typeof window !== "undefined" ? window.location.origin : "https://rameelo.com"}/group/${groupId}` : "";
 
@@ -147,7 +151,11 @@ function CreateGroupInner() {
       targetSize,
       discountPct: discount,
       deadline: deadline.toISOString(),
+      hostQty,
+      hostNotes: hostNotes || undefined,
     });
+    // Save email so host can edit their own member record
+    localStorage.setItem(`rameelo_group_member_${id}`, email);
 
     setSaving(false);
     if (error) {
@@ -177,7 +185,7 @@ function CreateGroupInner() {
       eventCity: event.city,
       eventState: event.state,
       artistName: event.artists?.name ?? null,
-      qty: 1,
+      qty: hostQty,
       unitPrice: discountedPrice,
       discount,
       discountAmount: unitPrice - discountedPrice,
@@ -191,7 +199,9 @@ function CreateGroupInner() {
   }
 
   const shareVia = (channel: string) => {
-    const text = `Join my group for ${event?.title ?? "this event"} and save ${discount}% on tickets! 🎉`;
+    const text = tierHasDiscount && discount > 0
+      ? `Join my group for ${event?.title ?? "this event"} and save ${discount}% on tickets! 🎉`
+      : `Join my group for ${event?.title ?? "this event"}! We're coordinating tickets together 🎉`;
     const url = shareUrl;
     if (channel === "whatsapp") window.open(`https://wa.me/?text=${encodeURIComponent(text + "\n" + url)}`);
     else if (channel === "sms") window.open(`sms:?body=${encodeURIComponent(text + "\n" + url)}`);
@@ -254,7 +264,9 @@ function CreateGroupInner() {
               <p className="font-mono text-[10px] uppercase tracking-widest text-marigold font-bold mb-1">Step 1 of 3 · Your info</p>
               <h1 className="font-display font-bold text-ink text-2xl mb-1">Start a Group Order</h1>
               <p className="font-ui text-ink-muted text-sm leading-relaxed">
-                You&rsquo;re the organizer — share your link with your crew. Everyone pays their own ticket and you all unlock the group discount together.
+                {tierHasDiscount
+                  ? "You're the host — share your link with your crew. Everyone pays their own ticket and you all unlock the group discount together."
+                  : "You're the host — share your link with your crew. Everyone buys their own ticket and you can all coordinate in one place."}
               </p>
             </div>
 
@@ -265,25 +277,27 @@ function CreateGroupInner() {
               </div>
             )}
 
-            <div className="rounded-2xl border border-aubergine/15 bg-aubergine/4 p-4">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-aubergine font-bold mb-3">How Group Discounts Work</p>
-              <div className="space-y-2">
-                {GROUP_TIERS.slice().reverse().map(tier => (
-                  <div key={tier.min} className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="w-7 h-7 rounded-full bg-aubergine/10 flex items-center justify-center">
-                        <span className="font-mono text-[10px] font-bold text-aubergine">{tier.min}+</span>
+            {tierHasDiscount && (
+              <div className="rounded-2xl border border-aubergine/15 bg-aubergine/4 p-4">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-aubergine font-bold mb-3">How Group Discounts Work</p>
+                <div className="space-y-2">
+                  {GROUP_TIERS.slice().reverse().map(tier => (
+                    <div key={tier.min} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-aubergine/10 flex items-center justify-center">
+                          <span className="font-mono text-[10px] font-bold text-aubergine">{tier.min}+</span>
+                        </div>
+                        <span className="font-ui text-sm text-ink">{tier.label}</span>
                       </div>
-                      <span className="font-ui text-sm text-ink">{tier.label}</span>
+                      <span className="font-display font-bold text-aubergine">{tier.discount}% off</span>
                     </div>
-                    <span className="font-display font-bold text-aubergine">{tier.discount}% off</span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <p className="font-ui text-xs text-ink-muted mt-3 pt-3 border-t border-aubergine/10">
+                  Everyone pays their own ticket at the discounted rate — no one person foots the bill.
+                </p>
               </div>
-              <p className="font-ui text-xs text-ink-muted mt-3 pt-3 border-t border-aubergine/10">
-                Everyone pays their own ticket at the discounted rate — no one person foots the bill.
-              </p>
-            </div>
+            )}
 
             <div className="grid grid-cols-2 gap-3">
               <div>
@@ -339,7 +353,11 @@ function CreateGroupInner() {
             <div>
               <p className="font-mono text-[10px] uppercase tracking-widest text-marigold font-bold mb-1">Step 2 of 3 · Your tickets</p>
               <h2 className="font-display font-bold text-ink text-2xl mb-1">Set up your group</h2>
-              <p className="font-ui text-ink-muted text-sm">Choose ticket type and how many people you&rsquo;re bringing.</p>
+              <p className="font-ui text-ink-muted text-sm">
+                {tierHasDiscount
+                  ? "Choose ticket type and how many people you're bringing."
+                  : "Choose your ticket type and set a target group size."}
+              </p>
             </div>
 
             {event.ticket_tiers.length > 0 && (
@@ -364,39 +382,52 @@ function CreateGroupInner() {
             )}
 
             <div>
-              <label className={labelCls}>How many people are you bringing?</label>
-              <div className="space-y-2">
-                {TARGET_OPTIONS.map(opt => {
-                  const disc = discountForTarget(opt.value);
-                  const discPrice = Math.round(unitPrice * (1 - disc / 100));
-                  const selected = targetSize === opt.value;
-                  return (
-                    <button
-                      key={opt.value}
-                      type="button"
-                      onClick={() => setTargetSize(opt.value)}
-                      className={`w-full flex items-center justify-between p-4 rounded-xl border-2 transition-all ${selected ? "border-marigold bg-marigold/5" : "border-ivory-200 bg-white hover:border-marigold/30"}`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`w-5 h-5 rounded-full border-2 flex items-center justify-center ${selected ? "border-marigold" : "border-ivory-200"}`}>
-                          {selected && <div className="w-2.5 h-2.5 rounded-full bg-marigold" />}
-                        </div>
-                        <div className="text-left">
-                          <p className="font-display font-bold text-sm text-ink">{opt.label}</p>
-                          <p className={`font-mono text-[10px] ${selected ? "text-marigold-dark" : "text-ink-muted"}`}>{opt.sub}</p>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <p className={`font-display font-bold text-sm ${selected ? "text-peacock" : "text-ink-muted"}`}>${discPrice}</p>
-                        {disc > 0 && <p className="font-mono text-[10px] text-ink-muted line-through">${unitPrice}</p>}
-                      </div>
-                    </button>
-                  );
-                })}
+              <label className={labelCls}>How many tickets for you?</label>
+              <div className="flex items-center gap-3">
+                <button type="button" onClick={() => setHostQty(q => Math.max(1, q - 1))}
+                  className="w-11 h-11 rounded-xl border border-ivory-200 flex items-center justify-center font-bold text-xl text-ink hover:border-aubergine hover:text-aubergine transition-all">−</button>
+                <span className="font-display font-bold text-3xl text-ink w-10 text-center">{hostQty}</span>
+                <button type="button" onClick={() => setHostQty(q => Math.min(20, q + 1))}
+                  className="w-11 h-11 rounded-xl border border-ivory-200 flex items-center justify-center font-bold text-xl text-ink hover:border-aubergine hover:text-aubergine transition-all">+</button>
               </div>
+              <p className="font-ui text-xs text-ink-muted mt-1.5">Just your own tickets — group members set theirs when they join.</p>
             </div>
 
-            {discount > 0 && (
+            <div>
+              <label className={labelCls}>Notes for your group <span className="text-ink-muted/50 normal-case font-ui font-normal">(optional)</span></label>
+              <textarea
+                rows={2}
+                value={hostNotes}
+                onChange={e => setHostNotes(e.target.value)}
+                placeholder="e.g. I'm bringing my parents too 🎉"
+                className={`${inputCls} resize-none`}
+              />
+            </div>
+
+            <div>
+              <label className={labelCls}>How many people are you aiming to bring?</label>
+              <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setTargetSize(s => Math.max(2, s - 1))}
+                  className="w-12 h-12 rounded-xl border border-ivory-200 flex items-center justify-center font-bold text-xl text-ink hover:border-aubergine hover:text-aubergine transition-all"
+                >−</button>
+                <span className="font-display font-bold text-4xl text-ink w-16 text-center" style={{ letterSpacing: "-0.03em" }}>
+                  {targetSize}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setTargetSize(s => Math.min(100, s + 1))}
+                  className="w-12 h-12 rounded-xl border border-ivory-200 flex items-center justify-center font-bold text-xl text-ink hover:border-aubergine hover:text-aubergine transition-all"
+                >+</button>
+              </div>
+              <p className="font-ui text-xs text-ink-muted mt-3 leading-relaxed">
+                This is just a target — your group can end up larger or smaller, and that&apos;s totally fine. It gives the event organizer a sense of demand
+                {tierHasDiscount ? " and may unlock private discounts for bigger groups." : "."}
+              </p>
+            </div>
+
+            {tierHasDiscount && discount > 0 && (
               <div className="rounded-xl bg-peacock/8 border border-peacock/20 p-4">
                 <p className="font-display font-bold text-peacock text-base mb-1">
                   Your group saves ${totalSavings.toLocaleString()} total
@@ -436,7 +467,10 @@ function CreateGroupInner() {
               <p className="font-mono text-[10px] uppercase tracking-widest text-marigold font-bold mb-1">Group Created</p>
               <h2 className="font-display font-bold text-ink text-2xl mb-1">Your group link is ready!</h2>
               <p className="font-ui text-ink-muted text-sm">
-                Share this with your crew. When {targetSize} people join, everyone pays <strong className="text-ink">${discountedPrice}</strong> per ticket ({discount}% off).
+                {tierHasDiscount && discount > 0
+                  ? <>Share this with your crew. When {targetSize} people join, everyone pays <strong className="text-ink">${discountedPrice}</strong> per ticket ({discount}% off).</>
+                  : <>Share this with your crew. When {targetSize} people join, everyone can buy their ticket at <strong className="text-ink">${unitPrice}</strong> together.</>
+                }
               </p>
             </div>
 
@@ -484,7 +518,8 @@ function CreateGroupInner() {
                   {firstName[0]?.toUpperCase()}
                 </div>
                 <p className="font-ui text-sm text-ink-muted">
-                  <strong className="text-ink">{firstName}</strong> (you) · Need {targetSize - 1} more to unlock {discount}% off
+                  <strong className="text-ink">{firstName}</strong> (you) · Need {targetSize - 1} more
+                  {tierHasDiscount && discount > 0 ? ` to unlock ${discount}% off` : " to complete the group"}
                 </p>
               </div>
             </div>
@@ -499,7 +534,8 @@ function CreateGroupInner() {
             </div>
 
             <p className="text-center font-mono text-[10px] text-ink-muted">
-              Group link expires in 7 days · Discount locks when {targetSize} people join
+              Group link expires in 7 days
+              {tierHasDiscount && discount > 0 && ` · Discount locks when ${targetSize} people join`}
             </p>
           </div>
         )}

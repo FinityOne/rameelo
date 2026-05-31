@@ -4,6 +4,9 @@ export interface GroupMember {
   name: string;
   email: string;
   phone?: string;
+  qty: number;
+  notes?: string;
+  tierId?: string;   // member's chosen tier (falls back to group tier if null)
   isOrganizer: boolean;
   paid: boolean;
   joinedAt: string;
@@ -74,6 +77,8 @@ export async function createGroupOrder(params: {
   targetSize: number;
   discountPct: number;
   deadline: string;
+  hostQty: number;
+  hostNotes?: string;
 }): Promise<{ error: string | null }> {
   const supabase = createClient();
 
@@ -98,7 +103,9 @@ export async function createGroupOrder(params: {
     user_id: params.organizerUserId,
     name: params.organizerName,
     email: params.organizerEmail,
-    phone: params.organizerPhone,
+    phone: params.organizerPhone || null,
+    qty: params.hostQty,
+    notes: params.hostNotes || null,
     is_organizer: true,
     paid: false,
   });
@@ -130,14 +137,18 @@ export async function loadGroupOrder(groupId: string): Promise<GroupOrder | null
 
   const { data: membersData } = await supabase
     .from("group_order_members")
-    .select("name, email, phone, is_organizer, paid, joined_at")
+    .select("name, email, phone, qty, notes, member_tier_id, is_organizer, paid, joined_at")
     .eq("group_id", groupId)
     .order("joined_at");
 
-  const members: GroupMember[] = (membersData ?? []).map(m => ({
+  type MemberRow = { name: string; email: string; phone: string | null; qty: number; notes: string | null; member_tier_id: string | null; is_organizer: boolean; paid: boolean; joined_at: string };
+  const members: GroupMember[] = ((membersData ?? []) as unknown as MemberRow[]).map(m => ({
     name: m.name,
     email: m.email,
     phone: m.phone ?? undefined,
+    qty: m.qty ?? 1,
+    notes: m.notes ?? undefined,
+    tierId: m.member_tier_id ?? undefined,
     isOrganizer: m.is_organizer,
     paid: m.paid,
     joinedAt: m.joined_at,
@@ -175,30 +186,60 @@ export async function joinGroupOrder(params: {
   userId: string | null;
   name: string;
   email: string;
-  phone: string;
+  phone?: string;
+  qty: number;
+  tierId?: string;
+  notes?: string;
 }): Promise<{ error: string | null }> {
   const supabase = createClient();
 
-  // Check if already in this group by email
+  // If already in this group by email, update their record instead
   const { data: existing } = await supabase
     .from("group_order_members")
-    .select("id")
+    .select("id, paid")
     .eq("group_id", params.groupId)
     .eq("email", params.email)
-    .single();
+    .maybeSingle();
 
-  if (existing) return { error: null }; // Already joined — idempotent
+  if (existing) {
+    if (existing.paid) return { error: null }; // paid — nothing to change
+    await supabase
+      .from("group_order_members")
+      .update({ qty: params.qty, notes: params.notes ?? null, member_tier_id: params.tierId ?? null })
+      .eq("group_id", params.groupId)
+      .eq("email", params.email);
+    return { error: null };
+  }
 
   const { error } = await supabase.from("group_order_members").insert({
     group_id: params.groupId,
     user_id: params.userId,
     name: params.name,
     email: params.email,
-    phone: params.phone,
+    phone: params.phone || null,
+    qty: params.qty,
+    notes: params.notes || null,
+    member_tier_id: params.tierId ?? null,
     is_organizer: false,
     paid: false,
   });
 
+  return { error: error?.message ?? null };
+}
+
+export async function updateGroupMember(params: {
+  groupId: string;
+  email: string;
+  qty: number;
+  notes?: string;
+}): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("group_order_members")
+    .update({ qty: params.qty, notes: params.notes ?? null })
+    .eq("group_id", params.groupId)
+    .eq("email", params.email)
+    .eq("paid", false);
   return { error: error?.message ?? null };
 }
 
@@ -306,12 +347,14 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
       if (o.group_id) {
         const { data: members } = await supabase
           .from("group_order_members")
-          .select("name, email, is_organizer, paid, joined_at")
+          .select("name, email, qty, notes, is_organizer, paid, joined_at")
           .eq("group_id", o.group_id)
           .order("joined_at");
         groupMembers = (members ?? []).map(m => ({
           name: m.name,
           email: m.email,
+          qty: (m as unknown as Record<string, number>).qty ?? 1,
+          notes: (m as unknown as Record<string, string | null>).notes ?? undefined,
           isOrganizer: m.is_organizer,
           paid: m.paid,
           joinedAt: m.joined_at,
