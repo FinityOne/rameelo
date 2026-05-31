@@ -3,7 +3,7 @@
 import type { EventFormData, TicketTier } from "./types";
 import { EMPTY_TIER } from "./types";
 
-const PLATFORM_FEE_PCT = 0.05; // 5% example
+const PLATFORM_FEE_PCT = 0.03;
 const PAYMENT_FEE_PCT = 0.029;
 const PAYMENT_FEE_FLAT = 0.30;
 
@@ -189,7 +189,10 @@ function TierCard({ tier, idx, total, onChange, onRemove }: {
         {/* Transparent pricing preview */}
         {price > 0 && (
           <div className="rounded-xl border border-aubergine/15 bg-aubergine/5 p-4">
-            <p className="font-mono text-[9px] uppercase tracking-widest text-aubergine/60 mb-3">What your attendee sees at checkout</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="font-mono text-[9px] uppercase tracking-widest text-aubergine/60">What your attendee sees at checkout</p>
+              <p className="font-mono text-[9px] text-peacock font-bold">You receive: ${price.toFixed(2)}</p>
+            </div>
             <div className="space-y-1.5">
               <div className="flex justify-between font-ui text-sm">
                 <span className="text-ink-muted">Ticket price</span>

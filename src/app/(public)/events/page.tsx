@@ -167,30 +167,27 @@ function EventCard({ event }: { event: EventVM }) {
 
         <div className="flex items-center justify-between pt-2 border-t border-ivory-200">
           <div>
-            {!event.sellingOnRameelo ? (
-              <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Interest only</span>
-            ) : event.minPrice === null ? (
+            {event.minPrice === null ? (
               <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Tickets TBA</span>
             ) : event.minPrice === 0 ? (
               <span className="font-display font-bold text-peacock text-sm">Complimentary</span>
             ) : (
-              <>
+              <div className="flex items-baseline gap-1">
                 <span className="font-display font-bold text-ink text-base">From ${event.minPrice}</span>
                 {event.maxPrice !== null && event.maxPrice > event.minPrice && (
-                  <span className="text-ink-muted text-xs ml-1">– ${event.maxPrice}</span>
+                  <span className="text-ink-muted text-xs">– ${event.maxPrice}</span>
                 )}
-              </>
+                {!event.sellingOnRameelo && (
+                  <span className="font-mono text-[8px] uppercase tracking-widest bg-marigold/20 text-marigold-dark px-1.5 py-0.5 rounded-full ml-1">Soon</span>
+                )}
+              </div>
             )}
           </div>
           <Link
             href={`/events/${event.id}`}
-            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
-              event.sellingOnRameelo
-                ? "bg-marigold text-aubergine hover:bg-[#d4891b]"
-                : "bg-aubergine/8 text-aubergine border border-aubergine/20 hover:bg-aubergine/15"
-            }`}
+            className="px-3.5 py-2 rounded-xl text-xs font-semibold transition-all bg-marigold text-aubergine hover:bg-[#d4891b]"
           >
-            {event.sellingOnRameelo ? "Get Tickets" : "Express Interest"}
+            {event.sellingOnRameelo ? "Get Tickets" : "Get Early Access"}
           </Link>
         </div>
       </div>
@@ -328,6 +325,8 @@ export default function EventsPage() {
       );
     }
     result.sort((a, b) => {
+      const selling = (b.sellingOnRameelo ? 1 : 0) - (a.sellingOnRameelo ? 1 : 0);
+      if (selling !== 0) return selling;
       if (sort === 'Date: Soonest') return a.date.localeCompare(b.date);
       if (sort === 'Price: Low to High') return (a.minPrice ?? 0) - (b.minPrice ?? 0);
       if (sort === 'Price: High to Low') return (b.minPrice ?? 0) - (a.minPrice ?? 0);
@@ -369,53 +368,39 @@ export default function EventsPage() {
             Garba, Dandiya, and Navratri events across the USA — from Edison to LA. Browse and get tickets in seconds.
           </p>
 
-          {/* Airbnb-style search pill */}
-          <div ref={pillRef} className="relative max-w-xl">
-            <div className="flex items-stretch bg-white rounded-full shadow-lg overflow-visible border border-white/10">
+          {/* Filter pill — desktop: inline dropdowns / mobile: tap-through chips */}
+          <div ref={pillRef} className="w-full max-w-xl">
 
-              {/* Search segment */}
-              <div className="flex items-center gap-2.5 px-4 py-3 flex-1 min-w-0">
-                <svg className="w-4 h-4 text-aubergine/40 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                <input
-                  type="text"
-                  value={search}
-                  onChange={e => { setSearch(e.target.value); setShowAll(false); setOpenPanel(null); }}
-                  placeholder="Events, artists, venues…"
-                  className="flex-1 min-w-0 font-ui text-sm text-aubergine placeholder-aubergine/35 outline-none bg-transparent"
-                />
-              </div>
-
-              {/* Divider */}
-              <div className="w-px bg-ivory-200 my-2.5 shrink-0" />
+            {/* Desktop pill */}
+            <div className="hidden sm:flex items-stretch bg-white rounded-full shadow-lg border border-white/10 overflow-visible">
 
               {/* Location segment */}
-              <div className="relative shrink-0">
+              <div className="relative flex-1">
                 <button
                   type="button"
                   onClick={() => setOpenPanel(openPanel === 'location' ? null : 'location')}
-                  className={`flex items-center gap-1.5 px-4 py-3 h-full whitespace-nowrap transition-colors ${openPanel === 'location' ? 'bg-ivory/60' : 'hover:bg-ivory/40'}`}
+                  className={`flex items-center gap-2 px-5 py-3 w-full h-full whitespace-nowrap transition-colors rounded-l-full ${openPanel === 'location' ? 'bg-ivory/60' : 'hover:bg-ivory/40'}`}
                 >
                   <span className="text-sm leading-none">📍</span>
-                  <span className="font-ui text-sm text-aubergine font-medium truncate max-w-[100px]">{locationLabel}</span>
+                  <span className="font-ui text-sm text-aubergine font-medium truncate">{locationLabel}</span>
                   {chevron}
                 </button>
 
                 {openPanel === 'location' && (
-                  <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 bg-white rounded-2xl shadow-xl border border-ivory-200 overflow-hidden z-50 min-w-[180px]">
+                  <div className="absolute top-[calc(100%+8px)] left-0 bg-white rounded-2xl shadow-xl border border-ivory-200 overflow-hidden z-50 w-52">
                     <div className="px-3 py-2 border-b border-ivory-200">
                       <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Location</p>
                     </div>
-                    <div className="max-h-60 overflow-y-auto py-1.5">
+                    <div className="max-h-64 overflow-y-auto overscroll-contain py-1.5">
                       {cities.map(c => (
                         <button key={c} type="button"
                           onClick={() => { setActiveCity(c); setOpenPanel(null); setShowAll(false); }}
                           className={`w-full text-left px-4 py-2.5 font-ui text-sm transition-colors flex items-center gap-2.5 ${
                             activeCity === c ? 'text-aubergine font-semibold bg-marigold/8' : 'text-ink hover:bg-ivory'
                           }`}>
-                          {activeCity === c && <span className="w-1.5 h-1.5 rounded-full bg-marigold shrink-0" />}
-                          {activeCity !== c && <span className="w-1.5 h-1.5 shrink-0" />}
+                          {activeCity === c
+                            ? <span className="w-1.5 h-1.5 rounded-full bg-marigold shrink-0" />
+                            : <span className="w-1.5 h-1.5 shrink-0" />}
                           {c === 'All Cities' ? 'Anywhere' : c}
                           {c === 'All Cities' && geoCity && (
                             <span className="ml-auto font-mono text-[9px] text-ink-muted/60">Near {geoCity}</span>
@@ -427,22 +412,21 @@ export default function EventsPage() {
                 )}
               </div>
 
-              {/* Divider */}
               <div className="w-px bg-ivory-200 my-2.5 shrink-0" />
 
               {/* Category segment */}
-              <div className="relative shrink-0">
+              <div className="relative flex-1">
                 <button
                   type="button"
                   onClick={() => setOpenPanel(openPanel === 'category' ? null : 'category')}
-                  className={`flex items-center gap-1.5 px-4 py-3 h-full whitespace-nowrap transition-colors ${openPanel === 'category' ? 'bg-ivory/60' : 'hover:bg-ivory/40'}`}
+                  className={`flex items-center gap-2 px-5 py-3 w-full h-full whitespace-nowrap transition-colors ${openPanel === 'category' ? 'bg-ivory/60' : 'hover:bg-ivory/40'}`}
                 >
                   <span className="font-ui text-sm text-aubergine font-medium">{categoryLabel}</span>
                   {chevron}
                 </button>
 
                 {openPanel === 'category' && (
-                  <div className="absolute top-[calc(100%+8px)] left-1/2 -translate-x-1/2 bg-white rounded-2xl shadow-xl border border-ivory-200 overflow-hidden z-50 min-w-[160px]">
+                  <div className="absolute top-[calc(100%+8px)] right-0 bg-white rounded-2xl shadow-xl border border-ivory-200 overflow-hidden z-50 w-44">
                     <div className="px-3 py-2 border-b border-ivory-200">
                       <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Event type</p>
                     </div>
@@ -453,8 +437,9 @@ export default function EventsPage() {
                           className={`w-full text-left px-4 py-2.5 font-ui text-sm transition-colors flex items-center gap-2.5 ${
                             activeCategory === cat ? 'text-aubergine font-semibold bg-marigold/8' : 'text-ink hover:bg-ivory'
                           }`}>
-                          {activeCategory === cat && <span className="w-1.5 h-1.5 rounded-full bg-marigold shrink-0" />}
-                          {activeCategory !== cat && <span className="w-1.5 h-1.5 shrink-0" />}
+                          {activeCategory === cat
+                            ? <span className="w-1.5 h-1.5 rounded-full bg-marigold shrink-0" />
+                            : <span className="w-1.5 h-1.5 shrink-0" />}
                           {cat}
                         </button>
                       ))}
@@ -463,7 +448,6 @@ export default function EventsPage() {
                 )}
               </div>
 
-              {/* Search button */}
               <div className="p-1.5 shrink-0">
                 <button
                   type="button"
@@ -478,9 +462,52 @@ export default function EventsPage() {
               </div>
             </div>
 
-            {/* Active filter chips below pill */}
-            {(search || activeCity !== 'All Cities' || activeCategory !== 'All') && (
-              <div className="flex flex-wrap gap-2 mt-3">
+            {/* Mobile: vibe pills + city chips */}
+            <div className="sm:hidden space-y-3">
+              {/* Vibe row */}
+              <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-0.5">
+                {(['All', 'Garba', 'Dandiya', 'Raas', 'Workshop'] as const).map(cat => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => { setActiveCategory(cat === 'All' ? 'All' : cat); setShowAll(false); }}
+                    className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full border shrink-0 transition-all active:scale-95 ${
+                      (cat === 'All' ? activeCategory === 'All' : activeCategory === cat)
+                        ? 'bg-marigold border-marigold text-aubergine font-bold'
+                        : 'border-white/25 bg-white/10 text-white/80'
+                    }`}
+                    style={{ minHeight: 44 }}
+                  >
+                    <span className="font-ui text-sm font-medium">{cat === 'All' ? '✨ All' : cat}</span>
+                  </button>
+                ))}
+              </div>
+
+              {/* City chips grid */}
+              <div className="grid grid-cols-3 gap-2">
+                {['All Cities', ...cities.filter(c => c !== 'All Cities').slice(0, 8)].map(c => (
+                  <button
+                    key={c}
+                    type="button"
+                    onClick={() => { setActiveCity(c); setShowAll(false); }}
+                    className={`py-2.5 px-2 rounded-xl border text-center transition-all active:scale-95 ${
+                      activeCity === c
+                        ? 'border-marigold bg-marigold/20 text-white font-semibold'
+                        : 'border-white/20 bg-white/8 text-white/70'
+                    }`}
+                    style={{ minHeight: 44 }}
+                  >
+                    <span className="font-ui text-xs font-medium leading-tight block">
+                      {c === 'All Cities' ? '📍 All' : c}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Active filter chips (desktop) */}
+            {(activeCity !== 'All Cities' || activeCategory !== 'All') && (
+              <div className="hidden sm:flex flex-wrap gap-2 mt-3">
                 {activeCity !== 'All Cities' && (
                   <button onClick={() => { setActiveCity('All Cities'); setShowAll(false); }}
                     className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-white/15 text-white hover:bg-white/25 transition-colors backdrop-blur-sm">
@@ -491,12 +518,6 @@ export default function EventsPage() {
                   <button onClick={() => { setActiveCategory('All'); setShowAll(false); }}
                     className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-white/15 text-white hover:bg-white/25 transition-colors backdrop-blur-sm">
                     {activeCategory} <span className="opacity-60">×</span>
-                  </button>
-                )}
-                {search && (
-                  <button onClick={() => { setSearch(''); setShowAll(false); }}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-white/15 text-white hover:bg-white/25 transition-colors backdrop-blur-sm">
-                    &ldquo;{search}&rdquo; <span className="opacity-60">×</span>
                   </button>
                 )}
               </div>

@@ -25,11 +25,7 @@ type RawOrder = {
   created_at: string;
 };
 
-type MonthBucket = { label: string; gross: number; payout: number };
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const RAMEELO_FEE_PCT = 0.03;
+type MonthBucket = { label: string; gross: number };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -60,24 +56,24 @@ const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct
 // ── Monthly bar chart ─────────────────────────────────────────────────────────
 
 function MonthlyChart({ buckets }: { buckets: MonthBucket[] }) {
-  const maxVal = Math.max(...buckets.map(b => b.payout), 1);
-  const hasAny = buckets.some(b => b.payout > 0);
+  const maxVal = Math.max(...buckets.map(b => b.gross), 1);
+  const hasAny = buckets.some(b => b.gross > 0);
   if (!hasAny) return null;
 
   return (
     <div className="bg-white rounded-2xl border border-ivory-200 p-5">
-      <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-4">Monthly Earnings</p>
+      <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-4">Monthly Revenue</p>
       <div className="flex items-end gap-1.5 h-24">
         {buckets.map((b, i) => {
-          const heightPct = maxVal > 0 ? (b.payout / maxVal) * 100 : 0;
+          const heightPct = maxVal > 0 ? (b.gross / maxVal) * 100 : 0;
           const isNow = i === new Date().getMonth() && new Date().getFullYear() === parseInt(b.label.split(" ")[1] ?? "0");
           return (
             <div key={b.label} className="flex-1 flex flex-col items-center gap-1 group relative">
-              {b.payout > 0 && (
+              {b.gross > 0 && (
                 <div
                   className="absolute -top-7 left-1/2 -translate-x-1/2 bg-aubergine text-white font-mono text-[8px] px-1.5 py-0.5 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10"
                 >
-                  {fmtMoney(b.payout, true)}
+                  {fmtMoney(b.gross, true)}
                 </div>
               )}
               <div className="w-full flex items-end" style={{ height: 80 }}>
@@ -85,9 +81,9 @@ function MonthlyChart({ buckets }: { buckets: MonthBucket[] }) {
                   className="w-full rounded-t transition-all duration-500"
                   style={{
                     height: `${heightPct}%`,
-                    minHeight: b.payout > 0 ? 3 : 0,
-                    backgroundColor: isNow ? "#F5A623" : b.payout > 0 ? "#0E8C7A" : "#EBE6DB",
-                    opacity: b.payout > 0 ? 1 : 0.4,
+                    minHeight: b.gross > 0 ? 3 : 0,
+                    backgroundColor: isNow ? "#F5A623" : b.gross > 0 ? "#0E8C7A" : "#EBE6DB",
+                    opacity: b.gross > 0 ? 1 : 0.4,
                   }}
                 />
               </div>
@@ -163,7 +159,6 @@ export default function OrganizerFinancialsPage() {
   // Filters
   const [selectedYear, setSelectedYear]   = useState<number>(new Date().getFullYear());
   const [selectedEvent, setSelectedEvent] = useState<string>("all");
-  const [showFeeNote, setShowFeeNote]     = useState(false);
 
   useEffect(() => {
     async function load() {
@@ -217,19 +212,16 @@ export default function OrganizerFinancialsPage() {
 
   // ── Aggregates ────────────────────────────────────────────────────────────
   const totalGross   = filteredOrders.reduce((s, o) => s + ticketSubtotal(o), 0);
-  const rameeloFee   = Math.round(totalGross * RAMEELO_FEE_PCT * 100) / 100;
-  const netPayout    = totalGross - rameeloFee;
   const totalTickets = filteredOrders.reduce((s, o) => s + o.qty, 0);
   const totalOrders  = filteredOrders.length;
-  const avgOrder     = totalOrders > 0 ? netPayout / totalOrders : 0;
+  const avgOrder     = totalOrders > 0 ? totalGross / totalOrders : 0;
 
   // ── Monthly buckets ───────────────────────────────────────────────────────
   const monthlyBuckets = useMemo<MonthBucket[]>(() => {
     return MONTHS_SHORT.map((label, i) => {
       const monthOrders = filteredOrders.filter(o => new Date(o.created_at).getMonth() === i);
-      const gross  = monthOrders.reduce((s, o) => s + ticketSubtotal(o), 0);
-      const payout = gross * (1 - RAMEELO_FEE_PCT);
-      return { label, gross, payout };
+      const gross = monthOrders.reduce((s, o) => s + ticketSubtotal(o), 0);
+      return { label, gross };
     });
   }, [filteredOrders]);
 
@@ -239,10 +231,8 @@ export default function OrganizerFinancialsPage() {
     return relevantEvents.map(ev => {
       const evOrders = filteredOrders.filter(o => o.event_id === ev.id);
       const gross    = evOrders.reduce((s, o) => s + ticketSubtotal(o), 0);
-      const fee      = Math.round(gross * RAMEELO_FEE_PCT * 100) / 100;
-      const payout   = gross - fee;
       const tickets  = evOrders.reduce((s, o) => s + o.qty, 0);
-      return { ev, orders: evOrders.length, tickets, gross, fee, payout };
+      return { ev, orders: evOrders.length, tickets, gross };
     }).filter(row => row.orders > 0 || selectedEvent === row.ev.id);
   }, [allEvents, filteredOrders, selectedEvent]);
 
@@ -323,50 +313,24 @@ export default function OrganizerFinancialsPage() {
             </div>
           )}
 
-          {/* ── Hero payout block ── */}
+          {/* ── Hero revenue block ── */}
           <div className="rounded-2xl overflow-hidden border border-ivory-200">
-            {/* Main hero */}
             <div className="bg-white px-6 py-6 flex flex-col sm:flex-row sm:items-end justify-between gap-6">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2">
-                  Your take-home · {selectedYear}{selectedEvent !== "all" && ` · ${allEvents.find(e => e.id === selectedEvent)?.title ?? ""}`}
+                  Your revenue · {selectedYear}{selectedEvent !== "all" && ` · ${allEvents.find(e => e.id === selectedEvent)?.title ?? ""}`}
                 </p>
-                <div className="flex items-baseline gap-3">
-                  <p className="font-display font-bold text-peacock"
-                    style={{ fontSize: 48, letterSpacing: "-0.04em", lineHeight: 1 }}>
-                    {fmtMoney(netPayout)}
+                <p className="font-display font-bold text-peacock"
+                  style={{ fontSize: 48, letterSpacing: "-0.04em", lineHeight: 1 }}>
+                  {fmtMoney(totalGross)}
+                </p>
+                {totalGross > 0 && (
+                  <p className="font-mono text-[9px] text-ink-muted mt-1.5">
+                    You keep 100% of face value — the 3% Rameelo fee is charged to buyers at checkout.
                   </p>
-                  {totalGross > 0 && (
-                    <div className="pb-1">
-                      <p className="font-mono text-[9px] text-ink-muted leading-snug">from {fmtMoney(totalGross)} in ticket sales</p>
-                      <button
-                        onClick={() => setShowFeeNote(!showFeeNote)}
-                        className="font-mono text-[9px] text-ink-muted/60 hover:text-ink-muted underline decoration-dotted transition-colors"
-                      >
-                        {showFeeNote ? "hide details" : "how is this calculated?"}
-                      </button>
-                    </div>
-                  )}
-                </div>
-
-                {/* Inline fee note — shown on demand, subtle */}
-                {showFeeNote && (
-                  <div className="mt-3 flex items-start gap-2.5 bg-ivory rounded-xl px-4 py-3 max-w-sm">
-                    <svg className="w-3.5 h-3.5 text-ink-muted shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                    <div>
-                      <p className="font-ui text-xs text-ink leading-relaxed">
-                        Ticket sales of <strong>{fmtMoney(totalGross)}</strong> minus a 3% Rameelo platform fee
-                        (<strong>{fmtMoney(rameeloFee)}</strong>) = <strong className="text-peacock">{fmtMoney(netPayout)}</strong> payout.
-                      </p>
-                      <p className="font-mono text-[9px] text-ink-muted/70 mt-1">
-                        Platform fee covers: secure checkout, QR ticket delivery, group ordering, and buyer support — so you don&apos;t have to.
-                      </p>
-                    </div>
-                  </div>
                 )}
               </div>
 
-              {/* Right side KPIs */}
               <div className="flex gap-5 shrink-0">
                 {[
                   { label: "Tickets Sold",  value: totalTickets.toLocaleString() },
@@ -381,17 +345,16 @@ export default function OrganizerFinancialsPage() {
               </div>
             </div>
 
-            {/* Payout pending banner */}
-            {netPayout > 0 && (
+            {totalGross > 0 && (
               <div className="bg-peacock/8 border-t border-peacock/20 px-6 py-3 flex items-center justify-between gap-4">
                 <div className="flex items-center gap-2">
                   <svg className="w-4 h-4 text-peacock shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" /></svg>
                   <p className="font-ui text-sm text-peacock font-semibold">
-                    <strong>{fmtMoney(netPayout)}</strong> confirmed earnings
+                    <strong>{fmtMoney(totalGross)}</strong> confirmed earnings
                   </p>
                 </div>
                 <p className="font-mono text-[9px] text-peacock/70 text-right hidden sm:block">
-                  Payouts transferred via your connected payout method after each event
+                  Transferred to your connected payout method after each event
                 </p>
               </div>
             )}
@@ -420,9 +383,7 @@ export default function OrganizerFinancialsPage() {
                     <tr className="border-b border-ivory-200">
                       <th className="px-5 py-3 text-left font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal">Event</th>
                       <th className="px-4 py-3 text-center font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal">Tickets</th>
-                      <th className="px-4 py-3 text-right font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal">Ticket Sales</th>
-                      <th className="px-4 py-3 text-right font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal opacity-60">Platform</th>
-                      <th className="px-5 py-3 text-right font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal">Your Payout</th>
+                      <th className="px-5 py-3 text-right font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal">Revenue</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-ivory-200">
@@ -431,34 +392,21 @@ export default function OrganizerFinancialsPage() {
                       return (
                         <tr key={row.ev.id} className="hover:bg-ivory/50 transition-colors">
                           <td className="px-5 py-4">
-                            <div className="flex items-start gap-3">
-                              <div>
-                                <div className="flex items-center gap-2 mb-0.5">
-                                  <p className="font-ui text-sm font-semibold text-ink">{row.ev.title}</p>
-                                  <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 ${pill.cls}`}>
-                                    {pill.label}
-                                  </span>
-                                </div>
-                                <p className="font-mono text-[9px] text-ink-muted">{fmtDate(row.ev.start_date)}</p>
-                              </div>
+                            <div className="flex items-center gap-2 mb-0.5">
+                              <p className="font-ui text-sm font-semibold text-ink">{row.ev.title}</p>
+                              <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 ${pill.cls}`}>
+                                {pill.label}
+                              </span>
                             </div>
+                            <p className="font-mono text-[9px] text-ink-muted">{fmtDate(row.ev.start_date)}</p>
                           </td>
                           <td className="px-4 py-4 text-center">
                             <p className="font-display font-bold text-ink" style={{ letterSpacing: "-0.02em" }}>{row.tickets}</p>
                             <p className="font-mono text-[9px] text-ink-muted">{row.orders} order{row.orders !== 1 ? "s" : ""}</p>
                           </td>
-                          <td className="px-4 py-4 text-right">
-                            <p className="font-ui text-sm text-ink">{fmtMoney(row.gross)}</p>
-                          </td>
-                          {/* Fee column — visually de-emphasized */}
-                          <td className="px-4 py-4 text-right">
-                            <p className="font-mono text-[10px] text-ink-muted/60">
-                              {row.gross > 0 ? `−${fmtMoney(row.fee)}` : "—"}
-                            </p>
-                          </td>
                           <td className="px-5 py-4 text-right">
                             <p className="font-display font-bold text-peacock text-base" style={{ letterSpacing: "-0.02em" }}>
-                              {row.gross > 0 ? fmtMoney(row.payout) : "—"}
+                              {row.gross > 0 ? fmtMoney(row.gross) : "—"}
                             </p>
                           </td>
                         </tr>
@@ -466,21 +414,14 @@ export default function OrganizerFinancialsPage() {
                     })}
                   </tbody>
 
-                  {/* Totals row */}
                   {eventBreakdown.length > 1 && (
                     <tfoot>
                       <tr className="border-t-2 border-ivory-200 bg-ivory">
                         <td className="px-5 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted" colSpan={2}>
                           Total · {selectedYear}
                         </td>
-                        <td className="px-4 py-3 text-right font-ui text-sm font-semibold text-ink">
-                          {fmtMoney(totalGross)}
-                        </td>
-                        <td className="px-4 py-3 text-right font-mono text-[10px] text-ink-muted/60">
-                          {totalGross > 0 ? `−${fmtMoney(rameeloFee)}` : "—"}
-                        </td>
                         <td className="px-5 py-3 text-right font-display font-bold text-peacock text-base" style={{ letterSpacing: "-0.02em" }}>
-                          {fmtMoney(netPayout)}
+                          {fmtMoney(totalGross)}
                         </td>
                       </tr>
                     </tfoot>
@@ -506,14 +447,9 @@ export default function OrganizerFinancialsPage() {
                             {fmtDate(row.ev.start_date)} · {row.tickets} tickets · {row.orders} orders
                           </p>
                         </div>
-                        <div className="text-right shrink-0">
-                          <p className="font-display font-bold text-peacock text-base" style={{ letterSpacing: "-0.02em" }}>
-                            {row.gross > 0 ? fmtMoney(row.payout) : "—"}
-                          </p>
-                          {row.gross > 0 && (
-                            <p className="font-mono text-[9px] text-ink-muted/60">from {fmtMoney(row.gross)}</p>
-                          )}
-                        </div>
+                        <p className="font-display font-bold text-peacock text-base shrink-0" style={{ letterSpacing: "-0.02em" }}>
+                          {row.gross > 0 ? fmtMoney(row.gross) : "—"}
+                        </p>
                       </div>
                     </div>
                   );
@@ -521,7 +457,7 @@ export default function OrganizerFinancialsPage() {
                 {eventBreakdown.length > 1 && totalGross > 0 && (
                   <div className="px-4 py-4 bg-ivory flex items-center justify-between">
                     <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Total {selectedYear}</p>
-                    <p className="font-display font-bold text-peacock" style={{ letterSpacing: "-0.02em" }}>{fmtMoney(netPayout)}</p>
+                    <p className="font-display font-bold text-peacock" style={{ letterSpacing: "-0.02em" }}>{fmtMoney(totalGross)}</p>
                   </div>
                 )}
               </div>

@@ -354,15 +354,11 @@ function RevenueBreakdown({ events }: { events: EventStat[] }) {
   const totalEarned = events.reduce((s, e) => s + e.earnedRevenue, 0);
   const totalMax = events.reduce((s, e) => s + e.maxRevenue, 0);
   const totalRemaining = totalMax - totalEarned;
-  const platformFee = Math.round(totalEarned * 0.03);
-  const payoutEstimate = totalEarned - platformFee;
 
   if (totalMax === 0) return null;
 
   const sections = [
-    { label: "Gross revenue", value: totalEarned, color: "#0E8C7A", sub: "tickets sold × face value" },
-    { label: "Platform fee (3%)", value: -platformFee, color: "#7C1F2C", sub: "Rameelo service fee" },
-    { label: "Est. payout", value: payoutEstimate, color: "#2E1B30", sub: "your take-home", bold: true },
+    { label: "Revenue to date", value: totalEarned, color: "#0E8C7A", sub: "tickets sold × face value", bold: true },
     { label: "Remaining potential", value: totalRemaining, color: "#D4891B", sub: "if remaining seats fill" },
   ];
 
@@ -371,7 +367,7 @@ function RevenueBreakdown({ events }: { events: EventStat[] }) {
       <div className="px-5 py-4 border-b border-ivory-200">
         <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Revenue breakdown</p>
         <p className="font-display font-semibold text-ink text-base mt-0.5" style={{ letterSpacing: "-0.015em" }}>
-          Where your money goes
+          Revenue picture
         </p>
       </div>
       <div className="p-5 space-y-3">
@@ -397,11 +393,11 @@ function RevenueBreakdown({ events }: { events: EventStat[] }) {
         <div className="mt-4 pt-4 border-t border-ivory-200 rounded-xl bg-ivory p-3">
           <div className="flex items-center justify-between">
             <div>
-              <p className="font-display font-bold text-ink text-sm" style={{ letterSpacing: "-0.02em" }}>Theoretical max payout</p>
-              <p className="font-mono text-[9px] text-ink-muted">if all remaining seats sell + fees</p>
+              <p className="font-display font-bold text-ink text-sm" style={{ letterSpacing: "-0.02em" }}>Max potential revenue</p>
+              <p className="font-mono text-[9px] text-ink-muted">if all remaining seats sell</p>
             </div>
             <p className="font-display font-bold text-aubergine text-xl" style={{ letterSpacing: "-0.03em" }}>
-              {fmtCurrency(Math.round(totalMax * 0.97))}
+              {fmtCurrency(totalMax)}
             </p>
           </div>
         </div>
@@ -575,7 +571,7 @@ export default function OrganizerSalesPage() {
 
           {/* Disclaimer */}
           <p className="font-mono text-[9px] text-ink-muted/50 -mt-2">
-            * Revenue figures are estimated as tickets sold × face value. Actual payouts reflect group discounts and Rameelo platform fees.
+            * Revenue figures are estimated as tickets sold × face value. You keep 100% — the 3% Rameelo fee is added to the buyer&apos;s checkout total.
           </p>
 
           <div className="grid lg:grid-cols-2 gap-5">

@@ -395,63 +395,139 @@ function UrgencyBanner({
 }
 
 // ── Tier Availability Bar ─────────────────────────────────────────────────────
-function TierAvailabilityBar({ tier, isSelected, onClick }: {
+
+function fmtShortDate(d: string) {
+  return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+function isTierNotStarted(tier: Tier): boolean {
+  if (!tier.sale_start_date) return false;
+  return new Date(tier.sale_start_date + "T00:00:00") > new Date();
+}
+
+function isTierExpired(tier: Tier): boolean {
+  if (!tier.sale_end_date) return false;
+  // treat end date as end of that day
+  const end = new Date(tier.sale_end_date + "T23:59:59");
+  return end < new Date();
+}
+
+function daysUntilDate(d: string): number {
+  return Math.ceil((new Date(d + "T00:00:00").getTime() - Date.now()) / 86400000);
+}
+
+function TierAvailabilityBar({ tier, isSelected, onClick, isBestDeal, isMostPopular }: {
   tier: Tier;
   isSelected: boolean;
   onClick: () => void;
+  isBestDeal: boolean;
+  isMostPopular: boolean;
 }) {
+  const notStarted = isTierNotStarted(tier);
+  const expired    = isTierExpired(tier);
+  const locked     = notStarted || expired;
+
   const rem  = tier.quantity - tier.quantity_sold;
-  const pct  = Math.round((tier.quantity_sold / tier.quantity) * 100);
-  const soldOut      = rem <= 0;
-  const almostGone   = !soldOut && rem <= Math.ceil(tier.quantity * 0.15);
-  const sellingFast  = !almostGone && pct >= 50;
+  const pct  = tier.quantity > 0 ? Math.round((tier.quantity_sold / tier.quantity) * 100) : 0;
+  const soldOut    = !locked && rem <= 0;
+  const almostGone = !soldOut && !locked && rem <= Math.ceil(tier.quantity * 0.15);
+  const sellingFast = !almostGone && !soldOut && !locked && pct >= 50;
 
-  const barColor = soldOut ? "#6B5E6E" : almostGone ? "#C0392B" : sellingFast ? "#D4891B" : "#0E8C7A";
+  // Sale end urgency — ending within 3 days
+  const endingSoon = !locked && !soldOut && tier.sale_end_date && daysUntilDate(tier.sale_end_date) <= 3;
 
-  const badge = soldOut     ? { label: "Sold out",     bg: "bg-ivory-200",     text: "text-ink-muted" }
-              : almostGone  ? { label: `${rem} left`,  bg: "bg-durga/10",      text: "text-durga font-bold" }
-              : sellingFast ? { label: "Selling fast",  bg: "bg-marigold/10",   text: "text-marigold-dark" }
-              : null;
+  const disabled = locked || soldOut;
+
+  const barColor = soldOut || expired ? "#6B5E6E"
+    : almostGone ? "#C0392B"
+    : sellingFast ? "#D4891B"
+    : "#0E8C7A";
+
+  // Primary status badge (only one shown — priority order)
+  const badge = expired        ? { label: "Sale ended",    bg: "bg-ivory-200",   text: "text-ink-muted" }
+    : notStarted               ? { label: "Not yet open",  bg: "bg-ivory-200",   text: "text-ink-muted" }
+    : soldOut                  ? { label: "Sold out",       bg: "bg-ivory-200",   text: "text-ink-muted" }
+    : almostGone               ? { label: `${rem} left`,   bg: "bg-durga/10",    text: "text-durga font-bold" }
+    : sellingFast              ? { label: "Selling fast",   bg: "bg-marigold/10", text: "text-marigold-dark font-bold" }
+    : null;
+
+  // Accent labels (can stack alongside badge)
+  const accentLabels: { label: string; cls: string }[] = [];
+  if (!disabled && isBestDeal)    accentLabels.push({ label: "Best deal",      cls: "bg-peacock/10 text-peacock font-bold" });
+  if (!disabled && isMostPopular) accentLabels.push({ label: "Most popular",   cls: "bg-aubergine/10 text-aubergine font-bold" });
 
   return (
     <button
       type="button"
-      disabled={soldOut}
+      disabled={disabled}
       onClick={onClick}
       className={`w-full text-left p-3.5 rounded-xl border-2 transition-all ${
-        soldOut    ? "opacity-50 cursor-not-allowed border-ivory-200 bg-ivory"
+        disabled   ? "opacity-60 cursor-not-allowed border-ivory-200 bg-ivory"
         : isSelected ? "border-aubergine bg-aubergine/5"
         : "border-ivory-200 hover:border-aubergine/40 bg-white"
       }`}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
+      {/* Top row: name + badges + price */}
+      <div className="flex items-start justify-between gap-2 mb-1.5">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 flex-wrap">
-            <p className={`font-display font-bold text-sm ${isSelected ? "text-aubergine" : "text-ink"}`}>{tier.name}</p>
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <p className={`font-display font-bold text-sm ${isSelected && !disabled ? "text-aubergine" : "text-ink"}`}>{tier.name}</p>
             {badge && (
               <span className={`font-mono text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded-full ${badge.bg} ${badge.text}`}>
                 {badge.label}
               </span>
             )}
+            {accentLabels.map(a => (
+              <span key={a.label} className={`font-mono text-[9px] uppercase tracking-wide px-1.5 py-0.5 rounded-full ${a.cls}`}>
+                {a.label}
+              </span>
+            ))}
           </div>
-          {tier.description && <p className="font-ui text-xs text-ink-muted mt-0.5 leading-snug">{tier.description}</p>}
+          {tier.description && (
+            <p className="font-ui text-xs text-ink-muted mt-0.5 leading-snug">{tier.description}</p>
+          )}
         </div>
         <div className="text-right shrink-0">
-          <p className={`font-display font-bold text-base ${isSelected ? "text-aubergine" : "text-ink"}`}>
+          <p className={`font-display font-bold text-base ${isSelected && !disabled ? "text-aubergine" : "text-ink"}`}>
             {tier.price === 0 ? "Complimentary" : `$${tier.price}`}
           </p>
         </div>
       </div>
 
-      {/* Mini fill bar embedded in each tier */}
-      {!soldOut && tier.quantity > 0 && (
+      {/* Date context row */}
+      <div className="flex items-center gap-3 mb-2">
+        {notStarted && tier.sale_start_date && (
+          <p className="font-mono text-[10px] text-ink-muted flex items-center gap-1">
+            <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            Opens {fmtShortDate(tier.sale_start_date)}
+          </p>
+        )}
+        {expired && tier.sale_end_date && (
+          <p className="font-mono text-[10px] text-ink-muted">
+            Ended {fmtShortDate(tier.sale_end_date)}
+          </p>
+        )}
+        {!locked && !soldOut && tier.sale_end_date && (
+          <p className={`font-mono text-[10px] flex items-center gap-1 ${endingSoon ? "text-durga font-bold" : "text-ink-muted"}`}>
+            {endingSoon && <span className="w-1.5 h-1.5 bg-durga rounded-full animate-pulse shrink-0" />}
+            {endingSoon
+              ? daysUntilDate(tier.sale_end_date) === 0
+                ? "Ends today!"
+                : daysUntilDate(tier.sale_end_date) === 1
+                  ? "Ends tomorrow!"
+                  : `Ends in ${daysUntilDate(tier.sale_end_date)} days`
+              : `Sale ends ${fmtShortDate(tier.sale_end_date)}`}
+          </p>
+        )}
+      </div>
+
+      {/* Fill bar */}
+      {!notStarted && tier.quantity > 0 && (
         <div className="h-1 bg-ivory-200 rounded-full overflow-hidden">
-          <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, backgroundColor: barColor }} />
-        </div>
-      )}
-      {soldOut && (
-        <div className="h-1 bg-ivory-200 rounded-full overflow-hidden">
-          <div className="h-full rounded-full w-full" style={{ backgroundColor: barColor }} />
+          <div
+            className="h-full rounded-full transition-all"
+            style={{ width: `${soldOut || expired ? 100 : pct}%`, backgroundColor: barColor }}
+          />
         </div>
       )}
     </button>
@@ -540,7 +616,10 @@ export default function EventDetailClient({ id }: { id: string }) {
           .filter(t => t.is_visible)
           .sort((a, b) => a.sort_order - b.sort_order || a.price - b.price);
         setEvent(ev);
-        if (ev.ticket_tiers.length > 0) setSelectedTierId(ev.ticket_tiers[0].id);
+        const firstSelectable = ev.ticket_tiers.find(t =>
+          !isTierNotStarted(t) && !isTierExpired(t) && t.quantity - t.quantity_sold > 0
+        );
+        if (firstSelectable) setSelectedTierId(firstSelectable.id);
         setLoading(false);
       });
   }, [id]);
@@ -710,14 +789,19 @@ export default function EventDetailClient({ id }: { id: string }) {
                   {event.navratri_nights.length}-Night Event
                 </span>
               )}
-              {totalSoldOut && (
+              {event.selling_on_rameelo && totalSoldOut && (
                 <span className="font-mono text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/20 text-white backdrop-blur-sm">
                   Sold Out
                 </span>
               )}
-              {!totalSoldOut && urgencyState === "critical" && (
+              {event.selling_on_rameelo && !totalSoldOut && urgencyState === "critical" && (
                 <span className="font-mono text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full text-white animate-pulse backdrop-blur-sm" style={{ backgroundColor: "rgba(192,57,43,0.6)" }}>
                   ⚡ Almost Gone
+                </span>
+              )}
+              {!event.selling_on_rameelo && (
+                <span className="font-mono text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-marigold/70 text-aubergine backdrop-blur-sm">
+                  Tickets Coming Soon
                 </span>
               )}
             </div>
@@ -894,9 +978,16 @@ export default function EventDetailClient({ id }: { id: string }) {
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
                 Open in Google Maps →
               </a>
-              <div className="mt-4 h-28 rounded-xl bg-ivory border border-ivory-200 flex items-center justify-center">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Map preview</p>
-              </div>
+              <iframe
+                className="mt-4 w-full rounded-xl border border-ivory-200"
+                style={{ height: 200 }}
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+                src={`https://maps.google.com/maps?q=${encodeURIComponent(
+                  [event.venue_name, event.address_line1, event.city, event.state, event.zip]
+                    .filter(Boolean).join(", ")
+                )}&output=embed&z=15`}
+              />
             </div>
           </div>
 
@@ -1028,19 +1119,40 @@ export default function EventDetailClient({ id }: { id: string }) {
                   <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Select Tickets</p>
                   {event.ticket_tiers.length === 0 ? (
                     <p className="font-ui text-sm text-ink-muted py-2">No tickets available yet.</p>
-                  ) : (
-                    event.ticket_tiers.map(tier => (
+                  ) : (() => {
+                    // Compute cross-tier signals once
+                    const available = event.ticket_tiers.filter(t =>
+                      !isTierNotStarted(t) && !isTierExpired(t) && t.quantity - t.quantity_sold > 0
+                    );
+                    const minPrice = available.length ? Math.min(...available.map(t => t.price)) : null;
+                    const maxSold  = available.length ? Math.max(...available.map(t => t.quantity_sold)) : null;
+                    return event.ticket_tiers.map(tier => (
                       <TierAvailabilityBar
                         key={tier.id}
                         tier={tier}
                         isSelected={selectedTierId === tier.id}
+                        isBestDeal={
+                          available.length > 1 &&
+                          minPrice !== null &&
+                          tier.price === minPrice &&
+                          !isTierNotStarted(tier) && !isTierExpired(tier) &&
+                          tier.quantity - tier.quantity_sold > 0
+                        }
+                        isMostPopular={
+                          available.length > 1 &&
+                          maxSold !== null && maxSold > 0 &&
+                          tier.quantity_sold === maxSold &&
+                          !isTierNotStarted(tier) && !isTierExpired(tier) &&
+                          tier.quantity - tier.quantity_sold > 0
+                        }
                         onClick={() => {
+                          if (isTierNotStarted(tier) || isTierExpired(tier)) return;
                           const rem = tier.quantity - tier.quantity_sold;
                           if (rem > 0) { setSelectedTierId(tier.id); setQty(Math.min(qty, rem)); }
                         }}
                       />
-                    ))
-                  )}
+                    ));
+                  })()}
                 </div>
 
                 {selectedTier && !soldOut && (

@@ -199,7 +199,6 @@ export default function EventDashboardPage() {
   const grossRev     = tiers.reduce((s, t) => s + t.quantity_sold * t.price, 0);
   const maxRev       = tiers.reduce((s, t) => s + t.quantity * t.price, 0);
   const fillPct      = totalCap > 0 ? (totalSold / totalCap) * 100 : 0;
-  const estPayout    = Math.round(grossRev * 0.97);
   const revPct       = maxRev > 0 ? (grossRev / maxRev) * 100 : 0;
   const days         = daysUntil(ev.start_date);
   const fillColor    = fillPct >= 80 ? "#7C1F2C" : fillPct >= 50 ? "#0E8C7A" : "#D4891B";
@@ -207,8 +206,7 @@ export default function EventDashboardPage() {
   const gradient     = GRADIENTS.find(g => g.id === ev.cover_gradient) ?? GRADIENTS[0];
 
   const kpis = [
-    { label: "Gross Revenue", value: fmtCurrency(grossRev), sub: `of ${fmtCurrency(maxRev)} potential`, color: "#0E8C7A", icon: "💰" },
-    { label: "Est. Payout", value: fmtCurrency(estPayout), sub: "after 3% Rameelo fee", color: "#2E1B30", icon: "💳" },
+    { label: "Revenue", value: fmtCurrency(grossRev), sub: `of ${fmtCurrency(maxRev)} potential`, color: "#0E8C7A", icon: "💰" },
     { label: "Tickets Sold", value: totalSold.toLocaleString(), sub: `of ${totalCap.toLocaleString()} total`, color: "#2E1B30", icon: "🎟️" },
     { label: "Fill Rate", value: `${Math.round(fillPct)}%`, sub: fillPct >= 80 ? "Almost sold out!" : fillPct >= 50 ? "Good momentum" : "Still growing", color: fillColor, icon: "📊" },
     { label: "Total Orders", value: orderCount.toLocaleString(), sub: "individual purchases", color: "#2E1B30", icon: "🧾" },
@@ -278,7 +276,7 @@ export default function EventDashboardPage() {
       )}
 
       {/* ── KPI strip ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {kpis.map(tile => (
           <div key={tile.label} className="bg-white rounded-2xl border border-ivory-200 p-4">
             <div className="flex items-center gap-1.5 mb-1.5">

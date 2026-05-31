@@ -5,7 +5,6 @@ import Link from "next/link";
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
-const PLATFORM_FEE_PCT    = 0.03;
 const CHARGEBACK_RESERVE  = 0.20;  // 20% held as chargeback buffer
 const AVAILABLE_PCT       = 1 - CHARGEBACK_RESERVE; // 80% released
 const RESERVE_HOLD_DAYS   = 30;    // reserve releases 30 days after event
@@ -19,11 +18,9 @@ type PayoutRecord = {
   id: string;
   event_name: string;
   event_date: string;       // ISO date of event
-  gross_revenue: number;    // total ticket sales
-  platform_fee: number;     // 3%
-  net_to_organizer: number; // gross × 0.97
-  reserve: number;          // net × 0.20
-  payout_amount: number;    // net × 0.80
+  gross_revenue: number;    // total ticket sales (= your revenue, no platform deduction)
+  reserve: number;          // gross × 0.20 held as chargeback buffer
+  payout_amount: number;    // gross × 0.80 released per cycle
   status: PayoutStatus;
   payout_date: string;
   stripe_payout_id?: string;
@@ -47,11 +44,9 @@ function fmtDateShort(iso: string) {
 }
 
 function calcNet(gross: number) {
-  const platform_fee     = Math.round(gross * PLATFORM_FEE_PCT * 100) / 100;
-  const net_to_organizer = Math.round((gross - platform_fee) * 100) / 100;
-  const reserve          = Math.round(net_to_organizer * CHARGEBACK_RESERVE * 100) / 100;
-  const payout_amount    = Math.round(net_to_organizer * AVAILABLE_PCT * 100) / 100;
-  return { platform_fee, net_to_organizer, reserve, payout_amount };
+  const reserve       = Math.round(gross * CHARGEBACK_RESERVE * 100) / 100;
+  const payout_amount = Math.round(gross * AVAILABLE_PCT * 100) / 100;
+  return { reserve, payout_amount };
 }
 
 function nextPayoutDate(schedule: PayoutSchedule): Date {
@@ -139,7 +134,8 @@ function buildBalance(records: PayoutRecord[]) {
   // For paid: reserves have already released (paid > 30 days ago)
   // For still-pending events: only count cleared events' reserves
   const totalPaidGross  = paid.reduce((s, r) => s + r.gross_revenue, 0);
-  const { net_to_organizer: totalPaidNet, reserve: totalPaidReserve } = calcNet(totalPaidGross);
+  const { reserve: totalPaidReserve } = calcNet(totalPaidGross);
+  void totalPaidReserve;
 
   // Cleared = paid payouts that are done, reserve already released
   const totalPaidOut = paid.reduce((s, r) => s + r.payout_amount, 0);
@@ -299,7 +295,7 @@ function ReserveExplainer({ totalReserve, nextRelease }: { totalReserve: number;
       {open && (
         <div className="mt-3 pt-3 border-t border-marigold/20 space-y-1.5">
           {[
-            ["What is it?", "20% of your net payout is temporarily held to cover any chargebacks or disputes that arise after an event."],
+            ["What is it?", "20% of your revenue is temporarily held to cover any chargebacks or disputes that arise after an event."],
             ["When is it released?", `Automatically released ${RESERVE_HOLD_DAYS} days after the event date, once the chargeback window has passed.`],
             ["Do I lose it?", "No — it's always yours. It's only used if a card dispute is filed. You receive it in your next regular payout cycle."],
           ].map(([q, a]) => (
@@ -374,11 +370,9 @@ function PayoutDetail({ record, onClose }: { record: PayoutRecord; onClose: () =
 
         <div className="px-5 py-5 space-y-3">
           {[
-            { label: "Gross ticket revenue",     value: fmtCurrency(record.gross_revenue),     color: "text-ink",        note: `${record.tickets_sold} tickets sold` },
-            { label: "Platform fee (3%)",         value: `−${fmtCurrency(record.platform_fee)}`, color: "text-ink-muted",  note: "Rameelo service fee" },
-            { label: "Net to you",                value: fmtCurrency(record.net_to_organizer),  color: "text-ink font-semibold", note: "After 3% fee", divider: true },
-            { label: "Chargeback reserve (20%)",  value: `−${fmtCurrency(record.reserve)}`,      color: released ? "text-peacock" : "text-[#a06b00]", note: released ? "Released — included in next payout" : `Held until ${fmtDateShort(releaseDate.toISOString())}` },
-            { label: "Paid out (80%)",            value: fmtCurrency(record.payout_amount),    color: "text-peacock font-bold", note: "Deposited to your bank", divider: true },
+            { label: "Ticket revenue",            value: fmtCurrency(record.gross_revenue),  color: "text-ink font-semibold", note: `${record.tickets_sold} tickets × face value`, divider: false },
+            { label: "Chargeback reserve (20%)",  value: `−${fmtCurrency(record.reserve)}`,  color: released ? "text-peacock" : "text-[#a06b00]", note: released ? "Released — included in next payout" : `Held until ${fmtDateShort(releaseDate.toISOString())}` },
+            { label: "Paid out (80%)",            value: fmtCurrency(record.payout_amount),  color: "text-peacock font-bold", note: "Deposited to your bank", divider: true },
           ].map((row, i) => (
             <div key={row.label}>
               {row.divider && <div className="border-t border-ivory-200 pt-3 -mt-0" />}
@@ -575,7 +569,7 @@ export default function PayoutsPage() {
 
         <div className="px-5 py-3 bg-ivory border-t border-ivory-200">
           <p className="font-mono text-[10px] text-ink-muted/50 text-center">
-            80% paid out per cycle · 20% held {RESERVE_HOLD_DAYS} days as chargeback reserve · 3% Rameelo fee deducted before split
+            80% of your revenue paid per cycle · 20% held {RESERVE_HOLD_DAYS} days as chargeback reserve · 3% Rameelo fee is charged to buyers at checkout, not deducted from you
           </p>
         </div>
       </div>
