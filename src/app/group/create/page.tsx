@@ -59,6 +59,7 @@ function CreateGroupInner() {
   const [lastName, setLastName]     = useState("");
   const [email, setEmail]           = useState("");
   const [phoneDigits, setPhoneDigits] = useState("");
+  const [groupName, setGroupName]   = useState("");
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
   const [targetSize, setTargetSize] = useState(10);
   const [hostQty, setHostQty]       = useState(1);
@@ -142,6 +143,7 @@ function CreateGroupInner() {
 
     const { error } = await createGroupOrder({
       groupId: id,
+      name: groupName.trim() || undefined,
       eventId,
       tierId: selectedTierId!,
       organizerName: `${firstName} ${lastName}`,
@@ -267,6 +269,25 @@ function CreateGroupInner() {
                 {tierHasDiscount
                   ? "You're the host — share your link with your crew. Everyone pays their own ticket and you all unlock the group discount together."
                   : "You're the host — share your link with your crew. Everyone buys their own ticket and you can all coordinate in one place."}
+              </p>
+            </div>
+
+            {/* Group name */}
+            <div>
+              <label className={labelCls}>
+                Give your group a name{" "}
+                <span className="text-ink-muted/50 normal-case font-ui font-normal">(optional)</span>
+              </label>
+              <input
+                type="text"
+                value={groupName}
+                onChange={e => setGroupName(e.target.value)}
+                placeholder="e.g. The Garba Squad 🎉"
+                maxLength={50}
+                className={inputCls}
+              />
+              <p className="font-mono text-[9px] text-ink-muted mt-1.5">
+                Shown to everyone on your group link — make it fun!
               </p>
             </div>
 
@@ -465,7 +486,9 @@ function CreateGroupInner() {
                 <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
               </div>
               <p className="font-mono text-[10px] uppercase tracking-widest text-marigold font-bold mb-1">Group Created</p>
-              <h2 className="font-display font-bold text-ink text-2xl mb-1">Your group link is ready!</h2>
+              <h2 className="font-display font-bold text-ink text-2xl mb-1">
+                {groupName.trim() ? groupName.trim() : "Your group link is ready!"}
+              </h2>
               <p className="font-ui text-ink-muted text-sm">
                 {tierHasDiscount && discount > 0
                   ? <>Share this with your crew. When {targetSize} people join, everyone pays <strong className="text-ink">${discountedPrice}</strong> per ticket ({discount}% off).</>

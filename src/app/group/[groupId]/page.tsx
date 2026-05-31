@@ -305,7 +305,9 @@ export default function GroupLandingPage() {
       <div className="bg-white border-b border-ivory-200">
         <div className="max-w-lg mx-auto px-4 py-3 flex items-center justify-between">
           <Logo variant="red" height={22} />
-          <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Group Order · {groupId}</span>
+          <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted truncate max-w-[200px]">
+            {group.name ?? `Group Order · ${groupId}`}
+          </span>
         </div>
       </div>
 
@@ -329,8 +331,13 @@ export default function GroupLandingPage() {
               </div>
             )}
           </div>
+          {group.name && (
+            <p className="font-display font-bold text-ink text-xl mb-1" style={{ letterSpacing: "-0.02em" }}>
+              {group.name}
+            </p>
+          )}
           <p className="font-ui text-sm text-ink-muted">
-            <strong className="text-ink">{group.organizerName}</strong> is hosting a group for this event
+            Hosted by <strong className="text-ink">{group.organizerName}</strong>
           </p>
           {isExpired && (
             <div className="mt-2 inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-durga/10 border border-durga/20">

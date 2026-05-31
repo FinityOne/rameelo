@@ -14,6 +14,7 @@ export interface GroupMember {
 
 export interface GroupOrder {
   groupId: string;
+  name?: string;
   eventId: string;
   tierId: string;
   organizerName: string;
@@ -70,6 +71,7 @@ export function generateGroupId(): string {
 
 export async function createGroupOrder(params: {
   groupId: string;
+  name?: string;
   eventId: string;
   tierId: string;
   organizerName: string;
@@ -86,6 +88,7 @@ export async function createGroupOrder(params: {
 
   const { error: groupError } = await supabase.from("group_orders").insert({
     id: params.groupId,
+    name: params.name || null,
     event_id: params.eventId,
     tier_id: params.tierId,
     organizer_name: params.organizerName,
@@ -122,7 +125,7 @@ export async function loadGroupOrder(groupId: string): Promise<GroupOrder | null
   const { data: group, error } = await supabase
     .from("group_orders")
     .select(`
-      id, event_id, tier_id,
+      id, name, event_id, tier_id,
       organizer_name, organizer_email, organizer_phone,
       target_size, discount_pct, deadline, status, created_at,
       events (
@@ -167,6 +170,7 @@ export async function loadGroupOrder(groupId: string): Promise<GroupOrder | null
 
   return {
     groupId: g.id,
+    name: (g as unknown as Record<string, string | null>).name ?? undefined,
     eventId: g.event_id,
     tierId: g.tier_id,
     organizerName: g.organizer_name,

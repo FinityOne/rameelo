@@ -573,7 +573,7 @@ export default function EventDetailClient({ id }: { id: string }) {
   }
 
   // Existing group orders (logged-in host — could have started multiple)
-  const [existingGroups, setExistingGroups] = useState<{ id: string; joined: number; target: number }[]>([]);
+  const [existingGroups, setExistingGroups] = useState<{ id: string; name?: string; joined: number; target: number }[]>([]);
 
   // Invite group — arrived via /events/[id]?groupId=RM-XXXXX
   const [inviteGroup, setInviteGroup] = useState<{ id: string; hostName: string; joined: number; discount: number } | null>(null);
@@ -659,7 +659,7 @@ export default function EventDetailClient({ id }: { id: string }) {
       if (!user) return;
       const { data: rows } = await supabase
         .from("group_orders")
-        .select("id, target_size")
+        .select("id, name, target_size")
         .eq("organizer_user_id", user.id)
         .eq("event_id", event.id)
         .eq("status", "open")
@@ -670,7 +670,8 @@ export default function EventDetailClient({ id }: { id: string }) {
           .from("group_order_members")
           .select("*", { count: "exact", head: true })
           .eq("group_id", g.id);
-        return { id: g.id, joined: count ?? 0, target: g.target_size };
+        const row = g as unknown as { id: string; name: string | null; target_size: number };
+        return { id: row.id, name: row.name ?? undefined, joined: count ?? 0, target: row.target_size };
       }));
       setExistingGroups(groups);
     });
@@ -1411,10 +1412,11 @@ export default function EventDetailClient({ id }: { id: string }) {
                       <div key={eg.id} className="rounded-2xl border border-aubergine/20 bg-aubergine/5 p-4">
                         <div className="flex items-center justify-between gap-3 mb-3">
                           <div>
-                            <p className="font-mono text-[9px] uppercase tracking-widest text-aubergine font-bold mb-0.5">Your active group · {eg.id}</p>
+                            <p className="font-mono text-[9px] uppercase tracking-widest text-aubergine font-bold mb-0.5">Your active group</p>
                             <p className="font-display font-bold text-ink text-sm">
-                              {eg.joined} of {eg.target} tickets
+                              {eg.name ?? eg.id}
                             </p>
+                            <p className="font-mono text-[10px] text-ink-muted">{eg.joined} of {eg.target} tickets</p>
                           </div>
                           <Link
                             href={`/group/${eg.id}`}
