@@ -167,8 +167,7 @@ export default function ReceiptPage() {
             My Tickets
           </Link>
           <div className="flex items-center gap-2">
-            {/* Apple Wallet — shown on iOS devices */}
-            {isIOS && order.status === "confirmed" && (
+            {order.status === "confirmed" && (
               <a
                 href={`/api/wallet/pass/${order.id}`}
                 className="flex items-center gap-2 px-4 py-2 rounded-xl bg-black text-white font-ui text-sm font-medium hover:bg-zinc-800 active:scale-95 transition-all"
