@@ -15,10 +15,11 @@ function fmtTime(t: string | null) {
 }
 
 export async function GET(
-  _req: Request,
+  req: Request,
   { params }: { params: Promise<{ orderId: string }> }
 ) {
   const { orderId } = await params;
+  const seat = new URL(req.url).searchParams.get("seat");
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   const supabase = await createClient();
@@ -75,7 +76,11 @@ export async function GET(
     const wwdr                 = Buffer.from(APPLE_WWDR_CERT, "base64").toString("utf-8");
     const signerKeyPassphrase  = APPLE_SIGNER_KEY_PASSPHRASE ?? undefined;
 
-    const serialNumber = `RM-${raw.id.replace(/-/g, "").slice(0, 12).toUpperCase()}`;
+    // Each seat gets its own serial so it's a distinct pass in Wallet
+    const seatNum      = seat ? parseInt(seat, 10) : null;
+    const seatSuffix   = seatNum ? `-T${seatNum}` : "";
+    const serialNumber = `RM-${raw.id.replace(/-/g, "").slice(0, 10).toUpperCase()}${seatSuffix}`;
+    const ticketId     = `${raw.id.slice(0, 8).toUpperCase()}${seatSuffix}`;
     const passDate     = new Date(ev.start_date + "T00:00:00").toISOString();
 
     const passJson = {
@@ -102,23 +107,26 @@ export async function GET(
         auxiliaryFields: [
           { key: "venue",  label: "VENUE",  value: `${ev.venue_name}, ${ev.city}` },
           { key: "tier",   label: "TICKET", value: tier.name },
-          { key: "qty",    label: "QTY",    value: `${raw.qty}` },
+          ...(seatNum ? [{ key: "seat", label: "SEAT", value: `${seatNum} of ${raw.qty}` }] : [
+            { key: "qty", label: "QTY", value: `${raw.qty}` },
+          ]),
         ],
         backFields: [
-          { key: "holder",  label: "Ticket Holder", value: raw.buyer_name },
-          { key: "email",   label: "Email",          value: raw.buyer_email },
-          { key: "order",   label: "Order ID",       value: serialNumber },
-          { key: "paid",    label: "Amount Paid",    value: `$${Number(raw.grand_total).toFixed(2)}` },
-          { key: "support", label: "Support",        value: "help@rameelo.com" },
+          { key: "holder",   label: "Ticket Holder", value: raw.buyer_name },
+          { key: "email",    label: "Email",          value: raw.buyer_email },
+          { key: "ticketid", label: "Ticket ID",      value: ticketId },
+          { key: "order",    label: "Order ID",       value: serialNumber },
+          { key: "paid",     label: "Amount Paid",    value: `$${Number(raw.grand_total).toFixed(2)}` },
+          { key: "support",  label: "Support",        value: "help@rameelo.com" },
         ],
       },
 
       barcodes: [
         {
-          message: `RAMEELO:${raw.id}`,
+          message: `RAMEELO:${raw.id}${seatSuffix}`,
           format: "PKBarcodeFormatQR",
           messageEncoding: "iso-8859-1",
-          altText: serialNumber,
+          altText: ticketId,
         },
       ],
 
@@ -139,7 +147,7 @@ export async function GET(
       status: 200,
       headers: {
         "Content-Type": "application/vnd.apple.pkpass",
-        "Content-Disposition": `attachment; filename="rameelo-${serialNumber}.pkpass"`,
+        "Content-Disposition": `attachment; filename="rameelo-${ticketId}.pkpass"`,
         "Cache-Control": "no-store",
       },
     });
