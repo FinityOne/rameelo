@@ -233,6 +233,15 @@ export async function joinGroupOrder(params: {
   return { error: error?.message ?? null };
 }
 
+export async function updateGroupName(groupId: string, name: string): Promise<{ error: string | null }> {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("group_orders")
+    .update({ name: name.trim() || null })
+    .eq("id", groupId);
+  return { error: error?.message ?? null };
+}
+
 export async function updateGroupMember(params: {
   groupId: string;
   email: string;

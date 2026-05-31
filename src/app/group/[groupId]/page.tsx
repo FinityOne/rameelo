@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Logo from "@/components/Logo";
-import { loadGroupOrder, joinGroupOrder, updateGroupMember, type GroupOrder } from "@/lib/group-orders";
+import { loadGroupOrder, joinGroupOrder, updateGroupMember, updateGroupName, type GroupOrder } from "@/lib/group-orders";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
 
 
@@ -63,6 +63,10 @@ export default function GroupLandingPage() {
   const [editQty, setEditQty]       = useState(1);
   const [editNotes, setEditNotes]   = useState("");
   const [saving, setSaving]         = useState(false);
+
+  // Group name edit (host only)
+  const [editingName, setEditingName] = useState(false);
+  const [nameInput, setNameInput]     = useState("");
 
   useEffect(() => {
     const supabase = createClient();
@@ -293,6 +297,15 @@ export default function GroupLandingPage() {
     setSaving(false);
   }
 
+  async function handleSaveName() {
+    setSaving(true);
+    await updateGroupName(groupId, nameInput);
+    const refreshed = await loadGroupOrder(groupId);
+    setGroup(refreshed);
+    setEditingName(false);
+    setSaving(false);
+  }
+
   function startEdit(member: GroupOrder["members"][0]) {
     setEditEmail(member.email);
     setEditQty(member.qty);
@@ -331,10 +344,48 @@ export default function GroupLandingPage() {
               </div>
             )}
           </div>
-          {group.name && (
-            <p className="font-display font-bold text-ink text-xl mb-1" style={{ letterSpacing: "-0.02em" }}>
-              {group.name}
-            </p>
+          {editingName ? (
+            <div className="flex items-center gap-2 mb-1 w-full max-w-xs mx-auto">
+              <input
+                type="text"
+                autoFocus
+                value={nameInput}
+                onChange={e => setNameInput(e.target.value)}
+                onKeyDown={e => { if (e.key === "Enter") handleSaveName(); if (e.key === "Escape") setEditingName(false); }}
+                maxLength={50}
+                placeholder="e.g. The Garba Squad 🎉"
+                className="flex-1 rounded-xl border border-aubergine/30 bg-white px-3 py-2 font-display font-bold text-ink text-base text-center focus:outline-none focus:ring-2 focus:ring-aubergine/25"
+              />
+              <button onClick={handleSaveName} disabled={saving}
+                className="shrink-0 px-3 py-2 rounded-xl bg-aubergine text-white font-ui font-semibold text-xs hover:bg-aubergine-light transition-colors disabled:opacity-60">
+                {saving ? "…" : "Save"}
+              </button>
+              <button onClick={() => setEditingName(false)}
+                className="shrink-0 w-8 h-8 rounded-xl border border-ivory-200 flex items-center justify-center text-ink-muted hover:text-ink transition-colors text-sm">
+                ✕
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center gap-2 mb-1">
+              {group.name ? (
+                <p className="font-display font-bold text-ink text-xl" style={{ letterSpacing: "-0.02em" }}>
+                  {group.name}
+                </p>
+              ) : myEmail === group.organizerEmail ? (
+                <p className="font-ui text-sm text-ink-muted/60 italic">No name yet</p>
+              ) : null}
+              {myEmail === group.organizerEmail && (
+                <button
+                  onClick={() => { setNameInput(group.name ?? ""); setEditingName(true); }}
+                  className="text-ink-muted/50 hover:text-aubergine transition-colors"
+                  title="Edit group name"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                  </svg>
+                </button>
+              )}
+            </div>
           )}
           <p className="font-ui text-sm text-ink-muted">
             Hosted by <strong className="text-ink">{group.organizerName}</strong>
