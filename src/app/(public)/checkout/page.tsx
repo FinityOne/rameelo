@@ -536,7 +536,7 @@ export default function CheckoutPage() {
                         <div>
                           <span className="font-ui text-ink-muted">Processing fee</span>
                           {paymentMethod === "card" ? (
-                            <p className="font-mono text-[9px] text-ink-muted/70">3.5% · credit/debit card</p>
+                            <p className="font-mono text-[9px] text-ink-muted/70">5% · credit/debit card</p>
                           ) : (
                             <p className="font-mono text-[9px] text-peacock">Free · bank transfer</p>
                           )}

@@ -1386,7 +1386,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                         </div>
                         <div className="flex items-start justify-between text-sm gap-2">
                           <div>
-                            <span className="font-ui text-ink-muted">Card processing (3.5%)</span>
+                            <span className="font-ui text-ink-muted">Card processing (5%)</span>
                             <p className="font-mono text-[9px] text-peacock mt-0.5">Free with bank / ACH at checkout</p>
                           </div>
                           <span className="font-ui text-ink-muted shrink-0">${processingFee.toFixed(2)}</span>
