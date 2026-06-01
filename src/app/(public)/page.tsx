@@ -532,7 +532,7 @@ export default async function HomePage() {
               className="font-display font-semibold text-ink"
               style={{ fontSize: "clamp(28px, 4vw, 40px)", letterSpacing: "-0.022em" }}
             >
-              One platform. Every seat in the circle.
+              One platform. Every ticket in the circle.
             </h2>
           </div>
 

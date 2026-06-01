@@ -107,7 +107,7 @@ export async function GET(
         auxiliaryFields: [
           { key: "venue",  label: "VENUE",  value: `${ev.venue_name}, ${ev.city}` },
           { key: "tier",   label: "TICKET", value: tier.name },
-          ...(seatNum ? [{ key: "seat", label: "SEAT", value: `${seatNum} of ${raw.qty}` }] : [
+          ...(seatNum ? [{ key: "ticket", label: "TICKET #", value: `${seatNum} of ${raw.qty}` }] : [
             { key: "qty", label: "QTY", value: `${raw.qty}` },
           ]),
         ],
