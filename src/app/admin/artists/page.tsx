@@ -39,6 +39,7 @@ type Artist = {
   is_featured: boolean;
   is_active: boolean;
   verified: boolean;
+  custom_domain: string | null;
   created_at: string;
 };
 
@@ -51,7 +52,7 @@ const EMPTY_ARTIST: Omit<Artist, 'id' | 'created_at'> = {
   spotify_url: '', apple_music_url: '', facebook_url: '', tiktok_url: '',
   booking_email: '', booking_phone: '', management_name: '', management_email: '',
   notable_events: '', awards: '',
-  is_featured: false, is_active: true, verified: false,
+  is_featured: false, is_active: true, verified: false, custom_domain: null,
 };
 
 const GENRE_OPTIONS = ['Garba', 'Dandiya', 'Raas', 'Folk', 'Fusion', 'Bollywood', 'Sufi', 'Classical', 'Pop', 'Workshop'];
@@ -166,6 +167,7 @@ function ArtistPanel({ artist, onClose, onSave }: PanelProps) {
         is_featured: form.is_featured,
         is_active: form.is_active,
         verified: form.verified,
+        custom_domain: form.custom_domain?.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "") || null,
       };
 
       if (isEdit) {
@@ -463,7 +465,7 @@ function ArtistPanel({ artist, onClose, onSave }: PanelProps) {
           )}
 
           {tab === 'booking' && (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="rounded-xl bg-marigold/8 border border-marigold/20 p-3">
                 <p className="font-ui text-xs text-ink-muted leading-relaxed">
                   <strong className="text-ink">Booking info</strong> is admin-only — it will not be shown on the public artist page unless you explicitly display it.
@@ -489,6 +491,71 @@ function ArtistPanel({ artist, onClose, onSave }: PanelProps) {
                   <label className={labelCls}>Management Email</label>
                   <input type="email" placeholder="manager@agency.com" value={form.management_email ?? ''}
                     onChange={e => patch({ management_email: e.target.value })} className={inputCls} />
+                </div>
+              </div>
+
+              {/* Custom Domain */}
+              <div className="rounded-2xl border-2 border-aubergine/15 bg-aubergine/3 overflow-hidden">
+                <div className="px-4 py-3 bg-aubergine/8 border-b border-aubergine/15 flex items-center gap-2">
+                  <svg className="w-4 h-4 text-aubergine" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" /></svg>
+                  <p className="font-display font-bold text-aubergine text-sm" style={{ letterSpacing: '-0.01em' }}>Custom Domain</p>
+                  <span className="ml-auto font-mono text-[8px] bg-marigold/20 text-marigold-dark px-2 py-0.5 rounded-full uppercase tracking-widest">Official Artist Site</span>
+                </div>
+                <div className="p-4 space-y-4">
+                  <p className="font-ui text-xs text-ink-muted leading-relaxed">
+                    Point the artist&apos;s own domain here — visitors who land on <strong className="text-ink">jigardangadhavi.com</strong> will see the full Rameelo artist page with an &ldquo;Official site powered by Rameelo&rdquo; banner.
+                  </p>
+                  <div>
+                    <label className={labelCls}>Custom Domain (no https://)</label>
+                    <input
+                      type="text"
+                      placeholder="jigardangadhavi.com"
+                      value={form.custom_domain ?? ''}
+                      onChange={e => patch({ custom_domain: e.target.value })}
+                      className={inputCls}
+                    />
+                    {form.custom_domain && (
+                      <p className="mt-1.5 font-mono text-[9px] text-peacock">
+                        ✓ Saved as: {form.custom_domain.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "")}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* DNS setup instructions */}
+                  <div className="rounded-xl bg-ivory border border-ivory-200 p-3 space-y-2">
+                    <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted font-bold">DNS Setup (do once per domain)</p>
+                    <p className="font-ui text-xs text-ink-muted">In your domain registrar (GoDaddy, Namecheap, Google Domains, etc.), add these records:</p>
+                    <div className="space-y-1.5 font-mono text-[10px]">
+                      <div className="flex gap-2 items-center">
+                        <span className="bg-aubergine/10 text-aubergine px-2 py-0.5 rounded shrink-0">A</span>
+                        <span className="text-ink-muted">@</span>
+                        <span className="text-ink">76.76.21.21</span>
+                        <span className="text-ink-muted ml-auto">Vercel IP</span>
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <span className="bg-aubergine/10 text-aubergine px-2 py-0.5 rounded shrink-0">CNAME</span>
+                        <span className="text-ink-muted">www</span>
+                        <span className="text-ink">cname.vercel-dns.com</span>
+                      </div>
+                    </div>
+                    <p className="font-ui text-[10px] text-ink-muted pt-1 border-t border-ivory-200">
+                      Then add the domain in your Vercel project → Settings → Domains.
+                    </p>
+                  </div>
+
+                  {/* What the visitor sees */}
+                  <div className="rounded-xl overflow-hidden border border-peacock/20">
+                    <p className="px-3 py-2 bg-peacock/6 font-mono text-[9px] uppercase tracking-widest text-peacock border-b border-peacock/15">Preview — what visitors see</p>
+                    <div className="p-3 bg-aubergine/90 flex items-center gap-3">
+                      <div className="w-5 h-5 rounded bg-marigold flex items-center justify-center shrink-0">
+                        <span className="font-display font-bold text-aubergine text-[10px]">R</span>
+                      </div>
+                      <p className="font-ui text-xs text-white/90 leading-snug flex-1">
+                        <strong className="text-marigold">{form.custom_domain || 'artistname.com'}</strong> is the official site for <strong className="text-white">{form.name || 'this artist'}</strong> · All tour info &amp; tickets exclusively on Rameelo
+                      </p>
+                      <span className="font-mono text-[8px] text-white/50 shrink-0 border border-white/15 rounded px-1.5 py-0.5">Official ✓</span>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -694,14 +761,21 @@ function ArtistRow({ artist, onEdit, onToggleFeatured, onToggleActive, toggling 
           <p className="font-display font-bold text-ink text-sm truncate" style={{ letterSpacing: '-0.01em' }}>{artist.name}</p>
           {artist.verified && <span className="text-[10px] text-peacock shrink-0">✓</span>}
         </div>
-        <p className="font-ui text-xs text-ink-muted truncate">
-          {artist.tagline
-            ? artist.tagline
-            : location
-            ? `📍 ${location}`
-            : <span className="italic">No tagline</span>
-          }
-        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="font-ui text-xs text-ink-muted truncate">
+            {artist.tagline
+              ? artist.tagline
+              : location
+              ? `📍 ${location}`
+              : <span className="italic">No tagline</span>
+            }
+          </p>
+          {artist.custom_domain && (
+            <span className="font-mono text-[8px] bg-aubergine/8 border border-aubergine/15 text-aubergine px-1.5 py-0.5 rounded shrink-0">
+              🌐 {artist.custom_domain}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Genres */}
