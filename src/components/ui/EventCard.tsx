@@ -7,7 +7,12 @@ interface EventCardProps {
   city: string;
   state: string;
   date: string;
-  price: number;
+  /** Lowest ticket price; `null` when no tiers are listed yet (Tickets TBA). */
+  minPrice: number | null;
+  /** Highest ticket price; used to show a "From $x – $y" range. */
+  maxPrice?: number | null;
+  /** Whether tickets are actually sold on Rameelo (vs. listed for interest). */
+  sellingOnRameelo?: boolean;
   soldPct: number;
   soldOut?: boolean;
   isLive?: boolean;
@@ -20,7 +25,9 @@ export function EventCard({
   city,
   state,
   date,
-  price,
+  minPrice,
+  maxPrice = null,
+  sellingOnRameelo = true,
   soldPct,
   soldOut = false,
   isLive = false,
@@ -89,10 +96,25 @@ export function EventCard({
 
         <div className="flex items-center justify-between">
           <div>
-            <span className="font-display font-bold text-ink text-xl" style={{ letterSpacing: "-0.02em" }}>
-              ${price}
-            </span>
-            <span className="text-ink-muted text-xs font-ui"> /ea</span>
+            {minPrice === null ? (
+              <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Tickets TBA</span>
+            ) : minPrice === 0 ? (
+              <span className="font-display font-bold text-peacock text-xl" style={{ letterSpacing: "-0.02em" }}>
+                Complimentary
+              </span>
+            ) : (
+              <div className="flex items-baseline gap-1.5">
+                <span className="font-display font-bold text-ink text-xl" style={{ letterSpacing: "-0.02em" }}>
+                  From ${minPrice}
+                </span>
+                {maxPrice !== null && maxPrice > minPrice && (
+                  <span className="text-ink-muted text-xs font-ui">– ${maxPrice}</span>
+                )}
+                {!sellingOnRameelo && (
+                  <span className="font-mono text-[8px] uppercase tracking-widest bg-marigold/20 text-marigold-dark px-1.5 py-0.5 rounded-full">Soon</span>
+                )}
+              </div>
+            )}
           </div>
           <Link
             href={href}
@@ -102,7 +124,7 @@ export function EventCard({
                 : "bg-marigold text-aubergine hover:bg-marigold-dark"
             }`}
           >
-            {soldOut ? "Sold out" : "Buy tickets"}
+            {soldOut ? "Sold out" : sellingOnRameelo ? "Get tickets" : "Get early access"}
           </Link>
         </div>
       </div>

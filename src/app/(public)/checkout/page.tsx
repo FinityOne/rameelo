@@ -33,6 +33,23 @@ type PaymentMethod = "card" | "ach";
 const RAMEELO_FEE_PCT  = 0.03;
 const CARD_FEE_PCT     = 0.05;
 
+// Documented sandbox/test credentials — orders paid with these are flagged as test.
+const TEST_CARD_NUMBER    = "4242424242424242";
+const TEST_ACH_ROUTING    = "110000000";
+const TEST_ACH_ACCOUNT    = "000123456789";
+
+function isTestPayment(args: {
+  method: PaymentMethod;
+  cardNumber: string;
+  routingNumber: string;
+  accountNumber: string;
+}): boolean {
+  if (args.method === "card") {
+    return args.cardNumber.replace(/\D/g, "") === TEST_CARD_NUMBER;
+  }
+  return args.routingNumber === TEST_ACH_ROUTING && args.accountNumber === TEST_ACH_ACCOUNT;
+}
+
 function calcFees(subtotalAfterDiscount: number, method: PaymentMethod) {
   const rameeloFee    = Math.round(subtotalAfterDiscount * RAMEELO_FEE_PCT * 100) / 100;
   const processingFee = method === "card"
@@ -127,6 +144,7 @@ export default function CheckoutPage() {
   const cardValid    = cardNumber.replace(/\s/g, "").length === 16 && expiry.length === 5 && cvv.length >= 3 && nameOnCard && billingZip.length === 5;
   const achValid     = routingNumber.length === 9 && accountNumber.length >= 4 && accountName.trim().length > 0;
   const paymentValid = paymentMethod === "card" ? cardValid : achValid;
+  const testDetected = isTestPayment({ method: paymentMethod, cardNumber, routingNumber, accountNumber });
 
   function handleContactNext(e: React.FormEvent) {
     e.preventDefault();
@@ -137,6 +155,8 @@ export default function CheckoutPage() {
     e.preventDefault();
     if (!payload) return;
     setLoading(true);
+
+    const isTest = isTestPayment({ method: paymentMethod, cardNumber, routingNumber, accountNumber });
 
     const { orderId, error } = await saveOrder({
       userId: authedUserId,
@@ -155,6 +175,7 @@ export default function CheckoutPage() {
       processingFee,
       paymentMethod,
       grandTotal,
+      isTest,
     });
 
     if (orderId && payload.groupId && payload.groupEmail) {
@@ -393,6 +414,11 @@ export default function CheckoutPage() {
                   ) : (
                     <p className="font-ui text-xs text-ink-muted">
                       Routing: <span className="font-mono font-bold text-ink">110000000</span> · Account: <span className="font-mono font-bold text-ink">000123456789</span>
+                    </p>
+                  )}
+                  {testDetected && (
+                    <p className="font-ui text-[11px] text-marigold-dark font-semibold mt-1.5 flex items-center gap-1">
+                      <span aria-hidden>⚑</span> Test credentials detected — this order will be recorded as a test order.
                     </p>
                   )}
                 </div>

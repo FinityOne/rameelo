@@ -288,6 +288,7 @@ export async function saveOrder(params: {
   processingFee: number;
   paymentMethod: "card" | "ach";
   grandTotal: number;
+  isTest?: boolean;
 }): Promise<{ orderId: string | null; error: string | null }> {
   const supabase = createClient();
 
@@ -310,6 +311,7 @@ export async function saveOrder(params: {
       processing_fee: params.processingFee,
       payment_method: params.paymentMethod,
       grand_total: params.grandTotal,
+      is_test: params.isTest ?? false,
       status: "confirmed",
     })
     .select("id")
@@ -326,7 +328,7 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
     .from("orders")
     .select(`
       id, group_id, qty, unit_price, discount_pct,
-      discount_amount, service_fee, grand_total,
+      discount_amount, service_fee, grand_total, is_test,
       status, created_at, buyer_name, buyer_email, buyer_phone,
       events (
         id, title, start_date, start_time,
@@ -392,6 +394,7 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
         qty: o.qty,
         unitPrice: o.unit_price,
         grandTotal: o.grand_total,
+        isTest: o.is_test ?? false,
         purchasedAt: o.created_at,
         groupMembers,
         transfers: (transfersByOrder.get(o.id) ?? []).map(t => ({
@@ -467,6 +470,7 @@ interface RawOrderRow {
   discount_amount: number;
   service_fee: number;
   grand_total: number;
+  is_test: boolean;
   status: string;
   created_at: string;
   buyer_name: string;
@@ -503,6 +507,7 @@ export interface PortalOrderRow {
   qty: number;
   unitPrice: number;
   grandTotal: number;
+  isTest: boolean;
   purchasedAt: string;
   groupMembers?: GroupMember[];
   transfers?: {

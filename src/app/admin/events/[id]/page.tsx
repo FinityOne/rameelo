@@ -16,6 +16,18 @@ type InterestSubmission = {
   created_at: string;
 };
 
+type OrderRow = {
+  id: string;
+  buyer_name: string;
+  buyer_email: string;
+  qty: number;
+  grand_total: number;
+  payment_method: string;
+  status: string;
+  is_test: boolean;
+  created_at: string;
+};
+
 type TicketTier = {
   id: string;
   name: string;
@@ -126,6 +138,8 @@ export default function AdminEventReviewPage() {
   const [done, setDone]       = useState<'approved' | 'rejected' | null>(null);
   const [togglingRameelo, setTogglingRameelo] = useState(false);
   const [interests, setInterests] = useState<InterestSubmission[]>([]);
+  const [orders, setOrders] = useState<OrderRow[]>([]);
+  const [togglingOrderId, setTogglingOrderId] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -155,6 +169,13 @@ export default function AdminEventReviewPage() {
         .eq('event_id', id)
         .order('created_at', { ascending: false });
       setInterests((interestData ?? []) as InterestSubmission[]);
+
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('id, buyer_name, buyer_email, qty, grand_total, payment_method, status, is_test, created_at')
+        .eq('event_id', id)
+        .order('created_at', { ascending: false });
+      setOrders((orderData ?? []) as OrderRow[]);
 
       setLoading(false);
     }
@@ -214,6 +235,17 @@ export default function AdminEventReviewPage() {
     await supabase.from('events').update({ selling_on_rameelo: next }).eq('id', id);
     setEvent(prev => prev ? { ...prev, selling_on_rameelo: next } : prev);
     setTogglingRameelo(false);
+  }
+
+  async function toggleOrderTest(order: OrderRow) {
+    setTogglingOrderId(order.id);
+    const supabase = createClient();
+    const next = !order.is_test;
+    const { error } = await supabase.from('orders').update({ is_test: next }).eq('id', order.id);
+    if (!error) {
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, is_test: next } : o));
+    }
+    setTogglingOrderId(null);
   }
 
   if (loading) {
@@ -507,6 +539,107 @@ export default function AdminEventReviewPage() {
           </div>
         )}
       </div>
+
+      {/* Orders */}
+      {orders.length > 0 && (() => {
+        const testCount = orders.filter(o => o.is_test).length;
+        const liveOrders = orders.filter(o => !o.is_test);
+        const liveRevenue = liveOrders.reduce((s, o) => s + o.grand_total, 0);
+        const liveTickets = liveOrders.reduce((s, o) => s + o.qty, 0);
+        return (
+          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+            <div className="px-5 py-3.5 bg-ivory border-b border-ivory-200 flex items-center justify-between">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Orders</p>
+              <div className="flex items-center gap-4">
+                <span className="font-mono text-[10px] text-ink-muted">
+                  {orders.length} order{orders.length !== 1 ? 's' : ''}
+                </span>
+                {testCount > 0 && (
+                  <span className="font-mono text-[10px] font-bold text-marigold-dark">
+                    {testCount} test
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Summary (live only) */}
+            <div className="px-5 py-3.5 grid grid-cols-3 gap-4 border-b border-ivory-200 bg-ivory/50">
+              <div>
+                <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Live orders</p>
+                <p className="font-display font-bold text-ink text-xl mt-0.5" style={{ letterSpacing: '-0.02em' }}>
+                  {liveOrders.length}
+                </p>
+              </div>
+              <div>
+                <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Live tickets</p>
+                <p className="font-display font-bold text-aubergine text-xl mt-0.5" style={{ letterSpacing: '-0.02em' }}>
+                  {liveTickets.toLocaleString()}
+                </p>
+              </div>
+              <div>
+                <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Live revenue</p>
+                <p className="font-display font-bold text-ink text-xl mt-0.5" style={{ letterSpacing: '-0.02em' }}>
+                  ${liveRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </p>
+              </div>
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-ivory-200">
+                    <th className="px-5 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal">Buyer</th>
+                    <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal hidden sm:table-cell">Email</th>
+                    <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal text-right">Qty</th>
+                    <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal text-right">Total</th>
+                    <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal hidden sm:table-cell">Method</th>
+                    <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal hidden md:table-cell">Placed</th>
+                    <th className="px-5 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal text-right">Category</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-ivory-200">
+                  {orders.map(o => (
+                    <tr key={o.id} className={`transition-colors ${o.is_test ? 'bg-marigold/[0.04] hover:bg-marigold/[0.08]' : 'hover:bg-ivory/50'}`}>
+                      <td className="px-5 py-3 font-ui text-sm text-ink font-medium">
+                        <div className="flex items-center gap-2">
+                          {o.buyer_name}
+                          {o.is_test && (
+                            <span className="font-mono text-[8px] uppercase tracking-widest bg-marigold/20 text-marigold-dark px-1.5 py-0.5 rounded-full">Test</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 font-ui text-xs text-ink-muted hidden sm:table-cell">{o.buyer_email}</td>
+                      <td className="px-3 py-3 text-right font-mono text-sm text-ink">{o.qty}</td>
+                      <td className="px-3 py-3 text-right font-mono text-sm text-ink">${o.grand_total.toFixed(2)}</td>
+                      <td className="px-3 py-3 font-ui text-xs text-ink-muted hidden sm:table-cell uppercase">{o.payment_method}</td>
+                      <td className="px-3 py-3 font-mono text-[10px] text-ink-muted hidden md:table-cell">{fmtTS(o.created_at)}</td>
+                      <td className="px-5 py-3 text-right">
+                        <button
+                          onClick={() => toggleOrderTest(o)}
+                          disabled={togglingOrderId === o.id}
+                          title={o.is_test ? 'Mark as a live order' : 'Mark as a test order'}
+                          className={`inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest font-bold px-2.5 py-1.5 rounded-full border transition-all ${togglingOrderId === o.id ? 'opacity-50' : ''} ${
+                            o.is_test
+                              ? 'bg-marigold/15 text-marigold-dark border-marigold/30 hover:bg-marigold/25'
+                              : 'bg-peacock/10 text-peacock border-peacock/25 hover:bg-peacock/20'
+                          }`}
+                        >
+                          <span className={`w-1.5 h-1.5 rounded-full ${o.is_test ? 'bg-marigold-dark' : 'bg-peacock'}`} />
+                          {o.is_test ? 'Test' : 'Live'}
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="px-5 py-2.5 bg-ivory/50 border-t border-ivory-200">
+              <p className="font-ui text-[11px] text-ink-muted">Test orders are excluded from live totals and labeled as test in the member portal.</p>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Interest form submissions */}
       {(interests.length > 0 || !event.selling_on_rameelo) && (

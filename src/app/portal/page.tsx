@@ -17,13 +17,6 @@ const SPONSOR_ADS = [
 
 // ── Live platform types ───────────────────────────────────────────────────────
 
-type PlatformStats = {
-  total_members: number;
-  tickets_today: number;
-  upcoming_events: number;
-  active_groups: number;
-};
-
 type LiveActivityItem = {
   type: "ticket" | "group";
   event_title: string;
@@ -193,29 +186,6 @@ function QRMini({ value }: { value: string }) {
   );
 }
 
-// ── Animated counter ──────────────────────────────────────────────────────────
-
-function AnimatedCount({ target, suffix = "" }: { target: number; suffix?: string }) {
-  const [count, setCount] = useState(0);
-  const started = useRef(false);
-  useEffect(() => {
-    if (started.current) return;
-    started.current = true;
-    const duration = 1200;
-    const start = Date.now();
-    const tick = () => {
-      const elapsed = Date.now() - start;
-      const progress = Math.min(elapsed / duration, 1);
-      // ease-out cubic
-      const eased = 1 - Math.pow(1 - progress, 3);
-      setCount(Math.round(eased * target));
-      if (progress < 1) requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  }, [target]);
-  return <>{count.toLocaleString()}{suffix}</>;
-}
-
 // ── Live activity feed ────────────────────────────────────────────────────────
 
 function LiveActivityFeed({ items }: { items: LiveActivityItem[] }) {
@@ -275,34 +245,6 @@ function LiveActivityFeed({ items }: { items: LiveActivityItem[] }) {
           Browse all events →
         </Link>
       </div>
-    </div>
-  );
-}
-
-// ── Hype bar ──────────────────────────────────────────────────────────────────
-
-function HypeBar({ stats }: { stats: PlatformStats | null }) {
-  const items = [
-    { label: "Members",         value: stats?.total_members   ?? 0, color: "#F5A623", icon: "🪈" },
-    { label: "Tickets Today",   value: stats?.tickets_today   ?? 0, color: "#0E8C7A", icon: "🎟️" },
-    { label: "Upcoming Events", value: stats?.upcoming_events ?? 0, color: "#E8547A", icon: "📅" },
-    { label: "Active Groups",   value: stats?.active_groups   ?? 0, color: "#6366F1", icon: "👥" },
-  ];
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      {items.map(s => (
-        <div key={s.label} className="bg-white rounded-2xl border border-ivory-200 px-4 py-3.5 flex items-center gap-3">
-          <div className="w-9 h-9 rounded-xl flex items-center justify-center text-lg shrink-0" style={{ backgroundColor: s.color + "18" }}>
-            {s.icon}
-          </div>
-          <div className="min-w-0">
-            <p className="font-display font-bold text-ink leading-none" style={{ fontSize: 22, letterSpacing: "-0.03em", color: s.color }}>
-              {stats ? <AnimatedCount target={s.value} /> : "—"}
-            </p>
-            <p className="font-mono text-[9px] text-ink-muted uppercase tracking-widest mt-0.5">{s.label}</p>
-          </div>
-        </div>
-      ))}
     </div>
   );
 }
@@ -388,7 +330,12 @@ function TicketCard({ order }: { order: PortalOrderRow }) {
         {initials}
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-display font-bold text-ink text-xs truncate group-hover:text-aubergine transition-colors">{order.eventTitle}</p>
+        <div className="flex items-center gap-1.5 min-w-0">
+          <p className="font-display font-bold text-ink text-xs truncate group-hover:text-aubergine transition-colors">{order.eventTitle}</p>
+          {order.isTest && (
+            <span className="font-mono text-[8px] uppercase tracking-widest font-bold bg-marigold/20 text-marigold-dark px-1.5 py-0.5 rounded-full shrink-0">Test</span>
+          )}
+        </div>
         <p className="font-mono text-[10px] text-ink-muted">{fmtDateShort(order.eventDate)} · {order.city}, {order.state}</p>
         <p className="font-mono text-[10px] text-ink-muted">{order.qty} ticket{order.qty > 1 ? "s" : ""}</p>
       </div>
@@ -516,7 +463,6 @@ export default function PortalDashboard() {
   const [pendingGroups, setPendingGroups] = useState<PendingGroup[]>([]);
   const [recommended, setRecommended]     = useState<RecommendedEvent[]>([]);
   const [incomingTransfers, setIncomingTransfers] = useState<IncomingTransfer[]>([]);
-  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
   const [liveActivity, setLiveActivity]   = useState<LiveActivityItem[]>([]);
   const [communityGroups, setCommunityGroups] = useState<CommunityGroup[]>([]);
   const [loading, setLoading]             = useState(true);
@@ -528,7 +474,7 @@ export default function PortalDashboard() {
       if (!authUser) return;
       const today = new Date().toISOString().slice(0, 10);
       const email = authUser.email ?? "";
-      const [myOrders, myPending, incoming, { data: eventsRaw }, statsRes, activityRes, groupsRes] = await Promise.all([
+      const [myOrders, myPending, incoming, { data: eventsRaw }, activityRes, groupsRes] = await Promise.all([
         loadMyOrders(authUser.id),
         loadMyPendingGroups(authUser.id),
         email ? loadIncomingTransfers(email) : Promise.resolve([]),
@@ -539,8 +485,11 @@ export default function PortalDashboard() {
           .gte("start_date", today)
           .order("start_date")
           .limit(6),
-        supabase.rpc("get_platform_stats"),
-        supabase.rpc("get_recent_activity", { p_limit: 10 }),
+        supabase
+          .from("live_activity")
+          .select("type, event_title, city, state, qty, group_size, created_at")
+          .order("created_at", { ascending: false })
+          .limit(10),
         supabase
           .from("chat_groups")
           .select("id, name, emoji, description, category, color1, color2, member_count, is_hot")
@@ -552,7 +501,6 @@ export default function PortalDashboard() {
       setOrders(myOrders);
       setPendingGroups(myPending);
       setIncomingTransfers(incoming);
-      if (statsRes.data) setPlatformStats(statsRes.data as PlatformStats);
       if (activityRes.data) setLiveActivity((activityRes.data as LiveActivityItem[]) ?? []);
       if (groupsRes.data) setCommunityGroups(groupsRes.data as CommunityGroup[]);
       const myEventIds = new Set(myOrders.map(o => o.eventId));
@@ -645,8 +593,8 @@ export default function PortalDashboard() {
         {nextOrder && <EventCountdown order={nextOrder} />}
       </div>
 
-      {/* ── Hype bar ── */}
-      {!loading && <HypeBar stats={platformStats} />}
+      {/* ── Quick actions (primary nav) ── */}
+      <QuickActions hasTickets={hasTickets} orderCount={orders.length} />
 
       {/* ── Garba Passport promo ── */}
       {!loading && (
@@ -743,12 +691,6 @@ export default function PortalDashboard() {
         </div>
       )}
 
-      {/* ── Community groups ── */}
-      <CommunityGroupsRow groups={communityGroups} />
-
-      {/* ── Quick actions ── */}
-      <QuickActions hasTickets={hasTickets} orderCount={orders.length} />
-
       {/* ── Recommended events ── */}
       <div>
         <div className="flex items-center justify-between mb-3">
@@ -769,6 +711,9 @@ export default function PortalDashboard() {
           </div>
         )}
       </div>
+
+      {/* ── Community groups ── */}
+      <CommunityGroupsRow groups={communityGroups} />
 
       {/* ── Sponsors ── */}
       <div>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { stats } from "@/lib/data";
+import { getPlatformStats, headlineStats } from "@/lib/platform-stats";
 import { breadcrumbSchema, webPageSchema, ld } from "@/lib/jsonld";
 
 export const metadata: Metadata = {
@@ -84,7 +84,8 @@ const aboutPage = webPageSchema({
   ],
 });
 
-export default function AboutPage() {
+export default async function AboutPage() {
+  const stats = headlineStats(await getPlatformStats());
   return (
     <div className="bg-cream">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(aboutPage) }} />

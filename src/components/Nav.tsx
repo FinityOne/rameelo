@@ -68,7 +68,7 @@ function CatItem({
           </span>
         )}
       </span>
-      <span className={`font-mono text-[9px] mt-1 leading-none tracking-wide ${active ? "text-aubergine/60" : "text-ink/35"}`}>
+      <span className={`font-ui text-[11px] mt-1 leading-none ${active ? "text-aubergine/55" : "text-ink/45"}`}>
         {sub}
       </span>
     </span>
@@ -171,9 +171,9 @@ export default function Nav() {
 
             <span className="h-3 w-px bg-white/15 shrink-0" />
 
-            <ComingSoon label="Help center coming soon">
-              <span className="font-mono text-[10px] text-white/45 hover:text-white/70 transition-colors cursor-default">Help</span>
-            </ComingSoon>
+            <Link href="/help" className="font-mono text-[10px] text-white/45 hover:text-white/80 transition-colors">
+              Help
+            </Link>
 
             <span className="h-3 w-px bg-white/15 shrink-0" />
 
@@ -194,28 +194,28 @@ export default function Nav() {
 
       {/* ── Tier 2: Logo + Search + Auth ── */}
       <div className="bg-ivory border-b border-ivory-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center gap-5 h-[60px]">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-[60px]">
 
           {/* Logo */}
           <div className="shrink-0">
             <Logo variant="red" height={28} />
           </div>
 
-          {/* Search bar */}
-          <div className="flex-1 max-w-lg hidden md:block">
-            <div className="flex items-center gap-2.5 bg-white border border-ivory-200 rounded-xl px-4 py-2 shadow-sm hover:border-ink/20 transition-colors cursor-text">
-              <svg className="w-4 h-4 text-ink/30 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          {/* Search bar — compact + centered */}
+          <div className="hidden lg:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
+            <div className="flex items-center gap-2.5 bg-ink/[0.06] border border-ink/[0.07] rounded-full px-4 py-1.5 hover:bg-ink/[0.09] transition-colors cursor-text">
+              <svg className="w-4 h-4 text-ink/35 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
               </svg>
-              <span className="flex-1 font-ui text-sm text-ink/30 select-none">Search events, artists, cities…</span>
-              <kbd className="hidden lg:flex items-center gap-0.5 font-mono text-[10px] bg-ink/5 border border-ink/10 text-ink/30 px-1.5 py-0.5 rounded">
+              <span className="flex-1 font-ui text-[13px] text-ink/45 select-none">Search events, artists, cities…</span>
+              <kbd className="flex items-center gap-0.5 font-mono text-[10px] bg-white/50 border border-ink/10 text-ink/40 px-1.5 py-0.5 rounded-md">
                 <span style={{ fontSize: 11 }}>⌘</span>K
               </kbd>
             </div>
           </div>
 
           {/* Right: wishlist, cart, auth */}
-          <div className="flex items-center gap-1 ml-auto">
+          <div className="flex items-center gap-1">
             {/* Wishlist */}
             <ComingSoon label="Wishlists coming soon">
               <span className="w-9 h-9 rounded-xl flex items-center justify-center hover:bg-ivory-200 transition-colors cursor-default text-ink/50">
@@ -312,12 +312,6 @@ export default function Nav() {
 
           {/* Right: utility links */}
           <div className="flex items-center gap-6 shrink-0 py-3">
-            <Link
-              href="/organizers"
-              className={`font-ui text-[13px] font-medium transition-colors whitespace-nowrap ${pathname === "/organizers" ? "text-aubergine" : "text-ink/55 hover:text-ink"}`}
-            >
-              For organizers
-            </Link>
             <ComingSoon label="Sponsorship info coming soon">
               <span className="font-ui text-[13px] font-medium text-ink/40 cursor-default whitespace-nowrap">
                 Sponsor with us
@@ -380,7 +374,7 @@ export default function Nav() {
           })}
 
           <div className="border-t border-ink/6 pt-2 mt-2 space-y-0.5">
-            <Link href="/organizers" onClick={() => setMobileOpen(false)} className="block px-4 py-2.5 rounded-[8px] font-ui text-sm text-ink-muted hover:text-ink hover:bg-ivory-200 transition-colors">For organizers</Link>
+            <Link href="/organizers" onClick={() => setMobileOpen(false)} className="block px-4 py-2.5 rounded-[8px] font-ui text-sm text-ink-muted hover:text-ink hover:bg-ivory-200 transition-colors">Sell on Rameelo</Link>
             <div className="flex items-center justify-between px-4 py-2.5 rounded-[8px] text-ink/30">
               <span className="font-ui text-sm">Sponsor with us</span>
               <span className="font-mono text-[9px] bg-ink/6 px-2 py-0.5 rounded">Coming soon</span>

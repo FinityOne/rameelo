@@ -549,8 +549,9 @@ function WalletButton({ orderId, seat, size = "sm" }: { orderId: string; seat: n
   );
 }
 
-function TicketCard({ orderId, seat, total, eventTitle, tierName, transfer, onTransfer, onCancelTransfer }: {
+function TicketCard({ orderId, seat, total, eventTitle, tierName, isTest, transfer, onTransfer, onCancelTransfer }: {
   orderId: string; seat: number; total: number; eventTitle: string; tierName: string;
+  isTest?: boolean;
   transfer?: SeatTransfer;
   onTransfer?: (seat: number) => void;
   onCancelTransfer?: () => void;
@@ -601,6 +602,11 @@ function TicketCard({ orderId, seat, total, eventTitle, tierName, transfer, onTr
               }`}>
                 {isTransferred ? "Sent" : isPending ? "Transfer pending" : "Valid"}
               </span>
+              {isTest && (
+                <span className="font-mono text-[9px] uppercase tracking-wide px-2 py-0.5 rounded-full border font-bold bg-marigold/15 border-marigold/20 text-marigold-dark">
+                  Test
+                </span>
+              )}
             </div>
             {(isPending || isTransferred) && (
               <p className="font-ui text-xs mt-0.5 text-ink-muted/70">
@@ -757,6 +763,7 @@ function OrderCard({ order, userId, userEmail, isIOS, onRefresh }: {
             <div className="flex-1 px-4 py-4 min-w-0">
               {/* Status pills */}
               <div className="flex items-center gap-1.5 mb-2 flex-wrap">
+                {order.isTest && <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold bg-marigold/20 text-marigold-dark">Test order</span>}
                 {allTransferred && <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold bg-ivory-200 text-ink-muted">All Transferred</span>}
                 {!allTransferred && pendingCount > 0 && <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold bg-marigold/15 text-marigold-dark">{pendingCount} Pending Transfer</span>}
                 {!allTransferred && !pendingCount && isUpcoming && <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold bg-peacock/10 text-peacock">Upcoming</span>}
@@ -825,6 +832,7 @@ function OrderCard({ order, userId, userEmail, isIOS, onRefresh }: {
                     total={order.qty}
                     eventTitle={order.eventTitle}
                     tierName={order.tierName}
+                    isTest={order.isTest}
                     transfer={getTransferForSeat(seat, transfers)}
                     onTransfer={isUpcoming ? (s) => setTransferModal({ seats: [s] }) : undefined}
                     onCancelTransfer={onRefresh}

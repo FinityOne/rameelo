@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { stats, testimonials, communityGroups } from "@/lib/data";
+import { testimonials, communityGroups } from "@/lib/data";
 import { Eyebrow, Button, Badge, EventCard, Avatar } from "@/components/ui";
 import HeroSearch from "@/components/HeroSearch";
 import { createClient } from "@/lib/supabase/server";
-import USAEventMap from "@/components/USAEventMapClient";
+import { getPlatformStats, headlineStats, compactNumber } from "@/lib/platform-stats";
 import { breadcrumbSchema, faqSchema, itemListSchema, ld } from "@/lib/jsonld";
 
 export const metadata: Metadata = {
@@ -69,6 +69,7 @@ type LiveEvent = {
   id: string; title: string; category: string;
   city: string; state: string; start_date: string; start_time: string; venue_name: string;
   artists: { name: string } | null;
+  selling_on_rameelo: boolean;
   ticket_tiers: { price: number; quantity: number; quantity_sold: number }[];
 };
 
@@ -87,12 +88,10 @@ export default async function HomePage() {
   const supabase = await createClient();
   const today = new Date().toISOString().split("T")[0];
 
-  const [{ count: profileCount }, { count: teamCount }, { count: eventCount }, { data: rawEvents }] = await Promise.all([
-    supabase.from("profiles").select("*", { count: "exact", head: true }),
-    supabase.from("collegiate_teams").select("*", { count: "exact", head: true }),
-    supabase.from("events").select("*", { count: "exact", head: true }).eq("status", "published"),
+  const [platformStats, { data: rawEvents }] = await Promise.all([
+    getPlatformStats(),
     supabase.from("events")
-      .select("id, title, category, city, state, start_date, start_time, venue_name, artists(name), ticket_tiers(price, quantity, quantity_sold)")
+      .select("id, title, category, city, state, start_date, start_time, venue_name, selling_on_rameelo, artists(name), ticket_tiers(price, quantity, quantity_sold)")
       .eq("status", "published")
       .gte("start_date", today)
       .order("start_date")
@@ -100,11 +99,9 @@ export default async function HomePage() {
   ]);
 
   const liveEvents = (rawEvents ?? []) as unknown as LiveEvent[];
-  const memberCount = profileCount ?? 0;
-  const collegiateCount = teamCount ?? 0;
-  const memberDisplay = memberCount >= 1000
-    ? `${(memberCount / 1000).toFixed(1).replace(".0", "")}k`
-    : String(memberCount);
+  const { events: eventCount, members: memberCount, teams: collegiateCount, cities: cityCount } = platformStats;
+  const headline = headlineStats(platformStats);
+  const memberDisplay = compactNumber(memberCount).toLowerCase();
 
   const homeFaq = faqSchema([
     { question: "What is Rameelo?", answer: "Rameelo is America's dedicated ticketing platform for raas garba, dandiya, and Navratri events. We serve 14+ cities including Edison NJ, Houston, Chicago, Atlanta, and the Bay Area." },
@@ -199,7 +196,7 @@ export default async function HomePage() {
             </div>
             <span className="w-px h-4 bg-white/10 hidden sm:block" />
             <div className="flex items-center gap-2">
-              <span className="font-mono text-[10px] text-white/25 tracking-widest uppercase">27 cities</span>
+              <span className="font-mono text-[10px] text-white/25 tracking-widest uppercase">{cityCount > 0 ? cityCount : 27} cities</span>
               <span className="w-px h-3 bg-white/10" />
               <span className="font-mono text-[10px] text-white/25 tracking-widest uppercase">Navratri 2026</span>
               <span className="w-px h-3 bg-white/10" />
@@ -222,25 +219,23 @@ export default async function HomePage() {
               <div className="grid grid-cols-2 divide-x divide-y divide-white/8 border border-white/8 rounded-xl overflow-hidden">
                 {[
                   {
-                    value: eventCount && eventCount > 0 ? `${eventCount}+` : "500+",
+                    value: eventCount > 0 ? `${eventCount}+` : "500+",
                     label: "events listed nationwide",
                     italic: true,
                   },
                   {
-                    value: "47",
+                    value: cityCount > 0 ? `${cityCount}` : "47",
                     label: "cities in the network",
                     italic: false,
                   },
                   {
-                    value: `${Math.max(collegiateCount, 180)}+`,
+                    value: collegiateCount > 0 ? `${collegiateCount}+` : "180+",
                     label: "collegiate teams",
                     italic: true,
                     dot: true,
                   },
                   {
-                    value: memberCount >= 1000
-                      ? `${(memberCount / 1000).toFixed(0)}K`
-                      : `${memberCount > 0 ? memberCount : "92K"}`,
+                    value: memberCount > 0 ? compactNumber(memberCount) : "92K",
                     label: "dancers on Rameelo",
                     italic: false,
                   },
@@ -427,11 +422,6 @@ export default async function HomePage() {
       </section>
 
       {/* ══════════════════════════════════════════
-          USA EVENT MAP
-      ══════════════════════════════════════════ */}
-      <USAEventMap />
-
-      {/* ══════════════════════════════════════════
           CITY TICKER
       ══════════════════════════════════════════ */}
       <CityTicker />
@@ -442,7 +432,7 @@ export default async function HomePage() {
       <section className="bg-ivory py-14">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 md:grid-cols-4 gap-px bg-ivory-200 rounded-[16px] overflow-hidden border border-ivory-200">
-            {stats.map((stat) => (
+            {headline.map((stat) => (
               <div key={stat.label} className="bg-ivory py-8 px-6 text-center">
                 <p
                   className="font-display font-bold text-aubergine"
@@ -499,7 +489,8 @@ export default async function HomePage() {
                 const total = tiers.reduce((s, t) => s + t.quantity, 0);
                 const sold  = tiers.reduce((s, t) => s + t.quantity_sold, 0);
                 const pct   = total > 0 ? Math.round((sold / total) * 100) : 0;
-                const minPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : 0;
+                const minPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : null;
+                const maxPrice = tiers.length > 0 ? Math.max(...tiers.map(t => t.price)) : null;
                 const dateStr  = new Date(event.start_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
                 return (
                   <EventCard
@@ -509,7 +500,9 @@ export default async function HomePage() {
                     city={event.city}
                     state={event.state}
                     date={dateStr}
-                    price={minPrice}
+                    minPrice={minPrice}
+                    maxPrice={maxPrice}
+                    sellingOnRameelo={event.selling_on_rameelo}
                     soldPct={pct}
                     soldOut={total > 0 && sold >= total}
                     href={`/events/${event.id}`}
@@ -739,17 +732,17 @@ export default async function HomePage() {
           </div>
 
           <h2 className="font-display font-bold text-white mb-3" style={{ fontSize: "clamp(40px, 5.5vw, 68px)", letterSpacing: "-0.025em", lineHeight: 1.04 }}>
-            Be inside
+            Join the
           </h2>
           <h2 className="font-editorial italic text-marigold mb-8" style={{ fontSize: "clamp(40px, 5.5vw, 68px)", lineHeight: 1.04, fontWeight: 500 }}>
-            when it drops.
+            founding circle.
           </h2>
 
           <p className="font-ui text-white/50 text-base mb-3 max-w-sm mx-auto">
-            June 1st. Something the US garba community has never had before.
+            Tickets, your crew, the artists, and the afterparty — all in one place.
           </p>
           <p className="font-ui text-white/30 text-sm mb-10 max-w-xs mx-auto">
-            {memberDisplay} founding members already registered. They find out first.
+            {memberDisplay} founding members already in the circle.
           </p>
 
           <Link

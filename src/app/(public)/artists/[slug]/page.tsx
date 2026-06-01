@@ -446,6 +446,12 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
           <div className="flex flex-col lg:flex-row gap-10 lg:gap-16 items-start lg:items-end">
             {/* Left: Identity */}
             <div className="flex-1">
+              {/* Profile portrait */}
+              <div className="mb-5">
+                <div className="inline-block rounded-3xl p-1 bg-white/10 border border-white/20 shadow-xl">
+                  <ArtistAvatar artist={artist} size={104} />
+                </div>
+              </div>
               {/* Genre + status pills */}
               <div className="flex flex-wrap gap-2 mb-5">
                 {artist.genres.slice(0, 3).map((g) => (
@@ -659,65 +665,6 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
           )}
         </section>
 
-        {/* ── OFFICIAL TICKETING PARTNER STRIP ────────────────────────────── */}
-        <section
-          className="relative overflow-hidden rounded-3xl p-8 sm:p-12"
-          style={{ background: `linear-gradient(135deg, ${heroColor} 0%, #1a0a1f 100%)` }}
-        >
-          <div className="absolute inset-0 opacity-[0.06]"
-            style={{ backgroundImage: "radial-gradient(circle at 80% 20%, #F5A623 0%, transparent 50%), radial-gradient(circle at 20% 80%, #fff 0%, transparent 50%)" }} />
-          <div className="relative flex flex-col sm:flex-row items-center sm:items-start gap-8">
-            <div className="flex-1 text-center sm:text-left">
-              <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-marigold/40 bg-marigold/15 mb-4">
-                <span className="w-1.5 h-1.5 rounded-full bg-marigold animate-pulse" />
-                <span className="font-mono text-[10px] uppercase tracking-widest text-marigold">Official Ticketing Partner</span>
-              </div>
-              <h2 className="font-display font-bold text-white text-2xl sm:text-3xl mb-3" style={{ letterSpacing: "-0.02em" }}>
-                Rameelo is {artist.name}&apos;s exclusive ticketing home
-              </h2>
-              <p className="font-ui text-white/60 text-base leading-relaxed max-w-xl mb-6">
-                Every {artist.name} tour date, every city, every ticket — verified and sold exclusively on Rameelo. No third-party resellers, no inflated prices. Just direct access to the artist you love.
-              </p>
-              <div className="flex flex-wrap gap-3 justify-center sm:justify-start">
-                {events.length > 0 && (
-                  <Link href="#shows"
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-display font-bold text-sm text-aubergine hover:opacity-90 transition-all shadow-lg"
-                    style={{ backgroundColor: "#F5A623" }}
-                  >
-                    Get tickets →
-                  </Link>
-                )}
-                <Link href="/auth/signup"
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-ui font-semibold text-sm text-white border border-white/20 bg-white/10 hover:bg-white/20 transition-all">
-                  Get notified when shows drop
-                </Link>
-              </div>
-            </div>
-            <div className="flex flex-col items-center gap-4 shrink-0">
-              <div className="w-20 h-20 rounded-2xl flex items-center justify-center" style={{ backgroundColor: "#F5A623" }}>
-                <span className="font-display font-bold text-aubergine text-4xl leading-none">R</span>
-              </div>
-              <div className="text-center">
-                <p className="font-display font-bold text-white text-lg">Rameelo</p>
-                <p className="font-mono text-[9px] uppercase tracking-widest text-white/40">Official Partner</p>
-              </div>
-              <div className="flex flex-col gap-2 text-center">
-                {[
-                  "Verified tickets",
-                  "No hidden fees",
-                  "Instant e-tickets",
-                  "Group discounts",
-                ].map(f => (
-                  <div key={f} className="flex items-center gap-2">
-                    <svg className="w-3.5 h-3.5 text-peacock shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-                    <span className="font-ui text-sm text-white/70">{f}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </section>
-
         {/* ── VIDEOS ───────────────────────────────────────────────────────── */}
         {youtubeVideos.length > 0 && (
           <section>
@@ -796,7 +743,7 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
                 Booking {artist.name} for your event?
               </h2>
               <p className="font-ui text-ink-muted text-base leading-relaxed mb-6">
-                Rameelo is the official ticketing platform for {artist.name}&apos;s shows. If you&apos;re booking this artist, list and sell tickets through Rameelo — your audience already expects to find them here.
+                Booking {artist.name}? List and sell tickets through Rameelo — fans browse artist pages here to find upcoming shows, so your event gets in front of the right audience from day one.
               </p>
               <div className="flex flex-wrap gap-3">
                 <Link
@@ -814,7 +761,7 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
             </div>
             <div className="flex flex-col gap-3 sm:min-w-[220px]">
               {[
-                { icon: "🎟️", title: "Official ticketing", desc: "Fans know to look here first" },
+                { icon: "🎟️", title: "Built-in ticketing", desc: "Fans discover shows here" },
                 { icon: "📣", title: "Artist page traffic", desc: "Domain visits land on your event" },
                 { icon: "👥", title: "Group discounts", desc: "Built-in group buying flows" },
                 { icon: "📱", title: "Apple Wallet passes", desc: "Premium e-ticket experience" },

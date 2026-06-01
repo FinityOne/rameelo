@@ -5,12 +5,12 @@ import { faqSchema, webPageSchema, ld } from "@/lib/jsonld";
 
 export const metadata: Metadata = {
   title: "Pricing — Rameelo | Free for Organizers",
-  description: "Rameelo is completely free for organizers — keep 100% of your ticket revenue. Buyers pay a 3% platform fee on top of ticket prices. Zero fees on ACH bank transfers.",
+  description: "Rameelo is completely free for organizers — keep 100% of your ticket revenue. Buyers pay a 3% platform fee plus 5% card processing (8% by card); pay by bank transfer (ACH) to skip the card fee and pay just 3%.",
   keywords: ["garba ticketing pricing", "navratri event platform free", "organizer fees garba", "rameelo pricing", "free garba ticketing"],
   alternates: { canonical: "https://rameelo.com/pricing" },
   openGraph: {
     title: "Pricing — Rameelo | Free for Organizers",
-    description: "Free for organizers. 3% platform fee. Zero fees for buyers who pay by bank transfer.",
+    description: "Free for organizers. 3% platform fee + 5% card processing. Pay by bank transfer to skip the card fee.",
     type: "website",
     url: "https://rameelo.com/pricing",
     siteName: "Rameelo",
@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title: "Free for organizers — Rameelo Garba Platform",
-    description: "No monthly fee. 3% flat platform fee. Zero buyer fees on bank transfers.",
+    description: "No monthly fee. 3% platform fee + 5% card processing. Lower fees when buyers pay by bank transfer.",
     images: ["https://rameelo.com/og-default.jpg"],
   },
 };
@@ -50,7 +50,7 @@ const FAQS = [
   },
   {
     q: "How much do buyers pay on top of the ticket price?",
-    a: "Buyers pay a 3% Rameelo platform fee automatically added at checkout. If they pay by credit or debit card, an additional ~2% payment processing fee applies (totaling ~5%). Buyers who pay by bank account (ACH) pay only the ticket face price — no fees at all.",
+    a: "Buyers pay a 3% Rameelo platform fee automatically added at checkout. If they pay by credit or debit card, an additional 5% payment processing fee applies (totaling 8%). Buyers who pay by bank account (ACH) skip the card processing fee and pay only the 3% platform fee.",
   },
   {
     q: "When do I receive my payout?",
@@ -194,10 +194,10 @@ export default function PricingPage() {
                 <div className="flex-1">
                   <div className="flex items-center justify-between mb-1">
                     <p className="font-ui font-semibold text-ink text-sm">Credit or debit card</p>
-                    <span className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>+5%</span>
+                    <span className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>+8%</span>
                   </div>
                   <p className="font-ui text-sm text-ink-muted leading-snug">
-                    3% platform fee + ~2% card processing, added on top of the ticket price at checkout.
+                    3% platform fee + 5% card processing, added on top of the ticket price at checkout.
                   </p>
                 </div>
               </div>
@@ -206,7 +206,7 @@ export default function PricingPage() {
               <div className="bg-ivory rounded-2xl border-2 border-peacock/20 p-6 flex items-start gap-4 shadow-sm relative overflow-hidden">
                 <div className="absolute top-3 right-3">
                   <span className="inline-flex items-center px-2.5 py-1 rounded-full font-mono text-[9px] font-bold uppercase tracking-wide bg-peacock/10 text-peacock border border-peacock/20">
-                    Zero fees
+                    No card fee
                   </span>
                 </div>
                 <div className="w-12 h-12 rounded-2xl bg-peacock/8 border border-peacock/15 flex items-center justify-center shrink-0">
@@ -217,9 +217,10 @@ export default function PricingPage() {
                 <div className="flex-1 pr-16">
                   <div className="flex items-center gap-2 mb-1">
                     <p className="font-ui font-semibold text-ink text-sm">Bank account (ACH)</p>
+                    <span className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>+3%</span>
                   </div>
                   <p className="font-ui text-sm text-ink-muted leading-snug">
-                    Pay directly from your bank — no fees added. Buyers pay exactly the ticket price.
+                    Pay directly from your bank — skip the 5% card processing fee. Buyers pay just the 3% platform fee.
                   </p>
                 </div>
               </div>
@@ -229,14 +230,14 @@ export default function PricingPage() {
                 <p className="font-mono text-[9px] uppercase tracking-widest text-ink/30 mb-3">Example · $50 ticket · organizer keeps $50 either way</p>
                 <div className="grid grid-cols-2 gap-3">
                   <div className="text-center bg-ink/3 rounded-xl p-3">
-                    <p className="font-display font-black text-ink text-2xl mb-0.5" style={{ letterSpacing: "-0.03em" }}>$52.50</p>
+                    <p className="font-display font-black text-ink text-2xl mb-0.5" style={{ letterSpacing: "-0.03em" }}>$54.00</p>
                     <p className="font-mono text-[9px] text-ink/40 uppercase tracking-wider">Buyer pays (card)</p>
-                    <p className="font-mono text-[9px] text-ink/25 mt-0.5">$50 + 5% fees</p>
+                    <p className="font-mono text-[9px] text-ink/25 mt-0.5">$50 + 8% fees</p>
                   </div>
                   <div className="text-center bg-peacock/5 border border-peacock/15 rounded-xl p-3">
-                    <p className="font-display font-black text-peacock text-2xl mb-0.5" style={{ letterSpacing: "-0.03em" }}>$50.00</p>
+                    <p className="font-display font-black text-peacock text-2xl mb-0.5" style={{ letterSpacing: "-0.03em" }}>$51.50</p>
                     <p className="font-mono text-[9px] text-peacock/70 uppercase tracking-wider">Buyer pays (ACH)</p>
-                    <p className="font-mono text-[9px] text-peacock/40 mt-0.5">No fees added</p>
+                    <p className="font-mono text-[9px] text-peacock/40 mt-0.5">$50 + 3% platform fee</p>
                   </div>
                 </div>
               </div>
