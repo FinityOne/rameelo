@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { GRADIENTS } from "@/app/organizer/events/create/types";
 import { loadMyOrders, type PortalOrderRow, type GroupMember } from "@/lib/group-orders";
 import {
   lookupUserByEmail,
@@ -42,14 +43,34 @@ function QRCode({ value, size = 140 }: { value: string; size?: number }) {
 function fmtDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
-function fmtDateShort(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
 function fmtDateTime(iso: string) {
   return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
 }
 
 const AVATAR_COLORS = ["#2E1B30", "#0E8C7A", "#7C1F2C", "#D4891B", "#5a1e7a", "#892240", "#1a4a5e"];
+
+// Resolve an event's cover into a CSS background for the ticket panel.
+// Prefers the uploaded cover image; otherwise falls back to the saved gradient id.
+function coverBackground(coverImageUrl: string | null, coverGradient: string): string {
+  if (coverImageUrl) {
+    return `linear-gradient(135deg, rgba(20,8,22,0.35) 0%, rgba(20,8,22,0.55) 100%), url(${coverImageUrl}) center/cover no-repeat`;
+  }
+  const g = GRADIENTS.find(x => x.id === coverGradient);
+  return g?.css ?? "linear-gradient(135deg, #7C1F2C 0%, #B84A22 50%, #F5A623 100%)";
+}
+
+function fmtTime(t?: string) {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  if (Number.isNaN(h)) return t;
+  return `${h % 12 || 12}:${String(m ?? 0).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+}
+
+// Short ticket reference shown on the ticket face, e.g. #RMZ-2207-A3
+function ticketRef(orderId: string, seat: number) {
+  const tail = orderId.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase().padStart(6, "0");
+  return `#RMZ-${tail.slice(0, 4)}-${tail.slice(4)}${seat}`;
+}
 
 type SeatTransfer = PortalOrderRow["transfers"] extends (infer T)[] | undefined ? T : never;
 
@@ -530,217 +551,284 @@ function GroupMembersPanel({ members, groupId }: { members: GroupMember[]; group
   );
 }
 
-// ── Individual Ticket Card ────────────────────────────────────────────────────────
-function WalletButton({ orderId, seat, size = "sm" }: { orderId: string; seat: number; size?: "sm" | "lg" }) {
+// ── Apple Wallet button ────────────────────────────────────────────────────────
+function AppleWalletButton({ orderId, seat, full = false }: { orderId: string; seat: number; full?: boolean }) {
   return (
     <a
       href={`/api/wallet/pass/${orderId}?seat=${seat}`}
       onClick={e => e.stopPropagation()}
-      className={size === "lg"
-        ? "flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-black text-white font-ui text-sm font-medium hover:bg-zinc-800 active:scale-95 transition-all"
-        : "shrink-0 flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-black text-white font-ui font-semibold text-[11px] hover:bg-zinc-800 active:scale-95 transition-all"
-      }
+      className={`flex items-center justify-center gap-1.5 rounded-xl bg-aubergine text-white font-ui font-semibold hover:bg-aubergine-light active:scale-[0.97] transition-all ${full ? "w-full py-3 text-sm" : "px-3.5 py-2.5 text-[13px]"}`}
+      style={{ minHeight: 44 }}
     >
-      <svg className={size === "lg" ? "w-4 h-4" : "w-3 h-3"} viewBox="0 0 24 24" fill="currentColor">
+      <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
         <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
       </svg>
-      {size === "lg" ? "Add to Apple Wallet" : "Wallet"}
+      Apple Wallet
     </a>
   );
 }
 
-function TicketCard({ orderId, seat, total, eventTitle, tierName, isTest, transfer, onTransfer, onCancelTransfer }: {
-  orderId: string; seat: number; total: number; eventTitle: string; tierName: string;
-  isTest?: boolean;
-  transfer?: SeatTransfer;
-  onTransfer?: (seat: number) => void;
-  onCancelTransfer?: () => void;
+// ── Fullscreen QR (enlarge + brighten for scanning) ─────────────────────────────
+function QREnlargeModal({ ticketId, eventTitle, tierName, onClose }: {
+  ticketId: string; eventTitle: string; tierName: string; onClose: () => void;
 }) {
-  const [expanded, setExpanded] = useState(false);
-  const [cancelling, setCancelling] = useState(false);
-  const ticketId = `${orderId}-T${seat}`;
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => { document.body.style.overflow = prev; window.removeEventListener("keydown", onKey); };
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[60] bg-white flex flex-col items-center justify-center px-6" onClick={onClose}>
+      <button
+        onClick={onClose}
+        className="absolute top-5 right-5 w-11 h-11 rounded-full bg-ink/5 flex items-center justify-center text-ink/60 hover:text-ink transition-colors"
+        aria-label="Close"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+
+      <div className="flex flex-col items-center gap-5" onClick={e => e.stopPropagation()}>
+        <div className="text-center">
+          <p className="font-display font-bold text-ink text-lg leading-tight" style={{ letterSpacing: "-0.015em" }}>{eventTitle}</p>
+          <p className="font-ui text-sm text-ink-muted">{tierName}</p>
+        </div>
+        <div className="p-5 rounded-3xl bg-white shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-ivory-200">
+          <QRCode value={ticketId} size={Math.min(320, typeof window !== "undefined" ? window.innerWidth - 96 : 320)} />
+        </div>
+        <p className="font-mono text-[11px] text-ink/40">{ticketRef(ticketId.split("-T")[0], Number(ticketId.split("-T")[1] || 1))}</p>
+        <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-peacock/10 border border-peacock/20">
+          <span className="w-1.5 h-1.5 rounded-full bg-peacock animate-pulse" />
+          <p className="font-mono text-[11px] text-peacock font-bold uppercase tracking-widest">Screen brightened · show at entry</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── A single ticket slide (one seat) ────────────────────────────────────────────
+type Slide = { order: PortalOrderRow; seat: number; transfer?: SeatTransfer; globalIndex: number };
+
+function seasonLabel(order: PortalOrderRow) {
+  const cat = (order.category || "Garba").trim();
+  const catUpper = cat.charAt(0).toUpperCase() + cat.slice(1);
+  const yr = order.eventDate ? `'${order.eventDate.slice(2, 4)}` : "";
+  return `${catUpper} · Navratri ${yr}`.trim();
+}
+
+function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: {
+  slide: Slide;
+  total: number;
+  onEnlarge: (ticketId: string, eventTitle: string, tierName: string) => void;
+  onTransfer: (order: PortalOrderRow, seat: number) => void;
+  onCancelTransfer: () => void;
+}) {
+  const { order, seat, transfer, globalIndex } = slide;
+  const ticketId = `${order.orderId}-T${seat}`;
   const isPending = transfer?.status === "pending";
   const isTransferred = transfer?.status === "accepted";
+  const isUpcoming = order.eventDate >= new Date().toISOString().slice(0, 10);
+  const [cancelling, setCancelling] = useState(false);
 
   async function handleCancel() {
     if (!transfer) return;
     setCancelling(true);
     await cancelTransfer(transfer.id);
     setCancelling(false);
-    onCancelTransfer?.();
+    onCancelTransfer();
   }
 
+  const statusBadge = isTransferred
+    ? { label: "Sent", cls: "text-ink-muted" }
+    : isPending
+      ? { label: "Pending", cls: "text-marigold-dark" }
+      : { label: "Valid", cls: "text-peacock" };
+
   return (
-    <div className={`rounded-2xl border overflow-hidden transition-all ${
-      isTransferred ? "border-ivory-200 opacity-60" :
-      isPending ? "border-marigold/30" :
-      expanded ? "border-marigold/30 shadow-md" : "border-ivory-200"
-    } bg-white`}>
-      {/* Collapsed row — full-width tap target, actions stack below on mobile */}
-      <div className="px-4 py-3.5">
-        <div className="flex items-center gap-3">
-          {/* Ticket number badge */}
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-[11px] font-bold shrink-0"
-            style={{ backgroundColor: isTransferred ? "#E8E3D5" : isPending ? "#F5A623" : "#2E1B30", color: isTransferred ? "#9999AA" : isPending ? "#2E1B30" : "#fff" }}>
-            T{seat}
+    <div className="relative">
+      {/* Ticket-stub perforation notches (desktop seam at 42%) */}
+      <div className="hidden lg:block absolute w-4 h-4 rounded-full bg-ivory z-20" style={{ left: "42%", top: -8, transform: "translateX(-50%)" }} />
+      <div className="hidden lg:block absolute w-4 h-4 rounded-full bg-ivory z-20" style={{ left: "42%", bottom: -8, transform: "translateX(-50%)" }} />
+    <div className="rounded-[28px] border border-ivory-200 bg-white shadow-sm flex flex-col lg:flex-row overflow-hidden">
+      {/* ── Gradient event panel ── */}
+      <div
+        className="relative lg:w-[42%] shrink-0 p-6 sm:p-7 flex flex-col text-white min-h-[230px] lg:min-h-[420px]"
+        style={{ background: coverBackground(order.coverImageUrl, order.coverGradient) }}
+      >
+        {/* texture */}
+        <div className="absolute inset-0 pointer-events-none opacity-[0.18]" style={{ backgroundImage: "radial-gradient(circle at 75% 15%, rgba(255,255,255,0.5) 0%, transparent 45%), radial-gradient(circle at 10% 90%, rgba(0,0,0,0.25) 0%, transparent 50%)" }} />
+        <div className="relative flex-1 flex flex-col">
+          <div className="flex items-center justify-between gap-2">
+            <span className="inline-flex items-center font-mono text-[10px] uppercase tracking-[0.18em] text-white/90 bg-black/25 backdrop-blur-sm px-3 py-1.5 rounded-full">
+              {seasonLabel(order)}
+            </span>
+            {order.isTest && (
+              <span className="inline-flex items-center font-mono text-[9px] uppercase tracking-widest font-bold bg-white/20 text-white px-2 py-1 rounded-full">Test</span>
+            )}
           </div>
 
-          {/* Text — tap to expand */}
-          <button
-            onClick={() => !isPending && !isTransferred && setExpanded(!expanded)}
-            className="flex-1 text-left min-w-0"
-            disabled={isPending || isTransferred}
-          >
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className={`font-display font-bold text-sm ${isTransferred ? "text-ink-muted" : "text-ink"}`}>
-                {isPending || isTransferred ? tierName : `${tierName}${total > 1 ? ` · Ticket ${seat} of ${total}` : ""}`}
+          <div className="mt-auto pt-8">
+            <h3 className="font-editorial italic leading-[0.98] mb-1.5" style={{ fontSize: "clamp(2rem, 4vw, 2.9rem)", letterSpacing: "-0.01em" }}>
+              {order.eventTitle}
+            </h3>
+            {order.artistName && (
+              <p className="font-ui text-white/75 text-sm mb-4">
+                {order.artistName}{isUpcoming ? " · live" : ""}
               </p>
-              <span className={`font-mono text-[9px] uppercase tracking-wide px-2 py-0.5 rounded-full border font-bold ${
-                isTransferred ? "bg-ivory border-ivory-200 text-ink-muted" :
-                isPending ? "bg-marigold/15 border-marigold/20 text-marigold-dark" :
-                "bg-peacock/10 border-peacock/20 text-peacock"
-              }`}>
-                {isTransferred ? "Sent" : isPending ? "Transfer pending" : "Valid"}
-              </span>
-              {isTest && (
-                <span className="font-mono text-[9px] uppercase tracking-wide px-2 py-0.5 rounded-full border font-bold bg-marigold/15 border-marigold/20 text-marigold-dark">
-                  Test
-                </span>
+            )}
+            <div className="space-y-1.5">
+              <div className="flex items-center gap-2 text-white/85">
+                <svg className="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                <span className="font-ui text-[13px]">{fmtDate(order.eventDate)}</span>
+              </div>
+              {order.eventTime && (
+                <div className="flex items-center gap-2 text-white/85">
+                  <svg className="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <span className="font-ui text-[13px]">Doors {fmtTime(order.eventTime)}</span>
+                </div>
+              )}
+              {(order.venue || order.city) && (
+                <div className="flex items-center gap-2 text-white/85">
+                  <svg className="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  <span className="font-ui text-[13px] truncate">{[order.venue, [order.city, order.state].filter(Boolean).join(", ")].filter(Boolean).join("  ·  ")}</span>
+                </div>
               )}
             </div>
-            {(isPending || isTransferred) && (
-              <p className="font-ui text-xs mt-0.5 text-ink-muted/70">
-                → {transfer!.toName || transfer!.toEmail}
-              </p>
-            )}
-          </button>
-
-          {/* Chevron for free seats */}
-          {!isPending && !isTransferred && (
-            <button onClick={() => setExpanded(!expanded)} className="shrink-0 p-1" aria-label="Expand ticket">
-              <svg className={`w-4 h-4 text-ink-muted transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-              </svg>
-            </button>
-          )}
-        </div>
-
-        {/* Action buttons — below text, full-width on mobile, easy thumb targets */}
-        {!isPending && !isTransferred && (
-          <div className="flex items-center gap-2 mt-3 ml-13">
-            <WalletButton orderId={orderId} seat={seat} size="sm" />
-            {onTransfer && (
-              <button
-                onClick={() => onTransfer(seat)}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-aubergine/20 text-aubergine font-ui font-semibold text-xs hover:bg-aubergine/5 active:bg-aubergine/10 transition-all"
-                style={{ minHeight: 36 }}
-              >
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                Transfer
-              </button>
-            )}
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Transferred/pending indicator (collapsed) */}
-      {(isPending || isTransferred) && (
-        <div className={`mx-4 mb-3 rounded-xl overflow-hidden ${isPending ? "bg-marigold/8 border border-marigold/15" : "bg-ivory border border-ivory-200"}`}>
-          <p className={`px-3 pt-2 text-xs font-ui ${isPending ? "text-marigold-dark" : "text-ink-muted"}`}>
-            {isPending
-              ? `Waiting for ${transfer!.toName || transfer!.toEmail} to accept · Sent ${fmtDateTime(transfer!.createdAt)}`
-              : `Accepted by ${transfer!.toName || transfer!.toEmail} · ${transfer!.acceptedAt ? fmtDateTime(transfer!.acceptedAt) : ""}`}
-          </p>
-          {isPending && (
-            <div className="px-3 pb-2 mt-1.5">
+      {/* ── Detail + QR panel ── */}
+      <div className="flex-1 flex flex-col lg:flex-row items-stretch">
+        {/* QR / status block */}
+        <div className="flex flex-col items-center justify-center gap-2.5 p-6 sm:p-7 lg:border-r border-dashed border-ivory-200">
+          {isPending || isTransferred ? (
+            <div className="flex flex-col items-center justify-center text-center gap-3 py-6 max-w-[220px]">
+              <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl ${isPending ? "bg-marigold/15" : "bg-ivory-200"}`}>
+                {isPending ? "✈️" : "✓"}
+              </div>
+              <p className="font-display font-bold text-ink text-sm">
+                {isPending ? "Transfer pending" : "Transferred"}
+              </p>
+              <p className="font-ui text-xs text-ink-muted leading-snug">
+                {isPending
+                  ? `Waiting for ${transfer!.toName || transfer!.toEmail} to accept.`
+                  : `Now belongs to ${transfer!.toName || transfer!.toEmail}.`}
+              </p>
+              {isPending && (
+                <button disabled={cancelling} onClick={handleCancel} className="font-mono text-[10px] text-durga/70 hover:text-durga transition-colors flex items-center gap-1">
+                  {cancelling ? "Cancelling…" : "Cancel transfer"}
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
               <button
-                disabled={cancelling}
-                onClick={handleCancel}
-                className="flex items-center gap-1 font-mono text-[10px] text-durga/70 hover:text-durga transition-colors"
+                onClick={() => onEnlarge(ticketId, order.eventTitle, order.tierName)}
+                className="relative group p-3.5 rounded-2xl bg-white border border-ivory-200 hover:border-aubergine/30 transition-colors"
+                aria-label="Enlarge QR code"
               >
-                {cancelling
-                  ? <><div className="w-3 h-3 rounded-full border border-durga/40 border-t-durga animate-spin" />Cancelling…</>
-                  : <>
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                      Cancel transfer
-                    </>}
+                <QRCode value={ticketId} size={150} />
+                <span className="absolute bottom-2 right-2 w-6 h-6 rounded-lg bg-aubergine/90 text-white flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+                </span>
               </button>
+              <p className="font-mono text-[10px] text-ink-muted flex items-center gap-1.5">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
+                Tap to enlarge &amp; brighten
+              </p>
+            </>
+          )}
+        </div>
+
+        {/* Details + actions */}
+        <div className="flex-1 p-6 sm:p-7 flex flex-col justify-center">
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className="font-mono text-[11px] uppercase tracking-widest text-marigold-dark font-bold">{order.tierName}</span>
+            <span className="inline-flex items-center gap-1.5">
+              <span className={`w-1.5 h-1.5 rounded-full ${isTransferred ? "bg-ink-muted/40" : isPending ? "bg-marigold" : "bg-peacock"}`} />
+              <span className={`font-mono text-[10px] uppercase tracking-widest font-bold ${statusBadge.cls}`}>{statusBadge.label}</span>
+            </span>
+          </div>
+
+          <h4 className="font-display font-bold text-ink leading-none mb-1" style={{ fontSize: "clamp(1.5rem, 3vw, 2rem)", letterSpacing: "-0.025em" }}>
+            Ticket {globalIndex + 1} <span className="text-ink-muted/50 font-normal">of {total}</span>
+          </h4>
+          <p className="font-mono text-[11px] text-ink-muted mb-5">{ticketRef(order.orderId, seat)}</p>
+
+          {!isPending && !isTransferred && (
+            <div className="space-y-2.5">
+              <button
+                onClick={() => onEnlarge(ticketId, order.eventTitle, order.tierName)}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-aubergine text-white font-display font-bold text-sm hover:bg-aubergine-light active:scale-[0.98] transition-all"
+                style={{ minHeight: 48 }}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7V5a2 2 0 012-2h2M4 17v2a2 2 0 002 2h2m8-18h2a2 2 0 012 2v2m-4 14h2a2 2 0 002-2v-2M9 12h6" /></svg>
+                Show at entry
+              </button>
+              <div className="grid grid-cols-2 gap-2.5">
+                <AppleWalletButton orderId={order.orderId} seat={seat} />
+                <button
+                  onClick={() => onTransfer(order, seat)}
+                  disabled={!isUpcoming}
+                  className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-ink/12 text-ink font-ui font-semibold text-[13px] hover:bg-ivory active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  style={{ minHeight: 44 }}
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                  Transfer
+                </button>
+              </div>
             </div>
           )}
         </div>
-      )}
-
-      {/* Expanded QR view */}
-      {expanded && !isPending && !isTransferred && (
-        <>
-          <div className="border-t-2 border-dashed border-ivory-200 mx-4" />
-          <div className="px-4 pb-5 pt-4">
-            {/* QR centred — big enough to scan easily on mobile */}
-            <div className="flex flex-col items-center gap-3 mb-4">
-              <div className="p-4 rounded-2xl border-2 border-marigold/20 bg-white shadow-sm">
-                <QRCode value={ticketId} size={180} />
-              </div>
-              <p className="font-display font-bold text-ink text-base">{tierName}</p>
-              {total > 1 && <p className="font-mono text-[10px] text-ink-muted">Ticket {seat} of {total}</p>}
-              <div className="flex items-center gap-1.5 px-4 py-1.5 rounded-full bg-peacock/10 border border-peacock/20">
-                <div className="w-1.5 h-1.5 bg-peacock rounded-full animate-pulse" />
-                <p className="font-mono text-[10px] text-peacock font-bold uppercase tracking-wide">Valid · Show at entry</p>
-              </div>
-            </div>
-
-            {/* Details + Wallet — stacked, full-width */}
-            <div className="rounded-xl bg-ivory border border-ivory-200 divide-y divide-ivory-200 mb-3">
-              {[{ label: "Event", value: eventTitle }, { label: "Ticket type", value: tierName }, ...(total > 1 ? [{ label: "Ticket", value: `${seat} of ${total}` }] : [])].map(row => (
-                <div key={row.label} className="flex items-center justify-between gap-4 px-4 py-2.5">
-                  <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted shrink-0">{row.label}</span>
-                  <span className="font-ui text-sm font-semibold text-ink text-right truncate">{row.value}</span>
-                </div>
-              ))}
-            </div>
-
-            <WalletButton orderId={orderId} seat={seat} size="lg" />
-          </div>
-        </>
-      )}
+      </div>
+    </div>
     </div>
   );
 }
 
-// ── Order Card ─────────────────────────────────────────────────────────────────
-function OrderCard({ order, userId, userEmail, isIOS, onRefresh }: {
-  order: PortalOrderRow;
+// ── Tickets carousel ────────────────────────────────────────────────────────────
+function TicketsCarousel({ eventTitle, orders, userId, userEmail, onRefresh }: {
+  eventTitle?: string;
+  orders: PortalOrderRow[];
   userId: string;
   userEmail: string;
-  isIOS: boolean;
   onRefresh: () => void;
 }) {
-  const dateISO = order.eventDate;
-  const isUpcoming = dateISO >= new Date().toISOString().slice(0, 10);
-  const transfers = order.transfers ?? [];
+  // Flatten every order into per-seat slides
+  const slides: Slide[] = [];
+  orders.forEach(order => {
+    const transfers = order.transfers ?? [];
+    for (let seat = 1; seat <= order.qty; seat++) {
+      slides.push({ order, seat, transfer: getTransferForSeat(seat, transfers), globalIndex: slides.length });
+    }
+  });
+  const total = slides.length;
 
-  // How many seats are in a pending/accepted transfer?
-  const transferredSeats = new Set(transfers.flatMap(t =>
-    t.seatNumbers.length > 0 ? t.seatNumbers : Array.from({ length: order.qty }, (_, i) => i + 1)
-  ));
-  const freeCount = order.qty - transferredSeats.size;
-  const pendingCount = transfers.filter(t => t.status === "pending").flatMap(t => t.seatNumbers.length > 0 ? t.seatNumbers : Array.from({ length: order.qty }, (_, i) => i + 1)).length;
-  const acceptedCount = order.qty - freeCount - pendingCount;
+  const [current, setCurrent] = useState(0);
+  const [enlarge, setEnlarge] = useState<{ ticketId: string; eventTitle: string; tierName: string } | null>(null);
+  const [transferModal, setTransferModal] = useState<{ order: PortalOrderRow; seats: number[] } | null>(null);
+  const touchX = useRef<number | null>(null);
 
-  const hasAnyTransfer = transfers.length > 0;
-  const allTransferred = freeCount === 0 && pendingCount === 0;
+  const safeCurrent = Math.min(current, Math.max(0, total - 1));
+  const slide = slides[safeCurrent];
 
-  const [expanded, setExpanded] = useState(isUpcoming && freeCount > 0);
-  const [transferModal, setTransferModal] = useState<{ seats?: number[] } | null>(null);
+  function go(dir: -1 | 1) {
+    setCurrent(c => Math.max(0, Math.min(total - 1, c + dir)));
+  }
 
-  const daysUntil = isUpcoming ? Math.ceil((new Date(dateISO + "T00:00:00").getTime() - Date.now()) / 86400000) : null;
-  const colorIndex = (order.artistName.charCodeAt(0) || 0) % AVATAR_COLORS.length;
-  const artistColor = AVATAR_COLORS[colorIndex];
+  if (total === 0) return null;
 
   return (
-    <>
-      {transferModal !== null && (
+    <div>
+      {enlarge && (
+        <QREnlargeModal {...enlarge} onClose={() => setEnlarge(null)} />
+      )}
+      {transferModal && (
         <TransferModal
-          order={order}
+          order={transferModal.order}
           userId={userId}
           userEmail={userEmail}
           preselectedSeats={transferModal.seats}
@@ -749,139 +837,221 @@ function OrderCard({ order, userId, userEmail, isIOS, onRefresh }: {
         />
       )}
 
-      <div className={`rounded-2xl overflow-hidden border transition-all ${
-        allTransferred ? "border-ivory-200 opacity-70" :
-        pendingCount > 0 ? "border-marigold/30 shadow-sm" :
-        expanded ? "border-marigold/30 shadow-md" : "border-ivory-200 hover:border-marigold/20"
-      } bg-white`}>
-        {/* Header — tap to expand */}
-        <button onClick={() => setExpanded(!expanded)} className="w-full text-left">
-          <div className="flex items-stretch">
-            {/* Colour accent bar */}
-            <div className="w-1 shrink-0" style={{ backgroundColor: allTransferred ? "#B0B0C0" : artistColor }} />
+      {/* Header row */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="min-w-0">
+          <h2 className="font-display font-bold text-ink text-lg truncate" style={{ letterSpacing: "-0.015em" }}>
+            {eventTitle ? eventTitle : "Your tickets"}
+          </h2>
+          <p className="font-ui text-xs text-ink-muted">{total} ticket{total !== 1 ? "s" : ""} for this event</p>
+        </div>
+        <p className="font-mono text-sm text-ink-muted tabular-nums shrink-0">
+          <span className="text-ink font-bold">{String(safeCurrent + 1).padStart(2, "0")}</span> / {total}
+        </p>
+      </div>
 
-            <div className="flex-1 px-4 py-4 min-w-0">
-              {/* Status pills */}
-              <div className="flex items-center gap-1.5 mb-2 flex-wrap">
-                {order.isTest && <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold bg-marigold/20 text-marigold-dark">Test order</span>}
-                {allTransferred && <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold bg-ivory-200 text-ink-muted">All Transferred</span>}
-                {!allTransferred && pendingCount > 0 && <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold bg-marigold/15 text-marigold-dark">{pendingCount} Pending Transfer</span>}
-                {!allTransferred && !pendingCount && isUpcoming && <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold bg-peacock/10 text-peacock">Upcoming</span>}
-                {!isUpcoming && !allTransferred && <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold bg-ivory-200 text-ink-muted">Past</span>}
-                {order.groupId && <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold bg-marigold/15 text-marigold-dark">Group</span>}
-              </div>
+      {/* Carousel */}
+      <div
+        className="relative"
+        tabIndex={0}
+        onKeyDown={e => { if (e.key === "ArrowLeft") go(-1); if (e.key === "ArrowRight") go(1); }}
+        onTouchStart={e => { touchX.current = e.touches[0].clientX; }}
+        onTouchEnd={e => {
+          if (touchX.current === null) return;
+          const dx = e.changedTouches[0].clientX - touchX.current;
+          if (Math.abs(dx) > 45) go(dx < 0 ? 1 : -1);
+          touchX.current = null;
+        }}
+      >
+        <TicketSlide
+          slide={slide}
+          total={total}
+          onEnlarge={(ticketId, eventTitle, tierName) => setEnlarge({ ticketId, eventTitle, tierName })}
+          onTransfer={(order, seat) => setTransferModal({ order, seats: [seat] })}
+          onCancelTransfer={onRefresh}
+        />
 
-              {/* Title + chevron on same row */}
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0 flex-1">
-                  <h3 className={`font-display font-bold text-base leading-snug ${allTransferred ? "text-ink-muted" : "text-ink"}`}>{order.eventTitle}</h3>
-                  {order.artistName && <p className="font-ui text-xs text-ink-muted mt-0.5">{order.artistName}</p>}
-                </div>
-                {/* Countdown or chevron */}
-                <div className="flex flex-col items-end gap-0.5 shrink-0">
-                  {daysUntil !== null && !allTransferred && (
-                    <div className="text-right">
-                      <p className="font-display font-bold text-aubergine text-xl leading-none">{daysUntil}d</p>
-                    </div>
-                  )}
-                  <svg className={`w-4 h-4 text-ink-muted transition-transform duration-200 ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-
-              {/* Meta row — wraps cleanly on mobile */}
-              <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                <span className="font-mono text-[10px] text-ink-muted">📅 {fmtDateShort(order.eventDate)}</span>
-                {(order.city || order.state) && (
-                  <span className="font-mono text-[10px] text-ink-muted">📍 {[order.city, order.state].filter(Boolean).join(", ")}</span>
-                )}
-                <span className="font-mono text-[10px] text-ink-muted">
-                  🎟️ {order.qty} × {order.tierName}
-                  {hasAnyTransfer && (
-                    <span className="text-ink-muted/60">
-                      {freeCount > 0 ? ` · ${freeCount} yours` : ""}
-                      {pendingCount > 0 ? ` · ${pendingCount} pending` : ""}
-                      {acceptedCount > 0 ? ` · ${acceptedCount} sent` : ""}
-                    </span>
-                  )}
-                </span>
-              </div>
-            </div>
-          </div>
-        </button>
-
-        {expanded && (
+        {/* Arrows (desktop) */}
+        {total > 1 && (
           <>
-            <div className="border-t-2 border-dashed border-ivory-200 mx-5" />
-            <div className="px-5 py-4 space-y-3">
-              {freeCount > 0 && (
-                <div className="flex items-start gap-2 px-3 py-2.5 rounded-xl bg-aubergine/5 border border-aubergine/10">
-                  <svg className="w-3.5 h-3.5 text-aubergine mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                  <p className="font-ui text-xs text-ink-muted">Tap a ticket to show its QR at entry. Use the Transfer button to send individual seats.</p>
-                </div>
-              )}
-
-              {/* Individual ticket cards */}
-              <div className="space-y-2">
-                {Array.from({ length: order.qty }, (_, i) => i + 1).map(seat => (
-                  <TicketCard
-                    key={seat}
-                    orderId={order.orderId}
-                    seat={seat}
-                    total={order.qty}
-                    eventTitle={order.eventTitle}
-                    tierName={order.tierName}
-                    isTest={order.isTest}
-                    transfer={getTransferForSeat(seat, transfers)}
-                    onTransfer={isUpcoming ? (s) => setTransferModal({ seats: [s] }) : undefined}
-                    onCancelTransfer={onRefresh}
-                  />
-                ))}
-              </div>
-
-              {/* Multi-seat transfer button (only if 2+ free seats remain) */}
-              {isUpcoming && freeCount >= 2 && (
-                <button
-                  onClick={() => setTransferModal({ seats: undefined })}
-                  className="w-full py-2.5 rounded-xl border border-aubergine/20 text-aubergine font-ui font-semibold text-xs hover:bg-aubergine/5 transition-all flex items-center justify-center gap-1.5"
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                  Send multiple tickets…
-                </button>
-              )}
-
-              {order.groupId && order.groupMembers && order.groupMembers.length > 0 && (
-                <GroupMembersPanel members={order.groupMembers} groupId={order.groupId} />
-              )}
-
-              {/* Footer — receipt link + total + wallet */}
-              <div className="pt-3 border-t border-ivory-200">
-                <div className="flex items-center justify-between gap-3">
-                  <div>
-                    <p className="font-display font-bold text-ink">${order.grandTotal.toFixed(2)} paid</p>
-                    <Link href={`/portal/tickets/${order.orderId}`} className="font-mono text-[9px] text-aubergine hover:underline flex items-center gap-1 mt-0.5">
-                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                      View receipt
-                    </Link>
-                  </div>
-                  <a
-                    href={`/api/wallet/pass/${order.orderId}`}
-                    className="flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-black text-white font-ui text-sm font-medium hover:bg-zinc-800 active:scale-95 transition-all"
-                    style={{ minHeight: 44 }}
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
-                    </svg>
-                    Apple Wallet
-                  </a>
-                </div>
-              </div>
-            </div>
+            <button
+              onClick={() => go(-1)}
+              disabled={safeCurrent === 0}
+              aria-label="Previous ticket"
+              className="hidden sm:flex absolute -left-3 lg:-left-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white border border-ivory-200 shadow-md items-center justify-center text-ink hover:bg-ivory active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            </button>
+            <button
+              onClick={() => go(1)}
+              disabled={safeCurrent === total - 1}
+              aria-label="Next ticket"
+              className="hidden sm:flex absolute -right-3 lg:-right-5 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-white border border-ivory-200 shadow-md items-center justify-center text-ink hover:bg-ivory active:scale-95 transition-all disabled:opacity-30 disabled:cursor-not-allowed z-10"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </button>
           </>
         )}
       </div>
-    </>
+
+      {/* Group panel for current slide's order */}
+      {slide.order.groupId && slide.order.groupMembers && slide.order.groupMembers.length > 0 && (
+        <GroupMembersPanel members={slide.order.groupMembers} groupId={slide.order.groupId} />
+      )}
+
+      {/* Dots */}
+      {total > 1 && (
+        <div className="flex items-center justify-center gap-1.5 mt-5 flex-wrap">
+          {slides.map((s, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrent(i)}
+              aria-label={`Go to ticket ${i + 1}`}
+              className="rounded-full transition-all"
+              style={{
+                width: i === safeCurrent ? 22 : 7,
+                height: 7,
+                backgroundColor: i === safeCurrent ? "#2E1B30" : "rgba(46,27,48,0.18)",
+              }}
+            />
+          ))}
+        </div>
+      )}
+
+      {/* Helper hint */}
+      {total > 1 && (
+        <p className="text-center font-ui text-xs text-ink-muted mt-3 flex items-center justify-center gap-2">
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          Swipe or use arrows to see your other tickets
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </p>
+      )}
+
+      {/* Receipt links per order for this event */}
+      <div className="mt-5 flex flex-wrap items-center justify-center gap-x-5 gap-y-1.5">
+        {orders.map((o, i) => (
+          <Link key={o.orderId} href={`/portal/tickets/${o.orderId}`} className="font-mono text-[10px] text-aubergine/70 hover:text-aubergine hover:underline flex items-center gap-1 transition-colors">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+            {orders.length > 1 ? `Receipt · Order ${i + 1}` : "View receipt"}
+          </Link>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Featured upcoming summary card ──────────────────────────────────────────────
+function SummaryCard({ order }: { order: PortalOrderRow }) {
+  const days = Math.ceil((new Date(order.eventDate + "T00:00:00").getTime() - Date.now()) / 86400000);
+  const d = new Date(order.eventDate + "T00:00:00");
+  const mon = d.toLocaleDateString("en-US", { month: "short" });
+  const day = d.getDate();
+
+  return (
+    <div className="rounded-[24px] overflow-hidden border border-ivory-200 bg-white shadow-sm flex flex-col sm:flex-row">
+      {/* Date gradient chip panel */}
+      <div
+        className="relative shrink-0 sm:w-[148px] p-5 flex flex-col justify-end text-white min-h-[110px]"
+        style={{ background: coverBackground(order.coverImageUrl, order.coverGradient) }}
+      >
+        <div className="absolute inset-0 pointer-events-none opacity-[0.16]" style={{ backgroundImage: "radial-gradient(circle at 70% 20%, rgba(255,255,255,0.6) 0%, transparent 50%)" }} />
+        <p className="relative font-editorial italic leading-[0.9]" style={{ fontSize: "1.9rem" }}>
+          {mon}<br />{day}
+        </p>
+      </div>
+
+      {/* Details */}
+      <div className="flex-1 p-5 sm:p-6 min-w-0">
+        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+          <span className="font-mono text-[9px] uppercase tracking-widest font-bold bg-peacock/12 text-peacock px-2 py-1 rounded-md">Upcoming</span>
+          {days >= 0 && <span className="font-ui text-[13px] text-ink-muted">in {days} day{days !== 1 ? "s" : ""}</span>}
+        </div>
+        <h3 className="font-display font-bold text-ink leading-tight" style={{ fontSize: "clamp(1.4rem, 3vw, 1.75rem)", letterSpacing: "-0.025em" }}>
+          {order.eventTitle}
+        </h3>
+        {order.artistName && <p className="font-ui text-sm text-ink-muted mb-3">{order.artistName}</p>}
+        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mt-2">
+          <span className="font-ui text-[13px] text-ink-muted flex items-center gap-1.5">
+            <svg className="w-3.5 h-3.5 text-ink/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            {fmtDate(order.eventDate)}
+          </span>
+          {(order.city || order.state) && (
+            <span className="font-ui text-[13px] text-ink-muted flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-ink/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              {[order.city, order.state].filter(Boolean).join(", ")}
+            </span>
+          )}
+          {order.eventTime && (
+            <span className="font-ui text-[13px] text-ink-muted flex items-center gap-1.5">
+              <svg className="w-3.5 h-3.5 text-ink/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              Doors {fmtTime(order.eventTime)}
+            </span>
+          )}
+          <span className="font-ui text-[13px] text-ink font-semibold">{order.qty} × {order.tierName}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Event group (one card per event) ────────────────────────────────────────────
+type EventGroup = {
+  eventId: string; eventTitle: string; eventDate: string; eventTime: string;
+  city: string; state: string; coverGradient: string; coverImageUrl: string | null;
+  orders: PortalOrderRow[]; tickets: number;
+};
+
+function groupOrdersByEvent(orders: PortalOrderRow[]): EventGroup[] {
+  const map = new Map<string, EventGroup>();
+  for (const o of orders) {
+    const g = map.get(o.eventId) ?? {
+      eventId: o.eventId, eventTitle: o.eventTitle, eventDate: o.eventDate, eventTime: o.eventTime,
+      city: o.city, state: o.state, coverGradient: o.coverGradient, coverImageUrl: o.coverImageUrl,
+      orders: [], tickets: 0,
+    };
+    g.orders.push(o);
+    g.tickets += o.qty;
+    map.set(o.eventId, g);
+  }
+  return Array.from(map.values()).sort((a, b) => a.eventDate.localeCompare(b.eventDate));
+}
+
+function EventSelector({ groups, selectedId, onSelect }: {
+  groups: EventGroup[]; selectedId: string; onSelect: (id: string) => void;
+}) {
+  return (
+    <div>
+      <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2.5">
+        Pick an event · {groups.length} with tickets
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+        {groups.map(g => {
+          const active = g.eventId === selectedId;
+          return (
+            <button
+              key={g.eventId}
+              onClick={() => onSelect(g.eventId)}
+              className={`flex items-center gap-3 p-2.5 rounded-2xl border text-left transition-all ${
+                active ? "border-aubergine bg-aubergine/[0.04] ring-1 ring-aubergine/30" : "border-ivory-200 bg-white hover:border-aubergine/30"
+              }`}
+            >
+              <div className="w-12 h-12 rounded-xl shrink-0 flex items-center justify-center text-lg overflow-hidden" style={{ background: coverBackground(g.coverImageUrl, g.coverGradient) }}>
+                {!g.coverImageUrl && <span>🪔</span>}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className={`font-display font-bold text-sm leading-tight truncate ${active ? "text-aubergine" : "text-ink"}`}>{g.eventTitle}</p>
+                <p className="font-ui text-xs text-ink-muted truncate">
+                  {fmtDate(g.eventDate)}{(g.city || g.state) && ` · ${[g.city, g.state].filter(Boolean).join(", ")}`}
+                </p>
+              </div>
+              <span className={`font-mono text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${active ? "bg-aubergine text-white" : "bg-ivory text-ink-muted border border-ivory-200"}`}>
+                {g.tickets} ticket{g.tickets !== 1 ? "s" : ""}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -894,12 +1064,8 @@ export default function TicketsPage() {
   const [filter, setFilter] = useState<"all" | "upcoming" | "past">("upcoming");
   const [userId, setUserId] = useState("");
   const [userEmail, setUserEmail] = useState("");
-  const [isIOS, setIsIOS] = useState(false);
+  const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   const today = new Date().toISOString().slice(0, 10);
-
-  useEffect(() => {
-    setIsIOS(/iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
-  }, []);
 
   async function loadAll(uid: string, email: string) {
     const [ordersData, incoming, received] = await Promise.all([
@@ -963,20 +1129,33 @@ export default function TicketsPage() {
     return sum + pending.reduce((s, t) => s + (t.seatNumbers.length || o.qty), 0);
   }, 0);
 
+  const nextUpcoming = orders
+    .filter(o => o.eventDate >= today)
+    .sort((a, b) => a.eventDate.localeCompare(b.eventDate))[0] ?? null;
+  const filteredReceived = receivedTickets.filter(t => filter === "all" || (filter === "upcoming" ? t.eventDate >= today : t.eventDate < today));
+
+  // Group the member's tickets by event so they can pick which event to view.
+  const eventGroups = groupOrdersByEvent(filtered);
+  const activeGroup = eventGroups.find(g => g.eventId === selectedEventId) ?? eventGroups[0] ?? null;
+
   return (
-    <div className="max-w-3xl mx-auto space-y-5">
-      <div className="flex items-center justify-between flex-wrap gap-3">
+    <div className="max-w-4xl mx-auto space-y-7">
+      {/* ── Header ── */}
+      <div className="flex items-end justify-between flex-wrap gap-3">
         <div>
-          <h1 className="font-display font-bold text-ink text-2xl">My Tickets</h1>
-          <p className="font-ui text-ink-muted text-sm">
-            {orders.length} order{orders.length !== 1 ? "s" : ""}
-            {totalTransferredSeats > 0 && <span className="text-ink-muted/60"> · {totalTransferredSeats} transferred</span>}
-            {totalPendingSeats > 0 && <span className="text-marigold-dark"> · {totalPendingSeats} pending</span>}
-          </p>
+          <p className="font-mono text-[10px] uppercase tracking-[0.2em] text-ink-muted/70 mb-1.5">My Portal · Tickets</p>
+          <h1 className="font-display font-bold text-ink" style={{ fontSize: "clamp(1.8rem, 4vw, 2.4rem)", letterSpacing: "-0.03em" }}>Your tickets</h1>
+          {!loading && (
+            <p className="font-ui text-ink-muted text-sm mt-1">
+              {orders.length} order{orders.length !== 1 ? "s" : ""}
+              {totalTransferredSeats > 0 && <span className="text-ink-muted/60"> · {totalTransferredSeats} transferred</span>}
+              {totalPendingSeats > 0 && <span className="text-marigold-dark"> · {totalPendingSeats} pending</span>}
+            </p>
+          )}
         </div>
-        <div className="flex gap-1.5">
+        <div className="flex gap-1 p-1 rounded-xl bg-ink/[0.04] border border-ink/[0.06]">
           {(["upcoming", "past", "all"] as const).map(f => (
-            <button key={f} onClick={() => setFilter(f)} className={`px-3.5 py-2 rounded-xl text-xs font-semibold capitalize transition-all ${filter === f ? "bg-aubergine text-white" : "bg-white border border-ivory-200 text-ink-muted hover:text-ink"}`}>{f}</button>
+            <button key={f} onClick={() => setFilter(f)} className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${filter === f ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}>{f}</button>
           ))}
         </div>
       </div>
@@ -987,6 +1166,9 @@ export default function TicketsPage() {
         </div>
       ) : (
         <>
+          {/* Featured upcoming order */}
+          {nextUpcoming && <SummaryCard order={nextUpcoming} />}
+
           {/* Incoming pending transfers */}
           {incomingTransfers.length > 0 && (
             <div className="space-y-3">
@@ -995,50 +1177,52 @@ export default function TicketsPage() {
                 <span className="w-5 h-5 rounded-full bg-marigold flex items-center justify-center font-bold text-aubergine text-[10px]">{incomingTransfers.length}</span>
               </div>
               {incomingTransfers.map(t => <IncomingTransferCard key={t.id} transfer={t} onAccepted={handleIncomingAccepted} onDeclined={handleIncomingDeclined} />)}
-              <div className="h-px bg-ivory-200" />
             </div>
           )}
 
           {/* Received tickets (accepted transfers) */}
-          {receivedTickets.filter(t => filter === "all" || (filter === "upcoming" ? t.eventDate >= today : t.eventDate < today)).length > 0 && (
+          {filteredReceived.length > 0 && (
             <div className="space-y-3">
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Received Tickets</p>
-              {receivedTickets
-                .filter(t => filter === "all" || (filter === "upcoming" ? t.eventDate >= today : t.eventDate < today))
-                .map(t => <ReceivedTicketCard key={t.transferId} ticket={t} />)}
-              <div className="h-px bg-ivory-200" />
+              {filteredReceived.map(t => <ReceivedTicketCard key={t.transferId} ticket={t} />)}
             </div>
           )}
 
-          {/* My purchased orders */}
-          {filtered.length === 0 ? (
+          {/* My purchased tickets — grouped by event */}
+          {filtered.length === 0 || !activeGroup ? (
             <div className="text-center py-16">
               <p className="font-display text-xl font-bold text-ink mb-2">{orders.length === 0 ? "No tickets yet" : `No ${filter} tickets`}</p>
               <p className="font-ui text-ink-muted text-sm mb-6">{orders.length === 0 ? "Your tickets will appear here after purchase." : "Adjust the filter to see other tickets."}</p>
               <Link href="/events" className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-marigold text-aubergine font-semibold text-sm hover:bg-marigold-dark transition-all">Browse events →</Link>
             </div>
           ) : (
-            <div className="space-y-4">
-              {filtered.map(order => (
-                <OrderCard
-                  key={order.orderId}
-                  order={order}
-                  userId={userId}
-                  userEmail={userEmail}
-                  isIOS={isIOS}
-                  onRefresh={() => loadAll(userId, userEmail)}
-                />
-              ))}
+            <div className="space-y-5">
+              {/* Event picker — only when tickets span multiple events */}
+              {eventGroups.length > 1 && (
+                <EventSelector groups={eventGroups} selectedId={activeGroup.eventId} onSelect={setSelectedEventId} />
+              )}
+
+              {/* Tickets for the selected event (remounts per event to reset position) */}
+              <TicketsCarousel
+                key={activeGroup.eventId}
+                eventTitle={activeGroup.eventTitle}
+                orders={activeGroup.orders}
+                userId={userId}
+                userEmail={userEmail}
+                onRefresh={() => loadAll(userId, userEmail)}
+              />
             </div>
           )}
         </>
       )}
 
-      <div className="rounded-2xl p-6 text-center border-2 border-dashed border-ivory-200">
-        <p className="font-display font-bold text-ink text-lg mb-1">Find your next night</p>
-        <p className="font-ui text-ink-muted text-sm mb-4">100+ events this Navratri season across the US.</p>
-        <Link href="/events" className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark transition-all">Browse events →</Link>
-      </div>
+      {!loading && (
+        <div className="rounded-2xl p-6 text-center border-2 border-dashed border-ivory-200">
+          <p className="font-display font-bold text-ink text-lg mb-1">Find your next night</p>
+          <p className="font-ui text-ink-muted text-sm mb-4">100+ events this Navratri season across the US.</p>
+          <Link href="/events" className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark transition-all">Browse events →</Link>
+        </div>
+      )}
     </div>
   );
 }

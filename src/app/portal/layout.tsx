@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { createUser, saveUser, signOut as clearLocalUser, type RameeloUser, type UserRole } from "@/lib/auth";
+import { loadMyOrders } from "@/lib/group-orders";
 import Logo from "@/components/Logo";
 import { NotificationDropdown } from "@/components/NotificationDropdown";
 
@@ -15,6 +16,7 @@ type NavItem = {
   badge?: string;
   highlight?: boolean;
   external?: boolean;
+  comingSoon?: boolean; // renders non-clickable with a "Soon" badge
   groupStart?: string; // renders a mini sub-divider above this item
 };
 
@@ -30,36 +32,15 @@ const MEMBER_NAV: NavItem[] = [
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>,
   },
   {
-    href: "/portal/community",
-    label: "Community",
-    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
-    badge: "🔴",
-  },
-  {
     href: "/portal/friends",
     label: "Friends",
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>,
-  },
-  {
-    href: "/portal/groups",
-    label: "My Groups",
-    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
-  },
-  {
-    href: "/portal/feed",
-    label: "Activity Feed",
-    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>,
   },
   {
     href: "/portal/my-card",
     label: "Garba Passport",
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2M15 11h3m-3 4h2" /></svg>,
     highlight: true,
-  },
-  {
-    href: "/portal/refer",
-    label: "Refer & Earn",
-    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg>,
   },
   {
     href: "/events",
@@ -71,6 +52,32 @@ const MEMBER_NAV: NavItem[] = [
     href: "/portal/profile",
     label: "Profile",
     icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>,
+  },
+  // ── Coming soon (grouped, non-clickable) ──
+  {
+    href: "/portal/community",
+    label: "Community",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>,
+    comingSoon: true,
+    groupStart: "Coming soon",
+  },
+  {
+    href: "/portal/groups",
+    label: "My Groups",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>,
+    comingSoon: true,
+  },
+  {
+    href: "/portal/feed",
+    label: "Activity Feed",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" /></svg>,
+    comingSoon: true,
+  },
+  {
+    href: "/portal/refer",
+    label: "Refer & Earn",
+    icon: <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg>,
+    comingSoon: true,
   },
 ];
 
@@ -84,14 +91,33 @@ function NavLink({ item, pathname, onClick }: { item: NavItem; pathname: string;
   );
   const isHighlight = !!item.highlight;
 
+  const divider = item.groupStart && (
+    <div className="px-3 pt-3 pb-0.5 flex items-center gap-2">
+      <span className="font-mono text-[8px] uppercase tracking-widest text-white/15">{item.groupStart}</span>
+      <div className="flex-1 h-px bg-white/6" />
+    </div>
+  );
+
+  // Coming-soon items are shown but not clickable.
+  if (item.comingSoon) {
+    return (
+      <>
+        {divider}
+        <div
+          aria-disabled="true"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-white/30 cursor-not-allowed select-none"
+        >
+          <span className="shrink-0 text-white/20">{item.icon}</span>
+          <span className="font-ui font-medium text-sm">{item.label}</span>
+          <span className="ml-auto font-mono text-[8px] uppercase tracking-widest font-bold text-white/35 bg-white/8 px-1.5 py-0.5 rounded">Soon</span>
+        </div>
+      </>
+    );
+  }
+
   return (
     <>
-      {item.groupStart && (
-        <div className="px-3 pt-3 pb-0.5 flex items-center gap-2">
-          <span className="font-mono text-[8px] uppercase tracking-widest text-white/15">{item.groupStart}</span>
-          <div className="flex-1 h-px bg-white/6" />
-        </div>
-      )}
+      {divider}
       <Link
         href={item.href}
         onClick={onClick}
@@ -168,25 +194,28 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
         return;
       }
 
-      // Fetch profile, ticket count, and pending friend requests in parallel
-      const [{ data: profile }, { count }, { count: friendCount }] = await Promise.all([
+      // Fetch profile, owned tickets, and pending friend requests in parallel
+      const [{ data: profile }, myOrders, { count: friendCount }] = await Promise.all([
         supabase
           .from("profiles")
           .select("first_name, last_name, email, phone, city, state, role, avatar_url")
           .eq("id", authUser.id)
           .single(),
-        supabase
-          .from("orders")
-          .select("id", { count: "exact", head: true })
-          .eq("user_id", authUser.id)
-          .eq("status", "confirmed"),
+        loadMyOrders(authUser.id),
         supabase
           .from("friendships")
           .select("id", { count: "exact", head: true })
           .eq("addressee_id", authUser.id)
           .eq("status", "pending"),
       ]);
-      setTicketCount(count ?? 0);
+      // Total tickets the member owns, minus any transferred away (accepted transfers).
+      const ownedTickets = myOrders.reduce((sum, o) => {
+        const transferredOut = (o.transfers ?? [])
+          .filter(t => t.status === "accepted")
+          .reduce((s, t) => s + (t.seatNumbers.length || o.qty), 0);
+        return sum + Math.max(0, o.qty - transferredOut);
+      }, 0);
+      setTicketCount(ownedTickets);
       setFriendRequestCount(friendCount ?? 0);
 
       // Realtime: keep friend request badge in sync

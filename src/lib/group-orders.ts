@@ -332,7 +332,7 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
       status, created_at, buyer_name, buyer_email, buyer_phone,
       events (
         id, title, start_date, start_time,
-        city, state, venue_name, category, cover_gradient,
+        city, state, venue_name, category, cover_gradient, cover_image_url,
         artists (name, profile_image_url)
       ),
       ticket_tiers (id, name, price)
@@ -389,6 +389,8 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
         state: o.events?.state ?? "",
         venue: o.events?.venue_name ?? "",
         category: o.events?.category ?? "",
+        coverGradient: o.events?.cover_gradient ?? "",
+        coverImageUrl: o.events?.cover_image_url ?? null,
         artistName: o.events?.artists?.name ?? "",
         tierName: o.ticket_tiers?.name ?? "",
         qty: o.qty,
@@ -486,6 +488,7 @@ interface RawOrderRow {
     venue_name: string;
     category: string;
     cover_gradient: string;
+    cover_image_url: string | null;
     artists: { name: string; profile_image_url: string | null } | null;
   } | null;
   ticket_tiers: { id: string; name: string; price: number } | null;
@@ -502,6 +505,8 @@ export interface PortalOrderRow {
   state: string;
   venue: string;
   category: string;
+  coverGradient: string;
+  coverImageUrl: string | null;
   artistName: string;
   tierName: string;
   qty: number;

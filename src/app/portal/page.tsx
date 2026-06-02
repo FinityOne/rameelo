@@ -1,11 +1,18 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { GRADIENTS } from "@/app/organizer/events/create/types";
 import { getUser, type RameeloUser } from "@/lib/auth";
 import { loadMyOrders, loadMyPendingGroups, type PortalOrderRow, type PendingGroup } from "@/lib/group-orders";
 import { loadIncomingTransfers, type IncomingTransfer } from "@/lib/transfers";
+
+// Resolve an event's saved cover into a CSS background (image preferred, else gradient).
+function coverBg(coverImageUrl: string | null, coverGradient: string): string {
+  if (coverImageUrl) return `linear-gradient(135deg, rgba(20,8,22,0.35), rgba(20,8,22,0.55)), url(${coverImageUrl}) center/cover no-repeat`;
+  return GRADIENTS.find(g => g.id === coverGradient)?.css ?? "linear-gradient(135deg, #7C1F2C 0%, #B84A22 55%, #F5A623 120%)";
+}
 
 // ── Sponsor ads ───────────────────────────────────────────────────────────────
 
@@ -15,35 +22,11 @@ const SPONSOR_ADS = [
   { id: "chiro",  biz: "Bay Area Chiro & Wellness", tag: "Chiropractic", tagline: "Back pain after Garba? We've got you.", desc: "Dr. Meera Choksi, DC — performance recovery. First visit free.", cta: "Schedule Now", color: "#3D2543", accent: "#0E8C7A", emoji: "💆", sponsor: "Sponsored" },
 ];
 
-// ── Live platform types ───────────────────────────────────────────────────────
-
-type LiveActivityItem = {
-  type: "ticket" | "group";
-  event_title: string;
-  city: string;
-  state: string;
-  qty: number | null;
-  group_size: number | null;
-  created_at: string;
-};
-
-type CommunityGroup = {
-  id: string;
-  name: string;
-  emoji: string | null;
-  description: string | null;
-  category: string | null;
-  color1: string | null;
-  color2: string | null;
-  member_count: number;
-  is_hot: boolean;
-};
-
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type RecommendedEvent = {
   id: string; title: string; start_date: string; city: string; state: string;
-  cover_gradient: string; lowestPrice: number | null; fillPct: number; sellingOnRameelo: boolean;
+  cover_gradient: string; cover_image_url: string | null; lowestPrice: number | null; fillPct: number; sellingOnRameelo: boolean;
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -51,11 +34,14 @@ type RecommendedEvent = {
 function fmtDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
-function fmtDateShort(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric" });
+function fmtTime(t?: string) {
+  if (!t) return "";
+  const [h, m] = t.split(":").map(Number);
+  if (Number.isNaN(h)) return t;
+  return `${h % 12 || 12}:${String(m ?? 0).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
 }
-function daysUntil(dateStr: string) {
-  return Math.ceil((new Date(dateStr + "T00:00:00").getTime() - Date.now()) / 86400000);
+function fmtDateFull(d: string) {
+  return new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
 }
 function greeting(name: string) {
   const h = new Date().getHours();
@@ -68,12 +54,12 @@ function greeting(name: string) {
 
 // ── Live countdown ────────────────────────────────────────────────────────────
 
-function EventCountdown({ order }: { order: PortalOrderRow }) {
+function CountdownBoxes({ dateStr }: { dateStr: string }) {
   const [t, setT] = useState({ days: 0, hours: 0, mins: 0, secs: 0, ms: 1 });
 
   useEffect(() => {
     function tick() {
-      const target = new Date(order.eventDate + "T00:00:00").getTime();
+      const target = new Date(dateStr + "T00:00:00").getTime();
       const ms = Math.max(0, target - Date.now());
       setT({
         days:  Math.floor(ms / 86400000),
@@ -86,87 +72,35 @@ function EventCountdown({ order }: { order: PortalOrderRow }) {
     tick();
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
-  }, [order.eventDate]);
+  }, [dateStr]);
 
   const pad = (n: number) => String(n).padStart(2, "0");
-  const isToday  = t.ms > 0 && t.ms < 86400000;
-  const started  = t.ms === 0;
-
+  if (t.ms === 0) {
+    return (
+      <div className="inline-flex items-center px-4 py-2.5 rounded-xl bg-marigold/20 border border-marigold/40">
+        <p className="font-display font-bold text-marigold text-base">It&apos;s time to dance! 🎶</p>
+      </div>
+    );
+  }
   const units = [
     { val: pad(t.days),  label: "days" },
     { val: pad(t.hours), label: "hrs"  },
     { val: pad(t.mins),  label: "min"  },
     { val: pad(t.secs),  label: "sec"  },
   ];
-
   return (
-    <div className="relative border-t border-white/8 px-6 pt-5 pb-6">
-      {/* Event label */}
-      <div className="flex items-center gap-2 mb-4">
-        <div className="w-1.5 h-1.5 rounded-full bg-marigold animate-pulse shrink-0" />
-        <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-white/35">
-          {started ? "Happening now" : isToday ? "Starting today" : "Next event"}
-        </p>
-      </div>
-
-      <p
-        className="font-display font-bold text-white mb-5 leading-tight truncate"
-        style={{ fontSize: "clamp(16px,2.4vw,22px)", letterSpacing: "-0.025em" }}
-      >
-        {order.eventTitle}
-        <span className="font-ui font-normal text-white/35 text-sm ml-2">
-          · {order.city}, {order.state}
-        </span>
-      </p>
-
-      {started ? (
-        <div className="flex items-center gap-3">
-          <div className="px-5 py-3 rounded-2xl bg-marigold/20 border border-marigold/40">
-            <p className="font-display font-bold text-marigold text-lg" style={{ letterSpacing: "-0.02em" }}>
-              It&apos;s time to dance! 🎶
-            </p>
-          </div>
-          <Link href="/portal/tickets" className="px-4 py-3 rounded-xl bg-marigold text-aubergine font-ui font-semibold text-sm hover:bg-marigold-dark transition-all whitespace-nowrap">
-            View ticket →
-          </Link>
-        </div>
-      ) : (
-        <div className="flex items-end gap-3 sm:gap-4 flex-wrap">
-          {units.map(({ val, label }, i) => (
-            <div key={label} className="flex items-end gap-3 sm:gap-4">
-              {i > 0 && (
-                <span
-                  className="font-display font-bold text-white/20 pb-3"
-                  style={{ fontSize: "clamp(22px,3vw,34px)" }}
-                >
-                  :
-                </span>
-              )}
-              <div className="flex flex-col items-center">
-                <div
-                  className="flex items-center justify-center rounded-2xl border border-marigold/25 bg-marigold/10 tabular-nums"
-                  style={{ minWidth: "clamp(52px,7vw,72px)", padding: "10px 8px" }}
-                >
-                  <span
-                    className="font-display font-bold text-marigold leading-none"
-                    style={{ fontSize: "clamp(26px,4vw,42px)", letterSpacing: "-0.04em" }}
-                  >
-                    {val}
-                  </span>
-                </div>
-                <p className="font-mono text-[8px] uppercase tracking-widest text-white/25 mt-1.5">{label}</p>
-              </div>
+    <div className="flex items-start gap-2 sm:gap-3">
+      {units.map(({ val, label }, i) => (
+        <div key={label} className="flex items-start gap-2 sm:gap-3">
+          {i > 0 && <span className="font-display font-bold text-white/20 pt-2.5 text-2xl">:</span>}
+          <div className="flex flex-col items-center">
+            <div className="flex items-center justify-center rounded-xl tabular-nums" style={{ minWidth: "clamp(52px,6vw,66px)", padding: "10px 8px", background: "rgba(0,0,0,0.28)", border: "1px solid rgba(245,166,35,0.18)" }}>
+              <span className="font-display font-bold text-marigold leading-none" style={{ fontSize: "clamp(24px,3.5vw,36px)", letterSpacing: "-0.04em" }}>{val}</span>
             </div>
-          ))}
-
-          <Link
-            href="/portal/tickets"
-            className="mb-5 ml-2 px-4 py-3 rounded-xl bg-marigold text-aubergine font-ui font-semibold text-sm hover:bg-marigold-dark transition-all whitespace-nowrap self-center"
-          >
-            View ticket →
-          </Link>
+            <p className="font-mono text-[8px] uppercase tracking-[0.18em] text-white/30 mt-1.5">{label}</p>
+          </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }
@@ -186,166 +120,103 @@ function QRMini({ value }: { value: string }) {
   );
 }
 
-// ── Live activity feed ────────────────────────────────────────────────────────
+// ── Ticket row ────────────────────────────────────────────────────────────────
 
-function LiveActivityFeed({ items }: { items: LiveActivityItem[] }) {
-  function timeAgo(iso: string) {
-    const diff = Date.now() - new Date(iso).getTime();
-    const mins = Math.floor(diff / 60000);
-    if (mins < 1) return "just now";
-    if (mins < 60) return `${mins}m ago`;
-    const hrs = Math.floor(mins / 60);
-    if (hrs < 24) return `${hrs}h ago`;
-    return `${Math.floor(hrs / 24)}d ago`;
-  }
-
-  return (
-    <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
-      <div className="px-4 py-3.5 border-b border-ivory-200 flex items-center gap-2.5">
-        <div className="relative flex items-center gap-1.5">
-          <div className="w-2 h-2 rounded-full bg-peacock" />
-          <div className="absolute w-2 h-2 rounded-full bg-peacock animate-ping" />
-        </div>
-        <p className="font-mono text-[10px] uppercase tracking-widest text-ink font-bold">Live on Rameelo</p>
-      </div>
-
-      {items.length === 0 ? (
-        <div className="px-4 py-8 text-center space-y-2">
-          <p className="text-2xl">🪈</p>
-          <p className="font-display font-bold text-ink text-sm">Platform is live</p>
-          <p className="font-ui text-xs text-ink-muted">Ticket activity will appear here as events fill up.</p>
-          <Link href="/events" className="inline-block mt-2 font-ui text-xs font-semibold text-peacock hover:text-peacock/70 transition-colors">Browse events →</Link>
-        </div>
-      ) : (
-        <div className="divide-y divide-ivory-200">
-          {items.map((item, i) => (
-            <div key={i} className="px-4 py-3 flex items-start gap-3">
-              <div className="w-8 h-8 rounded-xl flex items-center justify-center text-sm shrink-0"
-                style={{ backgroundColor: item.type === "ticket" ? "#F5A62318" : "#0E8C7A18" }}>
-                {item.type === "ticket" ? "🎟️" : "👥"}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-ui text-xs font-semibold text-ink leading-snug">
-                  {item.type === "ticket"
-                    ? `${item.qty} ticket${(item.qty ?? 1) > 1 ? "s" : ""} sold`
-                    : `Group of ${item.group_size} forming`}
-                </p>
-                <p className="font-mono text-[9px] text-ink-muted mt-0.5 truncate">
-                  {item.event_title} · {item.city}, {item.state}
-                </p>
-              </div>
-              <span className="font-mono text-[9px] text-ink-muted shrink-0">{timeAgo(item.created_at)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="px-4 py-3 border-t border-ivory-200 bg-ivory">
-        <Link href="/events" className="flex items-center justify-center gap-1.5 font-ui text-xs font-semibold text-peacock hover:text-peacock/70 transition-colors">
-          Browse all events →
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-// ── Community groups row ──────────────────────────────────────────────────────
-
-function CommunityGroupsRow({ groups }: { groups: CommunityGroup[] }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  if (groups.length === 0) return null;
-
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-3">
-        <div className="flex items-center gap-2.5">
-          <h3 className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>
-            Community Groups
-          </h3>
-          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-peacock/10 font-mono text-[9px] font-bold uppercase tracking-widest text-peacock">
-            <span className="w-1 h-1 rounded-full bg-peacock animate-pulse" />
-            Live
-          </span>
-        </div>
-        <Link href="/portal/groups" className="font-ui text-sm text-peacock hover:text-peacock/70 transition-colors font-semibold">
-          See all →
-        </Link>
-      </div>
-      <div ref={scrollRef} className="flex gap-3 overflow-x-auto pb-2" style={{ scrollbarWidth: "none" }}>
-        {groups.map(g => (
-          <Link
-            key={g.id}
-            href="/portal/groups"
-            className="group shrink-0 w-56 bg-white rounded-2xl border border-ivory-200 overflow-hidden hover:border-peacock/30 hover:shadow-md transition-all"
-          >
-            <div
-              className="h-20 flex items-center justify-center text-4xl"
-              style={{ background: g.color1 && g.color2 ? `linear-gradient(135deg, ${g.color1}, ${g.color2})` : "#2E1B30" }}
-            >
-              {g.emoji ?? "🪈"}
-            </div>
-            <div className="px-3 py-2.5">
-              <p className="font-display font-bold text-ink text-xs leading-snug group-hover:text-peacock transition-colors">{g.name}</p>
-              {g.description && <p className="font-ui text-[11px] text-ink-muted mt-0.5 line-clamp-2 leading-snug">{g.description}</p>}
-              <div className="flex items-center gap-1.5 mt-2">
-                <div className="flex -space-x-1">
-                  {[0,1,2].map(n => (
-                    <div key={n} className="w-4 h-4 rounded-full border border-white" style={{ backgroundColor: ["#2E1B30","#0E8C7A","#F5A623"][n] }} />
-                  ))}
-                </div>
-                <span className="font-mono text-[9px] text-ink-muted">{g.member_count} member{g.member_count !== 1 ? "s" : ""}</span>
-                {g.is_hot && <span className="font-mono text-[9px] text-durga">🔥 Hot</span>}
-              </div>
-            </div>
-          </Link>
-        ))}
-        <Link
-          href="/portal/groups"
-          className="shrink-0 w-44 rounded-2xl border-2 border-dashed border-peacock/25 hover:border-peacock/50 transition-all flex flex-col items-center justify-center gap-2 p-4 group"
-        >
-          <div className="w-9 h-9 rounded-xl bg-peacock/10 flex items-center justify-center text-xl group-hover:bg-peacock/20 transition-colors">👥</div>
-          <p className="font-ui font-bold text-ink text-xs text-center group-hover:text-peacock transition-colors">Browse all groups</p>
-        </Link>
-      </div>
-    </div>
-  );
-}
-
-// ── Upcoming ticket card ──────────────────────────────────────────────────────
-
-const AVATAR_COLORS = ["#7C1F2C", "#0E8C7A", "#2E1B30", "#D4891B", "#5a1e7a", "#892240", "#1a4a5e"];
-
-function TicketCard({ order }: { order: PortalOrderRow }) {
-  const initials = (order.artistName || order.eventTitle).split(" ").map((w: string) => w[0]).join("").slice(0, 2).toUpperCase();
-  const colorIdx = ((order.artistName || order.eventTitle).charCodeAt(0) || 0) % AVATAR_COLORS.length;
-  const days = daysUntil(order.eventDate);
-  const urgent = days <= 3;
-
+function TicketRow({ order }: { order: PortalOrderRow }) {
   return (
     <Link
       href="/portal/tickets"
-      className="group flex items-center gap-3 p-4 rounded-2xl bg-white border border-ivory-200 hover:border-marigold/40 hover:shadow-sm transition-all"
+      className="group flex items-center gap-3.5 p-3 rounded-2xl bg-white border border-ivory-200 hover:border-marigold/40 hover:shadow-sm transition-all"
     >
-      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0" style={{ backgroundColor: AVATAR_COLORS[colorIdx] }}>
-        {initials}
+      {/* Cover thumbnail */}
+      <div className="w-12 h-12 rounded-xl shrink-0 flex items-center justify-center text-xl relative overflow-hidden" style={{ background: coverBg(order.coverImageUrl, order.coverGradient) }}>
+        {!order.coverImageUrl && <span>🪔</span>}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-1.5 min-w-0">
-          <p className="font-display font-bold text-ink text-xs truncate group-hover:text-aubergine transition-colors">{order.eventTitle}</p>
+          <p className="font-display font-bold text-ink text-sm truncate group-hover:text-aubergine transition-colors">{order.eventTitle}</p>
           {order.isTest && (
             <span className="font-mono text-[8px] uppercase tracking-widest font-bold bg-marigold/20 text-marigold-dark px-1.5 py-0.5 rounded-full shrink-0">Test</span>
           )}
         </div>
-        <p className="font-mono text-[10px] text-ink-muted">{fmtDateShort(order.eventDate)} · {order.city}, {order.state}</p>
-        <p className="font-mono text-[10px] text-ink-muted">{order.qty} ticket{order.qty > 1 ? "s" : ""}</p>
+        <p className="font-ui text-xs text-ink-muted mt-0.5">
+          {fmtDate(order.eventDate)}
+          {(order.city || order.state) && <span className="text-ink-muted/60"> · 📍 {[order.city, order.state].filter(Boolean).join(", ")}</span>}
+        </p>
       </div>
-      <div className="flex flex-col items-end gap-1.5 shrink-0">
+      <span className="font-mono text-[10px] font-bold text-ink-muted bg-ivory border border-ivory-200 px-2.5 py-1 rounded-full shrink-0">
+        {order.qty} ticket{order.qty !== 1 ? "s" : ""}
+      </span>
+      <div className="shrink-0 rounded-md overflow-hidden border border-ivory-200">
         <QRMini value={order.orderId} />
-        {urgent && days > 0 && (
-          <span className="font-mono text-[9px] font-bold text-durga bg-durga/10 px-1.5 py-0.5 rounded-full">{days}d away</span>
-        )}
       </div>
     </Link>
+  );
+}
+
+// ── Group order banner (single, mockup style) ──────────────────────────────────
+function GroupOrderBanner({ group }: { group: PendingGroup }) {
+  const discounted = Math.round(group.tierPrice * (1 - group.discountPct / 100));
+  const tickets = Math.max(1, group.targetSize);
+  const total = discounted * tickets;
+  const hoursLeft = Math.max(0, Math.round((new Date(group.deadline).getTime() - Date.now()) / 3600000));
+  const daysLeft = Math.floor(hoursLeft / 24);
+  const timeLabel = daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left` : `${hoursLeft}h left`;
+  const urgent = hoursLeft < 48;
+
+  return (
+    <div className="rounded-2xl border border-marigold/30 bg-gradient-to-br from-marigold/[0.07] to-marigold/[0.02] p-5">
+      <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+        <div className="w-10 h-10 rounded-xl bg-marigold/15 flex items-center justify-center shrink-0">
+          <svg className="w-5 h-5 text-marigold-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <p className="font-display font-bold text-ink text-base" style={{ letterSpacing: "-0.015em" }}>Finish your group order</p>
+            <span className={`inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full ${urgent ? "bg-durga/10 text-durga" : "bg-marigold/15 text-marigold-dark"}`}>
+              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              {timeLabel}
+            </span>
+          </div>
+          <p className="font-ui text-sm text-ink-muted mt-0.5">
+            <span className="font-semibold text-ink">{group.eventTitle}</span> · {fmtDate(group.eventDate)}
+            {(group.city || group.state) && ` · ${[group.city, group.state].filter(Boolean).join(", ")}`}
+            {" — "}{tickets} unpaid ticket{tickets !== 1 ? "s" : ""} you started.
+          </p>
+        </div>
+        <div className="flex items-center gap-4 shrink-0">
+          <div className="text-right">
+            <p className="font-display font-bold text-ink text-xl leading-none">${total}</p>
+            <p className="font-mono text-[10px] text-ink-muted mt-0.5">{tickets} ticket{tickets !== 1 ? "s" : ""}</p>
+          </div>
+          <Link href={`/group/${group.groupId}`} className="hidden sm:inline-flex items-center px-4 py-2.5 rounded-xl border border-ink/12 bg-white text-ink font-ui font-semibold text-sm hover:bg-ivory transition-all">
+            Details
+          </Link>
+          <Link href={`/group/${group.groupId}`} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark active:scale-[0.98] transition-all whitespace-nowrap">
+            Complete checkout
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+          </Link>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Garba Passport card ─────────────────────────────────────────────────────────
+function PassportCard() {
+  return (
+    <div className="rounded-2xl p-5 relative overflow-hidden" style={{ background: "linear-gradient(135deg, #2E1B30 0%, #1a0f1f 100%)" }}>
+      <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full bg-marigold/10 blur-2xl pointer-events-none" />
+      <div className="relative">
+        <p className="font-mono text-[9px] uppercase tracking-[0.2em] text-marigold/70 mb-2">Garba Passport</p>
+        <p className="font-display font-bold text-white text-lg leading-tight mb-1.5" style={{ letterSpacing: "-0.015em" }}>Your passport is ready ✨</p>
+        <p className="font-ui text-sm text-white/55 leading-relaxed mb-4">Share your unique member card on Instagram or WhatsApp — invite friends to join Rameelo.</p>
+        <Link href="/portal/my-card" className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark active:scale-[0.98] transition-all">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+          Share my card
+        </Link>
+      </div>
+    </div>
   );
 }
 
@@ -386,30 +257,32 @@ function PendingGroupCard({ group }: { group: PendingGroup }) {
 
 // ── Quick actions ─────────────────────────────────────────────────────────────
 
-function QuickActions({ hasTickets, orderCount }: { hasTickets: boolean; orderCount: number }) {
+function QuickActions({ orderCount }: { orderCount: number }) {
+  const icon = (d: string) => (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={d} /></svg>
+  );
   const actions = [
-    { label: "Find Events",    href: "/events",            emoji: "🔍", desc: "Events near you",                          bg: "from-aubergine/8 to-aubergine/3",   border: "border-aubergine/15", hover: "hover:border-aubergine/30" },
-    { label: "Community",      href: "/portal/community",  emoji: "🪈", desc: "Share garba moments",                      bg: "from-peacock/8 to-peacock/3",       border: "border-peacock/15",   hover: "hover:border-peacock/30"   },
-    { label: "Group Order",    href: "/events",            emoji: "👥", desc: "Save up to 15%",                           bg: "from-marigold/10 to-marigold/3",    border: "border-marigold/20",  hover: "hover:border-marigold/40"  },
-    { label: "My Tickets",     href: "/portal/tickets",    emoji: "🎟️", desc: hasTickets ? `${orderCount} order${orderCount !== 1 ? "s" : ""}` : "None yet", bg: "from-durga/8 to-durga/3", border: "border-durga/15", hover: "hover:border-durga/30" },
-    { label: "Earnings",       href: "/portal/organizer",  emoji: "💰", desc: "Organizer dashboard",                      bg: "from-peacock/8 to-peacock/3",       border: "border-peacock/15",   hover: "hover:border-peacock/30"   },
-    { label: "Invite Friends", href: "/portal/refer",      emoji: "📲", desc: "Share the vibe",                           bg: "from-marigold/10 to-marigold/3",    border: "border-marigold/20",  hover: "hover:border-marigold/40"  },
+    { label: "Find Events",    href: "/events",           desc: "Near you",       tint: "#F5A623", svg: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" },
+    { label: "My Tickets",     href: "/portal/tickets",   desc: orderCount > 0 ? `${orderCount} order${orderCount !== 1 ? "s" : ""}` : "None yet", tint: "#7C1F2C", svg: "M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" },
+    { label: "Group Order",    href: "/events",           desc: "Save 15%",       tint: "#0E8C7A", svg: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4 0m4 0a4 4 0 014 4M9 12a4 4 0 110-8 4 4 0 010 8z" },
+    { label: "Invite Friends", href: "/portal/refer",     desc: "Share the vibe", tint: "#F5A623", svg: "M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 1010 8h2zm-7 5h14M5 21h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v11a2 2 0 002 2z" },
+    { label: "Earnings",       href: "/portal/organizer", desc: "Organizer",      tint: "#0E8C7A", svg: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
   ];
 
   return (
-    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2.5">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
       {actions.map(a => (
         <Link
           key={a.label}
           href={a.href}
-          className={`group flex flex-col items-center gap-2 p-3.5 rounded-2xl bg-gradient-to-b ${a.bg} border ${a.border} ${a.hover} transition-all text-center`}
+          className="group flex items-center gap-3 p-3.5 rounded-2xl bg-white border border-ivory-200 hover:border-ink/15 hover:shadow-sm transition-all"
         >
-          <div className="w-10 h-10 rounded-xl bg-white/80 flex items-center justify-center text-xl shadow-sm group-hover:scale-105 transition-transform">
-            {a.emoji}
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: `${a.tint}1a`, color: a.tint }}>
+            {icon(a.svg)}
           </div>
-          <div>
-            <p className="font-ui font-bold text-ink text-[11px] leading-tight">{a.label}</p>
-            <p className="font-mono text-[9px] text-ink-muted mt-0.5 leading-tight">{a.desc}</p>
+          <div className="min-w-0">
+            <p className="font-display font-bold text-ink text-[13px] leading-tight truncate">{a.label}</p>
+            <p className="font-ui text-[11px] text-ink-muted leading-tight truncate">{a.desc}</p>
           </div>
         </Link>
       ))}
@@ -420,35 +293,29 @@ function QuickActions({ hasTickets, orderCount }: { hasTickets: boolean; orderCo
 // ── Recommended event card ────────────────────────────────────────────────────
 
 function RecommendedCard({ ev }: { ev: RecommendedEvent }) {
-  const initials = ev.title.split(" ").slice(0, 2).map(w => w[0]).join("").toUpperCase();
-  const colorIdx = (ev.title.charCodeAt(0) || 0) % AVATAR_COLORS.length;
-  const urgencyColor = ev.fillPct >= 85 ? "#D4891B" : "#0E8C7A";
+  const d = new Date(ev.start_date + "T00:00:00");
+  const day = d.getDate();
+  const mon = d.toLocaleDateString("en-US", { month: "short" }).toUpperCase();
 
   return (
-    <Link href={`/events/${ev.id}`} className="group p-4 rounded-2xl bg-white border border-ivory-200 hover:border-marigold/30 hover:shadow-sm transition-all block">
-      <div className="flex items-start gap-3 mb-3">
-        <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white text-[10px] font-bold shrink-0" style={{ backgroundColor: AVATAR_COLORS[colorIdx] }}>
-          {initials}
+    <Link href={`/events/${ev.id}`} className="group rounded-2xl overflow-hidden bg-white border border-ivory-200 hover:border-marigold/30 hover:shadow-md transition-all block">
+      {/* Cover */}
+      <div className="relative h-28 flex items-center justify-center" style={{ background: coverBg(ev.cover_image_url, ev.cover_gradient) }}>
+        <div className="absolute inset-0 pointer-events-none opacity-[0.16]" style={{ backgroundImage: "radial-gradient(circle at 75% 20%, rgba(255,255,255,0.55) 0%, transparent 50%)" }} />
+        {/* Date chip */}
+        <div className="absolute top-3 left-3 bg-white rounded-xl px-2.5 py-1 text-center shadow-sm">
+          <p className="font-display font-bold text-ink leading-none" style={{ fontSize: 16 }}>{day}</p>
+          <p className="font-mono text-[8px] text-ink-muted uppercase tracking-widest leading-none mt-0.5">{mon}</p>
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="font-display font-bold text-ink text-sm truncate group-hover:text-aubergine transition-colors">{ev.title}</p>
-          <p className="font-mono text-[10px] text-ink-muted">{fmtDateShort(ev.start_date)} · {ev.city}, {ev.state}</p>
-        </div>
+        {!ev.cover_image_url && <span className="relative text-3xl">🪔</span>}
+        <span className="absolute bottom-2 right-3 font-mono text-[8px] uppercase tracking-widest text-white/55">Cover photo</span>
       </div>
-      {ev.fillPct > 0 && (
-        <div className="h-1.5 bg-ivory-200 rounded-full overflow-hidden mb-2">
-          <div className="h-full rounded-full transition-all" style={{ width: `${ev.fillPct}%`, backgroundColor: urgencyColor }} />
-        </div>
-      )}
-      <div className="flex items-center justify-between">
-        <p className="font-mono text-[10px] text-ink-muted">
-          {ev.fillPct > 0 ? `${ev.fillPct}% sold` : ev.sellingOnRameelo ? "On sale now" : "Express interest"}
-          {ev.fillPct >= 85 && " · 🔥 Almost gone"}
-        </p>
-        <p className="font-display font-bold text-ink text-sm">
-          {!ev.sellingOnRameelo ? (
-            <span className="font-mono text-[9px] text-ink-muted uppercase tracking-widest">Interest only</span>
-          ) : ev.lowestPrice && ev.lowestPrice > 0 ? `From $${ev.lowestPrice}` : "TBA"}
+      {/* Body */}
+      <div className="p-3.5">
+        <p className="font-display font-bold text-ink text-sm leading-snug truncate group-hover:text-aubergine transition-colors">{ev.title}</p>
+        <p className="font-ui text-xs text-ink-muted mt-0.5 flex items-center gap-1">
+          <svg className="w-3 h-3 text-ink/40 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+          {[ev.city, ev.state].filter(Boolean).join(", ")}
         </p>
       </div>
     </Link>
@@ -463,8 +330,6 @@ export default function PortalDashboard() {
   const [pendingGroups, setPendingGroups] = useState<PendingGroup[]>([]);
   const [recommended, setRecommended]     = useState<RecommendedEvent[]>([]);
   const [incomingTransfers, setIncomingTransfers] = useState<IncomingTransfer[]>([]);
-  const [liveActivity, setLiveActivity]   = useState<LiveActivityItem[]>([]);
-  const [communityGroups, setCommunityGroups] = useState<CommunityGroup[]>([]);
   const [loading, setLoading]             = useState(true);
 
   useEffect(() => {
@@ -474,38 +339,24 @@ export default function PortalDashboard() {
       if (!authUser) return;
       const today = new Date().toISOString().slice(0, 10);
       const email = authUser.email ?? "";
-      const [myOrders, myPending, incoming, { data: eventsRaw }, activityRes, groupsRes] = await Promise.all([
+      const [myOrders, myPending, incoming, { data: eventsRaw }] = await Promise.all([
         loadMyOrders(authUser.id),
         loadMyPendingGroups(authUser.id),
         email ? loadIncomingTransfers(email) : Promise.resolve([]),
         supabase
           .from("events")
-          .select("id, title, start_date, city, state, cover_gradient, selling_on_rameelo, ticket_tiers (price, quantity, quantity_sold)")
+          .select("id, title, start_date, city, state, cover_gradient, cover_image_url, selling_on_rameelo, ticket_tiers (price, quantity, quantity_sold)")
           .eq("status", "published")
           .gte("start_date", today)
           .order("start_date")
           .limit(6),
-        supabase
-          .from("live_activity")
-          .select("type, event_title, city, state, qty, group_size, created_at")
-          .order("created_at", { ascending: false })
-          .limit(10),
-        supabase
-          .from("chat_groups")
-          .select("id, name, emoji, description, category, color1, color2, member_count, is_hot")
-          .eq("is_active", true)
-          .eq("admin_hidden", false)
-          .order("sort_order")
-          .limit(8),
       ]);
       setOrders(myOrders);
       setPendingGroups(myPending);
       setIncomingTransfers(incoming);
-      if (activityRes.data) setLiveActivity((activityRes.data as LiveActivityItem[]) ?? []);
-      if (groupsRes.data) setCommunityGroups(groupsRes.data as CommunityGroup[]);
       const myEventIds = new Set(myOrders.map(o => o.eventId));
       const recs: RecommendedEvent[] = ((eventsRaw ?? []) as {
-        id: string; title: string; start_date: string; city: string; state: string; cover_gradient: string;
+        id: string; title: string; start_date: string; city: string; state: string; cover_gradient: string; cover_image_url: string | null;
         selling_on_rameelo: boolean;
         ticket_tiers: { price: number; quantity: number; quantity_sold: number }[];
       }[])
@@ -517,7 +368,7 @@ export default function PortalDashboard() {
           const totalS = tiers.reduce((s, t) => s + t.quantity_sold, 0);
           return {
             id: e.id, title: e.title, start_date: e.start_date, city: e.city ?? "", state: e.state ?? "",
-            cover_gradient: e.cover_gradient,
+            cover_gradient: e.cover_gradient, cover_image_url: e.cover_image_url ?? null,
             lowestPrice: e.selling_on_rameelo && prices.length > 0 ? Math.min(...prices) : null,
             fillPct: totalQ > 0 ? Math.round((totalS / totalQ) * 100) : 0,
             sellingOnRameelo: e.selling_on_rameelo,
@@ -537,80 +388,122 @@ export default function PortalDashboard() {
   const totalTickets  = orders.reduce((s, o) => s + o.qty, 0);
   const distinctEvents = new Set(orders.map(o => o.eventId)).size;
   const hasTickets = orders.length > 0;
+  const distinctGroups = new Set(orders.filter(o => o.groupId).map(o => o.groupId)).size;
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
 
       {/* ── Hero ── */}
-      <div className="rounded-3xl overflow-hidden relative" style={{ background: "linear-gradient(135deg,#1e0f20 0%,#2E1B30 50%,#1a1230 100%)" }}>
-        {/* Mandala circles */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none">
-          {[260, 380, 500, 640].map((s, i) => (
-            <div key={i} className="absolute rounded-full border border-white/4" style={{ width: s, height: s, top: "50%", left: "60%", transform: "translate(-50%,-50%)" }} />
-          ))}
-          <div className="absolute top-0 right-0 w-72 h-72 rounded-full bg-marigold/12 blur-3xl" />
-          <div className="absolute bottom-0 left-10 w-44 h-44 rounded-full bg-durga/8 blur-2xl" />
-        </div>
-
-        {/* Main row */}
-        <div className="relative px-6 py-7 flex flex-col sm:flex-row sm:items-center gap-5">
-          <div className="flex items-center gap-4 flex-1 min-w-0">
-            <div className="relative shrink-0">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white font-bold text-xl overflow-hidden" style={{ backgroundColor: user.avatarColor }}>
-                {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" /> : user.avatarInitials}
-              </div>
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-peacock border-2 border-[#2E1B30] flex items-center justify-center">
-                <div className="w-1.5 h-1.5 rounded-full bg-white" />
-              </div>
-            </div>
-            <div className="min-w-0">
-              <p className="font-mono text-[9px] uppercase tracking-widest text-white/30 mb-0.5">
-                Member since {new Date(user.joinedAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
-              </p>
-              <h2 className="font-display font-bold text-white leading-tight truncate" style={{ fontSize: 22, letterSpacing: "-0.025em" }}>
-                {greeting(user.firstName)}
-              </h2>
-              <p className="font-ui text-white/40 text-sm truncate">{user.email}{user.city ? ` · ${user.city}` : ""}</p>
-            </div>
+      <div className="rounded-3xl overflow-hidden relative" style={{ background: "linear-gradient(135deg,#1e0f20 0%,#2E1B30 55%,#1a1230 100%)" }}>
+        {/* Cover photo panel (desktop) */}
+        {nextOrder && (
+          <div className="hidden lg:block absolute inset-y-0 right-0 w-[40%]" style={{ background: coverBg(nextOrder.coverImageUrl, nextOrder.coverGradient) }}>
+            <div className="absolute inset-0" style={{ background: "linear-gradient(90deg, #21122a 0%, rgba(33,18,42,0.55) 30%, transparent 100%)" }} />
+            <div className="absolute inset-0 flex items-center justify-center text-5xl opacity-90 pointer-events-none">{!nextOrder.coverImageUrl && "🪔"}</div>
+            <span className="absolute bottom-4 right-5 font-mono text-[8px] uppercase tracking-[0.2em] text-white/40">Cover photo</span>
           </div>
+        )}
 
-          {/* Stats */}
-          <div className="flex gap-5 sm:gap-8 shrink-0">
+        {/* Stats */}
+        {!loading && (
+          <div className="absolute top-5 right-6 z-20 flex gap-5 sm:gap-7">
             {[
-              { label: "Tickets", value: loading ? "—" : String(totalTickets) },
-              { label: "Events",  value: loading ? "—" : String(distinctEvents) },
-              { label: "Groups",  value: loading ? "—" : String(new Set(orders.filter(o => o.groupId).map(o => o.groupId)).size) },
+              { label: "Tickets", value: totalTickets },
+              { label: "Events",  value: distinctEvents },
+              { label: "Groups",  value: distinctGroups },
             ].map(s => (
               <div key={s.label} className="text-center">
-                <p className="font-display font-bold text-white" style={{ fontSize: 26, letterSpacing: "-0.03em", lineHeight: 1 }}>{s.value}</p>
-                <p className="font-mono text-[9px] uppercase tracking-widest text-white/25 mt-0.5">{s.label}</p>
+                <p className="font-display font-bold text-white leading-none" style={{ fontSize: 22, letterSpacing: "-0.03em" }}>{s.value}</p>
+                <p className="font-mono text-[8px] uppercase tracking-[0.18em] text-white/40 mt-1">{s.label}</p>
               </div>
             ))}
           </div>
-        </div>
+        )}
 
-        {/* Next event big countdown */}
-        {nextOrder && <EventCountdown order={nextOrder} />}
+        {/* Content */}
+        <div className="relative z-10 p-6 sm:p-8 lg:max-w-[62%]">
+          {/* Identity */}
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-full overflow-hidden flex items-center justify-center text-white font-bold shrink-0 ring-2 ring-white/15" style={{ backgroundColor: user.avatarColor }}>
+              {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="w-full h-full object-cover" /> : user.avatarInitials}
+            </div>
+            <div className="min-w-0">
+              <h2 className="font-display font-bold text-white leading-tight truncate" style={{ fontSize: "clamp(18px,2.4vw,22px)", letterSpacing: "-0.025em" }}>
+                {greeting(user.firstName)}
+              </h2>
+              <p className="font-ui text-white/45 text-[13px] truncate">
+                {user.email}{user.city ? ` · ${user.city}` : ""} · Member since {new Date(user.joinedAt).toLocaleDateString("en-US", { month: "short", year: "numeric" })}
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t border-white/8 my-5" />
+
+          {nextOrder ? (
+            <>
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-marigold opacity-60" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-marigold" />
+                </span>
+                <p className="font-mono text-[9px] uppercase tracking-[0.22em] text-marigold/80">Your next event</p>
+              </div>
+
+              <h3 className="font-display font-bold text-white leading-none mb-3" style={{ fontSize: "clamp(26px,4vw,38px)", letterSpacing: "-0.03em" }}>
+                {nextOrder.eventTitle}
+              </h3>
+
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-6">
+                {(nextOrder.city || nextOrder.state) && (
+                  <span className="font-ui text-[13px] text-white/55 flex items-center gap-1.5">
+                    <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    {[nextOrder.city, nextOrder.state].filter(Boolean).join(", ")}
+                  </span>
+                )}
+                <span className="font-ui text-[13px] text-white/55 flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  {fmtDateFull(nextOrder.eventDate)}{nextOrder.eventTime ? ` · ${fmtTime(nextOrder.eventTime)}` : ""}
+                </span>
+                <span className="font-ui text-[13px] text-white/55 flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" /></svg>
+                  {nextOrder.qty} ticket{nextOrder.qty !== 1 ? "s" : ""}
+                </span>
+              </div>
+
+              <CountdownBoxes dateStr={nextOrder.eventDate} />
+
+              <div className="flex flex-wrap gap-2.5 mt-6">
+                <Link href="/portal/tickets" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark active:scale-[0.98] transition-all">
+                  View ticket
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                </Link>
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([nextOrder.venue, nextOrder.city, nextOrder.state].filter(Boolean).join(", "))}`}
+                  target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 px-5 py-3 rounded-xl border border-white/15 text-white/80 font-ui font-semibold text-sm hover:bg-white/8 transition-all"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  Get directions
+                </a>
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="font-display font-bold text-white text-lg mb-1" style={{ letterSpacing: "-0.02em" }}>No upcoming events yet</p>
+              <p className="font-ui text-white/45 text-sm mb-5">Find your next garba night — tickets across the US this Navratri.</p>
+              <Link href="/events" className="inline-flex items-center gap-2 px-5 py-3 rounded-xl bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark transition-all">
+                Browse events
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+              </Link>
+            </>
+          )}
+        </div>
       </div>
 
-      {/* ── Quick actions (primary nav) ── */}
-      <QuickActions hasTickets={hasTickets} orderCount={orders.length} />
+      {/* ── Quick actions ── */}
+      <QuickActions orderCount={orders.length} />
 
-      {/* ── Garba Passport promo ── */}
-      {!loading && (
-        <Link href="/portal/my-card" className="flex items-center gap-4 px-5 py-4 rounded-2xl border border-aubergine/30 bg-gradient-to-r from-aubergine/10 via-marigold/5 to-aubergine/8 hover:from-aubergine/15 hover:to-aubergine/12 transition-all group">
-          <div className="w-10 h-10 rounded-xl bg-aubergine flex items-center justify-center shrink-0 text-xl">🪪</div>
-          <div className="flex-1 min-w-0">
-            <p className="font-display font-bold text-ink text-sm" style={{ letterSpacing: "-0.01em" }}>
-              Your Garba Passport is ready ✨
-            </p>
-            <p className="font-ui text-xs text-ink-muted">Share your unique card on Instagram or WhatsApp and invite friends to join Rameelo.</p>
-          </div>
-          <svg className="w-5 h-5 text-aubergine/60 group-hover:translate-x-0.5 transition-transform shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-        </Link>
-      )}
-
-      {/* ── Transfer alert ── */}
+      {/* ── Incoming transfer alert ── */}
       {!loading && incomingTransfers.length > 0 && (
         <Link href="/portal/tickets" className="flex items-center gap-4 px-5 py-4 rounded-2xl border-2 border-marigold/40 bg-marigold/8 hover:bg-marigold/12 transition-all group">
           <div className="w-10 h-10 rounded-xl bg-marigold flex items-center justify-center shrink-0 text-xl">🎟️</div>
@@ -624,98 +517,73 @@ export default function PortalDashboard() {
         </Link>
       )}
 
-      {/* ── Pending groups ── */}
-      {pendingGroups.length > 0 && (
-        <div>
-          <div className="flex items-center gap-3 mb-3">
-            <div className="w-8 h-8 rounded-xl bg-marigold/15 flex items-center justify-center"><span className="text-base">👥</span></div>
-            <div>
-              <h3 className="font-display font-bold text-ink text-base">Finish Your Group Orders</h3>
-              <p className="font-ui text-xs text-ink-muted">You have unpaid group tickets — complete checkout to secure your spot.</p>
-            </div>
-          </div>
-          <div className="space-y-3">
-            {pendingGroups.map(g => <PendingGroupCard key={g.groupId} group={g} />)}
-          </div>
-        </div>
-      )}
+      {/* ── Group order banner (single) ── */}
+      {!loading && pendingGroups.length > 0 && <GroupOrderBanner group={pendingGroups[0]} />}
 
-      {/* ── Tickets + Live Feed (2-column) ── */}
+      {/* ── Main two-column ── */}
       {loading ? (
         <div className="flex items-center justify-center py-12">
           <div className="w-8 h-8 rounded-full border-4 border-ivory-200 border-t-marigold animate-spin" />
         </div>
       ) : (
-        <div className="grid lg:grid-cols-[1fr_300px] gap-5 items-start">
+        <div className="grid lg:grid-cols-[1fr_336px] gap-5 items-start">
 
-          {/* Left: tickets or CTA */}
-          <div>
-            {!hasTickets ? (
-              <div className="rounded-2xl overflow-hidden border border-marigold/25 bg-gradient-to-br from-marigold/8 via-transparent to-aubergine/5">
-                <div className="px-6 py-6 flex flex-col sm:flex-row items-start sm:items-center gap-5">
-                  <div className="flex-1">
-                    <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1.5">No tickets yet</p>
-                    <h3 className="font-display font-bold text-ink text-xl mb-1" style={{ letterSpacing: "-0.02em" }}>Your first Navratri night is one click away</h3>
-                    <p className="font-ui text-sm text-ink-muted leading-relaxed">Browse live events across the US — garba, dandiya, raas, and more. Group discounts up to 15% off.</p>
-                  </div>
-                  <Link href="/events" className="flex items-center gap-2 bg-marigold text-aubergine font-display font-bold text-sm px-6 py-3 rounded-xl hover:bg-marigold-dark transition-all shadow-sm whitespace-nowrap shrink-0">
-                    Browse events →
-                  </Link>
-                </div>
-              </div>
-            ) : (
-              <div>
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.015em" }}>Upcoming Tickets</h3>
+          {/* Left column */}
+          <div className="space-y-8 min-w-0">
+            {/* Your tickets */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>Your tickets</h3>
+                {hasTickets && (
                   <Link href="/portal/tickets" className="font-ui text-sm text-peacock hover:text-peacock/70 transition-colors font-semibold">
                     See all ({orders.length}) →
                   </Link>
-                </div>
-                {upcoming.length === 0 ? (
-                  <div className="rounded-2xl border border-ivory-200 bg-white p-6 text-center">
-                    <p className="font-display font-bold text-ink text-base mb-1">No upcoming events</p>
-                    <p className="font-ui text-xs text-ink-muted mb-4">All your tickets are for past events. Find your next night out!</p>
-                    <Link href="/events" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-marigold text-aubergine font-semibold text-sm hover:bg-marigold-dark transition-all">Browse events →</Link>
-                  </div>
-                ) : (
-                  <div className="space-y-2.5">
-                    {upcoming.slice(0, 4).map(o => <TicketCard key={o.orderId} order={o} />)}
-                  </div>
                 )}
               </div>
-            )}
+              {!hasTickets ? (
+                <div className="rounded-2xl border border-ivory-200 bg-white p-6 text-center">
+                  <p className="font-display font-bold text-ink text-base mb-1">No tickets yet</p>
+                  <p className="font-ui text-xs text-ink-muted mb-4">Browse live events across the US — group discounts up to 15% off.</p>
+                  <Link href="/events" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-marigold text-aubergine font-semibold text-sm hover:bg-marigold-dark transition-all">Browse events →</Link>
+                </div>
+              ) : (
+                <div className="space-y-2.5">
+                  {orders.slice(0, 3).map(o => <TicketRow key={o.orderId} order={o} />)}
+                </div>
+              )}
+            </div>
+
+            {/* More events */}
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>
+                  {hasTickets ? "More events you might like" : "Explore events near you"}
+                </h3>
+                <Link href="/events" className="font-ui text-sm text-peacock hover:text-peacock/70 font-semibold transition-colors">Browse all →</Link>
+              </div>
+              {recommended.length === 0 ? (
+                <div className="rounded-2xl border border-ivory-200 bg-white p-8 text-center">
+                  <p className="font-display font-bold text-ink text-base mb-1">Events coming soon</p>
+                  <p className="font-ui text-xs text-ink-muted mb-4">Check back as organizers publish new events for this season.</p>
+                  <Link href="/events" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-marigold text-aubergine font-semibold text-sm hover:bg-marigold-dark transition-all">Browse events →</Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {recommended.map(ev => <RecommendedCard key={ev.id} ev={ev} />)}
+                </div>
+              )}
+            </div>
           </div>
 
-          {/* Right: Live feed */}
-          <LiveActivityFeed items={liveActivity} />
+          {/* Right column */}
+          <div className="space-y-5">
+            <PassportCard />
+          </div>
         </div>
       )}
 
-      {/* ── Recommended events ── */}
-      <div>
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>
-            {hasTickets ? "More events you might like" : "Explore events near you"}
-          </h3>
-          <Link href="/events" className="font-ui text-sm text-peacock hover:text-peacock/70 font-semibold transition-colors">Browse all →</Link>
-        </div>
-        {recommended.length === 0 ? (
-          <div className="rounded-2xl border border-ivory-200 bg-white p-8 text-center">
-            <p className="font-display font-bold text-ink text-base mb-1">Events coming soon</p>
-            <p className="font-ui text-xs text-ink-muted mb-4">Check back as organizers publish new events for this season.</p>
-            <Link href="/events" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-marigold text-aubergine font-semibold text-sm hover:bg-marigold-dark transition-all">Browse events →</Link>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-            {recommended.map(ev => <RecommendedCard key={ev.id} ev={ev} />)}
-          </div>
-        )}
-      </div>
-
-      {/* ── Community groups ── */}
-      <CommunityGroupsRow groups={communityGroups} />
-
       {/* ── Sponsors ── */}
+      {!loading && (
       <div>
         <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted/40 mb-2 px-1">From our community partners</p>
         <div className="rounded-2xl overflow-hidden border border-ivory-200 mb-3">
@@ -753,6 +621,7 @@ export default function PortalDashboard() {
           ))}
         </div>
       </div>
+      )}
 
     </div>
   );

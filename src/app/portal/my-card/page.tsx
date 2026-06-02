@@ -25,7 +25,10 @@ type EventStamp = {
   start_date: string;
   artist:     string | null;   // free-text fallback
   artists:    { name: string } | null;  // joined from artists table
+  source:     "purchase" | "custom"; // purchase = from a ticket (locked), custom = user-added
 };
+
+type ArtistOption = { id: string; name: string };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -172,23 +175,265 @@ function EmptyStamp() {
   );
 }
 
+// ── Artist combobox ───────────────────────────────────────────────────────────
+function ArtistCombobox({ artists, query, setQuery, onSelect, selectedId }: {
+  artists: ArtistOption[];
+  query: string;
+  setQuery: (v: string) => void;
+  onSelect: (a: ArtistOption | null) => void;
+  selectedId: string | null;
+}) {
+  const [open, setOpen] = useState(false);
+  const q = query.trim().toLowerCase();
+  const matches = q
+    ? artists.filter(a => a.name.toLowerCase().includes(q)).slice(0, 6)
+    : artists.slice(0, 6);
+  const exact = artists.some(a => a.name.toLowerCase() === q);
+
+  return (
+    <div className="relative">
+      <input
+        type="text"
+        value={query}
+        onChange={e => { setQuery(e.target.value); onSelect(null); setOpen(true); }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setTimeout(() => setOpen(false), 150)}
+        placeholder="Search artists or type a name…"
+        className="w-full rounded-xl border border-ivory-200 px-4 py-3 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-[#1B2F5E]/20 focus:border-[#1B2F5E]/40 transition-all"
+      />
+      {open && (matches.length > 0 || (query.trim() && !exact)) && (
+        <div className="absolute z-10 left-0 right-0 mt-1.5 rounded-xl border border-ivory-200 bg-white shadow-lg overflow-hidden max-h-56 overflow-y-auto">
+          {matches.map(a => (
+            <button
+              key={a.id}
+              type="button"
+              onMouseDown={() => { onSelect(a); setQuery(a.name); setOpen(false); }}
+              className={`w-full text-left px-4 py-2.5 font-ui text-sm transition-colors flex items-center gap-2 ${selectedId === a.id ? "bg-[#1B2F5E]/8 text-[#1B2F5E] font-semibold" : "text-ink hover:bg-ivory"}`}
+            >
+              <span className="w-6 h-6 rounded-full bg-[#1B2F5E]/10 flex items-center justify-center text-[10px] font-bold text-[#1B2F5E] shrink-0">{a.name[0]?.toUpperCase()}</span>
+              {a.name}
+            </button>
+          ))}
+          {query.trim() && !exact && (
+            <button
+              type="button"
+              onMouseDown={() => { onSelect(null); setOpen(false); }}
+              className="w-full text-left px-4 py-2.5 font-ui text-sm text-ink-muted hover:bg-ivory transition-colors border-t border-ivory-200"
+            >
+              Use “<span className="font-semibold text-ink">{query.trim()}</span>” as the artist
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Add Stamp Modal (form + live preview) ───────────────────────────────────────
+function AddStampModal({ artists, userId, onClose, onAdded }: {
+  artists: ArtistOption[];
+  userId: string;
+  onClose: () => void;
+  onAdded: (s: EventStamp) => void;
+}) {
+  const [eventName, setEventName] = useState("");
+  const [date, setDate] = useState("");
+  const [city, setCity] = useState("");
+  const [stateField, setStateField] = useState("");
+  const [mode, setMode] = useState<"artist" | "noartist">("artist");
+  const [artistQuery, setArtistQuery] = useState("");
+  const [selectedArtist, setSelectedArtist] = useState<ArtistOption | null>(null);
+  const [customLabel, setCustomLabel] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, []);
+
+  const heroLabel = mode === "artist"
+    ? (selectedArtist?.name ?? artistQuery.trim())
+    : customLabel.trim();
+  const valid = !!(eventName.trim() && date && heroLabel);
+
+  // Live preview stamp
+  const preview: EventStamp = {
+    id: "preview",
+    title: eventName.trim() || "Your Garba",
+    city: city.trim() || null,
+    state: stateField.trim() || null,
+    start_date: date || new Date().toISOString().slice(0, 10),
+    artist: heroLabel || "Artist",
+    artists: null,
+    source: "custom",
+  };
+
+  async function handleAdd() {
+    if (!valid) return;
+    setSaving(true); setError("");
+    const supabase = createClient();
+    const { data, error: err } = await supabase
+      .from("passport_stamps")
+      .insert({
+        user_id: userId,
+        event_name: eventName.trim(),
+        event_date: date,
+        city: city.trim() || null,
+        state: stateField.trim() || null,
+        artist_id: mode === "artist" ? (selectedArtist?.id ?? null) : null,
+        artist_name: heroLabel,
+      })
+      .select("id, event_name, event_date, city, state, artist_name")
+      .single();
+    setSaving(false);
+    if (err || !data) { setError(err?.message ?? "Couldn't save your stamp. Try again."); return; }
+    onAdded({
+      id: data.id, title: data.event_name, city: data.city, state: data.state,
+      start_date: data.event_date, artist: data.artist_name, artists: null, source: "custom",
+    });
+  }
+
+  const labelCls = "font-mono text-[10px] uppercase tracking-widest text-ink-muted block mb-1.5";
+  const inputCls = "w-full rounded-xl border border-ivory-200 px-4 py-3 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-[#1B2F5E]/20 focus:border-[#1B2F5E]/40 transition-all";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
+      <div className="w-full sm:max-w-md bg-[#FDFAF2] sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden max-h-[94dvh] flex flex-col" onClick={e => e.stopPropagation()}>
+        {/* Drag handle (mobile) */}
+        <div className="sm:hidden flex justify-center pt-3 pb-1 shrink-0">
+          <div className="w-10 h-1 rounded-full bg-ink-muted/20" />
+        </div>
+
+        {/* Header */}
+        <div className="px-6 pt-4 pb-3 flex items-start justify-between gap-3 shrink-0">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-[#1B2F5E]/60">Add a stamp</p>
+            <p className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.015em" }}>Stamp a garba you danced at</p>
+          </div>
+          <button onClick={onClose} className="w-9 h-9 rounded-full bg-black/[0.04] flex items-center justify-center text-ink-muted hover:text-ink transition-colors shrink-0">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        {/* Live preview */}
+        <div className="px-6 pb-3 shrink-0">
+          <div className="rounded-2xl border border-[#1B2F5E]/12 bg-white px-4 py-4 flex items-center gap-4">
+            <div className="w-[104px] h-[104px] shrink-0">
+              <PassportStamp stamp={preview} />
+            </div>
+            <div className="min-w-0">
+              <p className="font-mono text-[9px] uppercase tracking-widest text-[#1B2F5E]/50 mb-1 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#1B2F5E] animate-pulse" /> Live preview
+              </p>
+              <p className="font-display font-bold text-ink text-sm leading-tight truncate">{preview.title}</p>
+              <p className="font-ui text-xs text-ink-muted truncate">{preview.artist}</p>
+              <p className="font-mono text-[10px] text-ink-muted/70 mt-0.5">
+                {[preview.city, preview.state].filter(Boolean).join(", ")}
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Form */}
+        <div className="px-6 pb-4 overflow-y-auto flex-1 space-y-4">
+          <div>
+            <label className={labelCls}>Event name</label>
+            <input value={eventName} onChange={e => setEventName(e.target.value)} placeholder="e.g. Edison Navratri Garba" className={inputCls} autoFocus />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>Date</label>
+              <input type="date" value={date} onChange={e => setDate(e.target.value)} className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>City</label>
+              <input value={city} onChange={e => setCity(e.target.value)} placeholder="Edison" className={inputCls} />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>State</label>
+            <input value={stateField} onChange={e => setStateField(e.target.value.toUpperCase().slice(0, 2))} placeholder="NJ" className={inputCls} />
+          </div>
+
+          {/* Artist mode toggle */}
+          <div>
+            <label className={labelCls}>What goes on the stamp?</label>
+            <div className="grid grid-cols-2 gap-2 mb-3">
+              <button type="button" onClick={() => setMode("artist")}
+                className={`py-2.5 rounded-xl border-2 font-ui font-semibold text-xs transition-all ${mode === "artist" ? "border-[#1B2F5E] bg-[#1B2F5E]/5 text-[#1B2F5E]" : "border-ivory-200 text-ink-muted hover:border-[#1B2F5E]/30"}`}>
+                Featured artist
+              </button>
+              <button type="button" onClick={() => setMode("noartist")}
+                className={`py-2.5 rounded-xl border-2 font-ui font-semibold text-xs transition-all ${mode === "noartist" ? "border-[#1B2F5E] bg-[#1B2F5E]/5 text-[#1B2F5E]" : "border-ivory-200 text-ink-muted hover:border-[#1B2F5E]/30"}`}>
+                No artist
+              </button>
+            </div>
+
+            {mode === "artist" ? (
+              <>
+                <ArtistCombobox artists={artists} query={artistQuery} setQuery={setArtistQuery} onSelect={setSelectedArtist} selectedId={selectedArtist?.id ?? null} />
+                <p className="font-ui text-[11px] text-ink-muted mt-1.5">Pick from the list, or type any artist name — it&apos;s your passport.</p>
+              </>
+            ) : (
+              <>
+                <input value={customLabel} onChange={e => setCustomLabel(e.target.value)} placeholder="e.g. Community Night, Society Garba" className={inputCls} />
+                <p className="font-ui text-[11px] text-ink-muted mt-1.5">Local garba with no headliner? Put any name you want on the stamp.</p>
+              </>
+            )}
+          </div>
+
+          {error && <p className="font-ui text-xs text-durga">{error}</p>}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-[#1B2F5E]/10 shrink-0 flex gap-2.5">
+          <button onClick={onClose} className="px-5 py-3.5 rounded-2xl border border-ink/12 font-ui font-semibold text-sm text-ink-muted hover:text-ink transition-colors">
+            Cancel
+          </button>
+          <button
+            disabled={!valid || saving}
+            onClick={handleAdd}
+            className={`flex-1 py-3.5 rounded-2xl font-display font-bold text-base transition-all flex items-center justify-center gap-2 ${valid && !saving ? "text-white hover:opacity-90 active:scale-[0.98]" : "bg-ivory-200 text-ink-muted/50 cursor-not-allowed"}`}
+            style={valid && !saving ? { backgroundColor: "#1B2F5E" } : undefined}
+          >
+            {saving ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Adding…</> : "Confirm & add stamp"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function GarbaPassportPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [stamps,  setStamps]  = useState<EventStamp[]>([]);
+  const [artists, setArtists] = useState<ArtistOption[]>([]);
+  const [userId,  setUserId]  = useState("");
+  const [showAdd, setShowAdd] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(false);
   const [copied,  setCopied]  = useState(false);
   const [shared,  setShared]  = useState(false);
 
+  function sortStamps(list: EventStamp[]) {
+    return [...list].sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
+  }
+
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) { router.push("/auth/signin"); return; }
+      setUserId(user.id);
 
-      const [{ data: profileData, error: pErr }, { data: ordersData }] = await Promise.all([
+      const [{ data: profileData, error: pErr }, { data: ordersData }, { data: customData }, { data: artistData }] = await Promise.all([
         supabase
           .from("profiles")
           .select("id, first_name, last_name, city, state, created_at, avatar_url")
@@ -199,33 +444,64 @@ export default function GarbaPassportPage() {
           .select("event_id")
           .eq("user_id", user.id)
           .eq("status", "confirmed"),
+        supabase
+          .from("passport_stamps")
+          .select("id, event_name, event_date, city, state, artist_name")
+          .eq("user_id", user.id),
+        supabase
+          .from("artists")
+          .select("id, name")
+          .eq("is_active", true)
+          .order("name"),
       ]);
 
       if (pErr || !profileData) { setError(true); setLoading(false); return; }
       setProfile(profileData as Profile);
+      setArtists((artistData ?? []) as ArtistOption[]);
 
-      // Deduplicate event IDs, then fetch events + artist in one clean query
+      const merged: EventStamp[] = [];
+
+      // Purchase stamps — from confirmed ticket orders (locked, can't be removed)
       if (ordersData && ordersData.length > 0) {
         const eventIds = [...new Set(ordersData.map(o => o.event_id).filter(Boolean))];
         const { data: eventsData } = await supabase
           .from("events")
           .select("id, title, city, state, start_date, artist, artists(name)")
           .in("id", eventIds);
-
-        if (eventsData) {
-          const stamps = eventsData.map(ev => ({
+        for (const ev of eventsData ?? []) {
+          merged.push({
             ...ev,
-            // artists may come back as array or object depending on Supabase version
             artists: Array.isArray(ev.artists) ? (ev.artists[0] ?? null) : ev.artists,
-          })) as EventStamp[];
-          stamps.sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime());
-          setStamps(stamps);
+            source: "purchase",
+          } as EventStamp);
         }
       }
 
+      // Custom stamps — user-added (removable)
+      for (const c of (customData ?? []) as { id: string; event_name: string; event_date: string; city: string | null; state: string | null; artist_name: string }[]) {
+        merged.push({
+          id: c.id, title: c.event_name, city: c.city, state: c.state,
+          start_date: c.event_date, artist: c.artist_name, artists: null, source: "custom",
+        });
+      }
+
+      setStamps(sortStamps(merged));
       setLoading(false);
     });
   }, [router]);
+
+  function handleStampAdded(s: EventStamp) {
+    setStamps(prev => sortStamps([...prev, s]));
+    setShowAdd(false);
+  }
+
+  async function handleRemoveStamp(id: string) {
+    setRemovingId(id);
+    const supabase = createClient();
+    const { error: err } = await supabase.from("passport_stamps").delete().eq("id", id);
+    if (!err) setStamps(prev => prev.filter(s => s.id !== id));
+    setRemovingId(null);
+  }
 
   if (loading) return (
     <div className="flex items-center justify-center min-h-[60vh]">
@@ -281,6 +557,10 @@ export default function GarbaPassportPage() {
 
   return (
     <div className="max-w-sm mx-auto space-y-6 pb-10">
+
+      {showAdd && (
+        <AddStampModal artists={artists} userId={userId} onClose={() => setShowAdd(false)} onAdded={handleStampAdded} />
+      )}
 
       {/* Back */}
       <div className="flex items-center gap-3">
@@ -434,9 +714,39 @@ export default function GarbaPassportPage() {
           {/* Stamps grid */}
           <div className="px-4 pb-5 grid grid-cols-3 gap-1.5">
             {stamps.map(s => (
-              <PassportStamp key={s.id} stamp={s} />
+              <div key={s.id} className="relative">
+                <PassportStamp stamp={s} />
+                {s.source === "custom" && (
+                  <button
+                    onClick={() => handleRemoveStamp(s.id)}
+                    disabled={removingId === s.id}
+                    aria-label="Remove stamp"
+                    title="Remove this stamp"
+                    className="absolute top-0 right-1 w-5 h-5 rounded-full bg-white border border-[#6B1E3A]/30 shadow-sm flex items-center justify-center text-[#6B1E3A] hover:bg-[#6B1E3A] hover:text-white transition-all"
+                  >
+                    {removingId === s.id
+                      ? <div className="w-2.5 h-2.5 rounded-full border border-[#6B1E3A]/40 border-t-[#6B1E3A] animate-spin" />
+                      : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>}
+                  </button>
+                )}
+              </div>
             ))}
-            {Array.from({ length: emptyCount }).map((_, i) => (
+            {/* Add a stamp tile */}
+            <button
+              onClick={() => setShowAdd(true)}
+              className="group flex items-center justify-center transition-transform hover:scale-105"
+              aria-label="Add a stamp"
+            >
+              <svg viewBox="0 0 120 120" className="w-full h-full" fill="none">
+                <circle cx="60" cy="60" r="56" stroke="#1B2F5E" strokeWidth="2.5" strokeDasharray="4 3" opacity="0.5" className="group-hover:opacity-80 transition-opacity" />
+                <circle cx="60" cy="42" r="13" stroke="#1B2F5E" strokeWidth="2.5" opacity="0.55" />
+                <line x1="60" y1="36" x2="60" y2="48" stroke="#1B2F5E" strokeWidth="2.5" opacity="0.7" strokeLinecap="round" />
+                <line x1="54" y1="42" x2="66" y2="42" stroke="#1B2F5E" strokeWidth="2.5" opacity="0.7" strokeLinecap="round" />
+                <text x="60" y="74" textAnchor="middle" fill="#1B2F5E" fontSize="9" fontFamily="monospace" fontWeight="700" letterSpacing="1.5" opacity="0.6">ADD</text>
+                <text x="60" y="86" textAnchor="middle" fill="#1B2F5E" fontSize="7" fontFamily="monospace" letterSpacing="1" opacity="0.45">A STAMP</text>
+              </svg>
+            </button>
+            {Array.from({ length: Math.max(0, emptyCount - 1) }).map((_, i) => (
               <EmptyStamp key={`empty-${i}`} />
             ))}
           </div>
@@ -452,11 +762,27 @@ export default function GarbaPassportPage() {
         </div>
       </div>
 
+      {/* Add a stamp — primary action */}
+      <button
+        onClick={() => setShowAdd(true)}
+        className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-white transition-all hover:opacity-95 active:scale-[0.99]"
+        style={{ backgroundColor: "#1B2F5E" }}
+      >
+        <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+        </div>
+        <div className="flex-1 text-left">
+          <p className="font-display font-bold text-[15px]" style={{ letterSpacing: "-0.01em" }}>Add a stamp</p>
+          <p className="font-ui text-xs text-white/60">Danced at a garba? Stamp it — no ticket needed.</p>
+        </div>
+        <svg className="w-4 h-4 text-white/50 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+      </button>
+
       {/* Stamp callout */}
       {stamps.length === 0 ? (
         <div className="px-5 py-4 rounded-2xl border border-[#1B2F5E]/15 bg-[#1B2F5E]/5 text-center">
-          <p className="font-display font-bold text-ink/70 text-sm mb-0.5" style={{ letterSpacing: "-0.01em" }}>No stamps yet</p>
-          <p className="font-ui text-xs text-ink-muted mb-3">Buy a ticket to any garba event — each one earns you a stamp from that artist.</p>
+          <p className="font-display font-bold text-ink/70 text-sm mb-0.5" style={{ letterSpacing: "-0.01em" }}>Your passport is empty — for now</p>
+          <p className="font-ui text-xs text-ink-muted mb-3">Add stamps for every garba you&apos;ve danced at, or buy a ticket to earn one automatically.</p>
           <Link href="/events" className="inline-block px-5 py-2.5 rounded-xl text-white font-ui font-semibold text-sm hover:opacity-90 transition-opacity"
             style={{ backgroundColor: "#1B2F5E" }}>
             Browse Events
@@ -464,12 +790,12 @@ export default function GarbaPassportPage() {
         </div>
       ) : (
         <div className="px-5 py-3.5 rounded-2xl border border-[#1B2F5E]/15 bg-[#1B2F5E]/5 flex items-center gap-3">
-          <span className="text-xl">🎟️</span>
+          <span className="text-xl">🪔</span>
           <div>
             <p className="font-display font-bold text-ink/80 text-sm" style={{ letterSpacing: "-0.01em" }}>
-              {stamps.length} garba event{stamps.length !== 1 ? "s" : ""} stamped
+              {stamps.length} garba{stamps.length !== 1 ? "s" : ""} stamped
             </p>
-            <p className="font-ui text-xs text-ink-muted">Every event earns a new stamp — keep collecting.</p>
+            <p className="font-ui text-xs text-ink-muted">Ticket stamps are locked in — your own stamps can be removed any time.</p>
           </div>
         </div>
       )}
