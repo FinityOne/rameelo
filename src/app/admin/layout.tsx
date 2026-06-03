@@ -15,6 +15,7 @@ type NavItem = {
   label: string;
   icon: React.ReactNode;
   exact?: boolean;
+  match?: (pathname: string) => boolean;
   badgeKey?: "pendingEvents";
 };
 type NavSection = { id: string; label: string; items: NavItem[] };
@@ -84,9 +85,10 @@ const SECTIONS: NavSection[] = [
     label: "Events",
     items: [
       {
-        href: "/admin/events",
+        href: "/admin/events/review",
         label: "Review Queue",
         badgeKey: "pendingEvents",
+        match: (p) => p.startsWith("/admin/events/review"),
         icon: (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
@@ -94,8 +96,22 @@ const SECTIONS: NavSection[] = [
         ),
       },
       {
+        href: "/admin/events",
+        label: "All Events",
+        // Active on the catalog + event detail/edit, but not the review/create sub-pages.
+        match: (p) =>
+          p === "/admin/events" ||
+          (/^\/admin\/events\/[^/]+/.test(p) && !p.startsWith("/admin/events/review") && !p.startsWith("/admin/events/create")),
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+          </svg>
+        ),
+      },
+      {
         href: "/admin/events/create",
         label: "Create Event",
+        match: (p) => p.startsWith("/admin/events/create"),
         icon: (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4v16m8-8H4" />
@@ -133,6 +149,16 @@ const SECTIONS: NavSection[] = [
     id: "finance",
     label: "Finance",
     items: [
+      {
+        href: "/admin/orders",
+        label: "Orders",
+        match: (p) => p.startsWith("/admin/orders"),
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 12h6m-6 4h6" />
+          </svg>
+        ),
+      },
       {
         href: "/admin/financials",
         label: "Revenue",
@@ -208,11 +234,15 @@ const PAGE_TITLES: Array<{ test: (p: string) => boolean; title: string }> = [
   { test: (p) => /^\/admin\/collegiate\/[^/]+\/edit$/.test(p),   title: "Edit Team" },
   { test: (p) => p === "/admin/collegiate/applications",          title: "Applications" },
   { test: (p) => p === "/admin/collegiate/create",                title: "Add Team" },
-  { test: (p) => p === "/admin/events",                           title: "Review Queue" },
+  { test: (p) => p === "/admin/events",                           title: "All Events" },
+  { test: (p) => p === "/admin/events/review",                    title: "Review Queue" },
   { test: (p) => p === "/admin/events/create",                    title: "Create Event" },
-  { test: (p) => /^\/admin\/events\/[^/]+$/.test(p),             title: "Review Event" },
+  { test: (p) => /^\/admin\/events\/[^/]+\/edit$/.test(p),       title: "Edit Event" },
+  { test: (p) => /^\/admin\/events\/[^/]+$/.test(p),             title: "Event Details" },
   { test: (p) => p === "/admin/community",                        title: "Moderation" },
   { test: (p) => p === "/admin/community/groups",                 title: "Community Groups" },
+  { test: (p) => p === "/admin/orders",                           title: "Orders" },
+  { test: (p) => /^\/admin\/orders\/[^/]+$/.test(p),             title: "Order Details" },
   { test: (p) => p === "/admin/financials",                       title: "Revenue" },
   { test: (p) => p === "/admin/notifications",                    title: "Notifications" },
   { test: (p) => p === "/admin/platform",                         title: "Platform Settings" },
@@ -238,7 +268,9 @@ function NavItem({
   badge?: number;
   onClick?: () => void;
 }) {
-  const active = item.exact ? pathname === item.href : pathname.startsWith(item.href);
+  const active = item.match
+    ? item.match(pathname)
+    : item.exact ? pathname === item.href : pathname.startsWith(item.href);
   return (
     <Link
       href={item.href}

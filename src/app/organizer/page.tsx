@@ -134,7 +134,7 @@ export default function OrganizerHubPage() {
 
       const eventIds = (rawEvents ?? []).map((e: { id: string }) => e.id);
       const { data: orders } = eventIds.length > 0
-        ? await supabase.from("orders").select("event_id, qty, unit_price, grand_total, created_at, status").in("event_id", eventIds).eq("status", "confirmed").order("created_at", { ascending: false })
+        ? await supabase.from("orders").select("event_id, qty, unit_price, grand_total, created_at, status").in("event_id", eventIds).eq("status", "confirmed").eq("is_test", false).order("created_at", { ascending: false })
         : { data: [] };
 
       const allOrders: OrderRow[] = (orders ?? []) as OrderRow[];

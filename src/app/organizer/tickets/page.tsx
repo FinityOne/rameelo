@@ -207,6 +207,7 @@ export default function OrganizerTicketsPage() {
           ticket_tiers (name)
         `)
         .in("event_id", eventIds)
+        .eq("is_test", false)
         .order("created_at", { ascending: false });
 
       const rows: OrderRow[] = ((rawOrders ?? []) as unknown as {

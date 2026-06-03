@@ -15,21 +15,19 @@ type EventRow = {
   start_date: string;
   status: string;
   created_at: string;
-  reviewed_at: string | null;
-  review_note: string | null;
   location_tba: boolean;
   selling_on_rameelo: boolean;
   organizer: { first_name: string | null; last_name: string | null; email: string } | null;
   organization: { name: string } | null;
+  ticket_tiers: { price: number; quantity: number }[];
 };
 
-type Tab = 'pending' | 'published' | 'rejected' | 'draft' | 'all';
+type Tab = 'published' | 'draft' | 'cancelled' | 'all';
 
 const TAB_META: Record<Tab, { label: string; status?: string }> = {
-  pending:   { label: 'Pending',   status: 'pending_review' },
   published: { label: 'Published', status: 'published' },
-  rejected:  { label: 'Rejected',  status: 'rejected' },
   draft:     { label: 'Draft',     status: 'draft' },
+  cancelled: { label: 'Cancelled', status: 'cancelled' },
   all:       { label: 'All' },
 };
 
@@ -37,7 +35,7 @@ const STATUS_PILL: Record<string, { label: string; cls: string }> = {
   draft:          { label: 'Draft',     cls: 'bg-ivory-200 text-ink-muted' },
   pending_review: { label: 'Pending',   cls: 'bg-marigold/20 text-[#a06b00]' },
   published:      { label: 'Published', cls: 'bg-peacock/15 text-peacock' },
-  rejected:       { label: 'Rejected',  cls: 'bg-durga/15 text-durga' },
+  rejected:       { label: 'Rejected', cls: 'bg-durga/15 text-durga' },
   cancelled:      { label: 'Cancelled', cls: 'bg-ivory-200 text-ink-muted' },
 };
 
@@ -45,21 +43,18 @@ const CATEGORY_LABELS: Record<string, string> = {
   garba: 'Garba', dandiya: 'Dandiya', raas: 'Raas', workshop: 'Workshop', community: 'Community', other: 'Other',
 };
 
-const PAGE_SIZE = 11;
+const PAGE_SIZE = 12;
+const GRID_COLS = 'minmax(0,2.4fr) 100px 92px 130px 120px 64px 100px';
 
-function fmtDate(d: string) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 function fmtDateShort(d: string) {
-  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export default function AdminEventsPage() {
   const router = useRouter();
   const [events, setEvents]   = useState<EventRow[]>([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab]         = useState<Tab>('pending');
-  const [acting, setActing]   = useState<string | null>(null);
+  const [tab, setTab]         = useState<Tab>('published');
 
   // Filters
   const [search, setSearch]           = useState('');
@@ -77,9 +72,10 @@ export default function AdminEventsPage() {
       .from('events')
       .select(`
         id, title, category, artist, city, state, start_date, status,
-        created_at, reviewed_at, review_note, location_tba, selling_on_rameelo,
+        created_at, location_tba, selling_on_rameelo,
         organizer:profiles!events_organizer_id_fkey (first_name, last_name, email),
-        organization:organizations (name)
+        organization:organizations (name),
+        ticket_tiers (price, quantity)
       `)
       .order('start_date', { ascending: true });
     setEvents((data ?? []) as unknown as EventRow[]);
@@ -91,23 +87,8 @@ export default function AdminEventsPage() {
   // Reset page when tab or filters change
   useEffect(() => { setPage(1); }, [tab, search, filterCat, filterState, filterArtist]);
 
-  async function quickApprove(id: string, e: React.MouseEvent) {
-    e.stopPropagation();
-    setActing(id);
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    await supabase.from('events').update({
-      status: 'published',
-      reviewed_at: new Date().toISOString(),
-      reviewed_by: user?.id,
-      review_note: null,
-    }).eq('id', id);
-    await load();
-    setActing(null);
-  }
-
   const pendingCount = events.filter(e => e.status === 'pending_review').length;
-  const TABS: Tab[] = ['pending', 'published', 'rejected', 'draft', 'all'];
+  const TABS: Tab[] = ['published', 'draft', 'cancelled', 'all'];
 
   // Derived filter options
   const allCategories = useMemo(() => Array.from(new Set(events.map(e => e.category))).sort(), [events]);
@@ -123,6 +104,8 @@ export default function AdminEventsPage() {
         e.title.toLowerCase().includes(q) ||
         (e.city ?? '').toLowerCase().includes(q) ||
         (e.state ?? '').toLowerCase().includes(q) ||
+        (e.artist ?? '').toLowerCase().includes(q) ||
+        (e.organization?.name ?? '').toLowerCase().includes(q) ||
         [e.organizer?.first_name, e.organizer?.last_name].filter(Boolean).join(' ').toLowerCase().includes(q) ||
         (e.organizer?.email ?? '').toLowerCase().includes(q)
       );
@@ -143,15 +126,16 @@ export default function AdminEventsPage() {
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const hasFilters = search || filterCat || filterState || filterArtist;
+  const today = new Date().toISOString().slice(0, 10);
 
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h2 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: '-0.02em' }}>Event Review</h2>
+          <h2 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: '-0.02em' }}>All Events</h2>
           <p className="font-ui text-ink-muted text-sm mt-0.5">
-            {loading ? '—' : `${events.length} total · ${pendingCount} awaiting review`}
+            {loading ? '—' : `${events.length} event${events.length !== 1 ? 's' : ''} across the platform`}
           </p>
         </div>
         <Link
@@ -165,6 +149,24 @@ export default function AdminEventsPage() {
         </Link>
       </div>
 
+      {/* Pending-review banner — routes triage to the dedicated queue */}
+      {!loading && pendingCount > 0 && (
+        <Link href="/admin/events/review"
+          className="flex items-center gap-3 px-4 py-3 rounded-2xl border border-marigold/30 bg-marigold/8 hover:bg-marigold/12 transition-colors group">
+          <span className="w-9 h-9 rounded-xl bg-marigold/20 flex items-center justify-center text-base shrink-0">🔍</span>
+          <div className="flex-1 min-w-0">
+            <p className="font-ui font-semibold text-ink text-sm">
+              {pendingCount} event{pendingCount !== 1 ? 's' : ''} awaiting review
+            </p>
+            <p className="font-ui text-xs text-ink-muted">Approve or reject submissions in the Review Queue.</p>
+          </div>
+          <span className="flex items-center gap-1 font-ui font-semibold text-sm text-[#a06b00] shrink-0">
+            Review now
+            <svg className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+          </span>
+        </Link>
+      )}
+
       {/* Tabs */}
       <div className="flex gap-1 bg-ivory rounded-2xl p-1 w-fit border border-ivory-200">
         {TABS.map(t => {
@@ -177,9 +179,7 @@ export default function AdminEventsPage() {
               }`}>
               {meta.label}
               {count > 0 && (
-                <span className={`text-[9px] font-bold font-mono px-1.5 py-0.5 rounded-full ${
-                  t === 'pending' ? 'bg-marigold text-aubergine' : 'bg-ivory-200 text-ink-muted'
-                }`}>
+                <span className="text-[9px] font-bold font-mono px-1.5 py-0.5 rounded-full bg-ivory-200 text-ink-muted">
                   {count}
                 </span>
               )}
@@ -199,7 +199,7 @@ export default function AdminEventsPage() {
             type="text"
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search title, city, organizer…"
+            placeholder="Search title, artist, organizer, org…"
             className="w-full pl-8 pr-3 py-2 rounded-xl border border-ivory-200 bg-white font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all"
           />
         </div>
@@ -274,7 +274,7 @@ export default function AdminEventsPage() {
         </div>
       ) : filtered.length === 0 ? (
         <div className="bg-white rounded-2xl border border-ivory-200 p-16 text-center">
-          <p className="text-3xl mb-3">{hasFilters ? '🔍' : '🎉'}</p>
+          <p className="text-3xl mb-3">{hasFilters ? '🔍' : '📅'}</p>
           <p className="font-ui text-ink-muted text-sm">
             {hasFilters ? 'No events match your filters.' : 'No events here yet.'}
           </p>
@@ -283,91 +283,95 @@ export default function AdminEventsPage() {
         <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
           {/* Table header */}
           <div className="grid items-center px-4 py-2 border-b border-ivory-200 bg-ivory/60"
-            style={{ gridTemplateColumns: '2fr 110px 110px 90px 90px 120px 110px' }}>
-            {['Event', 'Artist', 'Organization', 'Location', 'Date', 'Organizer', 'Actions'].map(h => (
-              <p key={h} className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">{h}</p>
+            style={{ gridTemplateColumns: GRID_COLS }}>
+            {['Event', 'Location', 'Date', 'Organizer', 'Capacity', 'Mode', ''].map((h, i) => (
+              <p key={i} className={`font-mono text-[9px] uppercase tracking-widest text-ink-muted ${i >= 4 && i <= 5 ? 'text-right' : ''}`}>{h}</p>
             ))}
           </div>
 
           {/* Rows */}
           <div className="divide-y divide-ivory-200">
             {paginated.map(ev => {
-              const pill      = STATUS_PILL[ev.status] ?? STATUS_PILL.draft;
-              const isPending = ev.status === 'pending_review';
-              const isActing  = acting === ev.id;
-              const orgName   = [ev.organizer?.first_name, ev.organizer?.last_name].filter(Boolean).join(' ') || ev.organizer?.email || '—';
-              const location  = ev.location_tba ? 'TBA' : [ev.city, ev.state].filter(Boolean).join(', ') || '—';
+              const pill     = STATUS_PILL[ev.status] ?? STATUS_PILL.draft;
+              const orgName  = [ev.organizer?.first_name, ev.organizer?.last_name].filter(Boolean).join(' ') || ev.organizer?.email || '—';
+              const location = ev.location_tba ? 'TBA' : [ev.city, ev.state].filter(Boolean).join(', ') || '—';
+              const capacity = ev.ticket_tiers.reduce((s, t) => s + t.quantity, 0);
+              const prices   = ev.ticket_tiers.map(t => t.price);
+              const minP     = prices.length ? Math.min(...prices) : 0;
+              const maxP     = prices.length ? Math.max(...prices) : 0;
+              const isPast   = ev.start_date < today;
+              const subline  = [CATEGORY_LABELS[ev.category] ?? ev.category, ev.artist, ev.organization?.name].filter(Boolean).join(' · ');
 
               return (
                 <div
                   key={ev.id}
                   onClick={() => router.push(`/admin/events/${ev.id}`)}
-                  className={`grid items-center px-4 py-2.5 cursor-pointer transition-colors hover:bg-ivory/50 ${isPending ? 'bg-marigold/[0.03]' : ''}`}
-                  style={{ gridTemplateColumns: '2fr 110px 110px 90px 90px 120px 110px' }}
+                  className="grid items-center px-4 py-2.5 cursor-pointer transition-colors hover:bg-ivory/50"
+                  style={{ gridTemplateColumns: GRID_COLS }}
                 >
-                  {/* Event title + status */}
+                  {/* Event title + status + subline */}
                   <div className="min-w-0 pr-3">
                     <div className="flex items-center gap-2 mb-0.5">
-                      {isPending && <span className="w-1.5 h-1.5 rounded-full bg-marigold shrink-0 animate-pulse" />}
                       <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 ${pill.cls}`}>
                         {pill.label}
                       </span>
+                      {isPast && <span className="font-mono text-[8px] uppercase tracking-widest text-ink-muted/50">Past</span>}
                     </div>
                     <p className="font-ui font-semibold text-ink text-sm truncate" style={{ letterSpacing: '-0.01em' }}>
                       {ev.title}
                     </p>
+                    <p className="font-ui text-[11px] text-ink-muted/80 truncate">{subline || '—'}</p>
                   </div>
 
-                  {/* Artist */}
-                  <p className="font-ui text-xs text-ink-muted truncate pr-2">{ev.artist || <span className="text-ink-muted/40">—</span>}</p>
-
-                  {/* Organization */}
-                  <p className="font-ui text-xs text-ink-muted truncate pr-2">{ev.organization?.name || <span className="text-ink-muted/40">—</span>}</p>
-
                   {/* Location */}
-                  <p className={`font-ui text-xs truncate ${ev.location_tba ? 'text-marigold-dark italic' : 'text-ink-muted'}`}>
+                  <p className={`font-ui text-xs truncate pr-2 ${ev.location_tba ? 'text-marigold-dark italic' : 'text-ink-muted'}`}>
                     {location}
                   </p>
 
                   {/* Event date */}
-                  <p className="font-mono text-xs text-ink-muted">
+                  <p className={`font-mono text-xs ${isPast ? 'text-ink-muted/50' : 'text-ink-muted'}`}>
                     {fmtDateShort(ev.start_date)}
                   </p>
 
                   {/* Organizer */}
                   <p className="font-ui text-xs text-ink-muted truncate pr-2">{orgName}</p>
 
-                  {/* Actions */}
-                  <div className="flex items-center gap-1.5" onClick={e => e.stopPropagation()}>
-                    {isPending ? (
+                  {/* Capacity + price */}
+                  <div className="text-right pr-2">
+                    {ev.ticket_tiers.length > 0 ? (
                       <>
-                        <button
-                          onClick={e => quickApprove(ev.id, e)}
-                          disabled={isActing}
-                          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-peacock/10 border border-peacock/20 text-peacock font-ui font-semibold text-xs hover:bg-peacock/20 transition-colors disabled:opacity-50"
-                        >
-                          {isActing
-                            ? <div className="w-3 h-3 rounded-full border-2 border-peacock/30 border-t-peacock animate-spin" />
-                            : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                          }
-                          Approve
-                        </button>
-                        <button
-                          onClick={() => router.push(`/admin/events/${ev.id}`)}
-                          className="px-2.5 py-1.5 rounded-lg bg-durga/8 border border-durga/20 text-durga font-ui font-semibold text-xs hover:bg-durga/15 transition-colors"
-                        >
-                          Review
-                        </button>
+                        <p className="font-mono text-xs text-ink">{capacity.toLocaleString()}</p>
+                        <p className="font-mono text-[10px] text-ink-muted/70">${minP}{maxP > minP ? `–$${maxP}` : ''}</p>
                       </>
                     ) : (
-                      <Link
-                        href={`/admin/events/${ev.id}`}
-                        onClick={e => e.stopPropagation()}
-                        className="px-2.5 py-1.5 rounded-lg border border-ivory-200 text-ink-muted font-ui text-xs hover:border-aubergine/30 hover:text-aubergine transition-colors"
-                      >
-                        View →
-                      </Link>
+                      <span className="font-mono text-xs text-ink-muted/40">—</span>
                     )}
+                  </div>
+
+                  {/* Mode */}
+                  <div className="flex justify-end pr-1">
+                    <span title={ev.selling_on_rameelo ? 'Selling tickets on Rameelo' : 'Interest collection only'}
+                      className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded-full ${ev.selling_on_rameelo ? 'bg-peacock/12 text-peacock' : 'bg-ivory-200 text-ink-muted'}`}>
+                      {ev.selling_on_rameelo ? '🎟️' : '👀'}
+                    </span>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
+                    <Link
+                      href={`/admin/events/${ev.id}/edit`}
+                      className="w-7 h-7 rounded-lg border border-ivory-200 flex items-center justify-center text-ink-muted hover:text-aubergine hover:border-aubergine/30 transition-colors"
+                      title="Edit event"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </Link>
+                    <Link
+                      href={`/admin/events/${ev.id}`}
+                      className="px-2.5 py-1.5 rounded-lg border border-ivory-200 text-ink-muted font-ui text-xs hover:border-aubergine/30 hover:text-aubergine transition-colors"
+                      title="View event"
+                    >
+                      View
+                    </Link>
                   </div>
                 </div>
               );

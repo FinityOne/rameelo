@@ -272,9 +272,9 @@ export default function AdminEventReviewPage() {
       {/* Breadcrumb + Edit button */}
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 min-w-0">
-          <Link href="/admin/events" className="font-ui text-xs text-ink-muted hover:text-ink flex items-center gap-1 shrink-0">
+          <Link href={isPending ? "/admin/events/review" : "/admin/events"} className="font-ui text-xs text-ink-muted hover:text-ink flex items-center gap-1 shrink-0">
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            Event Review
+            {isPending ? "Review Queue" : "All Events"}
           </Link>
           <span className="text-ink-muted/40 text-xs">/</span>
           <span className="font-ui text-xs text-ink-muted truncate max-w-[200px]">{event.title}</span>
@@ -296,7 +296,7 @@ export default function AdminEventReviewPage() {
             <p className="font-ui font-semibold text-peacock text-sm">Event published</p>
             <p className="font-ui text-xs text-ink-muted">This event is now live and visible to the public.</p>
           </div>
-          <Link href="/admin/events" className="ml-auto font-ui text-xs text-aubergine hover:underline shrink-0">← Back to queue</Link>
+          <Link href="/admin/events/review" className="ml-auto font-ui text-xs text-aubergine hover:underline shrink-0">← Back to queue</Link>
         </div>
       )}
       {done === 'rejected' && (
@@ -306,7 +306,7 @@ export default function AdminEventReviewPage() {
             <p className="font-ui font-semibold text-durga text-sm">Event rejected</p>
             <p className="font-ui text-xs text-ink-muted">The organizer has been notified with your feedback.</p>
           </div>
-          <Link href="/admin/events" className="ml-auto font-ui text-xs text-aubergine hover:underline shrink-0">← Back to queue</Link>
+          <Link href="/admin/events/review" className="ml-auto font-ui text-xs text-aubergine hover:underline shrink-0">← Back to queue</Link>
         </div>
       )}
 

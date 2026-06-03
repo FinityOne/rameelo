@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
+import QRCode from "@/components/QRCode";
 import { loadMyOrders, type PortalOrderRow, type GroupMember } from "@/lib/group-orders";
 import {
   lookupUserByEmail,
@@ -18,26 +19,10 @@ import {
 } from "@/lib/transfers";
 
 // ── QR Code ───────────────────────────────────────────────────────────────────
-function QRCode({ value, size = 140 }: { value: string; size?: number }) {
-  const grid = 21;
-  let seed = value.split("").reduce((a, c) => (a * 1664525 + c.charCodeAt(0)) & 0x7fffffff, 1013904223);
-  function next() { seed = (seed * 1664525 + 1013904223) & 0x7fffffff; return seed / 0x7fffffff; }
-  const cells = Array.from({ length: grid }, (_, r) =>
-    Array.from({ length: grid }, (__, c) => {
-      if ((r < 7 && c < 7) || (r < 7 && c >= grid - 7) || (r >= grid - 7 && c < 7)) {
-        const lr = r < 7 ? r : r - (grid - 7); const lc = c < 7 ? c : c >= grid - 7 ? c - (grid - 7) : c;
-        return (lr === 0 || lr === 6 || lc === 0 || lc === 6) || (lr >= 2 && lr <= 4 && lc >= 2 && lc <= 4);
-      }
-      return next() > 0.42;
-    })
-  );
-  const cs = size / grid;
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ display: "block", imageRendering: "pixelated" }}>
-      <rect width={size} height={size} fill="white" rx={3} />
-      {cells.map((row, r) => row.map((on, c) => on ? <rect key={`${r}-${c}`} x={c * cs + 0.5} y={r * cs + 0.5} width={cs - 1} height={cs - 1} fill="#2E1B30" rx={0.5} /> : null))}
-    </svg>
-  );
+// Real scannable QR lives in @/components/QRCode (imported above). The scanner +
+// Apple Wallet pass both read the `RAMEELO:<orderId>` payload.
+function ticketQrValue(orderId: string) {
+  return `RAMEELO:${orderId}`;
 }
 
 function fmtDate(d: string) {
@@ -493,7 +478,7 @@ function ReceivedTicketCard({ ticket }: { ticket: ReceivedTicket }) {
                   <div className="border-t-2 border-dashed border-ivory-200 mx-4" />
                   <div className="px-4 pb-4 pt-3 flex flex-col sm:flex-row gap-4 items-start">
                     <div className="flex flex-col items-center gap-2">
-                      <div className="p-3 rounded-2xl border-2 border-peacock/20 bg-white shadow-sm"><QRCode value={ticketId} size={140} /></div>
+                      <div className="p-3 rounded-2xl border-2 border-peacock/20 bg-white shadow-sm"><QRCode value={ticketQrValue(ticket.orderId)} size={140} /></div>
                       <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-peacock/10 border border-peacock/20">
                         <div className="w-1.5 h-1.5 bg-peacock rounded-full animate-pulse" />
                         <p className="font-mono text-[10px] text-peacock font-bold uppercase tracking-wide">Valid</p>
@@ -596,7 +581,7 @@ function QREnlargeModal({ ticketId, eventTitle, tierName, onClose }: {
           <p className="font-ui text-sm text-ink-muted">{tierName}</p>
         </div>
         <div className="p-5 rounded-3xl bg-white shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-ivory-200">
-          <QRCode value={ticketId} size={Math.min(320, typeof window !== "undefined" ? window.innerWidth - 96 : 320)} />
+          <QRCode value={ticketQrValue(ticketId.replace(/-T\d+$/, ""))} size={Math.min(320, typeof window !== "undefined" ? window.innerWidth - 96 : 320)} />
         </div>
         <p className="font-mono text-[11px] text-ink/40">{ticketRef(ticketId.split("-T")[0], Number(ticketId.split("-T")[1] || 1))}</p>
         <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-peacock/10 border border-peacock/20">
@@ -730,7 +715,7 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
                 className="relative group p-3.5 rounded-2xl bg-white border border-ivory-200 hover:border-aubergine/30 transition-colors"
                 aria-label="Enlarge QR code"
               >
-                <QRCode value={ticketId} size={150} />
+                <QRCode value={ticketQrValue(order.orderId)} size={150} />
                 <span className="absolute bottom-2 right-2 w-6 h-6 rounded-lg bg-aubergine/90 text-white flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
                 </span>

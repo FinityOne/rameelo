@@ -161,6 +161,7 @@ export default function EventDashboardPage() {
           .from("orders")
           .select("id, buyer_name, buyer_email, qty, grand_total, status, created_at, ticket_tiers(name)", { count: "exact" })
           .eq("event_id", id)
+          .eq("is_test", false)
           .order("created_at", { ascending: false })
           .limit(5),
 

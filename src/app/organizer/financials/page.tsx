@@ -186,6 +186,7 @@ export default function OrganizerFinancialsPage() {
         .select("id, event_id, qty, unit_price, discount_amount, grand_total, payment_method, created_at")
         .in("event_id", eventIds)
         .eq("status", "confirmed")
+        .eq("is_test", false)
         .order("created_at", { ascending: false });
 
       setAllOrders((ordersData ?? []) as RawOrder[]);

@@ -46,15 +46,21 @@ function stampDate(iso: string): string {
   return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-// Deterministic color from ID — rich ink colors for stamps
+// ── Brand palette (matches brand guide) ────────────────────────────────────────
+const PLUM        = "#2E1B30"; // aubergine
+const PLUM_LIGHT  = "#3D2543"; // aubergine-light
+const PLUM_DEEP   = "#1E1320"; // deeper plum for gradient base
+const GOLD        = "#F5A623"; // marigold — vivid, pops on story screenshots
+
+// Deterministic color from ID — rich brand inks for stamps (deep & saturated for cream parchment)
 const STAMP_COLORS = [
-  "#1B3A5C", // navy
-  "#1B2F5E", // forest green
-  "#6B1E3A", // burgundy
-  "#1B2F5E", // aubergine
-  "#3B2200", // dark amber
-  "#1A3B3B", // teal ink
-  "#4A1942", // plum
+  "#0E6B5E", // deep peacock
+  "#7C1F2C", // durga red
+  "#5A2348", // plum
+  "#2E1B30", // aubergine
+  "#9A5E12", // bronze (deep marigold)
+  "#0E8C7A", // peacock
+  "#9E3A3A", // brick red
 ];
 
 function stampColor(id: string): string {
@@ -72,6 +78,24 @@ function fitText(text: string, maxLen: number): string {
   return text.length > maxLen ? text.slice(0, maxLen - 1) + "." : text;
 }
 
+// Self-fitting hero line — picks a readable font size for the length, and only
+// compresses (never stretches) when the name would otherwise bleed past the ring.
+const HERO_MAX_WIDTH = 84; // safe chord width inside the inner ring (viewBox units)
+function HeroLine({ text, y, color }: { text: string; y: number; color: string }) {
+  const len      = text.length;
+  const fontSize = len <= 7 ? 14 : len <= 9 ? 12.5 : len <= 11 ? 11 : 10;
+  const estWidth = len * fontSize * 0.6; // rough serif advance
+  const constrain = estWidth > HERO_MAX_WIDTH;
+  return (
+    <text x="60" y={y} textAnchor="middle" dominantBaseline="middle"
+      fill={color} fontSize={fontSize} fontFamily="Georgia, serif" fontWeight="700"
+      letterSpacing="0.3"
+      {...(constrain ? { textLength: HERO_MAX_WIDTH, lengthAdjust: "spacingAndGlyphs" as const } : {})}>
+      {text}
+    </text>
+  );
+}
+
 // ── NPS-style Passport Stamp ──────────────────────────────────────────────────
 
 function PassportStamp({ stamp }: { stamp: EventStamp }) {
@@ -81,12 +105,14 @@ function PassportStamp({ stamp }: { stamp: EventStamp }) {
   const city     = stamp.city ?? "";
   const date     = stampDate(stamp.start_date);
 
-  // Artist name: up to 2 lines — split at space if long
-  const words     = artist.toUpperCase().split(" ");
-  const half      = Math.ceil(words.length / 2);
-  const line1     = words.slice(0, half).join(" ");
-  const line2     = words.slice(half).join(" ");
-  const singleLine = artist.length <= 11;
+  // Artist name layout: short names on one line; long multi-word names wrap to
+  // two balanced lines; a single very long word stays on one line and compresses.
+  const upper      = artist.toUpperCase();
+  const words      = upper.split(" ");
+  const useTwoLines = words.length >= 2 && upper.length > 11;
+  const half       = Math.ceil(words.length / 2);
+  const line1      = fitText(words.slice(0, half).join(" "), 14);
+  const line2      = fitText(words.slice(half).join(" "), 14);
 
   // City label for outer arc (bottom)
   const cityLabel = city ? fitText(city.toUpperCase(), 14) : "";
@@ -111,26 +137,14 @@ function PassportStamp({ stamp }: { stamp: EventStamp }) {
           GARBA NIGHT
         </text>
 
-        {/* Artist name — hero text */}
-        {singleLine ? (
-          <text x="60" y="58" textAnchor="middle" dominantBaseline="middle"
-            fill={color} fontSize="13.5" fontFamily="Georgia, serif" fontWeight="700"
-            letterSpacing="0.5">
-            {fitText(artist.toUpperCase(), 12)}
-          </text>
-        ) : (
+        {/* Artist name — hero text (self-fitting so it never bleeds past the ring) */}
+        {useTwoLines ? (
           <>
-            <text x="60" y="51" textAnchor="middle" dominantBaseline="middle"
-              fill={color} fontSize="12" fontFamily="Georgia, serif" fontWeight="700"
-              letterSpacing="0.5">
-              {fitText(line1, 12)}
-            </text>
-            <text x="60" y="64" textAnchor="middle" dominantBaseline="middle"
-              fill={color} fontSize="12" fontFamily="Georgia, serif" fontWeight="700"
-              letterSpacing="0.5">
-              {fitText(line2, 12)}
-            </text>
+            <HeroLine text={line1} y={51} color={color} />
+            <HeroLine text={line2} y={64} color={color} />
           </>
+        ) : (
+          <HeroLine text={fitText(upper, 16)} y={58} color={color} />
         )}
 
         {/* Thin rule below artist name */}
@@ -166,10 +180,10 @@ function EmptyStamp() {
   return (
     <div className="flex items-center justify-center opacity-[0.15]">
       <svg viewBox="0 0 120 120" className="w-full h-full" fill="none">
-        <circle cx="60" cy="60" r="56" stroke="#1B2F5E" strokeWidth="2" strokeDasharray="3 3" />
-        <circle cx="60" cy="60" r="44" stroke="#1B2F5E" strokeWidth="0.75" />
+        <circle cx="60" cy="60" r="56" stroke={PLUM} strokeWidth="2" strokeDasharray="3 3" />
+        <circle cx="60" cy="60" r="44" stroke={PLUM} strokeWidth="0.75" />
         <text x="60" y="62" textAnchor="middle" dominantBaseline="middle"
-          fill="#1B2F5E" fontSize="24" fontFamily="Georgia, serif" opacity="0.5">?</text>
+          fill={PLUM} fontSize="24" fontFamily="Georgia, serif" opacity="0.5">?</text>
       </svg>
     </div>
   );
@@ -199,7 +213,7 @@ function ArtistCombobox({ artists, query, setQuery, onSelect, selectedId }: {
         onFocus={() => setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
         placeholder="Search artists or type a name…"
-        className="w-full rounded-xl border border-ivory-200 px-4 py-3 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-[#1B2F5E]/20 focus:border-[#1B2F5E]/40 transition-all"
+        className="w-full rounded-xl border border-ivory-200 px-4 py-3 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-[#2E1B30]/20 focus:border-[#2E1B30]/40 transition-all"
       />
       {open && (matches.length > 0 || (query.trim() && !exact)) && (
         <div className="absolute z-10 left-0 right-0 mt-1.5 rounded-xl border border-ivory-200 bg-white shadow-lg overflow-hidden max-h-56 overflow-y-auto">
@@ -208,9 +222,9 @@ function ArtistCombobox({ artists, query, setQuery, onSelect, selectedId }: {
               key={a.id}
               type="button"
               onMouseDown={() => { onSelect(a); setQuery(a.name); setOpen(false); }}
-              className={`w-full text-left px-4 py-2.5 font-ui text-sm transition-colors flex items-center gap-2 ${selectedId === a.id ? "bg-[#1B2F5E]/8 text-[#1B2F5E] font-semibold" : "text-ink hover:bg-ivory"}`}
+              className={`w-full text-left px-4 py-2.5 font-ui text-sm transition-colors flex items-center gap-2 ${selectedId === a.id ? "bg-[#2E1B30]/8 text-[#2E1B30] font-semibold" : "text-ink hover:bg-ivory"}`}
             >
-              <span className="w-6 h-6 rounded-full bg-[#1B2F5E]/10 flex items-center justify-center text-[10px] font-bold text-[#1B2F5E] shrink-0">{a.name[0]?.toUpperCase()}</span>
+              <span className="w-6 h-6 rounded-full bg-[#2E1B30]/10 flex items-center justify-center text-[10px] font-bold text-[#2E1B30] shrink-0">{a.name[0]?.toUpperCase()}</span>
               {a.name}
             </button>
           ))}
@@ -229,20 +243,28 @@ function ArtistCombobox({ artists, query, setQuery, onSelect, selectedId }: {
   );
 }
 
-// ── Add Stamp Modal (form + live preview) ───────────────────────────────────────
-function AddStampModal({ artists, userId, onClose, onAdded }: {
+// ── Add / Edit Stamp Modal (form + live preview) ─────────────────────────────────
+function AddStampModal({ artists, userId, editing, onClose, onAdded, onUpdated }: {
   artists: ArtistOption[];
   userId: string;
+  editing: EventStamp | null;
   onClose: () => void;
   onAdded: (s: EventStamp) => void;
+  onUpdated: (s: EventStamp) => void;
 }) {
-  const [eventName, setEventName] = useState("");
-  const [date, setDate] = useState("");
-  const [city, setCity] = useState("");
-  const [stateField, setStateField] = useState("");
+  // When editing a custom stamp, prefill from it. Try to re-match a featured
+  // artist by name; otherwise the name still works as free text.
+  const matchedArtist = editing
+    ? (artists.find(a => a.name.toLowerCase() === (editing.artist ?? "").toLowerCase()) ?? null)
+    : null;
+
+  const [eventName, setEventName] = useState(editing?.title ?? "");
+  const [date, setDate] = useState((editing?.start_date ?? "").slice(0, 10));
+  const [city, setCity] = useState(editing?.city ?? "");
+  const [stateField, setStateField] = useState(editing?.state ?? "");
   const [mode, setMode] = useState<"artist" | "noartist">("artist");
-  const [artistQuery, setArtistQuery] = useState("");
-  const [selectedArtist, setSelectedArtist] = useState<ArtistOption | null>(null);
+  const [artistQuery, setArtistQuery] = useState(editing?.artist ?? "");
+  const [selectedArtist, setSelectedArtist] = useState<ArtistOption | null>(matchedArtist);
   const [customLabel, setCustomLabel] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -270,33 +292,35 @@ function AddStampModal({ artists, userId, onClose, onAdded }: {
     source: "custom",
   };
 
-  async function handleAdd() {
+  async function handleSave() {
     if (!valid) return;
     setSaving(true); setError("");
     const supabase = createClient();
-    const { data, error: err } = await supabase
-      .from("passport_stamps")
-      .insert({
-        user_id: userId,
-        event_name: eventName.trim(),
-        event_date: date,
-        city: city.trim() || null,
-        state: stateField.trim() || null,
-        artist_id: mode === "artist" ? (selectedArtist?.id ?? null) : null,
-        artist_name: heroLabel,
-      })
+    const payload = {
+      event_name: eventName.trim(),
+      event_date: date,
+      city: city.trim() || null,
+      state: stateField.trim() || null,
+      artist_id: mode === "artist" ? (selectedArtist?.id ?? null) : null,
+      artist_name: heroLabel,
+    };
+    const query = editing
+      ? supabase.from("passport_stamps").update(payload).eq("id", editing.id)
+      : supabase.from("passport_stamps").insert({ user_id: userId, ...payload });
+    const { data, error: err } = await query
       .select("id, event_name, event_date, city, state, artist_name")
       .single();
     setSaving(false);
     if (err || !data) { setError(err?.message ?? "Couldn't save your stamp. Try again."); return; }
-    onAdded({
+    const saved: EventStamp = {
       id: data.id, title: data.event_name, city: data.city, state: data.state,
       start_date: data.event_date, artist: data.artist_name, artists: null, source: "custom",
-    });
+    };
+    (editing ? onUpdated : onAdded)(saved);
   }
 
   const labelCls = "font-mono text-[10px] uppercase tracking-widest text-ink-muted block mb-1.5";
-  const inputCls = "w-full rounded-xl border border-ivory-200 px-4 py-3 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-[#1B2F5E]/20 focus:border-[#1B2F5E]/40 transition-all";
+  const inputCls = "w-full rounded-xl border border-ivory-200 px-4 py-3 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-[#2E1B30]/20 focus:border-[#2E1B30]/40 transition-all";
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm" onClick={onClose}>
@@ -309,8 +333,8 @@ function AddStampModal({ artists, userId, onClose, onAdded }: {
         {/* Header */}
         <div className="px-6 pt-4 pb-3 flex items-start justify-between gap-3 shrink-0">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-widest text-[#1B2F5E]/60">Add a stamp</p>
-            <p className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.015em" }}>Stamp a garba you danced at</p>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-[#2E1B30]/60">{editing ? "Edit stamp" : "Add a stamp"}</p>
+            <p className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.015em" }}>{editing ? "Update your garba stamp" : "Stamp a garba you danced at"}</p>
           </div>
           <button onClick={onClose} className="w-9 h-9 rounded-full bg-black/[0.04] flex items-center justify-center text-ink-muted hover:text-ink transition-colors shrink-0">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -319,13 +343,13 @@ function AddStampModal({ artists, userId, onClose, onAdded }: {
 
         {/* Live preview */}
         <div className="px-6 pb-3 shrink-0">
-          <div className="rounded-2xl border border-[#1B2F5E]/12 bg-white px-4 py-4 flex items-center gap-4">
+          <div className="rounded-2xl border border-[#2E1B30]/12 bg-white px-4 py-4 flex items-center gap-4">
             <div className="w-[104px] h-[104px] shrink-0">
               <PassportStamp stamp={preview} />
             </div>
             <div className="min-w-0">
-              <p className="font-mono text-[9px] uppercase tracking-widest text-[#1B2F5E]/50 mb-1 flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-[#1B2F5E] animate-pulse" /> Live preview
+              <p className="font-mono text-[9px] uppercase tracking-widest text-[#2E1B30]/50 mb-1 flex items-center gap-1.5">
+                <span className="w-1.5 h-1.5 rounded-full bg-[#2E1B30] animate-pulse" /> Live preview
               </p>
               <p className="font-display font-bold text-ink text-sm leading-tight truncate">{preview.title}</p>
               <p className="font-ui text-xs text-ink-muted truncate">{preview.artist}</p>
@@ -364,11 +388,11 @@ function AddStampModal({ artists, userId, onClose, onAdded }: {
             <label className={labelCls}>What goes on the stamp?</label>
             <div className="grid grid-cols-2 gap-2 mb-3">
               <button type="button" onClick={() => setMode("artist")}
-                className={`py-2.5 rounded-xl border-2 font-ui font-semibold text-xs transition-all ${mode === "artist" ? "border-[#1B2F5E] bg-[#1B2F5E]/5 text-[#1B2F5E]" : "border-ivory-200 text-ink-muted hover:border-[#1B2F5E]/30"}`}>
+                className={`py-2.5 rounded-xl border-2 font-ui font-semibold text-xs transition-all ${mode === "artist" ? "border-[#2E1B30] bg-[#2E1B30]/5 text-[#2E1B30]" : "border-ivory-200 text-ink-muted hover:border-[#2E1B30]/30"}`}>
                 Featured artist
               </button>
               <button type="button" onClick={() => setMode("noartist")}
-                className={`py-2.5 rounded-xl border-2 font-ui font-semibold text-xs transition-all ${mode === "noartist" ? "border-[#1B2F5E] bg-[#1B2F5E]/5 text-[#1B2F5E]" : "border-ivory-200 text-ink-muted hover:border-[#1B2F5E]/30"}`}>
+                className={`py-2.5 rounded-xl border-2 font-ui font-semibold text-xs transition-all ${mode === "noartist" ? "border-[#2E1B30] bg-[#2E1B30]/5 text-[#2E1B30]" : "border-ivory-200 text-ink-muted hover:border-[#2E1B30]/30"}`}>
                 No artist
               </button>
             </div>
@@ -390,17 +414,19 @@ function AddStampModal({ artists, userId, onClose, onAdded }: {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-4 border-t border-[#1B2F5E]/10 shrink-0 flex gap-2.5">
+        <div className="px-6 py-4 border-t border-[#2E1B30]/10 shrink-0 flex gap-2.5">
           <button onClick={onClose} className="px-5 py-3.5 rounded-2xl border border-ink/12 font-ui font-semibold text-sm text-ink-muted hover:text-ink transition-colors">
             Cancel
           </button>
           <button
             disabled={!valid || saving}
-            onClick={handleAdd}
+            onClick={handleSave}
             className={`flex-1 py-3.5 rounded-2xl font-display font-bold text-base transition-all flex items-center justify-center gap-2 ${valid && !saving ? "text-white hover:opacity-90 active:scale-[0.98]" : "bg-ivory-200 text-ink-muted/50 cursor-not-allowed"}`}
-            style={valid && !saving ? { backgroundColor: "#1B2F5E" } : undefined}
+            style={valid && !saving ? { backgroundColor: "#2E1B30" } : undefined}
           >
-            {saving ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Adding…</> : "Confirm & add stamp"}
+            {saving
+              ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />{editing ? "Saving…" : "Adding…"}</>
+              : (editing ? "Save changes" : "Confirm & add stamp")}
           </button>
         </div>
       </div>
@@ -417,6 +443,8 @@ export default function GarbaPassportPage() {
   const [artists, setArtists] = useState<ArtistOption[]>([]);
   const [userId,  setUserId]  = useState("");
   const [showAdd, setShowAdd] = useState(false);
+  const [editingStamp, setEditingStamp] = useState<EventStamp | null>(null);
+  const [manageMode, setManageMode] = useState(false);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(false);
@@ -495,6 +523,11 @@ export default function GarbaPassportPage() {
     setShowAdd(false);
   }
 
+  function handleStampUpdated(s: EventStamp) {
+    setStamps(prev => sortStamps(prev.map(x => (x.id === s.id ? s : x))));
+    setEditingStamp(null);
+  }
+
   async function handleRemoveStamp(id: string) {
     setRemovingId(id);
     const supabase = createClient();
@@ -527,6 +560,15 @@ export default function GarbaPassportPage() {
   const MIN_SLOTS  = 6;
   const emptyCount = Math.max(0, MIN_SLOTS - stamps.length);
 
+  // ── Screenshot-fit layout ──────────────────────────────────────────────────
+  // Past 9 stamps we compress the cover (keeping the portrait full-size so the
+  // member stays recognizable) and tighten the stamp grid into more columns so
+  // the whole passport still captures in a single Instagram-story screenshot.
+  const compact   = stamps.length > 9;
+  const stampCols = stamps.length > 16 ? 5 : stamps.length > 9 ? 4 : 3;
+  const stampGap  = compact ? 4 : 6; // px
+  const hasCustom = stamps.some(s => s.source === "custom"); // only custom stamps are editable/removable
+
   const whatsappMsg = encodeURIComponent(
     `Hey! I just joined Rameelo — the platform for garba & navratri events across the US 🪈\n\nCheck out my Garba Passport: ${referralUrl}`
   );
@@ -558,8 +600,15 @@ export default function GarbaPassportPage() {
   return (
     <div className="max-w-sm mx-auto space-y-6 pb-10">
 
-      {showAdd && (
-        <AddStampModal artists={artists} userId={userId} onClose={() => setShowAdd(false)} onAdded={handleStampAdded} />
+      {(showAdd || editingStamp) && (
+        <AddStampModal
+          artists={artists}
+          userId={userId}
+          editing={editingStamp}
+          onClose={() => { setShowAdd(false); setEditingStamp(null); }}
+          onAdded={handleStampAdded}
+          onUpdated={handleStampUpdated}
+        />
       )}
 
       {/* Back */}
@@ -569,93 +618,113 @@ export default function GarbaPassportPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 17l-5-5m0 0l5-5m-5 5h12" />
           </svg>
         </Link>
-        <div>
+        <div className="flex-1">
           <p className="font-display font-bold text-ink/85 text-lg" style={{ letterSpacing: "-0.02em" }}>Garba Passport</p>
           <p className="font-mono text-[9px] uppercase tracking-widest text-ink/35">
             {stamps.length > 0 ? `${stamps.length} stamp${stamps.length !== 1 ? "s" : ""} collected` : "Collect stamps at every garba"}
           </p>
         </div>
+        {/* Manage toggle — keeps edit/remove controls hidden for clean screenshots */}
+        {hasCustom && (
+          <button
+            onClick={() => setManageMode(m => !m)}
+            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full font-ui font-semibold text-xs border transition-all ${manageMode ? "text-white border-transparent" : "text-ink/60 border-ink/15 hover:border-ink/30 hover:text-ink/80"}`}
+            style={manageMode ? { backgroundColor: PLUM } : undefined}
+          >
+            {manageMode ? (
+              <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>Done</>
+            ) : (
+              <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>Manage</>
+            )}
+          </button>
+        )}
       </div>
 
       {/* ── PASSPORT BOOK ─────────────────────────────────────────────────── */}
-      <div className="rounded-2xl overflow-hidden shadow-[0_8px_40px_rgba(0,0,0,0.18)] select-none">
+      <div className="rounded-2xl overflow-hidden shadow-[0_12px_50px_rgba(46,27,48,0.35)] select-none ring-1"
+        style={{ ["--tw-ring-color" as string]: `${GOLD}22` }}>
 
-        {/* ── COVER ── USA passport navy blue */}
-        <div className="relative overflow-hidden" style={{ backgroundColor: "#1B2F5E" }}>
+        {/* ── COVER ── brand aubergine plum */}
+        <div className="relative overflow-hidden"
+          style={{ background: `linear-gradient(160deg, ${PLUM_LIGHT} 0%, ${PLUM} 52%, ${PLUM_DEEP} 100%)` }}>
 
           {/* Subtle texture overlay */}
-          <div className="absolute inset-0 opacity-[0.03]"
-            style={{ backgroundImage: "repeating-linear-gradient(45deg, #C9A84C 0px, #C9A84C 1px, transparent 1px, transparent 8px)" }} />
+          <div className="absolute inset-0 opacity-[0.04]"
+            style={{ backgroundImage: `repeating-linear-gradient(45deg, ${GOLD} 0px, ${GOLD} 1px, transparent 1px, transparent 8px)` }} />
+
+          {/* Warm radial glow behind the crest for screenshot pop */}
+          <div className="absolute inset-0"
+            style={{ background: `radial-gradient(120% 90% at 50% 0%, ${GOLD}14, transparent 60%)` }} />
 
           {/* Fine gold decorative border */}
-          <div className="absolute inset-x-0 top-0 h-[1.5px]" style={{ background: "linear-gradient(90deg, transparent, #C9A84C60, #C9A84C, #C9A84C60, transparent)" }} />
-          <div className="absolute inset-x-4 top-[5px] h-px" style={{ backgroundColor: "#C9A84C22" }} />
-          <div className="absolute inset-x-0 bottom-0 h-[1.5px]" style={{ background: "linear-gradient(90deg, transparent, #C9A84C60, #C9A84C, #C9A84C60, transparent)" }} />
-          <div className="absolute inset-x-4 bottom-[5px] h-px" style={{ backgroundColor: "#C9A84C22" }} />
-          <div className="absolute inset-y-0 left-0 w-[1.5px]" style={{ background: "linear-gradient(180deg, transparent, #C9A84C60, #C9A84C, #C9A84C60, transparent)" }} />
-          <div className="absolute inset-y-4 left-[5px] w-px" style={{ backgroundColor: "#C9A84C22" }} />
-          <div className="absolute inset-y-0 right-0 w-[1.5px]" style={{ background: "linear-gradient(180deg, transparent, #C9A84C60, #C9A84C, #C9A84C60, transparent)" }} />
-          <div className="absolute inset-y-4 right-[5px] w-px" style={{ backgroundColor: "#C9A84C22" }} />
+          <div className="absolute inset-x-0 top-0 h-[1.5px]" style={{ background: `linear-gradient(90deg, transparent, ${GOLD}80, ${GOLD}, ${GOLD}80, transparent)` }} />
+          <div className="absolute inset-x-4 top-[5px] h-px" style={{ backgroundColor: `${GOLD}2a` }} />
+          <div className="absolute inset-x-0 bottom-0 h-[1.5px]" style={{ background: `linear-gradient(90deg, transparent, ${GOLD}80, ${GOLD}, ${GOLD}80, transparent)` }} />
+          <div className="absolute inset-x-4 bottom-[5px] h-px" style={{ backgroundColor: `${GOLD}2a` }} />
+          <div className="absolute inset-y-0 left-0 w-[1.5px]" style={{ background: `linear-gradient(180deg, transparent, ${GOLD}80, ${GOLD}, ${GOLD}80, transparent)` }} />
+          <div className="absolute inset-y-4 left-[5px] w-px" style={{ backgroundColor: `${GOLD}2a` }} />
+          <div className="absolute inset-y-0 right-0 w-[1.5px]" style={{ background: `linear-gradient(180deg, transparent, ${GOLD}80, ${GOLD}, ${GOLD}80, transparent)` }} />
+          <div className="absolute inset-y-4 right-[5px] w-px" style={{ backgroundColor: `${GOLD}2a` }} />
 
           {/* Garba mandala watermark */}
-          <div className="absolute inset-0 flex items-center justify-center opacity-[0.06]">
+          <div className="absolute inset-0 flex items-center justify-center opacity-[0.07]">
             <svg viewBox="0 0 300 300" className="w-[140%] h-[140%]" fill="none">
               {Array.from({ length: 12 }, (_, i) => i * 30).map(a => (
-                <ellipse key={a} cx="150" cy="70" rx="10" ry="55" fill="#C9A84C" transform={`rotate(${a} 150 150)`} />
+                <ellipse key={a} cx="150" cy="70" rx="10" ry="55" fill={GOLD} transform={`rotate(${a} 150 150)`} />
               ))}
               {[130, 100, 72, 48, 26].map(r => (
-                <circle key={r} cx="150" cy="150" r={r} stroke="#C9A84C" strokeWidth="1.5" />
+                <circle key={r} cx="150" cy="150" r={r} stroke={GOLD} strokeWidth="1.5" />
               ))}
             </svg>
           </div>
 
           {/* Cover content */}
-          <div className="relative px-6 pt-7 pb-6">
+          <div className={`relative ${compact ? "px-5 pt-4 pb-4" : "px-6 pt-7 pb-6"}`}>
 
             {/* "United States of Garba" header */}
-            <p className="text-center font-mono text-[7.5px] uppercase tracking-[0.38em] mb-3"
-              style={{ color: "#C9A84C90" }}>
+            <p className={`text-center font-mono text-[7.5px] uppercase tracking-[0.38em] ${compact ? "mb-1.5" : "mb-3"}`}
+              style={{ color: `${GOLD}b0` }}>
               United&nbsp;States&nbsp;of&nbsp;Garba
             </p>
 
             {/* PASSPORT title */}
-            <div className="text-center mb-5">
-              <p className="font-display font-bold text-white text-base mb-0.5"
+            <div className={`text-center ${compact ? "mb-3" : "mb-5"}`}>
+              <p className={`font-display font-bold text-white ${compact ? "text-sm" : "text-base"} mb-0.5`}
                 style={{ letterSpacing: "0.18em", textShadow: "0 1px 8px rgba(0,0,0,0.4)" }}>
                 RAMEELO
               </p>
               <p className="font-mono font-bold tracking-[0.28em] uppercase"
-                style={{ fontSize: "13px", color: "#C9A84Ccc", letterSpacing: "0.35em" }}>
+                style={{ fontSize: compact ? "11px" : "13px", color: GOLD, letterSpacing: "0.35em", textShadow: `0 0 12px ${GOLD}40` }}>
                 PASSPORT
               </p>
               <div className="flex items-center justify-center gap-2 mt-1.5">
-                <div className="h-px flex-1" style={{ backgroundColor: "#C9A84C25" }} />
-                <span className="font-mono text-[7px] tracking-widest uppercase" style={{ color: "#C9A84C55" }}>Navratri 2026</span>
-                <div className="h-px flex-1" style={{ backgroundColor: "#C9A84C25" }} />
+                <div className="h-px flex-1" style={{ backgroundColor: `${GOLD}30` }} />
+                <span className="font-mono text-[7px] tracking-widest uppercase" style={{ color: `${GOLD}70` }}>Navratri 2026</span>
+                <div className="h-px flex-1" style={{ backgroundColor: `${GOLD}30` }} />
               </div>
             </div>
 
             {/* Portrait + identity fields */}
-            <div className="flex items-start gap-4 mb-5">
-              {/* Portrait */}
+            <div className={`flex items-start gap-4 ${compact ? "mb-3" : "mb-5"}`}>
+              {/* Portrait — kept full-size so the member stays recognizable even in compact mode */}
               <div className="shrink-0 flex flex-col items-center gap-1">
-                <div className="w-[68px] h-[84px] rounded-sm overflow-hidden border"
-                  style={{ borderColor: "#C9A84C40", backgroundColor: "#0d1a3a" }}>
+                <div className="w-[68px] h-[84px] rounded-sm overflow-hidden border-2 shadow-lg"
+                  style={{ borderColor: `${GOLD}66`, backgroundColor: PLUM_DEEP, boxShadow: `0 4px 14px ${PLUM_DEEP}99` }}>
                   {profile.avatar_url ? (
                     <img src={profile.avatar_url} alt="" className="w-full h-full object-cover" />
                   ) : (
                     <div className="w-full h-full flex items-center justify-center">
-                      <span className="font-display font-bold text-[28px]" style={{ color: "#C9A84C" }}>{initials}</span>
+                      <span className="font-display font-bold text-[28px]" style={{ color: GOLD }}>{initials}</span>
                     </div>
                   )}
                 </div>
-                <p className="font-mono text-[6px] uppercase tracking-widest" style={{ color: "#C9A84C45" }}>Photo</p>
+                <p className="font-mono text-[6px] uppercase tracking-widest" style={{ color: `${GOLD}55` }}>Photo</p>
               </div>
 
               {/* Identity fields */}
-              <div className="flex-1 min-w-0 space-y-3">
-                <div className="pb-2 border-b" style={{ borderColor: "#C9A84C18" }}>
-                  <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: "#C9A84C55" }}>
+              <div className={`flex-1 min-w-0 ${compact ? "space-y-1.5" : "space-y-3"}`}>
+                <div className={`${compact ? "pb-1" : "pb-2"} border-b`} style={{ borderColor: `${GOLD}22` }}>
+                  <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: `${GOLD}70` }}>
                     Surname / Nom
                   </p>
                   <p className="font-display font-bold text-white text-sm leading-tight truncate"
@@ -663,8 +732,8 @@ export default function GarbaPassportPage() {
                     {profile.last_name.toUpperCase()}
                   </p>
                 </div>
-                <div className="pb-2 border-b" style={{ borderColor: "#C9A84C18" }}>
-                  <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: "#C9A84C55" }}>
+                <div className={`${compact ? "pb-1" : "pb-2"} border-b`} style={{ borderColor: `${GOLD}22` }}>
+                  <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: `${GOLD}70` }}>
                     Given Names / Prénoms
                   </p>
                   <p className="font-display font-bold text-white text-sm leading-tight truncate"
@@ -674,25 +743,25 @@ export default function GarbaPassportPage() {
                 </div>
                 <div className="grid grid-cols-2 gap-x-3">
                   <div>
-                    <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: "#C9A84C55" }}>Issue Date</p>
-                    <p className="font-mono text-[9px] text-white/65">{memberSince(profile.created_at)}</p>
+                    <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: `${GOLD}70` }}>Issue Date</p>
+                    <p className="font-mono text-[9px] text-white/70">{memberSince(profile.created_at)}</p>
                   </div>
                   <div>
-                    <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: "#C9A84C55" }}>Place of Origin</p>
-                    <p className="font-mono text-[9px] text-white/65 uppercase">{location || "USA"}</p>
+                    <p className="font-mono text-[6.5px] uppercase tracking-widest mb-0.5" style={{ color: `${GOLD}70` }}>Place of Origin</p>
+                    <p className="font-mono text-[9px] text-white/70 uppercase">{location || "USA"}</p>
                   </div>
                 </div>
               </div>
             </div>
 
             {/* MRZ */}
-            <div className="rounded px-3 py-2.5" style={{ backgroundColor: "#00000030" }}>
+            <div className={`rounded px-3 ${compact ? "py-1.5" : "py-2.5"}`} style={{ backgroundColor: "#00000033" }}>
               <p className="font-mono text-[8px] tracking-[0.18em] leading-5 break-all select-all"
-                style={{ color: "#C9A84C40" }}>
+                style={{ color: `${GOLD}55` }}>
                 {`P<RML${profile.last_name.replace(/\s/g,"").toUpperCase().slice(0,8)}<<${profile.first_name.replace(/\s/g,"").toUpperCase().slice(0,8)}<<<<<<`}
               </p>
               <p className="font-mono text-[8px] tracking-[0.18em] break-all select-all"
-                style={{ color: "#C9A84C40" }}>
+                style={{ color: `${GOLD}55` }}>
                 {`${code}0RML26${stamps.length.toString().padStart(2,"0")}<<<<<<<<<<<<<<<<<<`}
               </p>
             </div>
@@ -700,34 +769,57 @@ export default function GarbaPassportPage() {
         </div>
 
         {/* ── STAMP PAGES ── cream/parchment interior */}
-        <div style={{ backgroundColor: "#FDFAF2" }}>
+        <div style={{ backgroundColor: "#FCF9F2" }}>
 
           {/* Page header */}
           <div className="px-5 pt-5 pb-3 flex items-center gap-3">
-            <div className="flex-1 h-px" style={{ backgroundColor: "#1B2F5E20" }} />
-            <p className="font-mono text-[8px] uppercase tracking-[0.3em]" style={{ color: "#1B2F5E55" }}>
+            <div className="flex-1 h-px" style={{ backgroundColor: `${PLUM}20` }} />
+            <p className="font-mono text-[8px] uppercase tracking-[0.3em] flex items-center gap-2" style={{ color: `${PLUM}70` }}>
               Visas &amp; Stamps
+              {compact && (
+                <span className="font-bold" style={{ color: GOLD }}>· {stamps.length}</span>
+              )}
             </p>
-            <div className="flex-1 h-px" style={{ backgroundColor: "#1B2F5E20" }} />
+            <div className="flex-1 h-px" style={{ backgroundColor: `${PLUM}20` }} />
           </div>
 
-          {/* Stamps grid */}
-          <div className="px-4 pb-5 grid grid-cols-3 gap-1.5">
+          {/* Stamps grid — columns scale up with stamp count so the whole book
+              still fits in one screenshot */}
+          <div className="px-4 pb-5 grid"
+            style={{ gridTemplateColumns: `repeat(${stampCols}, minmax(0, 1fr))`, gap: `${stampGap}px` }}>
             {stamps.map(s => (
               <div key={s.id} className="relative">
                 <PassportStamp stamp={s} />
-                {s.source === "custom" && (
-                  <button
-                    onClick={() => handleRemoveStamp(s.id)}
-                    disabled={removingId === s.id}
-                    aria-label="Remove stamp"
-                    title="Remove this stamp"
-                    className="absolute top-0 right-1 w-5 h-5 rounded-full bg-white border border-[#6B1E3A]/30 shadow-sm flex items-center justify-center text-[#6B1E3A] hover:bg-[#6B1E3A] hover:text-white transition-all"
-                  >
-                    {removingId === s.id
-                      ? <div className="w-2.5 h-2.5 rounded-full border border-[#6B1E3A]/40 border-t-[#6B1E3A] animate-spin" />
-                      : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>}
-                  </button>
+                {/* Edit + remove controls — only visible in Manage mode so screenshots stay clean */}
+                {manageMode && s.source === "custom" && (
+                  <>
+                    <button
+                      onClick={() => setEditingStamp(s)}
+                      aria-label="Edit stamp"
+                      title="Edit this stamp"
+                      className="absolute top-0 left-1 w-5 h-5 rounded-full bg-white border border-aubergine/25 shadow-sm flex items-center justify-center text-aubergine hover:bg-aubergine hover:text-white transition-all"
+                    >
+                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                    </button>
+                    <button
+                      onClick={() => handleRemoveStamp(s.id)}
+                      disabled={removingId === s.id}
+                      aria-label="Remove stamp"
+                      title="Remove this stamp"
+                      className="absolute top-0 right-1 w-5 h-5 rounded-full bg-white border border-durga/30 shadow-sm flex items-center justify-center text-durga hover:bg-durga hover:text-white transition-all"
+                    >
+                      {removingId === s.id
+                        ? <div className="w-2.5 h-2.5 rounded-full border border-durga/40 border-t-durga animate-spin" />
+                        : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>}
+                    </button>
+                  </>
+                )}
+                {/* Locked badge for ticket stamps while managing */}
+                {manageMode && s.source === "purchase" && (
+                  <div className="absolute top-0 right-1 w-5 h-5 rounded-full bg-white/90 border border-ink/10 shadow-sm flex items-center justify-center text-ink/40"
+                    title="Ticket stamps are locked in">
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                  </div>
                 )}
               </div>
             ))}
@@ -738,35 +830,46 @@ export default function GarbaPassportPage() {
               aria-label="Add a stamp"
             >
               <svg viewBox="0 0 120 120" className="w-full h-full" fill="none">
-                <circle cx="60" cy="60" r="56" stroke="#1B2F5E" strokeWidth="2.5" strokeDasharray="4 3" opacity="0.5" className="group-hover:opacity-80 transition-opacity" />
-                <circle cx="60" cy="42" r="13" stroke="#1B2F5E" strokeWidth="2.5" opacity="0.55" />
-                <line x1="60" y1="36" x2="60" y2="48" stroke="#1B2F5E" strokeWidth="2.5" opacity="0.7" strokeLinecap="round" />
-                <line x1="54" y1="42" x2="66" y2="42" stroke="#1B2F5E" strokeWidth="2.5" opacity="0.7" strokeLinecap="round" />
-                <text x="60" y="74" textAnchor="middle" fill="#1B2F5E" fontSize="9" fontFamily="monospace" fontWeight="700" letterSpacing="1.5" opacity="0.6">ADD</text>
-                <text x="60" y="86" textAnchor="middle" fill="#1B2F5E" fontSize="7" fontFamily="monospace" letterSpacing="1" opacity="0.45">A STAMP</text>
+                <circle cx="60" cy="60" r="56" stroke={PLUM} strokeWidth="2.5" strokeDasharray="4 3" opacity="0.5" className="group-hover:opacity-80 transition-opacity" />
+                <circle cx="60" cy="42" r="13" stroke={PLUM} strokeWidth="2.5" opacity="0.55" />
+                <line x1="60" y1="36" x2="60" y2="48" stroke={PLUM} strokeWidth="2.5" opacity="0.7" strokeLinecap="round" />
+                <line x1="54" y1="42" x2="66" y2="42" stroke={PLUM} strokeWidth="2.5" opacity="0.7" strokeLinecap="round" />
+                <text x="60" y="74" textAnchor="middle" fill={PLUM} fontSize="9" fontFamily="monospace" fontWeight="700" letterSpacing="1.5" opacity="0.6">ADD</text>
+                <text x="60" y="86" textAnchor="middle" fill={PLUM} fontSize="7" fontFamily="monospace" letterSpacing="1" opacity="0.45">A STAMP</text>
               </svg>
             </button>
-            {Array.from({ length: Math.max(0, emptyCount - 1) }).map((_, i) => (
+            {/* Empty filler slots — only in the sparse (non-compact) layout */}
+            {!compact && Array.from({ length: Math.max(0, emptyCount - 1) }).map((_, i) => (
               <EmptyStamp key={`empty-${i}`} />
             ))}
           </div>
 
           {/* Page footer — referral strip */}
           <div className="mx-4 mb-5 rounded-lg py-2.5 px-4 flex items-center justify-between gap-2 border"
-            style={{ backgroundColor: "#1B2F5E0a", borderColor: "#1B2F5E18" }}>
-            <p className="font-mono text-[8px] uppercase tracking-widest" style={{ color: "#1B2F5E70" }}>
+            style={{ backgroundColor: `${PLUM}0a`, borderColor: `${PLUM}18` }}>
+            <p className="font-mono text-[8px] uppercase tracking-widest" style={{ color: `${PLUM}80` }}>
               rameelo.com/join?ref=
             </p>
-            <p className="font-mono text-[9px] font-bold" style={{ color: "#1B2F5E" }}>{code}</p>
+            <p className="font-mono text-[9px] font-bold" style={{ color: PLUM }}>{code}</p>
           </div>
         </div>
       </div>
+
+      {/* Manage-mode hint — appears outside the book so it never lands in a screenshot */}
+      {manageMode && (
+        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border" style={{ backgroundColor: `${GOLD}14`, borderColor: `${GOLD}55` }}>
+          <svg className="w-4 h-4 shrink-0" fill="none" stroke={PLUM} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+          <p className="font-ui text-xs text-ink/70 flex-1">
+            <span className="font-semibold text-ink">Managing stamps.</span> Tap the pencil to edit or × to remove your own stamps. Tap <span className="font-semibold text-ink">Done</span> before screenshotting.
+          </p>
+        </div>
+      )}
 
       {/* Add a stamp — primary action */}
       <button
         onClick={() => setShowAdd(true)}
         className="w-full flex items-center gap-3 px-5 py-4 rounded-2xl text-white transition-all hover:opacity-95 active:scale-[0.99]"
-        style={{ backgroundColor: "#1B2F5E" }}
+        style={{ backgroundColor: "#2E1B30" }}
       >
         <div className="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center shrink-0">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
@@ -780,22 +883,26 @@ export default function GarbaPassportPage() {
 
       {/* Stamp callout */}
       {stamps.length === 0 ? (
-        <div className="px-5 py-4 rounded-2xl border border-[#1B2F5E]/15 bg-[#1B2F5E]/5 text-center">
+        <div className="px-5 py-4 rounded-2xl border border-[#2E1B30]/15 bg-[#2E1B30]/5 text-center">
           <p className="font-display font-bold text-ink/70 text-sm mb-0.5" style={{ letterSpacing: "-0.01em" }}>Your passport is empty — for now</p>
           <p className="font-ui text-xs text-ink-muted mb-3">Add stamps for every garba you&apos;ve danced at, or buy a ticket to earn one automatically.</p>
           <Link href="/events" className="inline-block px-5 py-2.5 rounded-xl text-white font-ui font-semibold text-sm hover:opacity-90 transition-opacity"
-            style={{ backgroundColor: "#1B2F5E" }}>
+            style={{ backgroundColor: "#2E1B30" }}>
             Browse Events
           </Link>
         </div>
       ) : (
-        <div className="px-5 py-3.5 rounded-2xl border border-[#1B2F5E]/15 bg-[#1B2F5E]/5 flex items-center gap-3">
+        <div className="px-5 py-3.5 rounded-2xl border border-[#2E1B30]/15 bg-[#2E1B30]/5 flex items-center gap-3">
           <span className="text-xl">🪔</span>
           <div>
             <p className="font-display font-bold text-ink/80 text-sm" style={{ letterSpacing: "-0.01em" }}>
               {stamps.length} garba{stamps.length !== 1 ? "s" : ""} stamped
             </p>
-            <p className="font-ui text-xs text-ink-muted">Ticket stamps are locked in — your own stamps can be removed any time.</p>
+            <p className="font-ui text-xs text-ink-muted">
+              {hasCustom
+                ? <>Add more anytime — and tap <span className="font-semibold text-ink/75">Manage</span> up top to edit or remove your own stamps. Ticket stamps stay locked in.</>
+                : <>Add a stamp for any garba you danced at. Ticket stamps are locked in automatically.</>}
+            </p>
           </div>
         </div>
       )}

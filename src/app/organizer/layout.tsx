@@ -16,121 +16,104 @@ type NavItem = {
   icon: React.ReactNode;
   exact?: boolean;
   cta?: boolean;
+  comingSoon?: boolean;
 };
 type NavSection = { id: string; label: string; items: NavItem[] };
+
+// Line-style nav icon from one or more SVG path `d` strings.
+const icon = (...ds: string[]) => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    {ds.map((d, i) => (
+      <path key={i} strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={d} />
+    ))}
+  </svg>
+);
 
 const SECTIONS: NavSection[] = [
   {
     id: "overview",
     label: "Overview",
     items: [
-      {
-        href: "/organizer",
-        label: "Hub",
-        exact: true,
-        icon: (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-          </svg>
-        ),
-      },
-      {
-        href: "/organizer/sales",
-        label: "Analytics",
-        icon: (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        ),
-      },
+      { href: "/organizer", label: "Dashboard", exact: true,
+        icon: icon("M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6") },
+      { href: "/organizer/sales", label: "Analytics",
+        icon: icon("M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z") },
     ],
   },
   {
     id: "events",
     label: "Events",
     items: [
-      {
-        href: "/organizer/events",
-        label: "My Events",
-        icon: (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
-        ),
-      },
-      {
-        href: "/organizer/events/create",
-        label: "Create Event",
-        cta: true,
-        icon: (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-        ),
-      },
+      { href: "/organizer/events", label: "Events",
+        icon: icon("M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z") },
     ],
   },
   {
     id: "audience",
     label: "Audience",
     items: [
-      {
-        href: "/organizer/tickets",
-        label: "Orders",
-        icon: (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-        ),
-      },
+      { href: "/organizer/tickets", label: "Orders",
+        icon: icon("M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17M9 19.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm10 0a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z") },
+      { href: "/organizer/customers", label: "Customers", comingSoon: true,
+        icon: icon("M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z") },
+    ],
+  },
+  {
+    id: "growth",
+    label: "Growth",
+    items: [
+      { href: "/organizer/marketing", label: "Marketing", comingSoon: true,
+        icon: icon("M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z") },
+      { href: "/organizer/reports", label: "Reports", comingSoon: true,
+        icon: icon("M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z") },
+    ],
+  },
+  {
+    id: "door",
+    label: "At the door",
+    items: [
+      { href: "/organizer/scan", label: "Check-In",
+        icon: icon("M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4") },
     ],
   },
   {
     id: "money",
     label: "Money",
     items: [
-      {
-        href: "/organizer/financials",
-        label: "Earnings",
-        icon: (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
-        ),
-      },
-      {
-        href: "/organizer/payouts",
-        label: "Payouts",
-        icon: (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" />
-          </svg>
-        ),
-      },
+      { href: "/organizer/financials", label: "Earnings",
+        icon: icon("M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z") },
+      { href: "/organizer/payouts", label: "Payouts",
+        icon: icon("M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z") },
     ],
   },
   {
     id: "org",
     label: "Organization",
     items: [
-      {
-        href: "/organizer/organization",
-        label: "Settings",
-        icon: (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-          </svg>
-        ),
-      },
+      { href: "/organizer/team", label: "Team",
+        icon: icon("M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z") },
+      { href: "/organizer/organization", label: "Settings",
+        icon: icon(
+          "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z",
+          "M15 12a3 3 0 11-6 0 3 3 0 016 0z") },
     ],
+  },
+];
+
+// Scanner-only members (org role = 'scanner') see just the door scanner.
+const SCANNER_ONLY_SECTIONS: NavSection[] = [
+  {
+    id: "door",
+    label: "At the door",
+    items: SECTIONS.find(s => s.id === "door")!.items,
   },
 ];
 
 // ── Page titles ────────────────────────────────────────────────────────────────
 
 const PAGE_TITLES: Array<{ test: (p: string) => boolean; title: string }> = [
-  { test: (p) => p === "/organizer",                               title: "Hub" },
-  { test: (p) => p === "/organizer/events",                        title: "My Events" },
+  { test: (p) => p === "/organizer",                               title: "Dashboard" },
+  { test: (p) => p === "/organizer/events",                        title: "Events" },
   { test: (p) => p === "/organizer/events/create",                 title: "Create Event" },
   { test: (p) => /^\/organizer\/events\/[^/]+$/.test(p),          title: "Event Overview" },
   { test: (p) => /^\/organizer\/events\/[^/]+\/edit$/.test(p),    title: "Edit Event" },
@@ -140,6 +123,8 @@ const PAGE_TITLES: Array<{ test: (p: string) => boolean; title: string }> = [
   { test: (p) => p === "/organizer/sales",                         title: "Analytics" },
   { test: (p) => p === "/organizer/financials",                    title: "Earnings" },
   { test: (p) => p === "/organizer/payouts",                       title: "Payouts" },
+  { test: (p) => p === "/organizer/scan",                          title: "Check-In" },
+  { test: (p) => p === "/organizer/team",                          title: "Team" },
   { test: (p) => p === "/organizer/organization",                  title: "Organization Settings" },
 ];
 
@@ -278,6 +263,19 @@ function NavItem({
       : pathname.startsWith(item.href)
   );
 
+  // Not-yet-built tabs: grayed out, non-clickable, with a "Soon" tag.
+  if (item.comingSoon) {
+    return (
+      <div className="relative flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-ui font-medium text-white/25 cursor-default select-none">
+        <span className="shrink-0 opacity-50">{item.icon}</span>
+        <span className="flex-1 leading-none">{item.label}</span>
+        <span className="font-mono text-[8px] uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-white/[0.06] text-white/35">
+          Soon
+        </span>
+      </div>
+    );
+  }
+
   if (item.cta) {
     return (
       <Link
@@ -322,6 +320,7 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [user, setUser] = useState<RameeloUser | null>(null);
   const [orgs, setOrgs] = useState<OrgOption[]>([]);
+  const [roles, setRoles] = useState<Record<string, string>>({});
   const [activeOrg, setActiveOrgState] = useState<OrgOption | null>(null);
   const [unauthorized, setUnauthorized] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -334,19 +333,34 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
   const pageTitle = getPageTitle(pathname);
   const isCreateEvent = pathname === "/organizer/events/create";
 
+  // Caller's role in the active org. Scanners get the door scanner only.
+  const activeRole = activeOrg ? (roles[activeOrg.id] ?? null) : null;
+  const scannerOnly = activeRole === "scanner";
+
   useEffect(() => {
     document.title = `Organizer · ${pageTitle} | Rameelo`;
   }, [pageTitle]);
+
+  // A scanner can't reach anything but the scanner page.
+  useEffect(() => {
+    if (scannerOnly && !pathname.startsWith("/organizer/scan")) {
+      router.replace("/organizer/scan");
+    }
+  }, [scannerOnly, pathname, router]);
 
   useEffect(() => {
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
       if (!authUser) { router.replace("/auth/signin"); return; }
 
+      // Claim any pending org invitations addressed to this account before we gate
+      // access — a freshly-invited member is granted organizer access on first load.
+      try { await supabase.rpc("claim_org_invitations"); } catch { /* best-effort */ }
+
       const [{ data: profile }, { data: orgRows }] = await Promise.all([
         supabase.from("profiles").select("first_name, last_name, email, role, avatar_url").eq("id", authUser.id).single(),
         supabase.from("organization_members")
-          .select("organizations(id, name, logo_url)")
+          .select("role, organizations(id, name, logo_url)")
           .eq("user_id", authUser.id),
       ]);
 
@@ -355,8 +369,12 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
         return;
       }
 
-      // @ts-expect-error nested join type
-      const orgList: OrgOption[] = (orgRows ?? []).map(r => r.organizations).filter(Boolean);
+      const roleMap: Record<string, string> = {};
+      const orgList: OrgOption[] = [];
+      for (const r of (orgRows ?? []) as unknown as { role: string; organizations: OrgOption | null }[]) {
+        if (r.organizations) { orgList.push(r.organizations); roleMap[r.organizations.id] = r.role; }
+      }
+      setRoles(roleMap);
       setOrgs(orgList);
 
       // Restore saved org or default to first
@@ -412,7 +430,7 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <OrgProvider orgs={orgs} activeOrg={activeOrg} setActiveOrg={setActiveOrg}>
+    <OrgProvider orgs={orgs} activeOrg={activeOrg} setActiveOrg={setActiveOrg} activeRole={activeRole} roles={roles}>
       <div className="min-h-screen flex" style={{ backgroundColor: "#FAF8F5" }}>
         {sidebarOpen && (
           <div className="fixed inset-0 bg-black/60 z-40 lg:hidden" onClick={() => setSidebarOpen(false)} />
@@ -444,7 +462,7 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
 
           {/* Nav */}
           <nav className="flex-1 px-2 py-3 overflow-y-auto space-y-4">
-            {SECTIONS.map((section) => (
+            {(scannerOnly ? SCANNER_ONLY_SECTIONS : SECTIONS).map((section) => (
               <div key={section.id}>
                 <p className="px-3 mb-1 font-mono text-[9px] uppercase tracking-widest select-none" style={{ color: "rgba(255,255,255,0.15)" }}>
                   {section.label}
@@ -537,7 +555,7 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
             <div className="flex-1" />
 
             <div className="flex items-center gap-2">
-              {!isCreateEvent && (
+              {!isCreateEvent && !scannerOnly && (
                 <Link
                   href="/organizer/events/create"
                   className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-ui font-semibold text-[12px] transition-all"

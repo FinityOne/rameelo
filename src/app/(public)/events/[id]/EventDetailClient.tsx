@@ -11,6 +11,7 @@ import { GRADIENTS } from "@/app/organizer/events/create/types";
 type Artist = {
   id: string;
   name: string;
+  slug: string | null;
   tagline: string | null;
   bio: string | null;
   profile_image_url: string | null;
@@ -148,6 +149,12 @@ function stableRandom(eventId: string, salt: string, min: number, max: number): 
 function daysUntil(dateStr: string): number {
   const target = new Date(dateStr + "T00:00:00");
   return Math.max(0, Math.ceil((target.getTime() - Date.now()) / 86400000));
+}
+
+/** A multi-day event is "past" once its final day is before today (local). */
+function isEventPast(ev: { start_date: string; end_date: string | null }): boolean {
+  const lastDay = ev.end_date ?? ev.start_date;
+  return lastDay < new Date().toISOString().slice(0, 10);
 }
 
 /** Pick urgency state based on lowest fill-% across visible tiers */
@@ -547,6 +554,31 @@ function ArtistAvatar({ artist, size = 14 }: { artist: Artist; size?: number }) 
   );
 }
 
+// ── Artist card ───────────────────────────────────────────────────────────────
+// Links to the artist's profile page (works on upcoming AND past events).
+function ArtistCard({ artist }: { artist: Artist }) {
+  const body = (
+    <>
+      <ArtistAvatar artist={artist} size={14} />
+      <div className="flex-1 min-w-0">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-0.5">Performing Artist</p>
+        <p className="font-display font-bold text-ink text-base sm:text-lg group-hover:text-aubergine transition-colors">{artist.name}</p>
+        {artist.tagline && <p className="font-ui text-ink-muted text-sm truncate">{artist.tagline}</p>}
+      </div>
+      {artist.slug && (
+        <span className="hidden sm:flex items-center gap-1 text-xs font-semibold text-marigold-dark group-hover:text-marigold transition-colors shrink-0">
+          View profile
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+        </span>
+      )}
+    </>
+  );
+  const cls = "flex items-center gap-4 p-4 sm:p-5 rounded-2xl bg-white border border-ivory-200";
+  return artist.slug
+    ? <Link href={`/artists/${artist.slug}`} className={`${cls} group hover:border-aubergine/30 hover:shadow-sm transition-all`}>{body}</Link>
+    : <div className={`${cls} group`}>{body}</div>;
+}
+
 // ── Main component ────────────────────────────────────────────────────────────
 export default function EventDetailClient({ id }: { id: string }) {
   const router = useRouter();
@@ -601,7 +633,7 @@ export default function EventDetailClient({ id }: { id: string }) {
         cover_image_url, cover_gradient,
         dress_code, dress_code_details, dandiya_sticks, age_restriction, capacity, selling_on_rameelo,
         artist:artists!events_artist_id_fkey (
-          id, name, tagline, bio, profile_image_url, genres
+          id, name, slug, tagline, bio, profile_image_url, genres
         ),
         organization:organizations!events_org_id_fkey (
           id, name, description, logo_url, city, state, website, instagram, facebook
@@ -653,7 +685,7 @@ export default function EventDetailClient({ id }: { id: string }) {
 
   // Check all open group orders this logged-in user has started for this event
   useEffect(() => {
-    if (!event) return;
+    if (!event || isEventPast(event)) return;
     const supabase = createClient();
     supabase.auth.getUser().then(async ({ data: { user } }) => {
       if (!user) return;
@@ -677,9 +709,9 @@ export default function EventDetailClient({ id }: { id: string }) {
     });
   }, [event]);
 
-  // Browser-level navigate-away warning
+  // Browser-level navigate-away warning — only while there's a purchase to lose
   useEffect(() => {
-    if (!event) return;
+    if (!event || isEventPast(event)) return;
     const handler = (e: BeforeUnloadEvent) => { e.preventDefault(); e.returnValue = ""; };
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
@@ -795,6 +827,155 @@ export default function EventDetailClient({ id }: { id: string }) {
   }
 
   const totalSoldOut = event.ticket_tiers.every(t => t.quantity_sold >= t.quantity);
+
+  // ── PAST EVENT ── rich, indexable recap — keeps artist/org/details for SEO &
+  // context, but drops every CTA, form, and urgency mechanic. ───────────────────
+  if (isEventPast(event)) {
+    const endedDate = fmtDate(event.end_date ?? event.start_date);
+    const whenValue = event.end_date && event.end_date !== event.start_date
+      ? `${fmtDate(event.start_date)} – ${fmtDate(event.end_date)}`
+      : `${fmtDate(event.start_date)}${fmtTime(event.start_time) ? ` · ${fmtTime(event.start_time)}` : ""}`;
+    const recap: { label: string; value: string }[] = [
+      { label: "When", value: whenValue },
+      { label: "Where", value: [event.venue_name, event.city, event.state].filter(Boolean).join(", ") },
+      ...(event.artist ? [{ label: "Lineup", value: event.artist.name }] : []),
+      ...(event.organization ? [{ label: "Presented by", value: event.organization.name }] : []),
+    ];
+
+    return (
+      <div className="min-h-screen" style={{ backgroundColor: "#FCF9F2" }}>
+        {/* Hero — full-color, no live/urgency badges */}
+        <div
+          className="relative overflow-hidden"
+          style={{
+            height: "clamp(200px, 28vw, 340px)",
+            background: event.cover_image_url ? undefined : gradient?.css,
+            backgroundColor: event.cover_image_url ? undefined : "#2E1B30",
+          }}
+        >
+          {event.cover_image_url && (
+            <img src={event.cover_image_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
+          )}
+          <div className="absolute inset-0" style={{ background: "linear-gradient(to top, rgba(0,0,0,0.72) 0%, rgba(0,0,0,0.2) 60%, transparent 100%)" }} />
+
+          <div className="relative max-w-3xl mx-auto px-4 sm:px-6 pt-5">
+            <div className="flex items-center gap-2 text-white/60 text-xs font-mono">
+              <Link href="/events" className="hover:text-white transition-colors">Events</Link>
+              <span>/</span>
+              <span className="text-white/80 truncate max-w-xs">{event.title}</span>
+            </div>
+          </div>
+
+          <div className="absolute bottom-0 left-0 right-0">
+            <div className="max-w-3xl mx-auto px-4 sm:px-6 pb-6 pt-10">
+              <div className="flex flex-wrap items-center gap-2 mb-2">
+                <span className="font-mono text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-white/15 text-white backdrop-blur-sm">
+                  {CATEGORY_LABELS[event.category] ?? event.category}
+                </span>
+                <span className="font-mono text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-black/40 text-white/90 backdrop-blur-sm">
+                  Event Ended
+                </span>
+              </div>
+              <h1 className="font-display text-xl sm:text-3xl md:text-4xl font-bold text-white leading-tight mb-2">
+                {event.title}
+              </h1>
+              <div className="flex flex-wrap items-center gap-3 sm:gap-5 text-white/70 text-xs sm:text-sm font-ui">
+                <span className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                  {fmtDate(event.start_date)}
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  {event.venue_name}, {event.city}, {event.state}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-5">
+          {/* Ended notice */}
+          <div className="rounded-2xl bg-white border border-ivory-200 p-5 flex items-start gap-4">
+            <div className="w-11 h-11 rounded-xl bg-ivory flex items-center justify-center shrink-0 text-ink-muted">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            </div>
+            <div className="min-w-0">
+              <p className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.015em" }}>This event has ended</p>
+              <p className="font-ui text-sm text-ink-muted mt-0.5">
+                {event.title} took place on {endedDate}. Tickets and registration are closed.
+              </p>
+            </div>
+          </div>
+
+          {/* Artist — clickable to profile (kept for context & indexing) */}
+          {event.artist && <ArtistCard artist={event.artist} />}
+
+          {/* Presented by */}
+          {event.organization && (
+            <div className="flex items-center gap-4 p-4 sm:p-5 rounded-2xl bg-white border border-ivory-200">
+              <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-aubergine/10 text-aubergine font-bold text-lg">
+                {event.organization.logo_url
+                  ? <img src={event.organization.logo_url} alt={event.organization.name} className="w-full h-full object-cover" />
+                  : event.organization.name.charAt(0)}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-0.5">Presented by</p>
+                <p className="font-display font-bold text-ink text-base">{event.organization.name}</p>
+                {(event.organization.city || event.organization.state) && (
+                  <p className="font-ui text-ink-muted text-xs">
+                    {[event.organization.city, event.organization.state].filter(Boolean).join(", ")}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Description */}
+          {event.description && (
+            <div className="rounded-2xl bg-white border border-ivory-200 p-4 sm:p-6">
+              <h2 className="font-display font-bold text-ink text-lg mb-3">About this event</h2>
+              <p className="font-ui text-ink-muted leading-relaxed text-sm sm:text-base">{event.description}</p>
+            </div>
+          )}
+
+          {/* Recap facts */}
+          <div className="rounded-2xl bg-white border border-ivory-200 divide-y divide-ivory-200">
+            {recap.map(r => (
+              <div key={r.label} className="flex items-start gap-4 px-5 py-3.5">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted shrink-0 w-28 pt-0.5">{r.label}</span>
+                <span className="font-ui text-sm text-ink">{r.value}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Venue (text + maps link — no heavy embed) */}
+          <div className="rounded-2xl bg-white border border-ivory-200 p-4 sm:p-6">
+            <h2 className="font-display font-bold text-ink text-lg mb-3">Venue</h2>
+            <p className="font-ui font-semibold text-ink">{event.venue_name}</p>
+            <p className="font-ui text-ink-muted text-sm">{event.address_line1}{event.city ? `, ${event.city}` : ""}, {event.state}{event.zip ? ` ${event.zip}` : ""}</p>
+            <a
+              href={`https://maps.google.com/?q=${encodeURIComponent(`${event.venue_name} ${event.address_line1} ${event.city} ${event.state}`)}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 mt-3 text-xs font-semibold text-marigold-dark hover:text-marigold transition-colors"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /></svg>
+              Open in Google Maps →
+            </a>
+          </div>
+
+          {/* Browse upcoming — navigation, not a sales CTA */}
+          <div className="text-center pt-1">
+            <Link href="/events" className="inline-flex items-center gap-1.5 font-ui font-semibold text-sm text-marigold-dark hover:text-marigold transition-colors">
+              Explore upcoming events
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            </Link>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FCF9F2" }}>
@@ -928,19 +1109,7 @@ export default function EventDetailClient({ id }: { id: string }) {
             </div>
 
             {/* Artist card */}
-            {event.artist && (
-              <div className="flex items-center gap-4 p-4 sm:p-5 rounded-2xl bg-white border border-ivory-200">
-                <ArtistAvatar artist={event.artist} size={14} />
-                <div className="flex-1 min-w-0">
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-0.5">Performing Artist</p>
-                  <p className="font-display font-bold text-ink text-base sm:text-lg">{event.artist.name}</p>
-                  {event.artist.tagline && <p className="font-ui text-ink-muted text-sm truncate">{event.artist.tagline}</p>}
-                </div>
-                <Link href={`/events?artist=${encodeURIComponent(event.artist.name)}`} className="hidden sm:block text-xs font-semibold text-marigold-dark hover:text-marigold transition-colors shrink-0">
-                  All events →
-                </Link>
-              </div>
-            )}
+            {event.artist && <ArtistCard artist={event.artist} />}
 
             {/* Presenting Organization */}
             {event.organization && (

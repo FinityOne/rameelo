@@ -197,6 +197,7 @@ export default function EventOrdersPage() {
       supabase.from("orders")
         .select("id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_amount, service_fee, grand_total, status, created_at, group_id, cancellation_reason, cancelled_at, ticket_tiers(name)")
         .eq("event_id", id)
+        .eq("is_test", false)
         .order("created_at", { ascending: false }),
     ]);
 

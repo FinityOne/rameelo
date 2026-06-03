@@ -84,6 +84,17 @@ function fmt12(t: string) {
   return `${h % 12 || 12}:${String(m).padStart(2, '0')} ${h >= 12 ? 'PM' : 'AM'}`;
 }
 
+// An event keeps showing in the upcoming list until 2 full days after it ends —
+// then it rolls into "Past events". (lastDay = end date for multi-day events.)
+const PAST_GRACE_DAYS = 2;
+function isPastEvent(lastDay: string): boolean {
+  const cutoff = new Date(lastDay + 'T00:00:00');
+  cutoff.setDate(cutoff.getDate() + PAST_GRACE_DAYS);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return today.getTime() > cutoff.getTime();
+}
+
 function ArtistAvatar({ name, photo, size = 28 }: { name: string; photo: string | null; size?: number }) {
   const initials = name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase();
   if (photo) return <img src={photo} alt={name} className="rounded-full object-cover shrink-0" style={{ width: size, height: size }} />;
@@ -95,7 +106,7 @@ function ArtistAvatar({ name, photo, size = 28 }: { name: string; photo: string 
   );
 }
 
-function EventCard({ event }: { event: EventVM }) {
+function EventCard({ event, isPast = false }: { event: EventVM; isPast?: boolean }) {
   const gradient = event.gradient;
 
   return (
@@ -112,7 +123,12 @@ function EventCard({ event }: { event: EventVM }) {
             style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(4px)' }}>
             {CATEGORY_LABELS[event.category] ?? event.category}
           </span>
-          {event.navratriNights.length > 1 && (
+          {isPast ? (
+            <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full text-white/85"
+              style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}>
+              Ended
+            </span>
+          ) : event.navratriNights.length > 1 && (
             <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full text-white/80"
               style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
               {event.navratriNights.length}-Night Event
@@ -177,7 +193,7 @@ function EventCard({ event }: { event: EventVM }) {
                 {event.maxPrice !== null && event.maxPrice > event.minPrice && (
                   <span className="text-ink-muted text-xs">– ${event.maxPrice}</span>
                 )}
-                {!event.sellingOnRameelo && (
+                {!isPast && !event.sellingOnRameelo && (
                   <span className="font-mono text-[8px] uppercase tracking-widest bg-marigold/20 text-marigold-dark px-1.5 py-0.5 rounded-full ml-1">Soon</span>
                 )}
               </div>
@@ -185,9 +201,13 @@ function EventCard({ event }: { event: EventVM }) {
           </div>
           <Link
             href={`/events/${event.id}`}
-            className="px-3.5 py-2 rounded-xl text-xs font-semibold transition-all bg-marigold text-aubergine hover:bg-[#d4891b]"
+            className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
+              isPast
+                ? 'bg-ivory text-ink-muted border border-ivory-200 hover:border-aubergine/30 hover:text-aubergine'
+                : 'bg-marigold text-aubergine hover:bg-[#d4891b]'
+            }`}
           >
-            {event.sellingOnRameelo ? "Get Tickets" : "Get Early Access"}
+            {isPast ? "View event" : event.sellingOnRameelo ? "Get Tickets" : "Get Early Access"}
           </Link>
         </div>
       </div>
@@ -204,6 +224,7 @@ export default function EventsPage() {
   const [activeCategory, setActiveCategory] = useState('All');
   const [activeCity, setActiveCity]       = useState('All Cities');
   const [sort, setSort]                   = useState('Date: Soonest');
+  const [view, setView]                   = useState<'upcoming' | 'past'>('upcoming');
   const [showAll, setShowAll]             = useState(false);
   const [openPanel, setOpenPanel]         = useState<Panel>(null);
   const [geoCity, setGeoCity]             = useState<string | null>(null);
@@ -308,11 +329,24 @@ export default function EventsPage() {
     if (matched?.city && activeCity === 'All Cities') setActiveCity(matched.city);
   }, [geoCity, events]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Split into upcoming vs past using the 2-day grace rule
+  const { upcoming, past } = useMemo(() => {
+    const up: EventVM[] = [];
+    const pa: EventVM[] = [];
+    for (const e of events) {
+      (isPastEvent(e.endDate ?? e.date) ? pa : up).push(e);
+    }
+    return { upcoming: up, past: pa };
+  }, [events]);
+
+  const base = view === 'past' ? past : upcoming;
+
+  // Filter options derive from all events so the picker stays stable across views
   const categories = ['All', ...Array.from(new Set(events.map(e => CATEGORY_LABELS[e.category] ?? e.category))).sort()];
   const cities = ['All Cities', ...Array.from(new Set(events.map(e => e.city).filter((c): c is string => !!c))).sort()];
 
   const filtered = useMemo(() => {
-    let result = [...events];
+    let result = [...base];
     if (activeCategory !== 'All') result = result.filter(e => (CATEGORY_LABELS[e.category] ?? e.category) === activeCategory);
     if (activeCity !== 'All Cities') result = result.filter(e => e.city === activeCity);
     if (search.trim()) {
@@ -325,15 +359,18 @@ export default function EventsPage() {
       );
     }
     result.sort((a, b) => {
-      const selling = (b.sellingOnRameelo ? 1 : 0) - (a.sellingOnRameelo ? 1 : 0);
-      if (selling !== 0) return selling;
-      if (sort === 'Date: Soonest') return a.date.localeCompare(b.date);
+      // Upcoming surfaces live-selling events first; past doesn't.
+      if (view !== 'past') {
+        const selling = (b.sellingOnRameelo ? 1 : 0) - (a.sellingOnRameelo ? 1 : 0);
+        if (selling !== 0) return selling;
+      }
       if (sort === 'Price: Low to High') return (a.minPrice ?? 0) - (b.minPrice ?? 0);
       if (sort === 'Price: High to Low') return (b.minPrice ?? 0) - (a.minPrice ?? 0);
-      return 0;
+      // Date: upcoming = soonest first, past = most recent first
+      return view === 'past' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date);
     });
     return result;
-  }, [events, activeCategory, activeCity, search, sort]);
+  }, [base, view, activeCategory, activeCity, search, sort]);
 
   const displayed = showAll ? filtered : filtered.slice(0, 24);
 
@@ -357,7 +394,7 @@ export default function EventsPage() {
           style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, #F5A623 0%, transparent 60%), radial-gradient(circle at 80% 20%, #1E3A7A 0%, transparent 50%)' }} />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-14 pb-10">
           <p className="font-mono text-marigold text-xs font-bold uppercase tracking-widest mb-4">
-            Navratri 2026 · {events.length} Event{events.length !== 1 ? 's' : ''} Nationwide
+            Navratri 2026 · {upcoming.length} Event{upcoming.length !== 1 ? 's' : ''} Nationwide
           </p>
           <h1 className="font-display text-4xl md:text-5xl font-bold text-white leading-tight mb-4 max-w-3xl">
             Find Your <span className="text-marigold">Garba.</span>
@@ -528,8 +565,8 @@ export default function EventsPage() {
           {!loading && (
             <div className="flex flex-wrap gap-6 mt-8 pt-8 border-t border-white/10">
               {[
-                { label: 'Live Events', value: String(events.length) },
-                { label: 'Cities', value: String(new Set(events.map(e => e.city)).size) },
+                { label: 'Live Events', value: String(upcoming.length) },
+                { label: 'Cities', value: String(new Set(upcoming.map(e => e.city)).size) },
                 { label: 'Nights of Garba', value: '9' },
               ].map(s => (
                 <div key={s.label}>
@@ -585,27 +622,71 @@ export default function EventsPage() {
           </div>
         ) : (
           <>
-            <div className="flex items-center gap-2 mb-6 flex-wrap">
+            <div className="flex items-center justify-between gap-3 mb-6 flex-wrap">
               <p className="font-ui text-sm text-ink">
                 <span className="font-bold">{filtered.length}</span>
-                <span className="text-ink-muted"> event{filtered.length !== 1 ? 's' : ''}</span>
+                <span className="text-ink-muted"> {view === 'past' ? 'past ' : ''}event{filtered.length !== 1 ? 's' : ''}</span>
                 {activeCity !== 'All Cities' && <span className="text-ink-muted"> in {activeCity}</span>}
               </p>
+
+              {/* Upcoming / Past toggle — only when past events exist */}
+              {past.length > 0 && (
+                <div className="flex items-center gap-0.5 bg-ivory border border-ivory-200 rounded-full p-0.5 shrink-0">
+                  {([['upcoming', 'Upcoming', upcoming.length], ['past', 'Past', past.length]] as const).map(([v, label, count]) => (
+                    <button key={v} type="button"
+                      onClick={() => { setView(v); setShowAll(false); }}
+                      className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-semibold transition-all ${
+                        view === v ? 'bg-white text-aubergine shadow-sm' : 'text-ink-muted hover:text-ink'
+                      }`}>
+                      {label}
+                      <span className={`font-mono text-[9px] px-1.5 py-0.5 rounded-full ${view === v ? 'bg-marigold/20 text-marigold-dark' : 'bg-ivory-200 text-ink-muted'}`}>
+                        {count}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {filtered.length === 0 ? (
               <div className="text-center py-24">
-                <p className="font-display text-2xl font-bold text-ink mb-2">No events found</p>
-                <p className="font-ui text-ink-muted text-sm mb-6">Try adjusting your filters.</p>
-                <button onClick={() => { setSearch(''); setActiveCategory('All'); setActiveCity('All Cities'); }}
-                  className="px-6 py-3 rounded-2xl bg-marigold text-aubergine font-semibold text-sm hover:bg-[#d4891b] transition-colors">
-                  Clear all filters
-                </button>
+                {view === 'past' ? (
+                  <>
+                    <p className="font-display text-2xl font-bold text-ink mb-2">No past events</p>
+                    <p className="font-ui text-ink-muted text-sm mb-6">Nothing matches here yet.</p>
+                    <button onClick={() => { setView('upcoming'); setShowAll(false); }}
+                      className="px-6 py-3 rounded-2xl bg-marigold text-aubergine font-semibold text-sm hover:bg-[#d4891b] transition-colors">
+                      Back to upcoming events
+                    </button>
+                  </>
+                ) : upcoming.length === 0 ? (
+                  <>
+                    <p className="font-display text-2xl font-bold text-ink mb-2">No upcoming events right now</p>
+                    <p className="font-ui text-ink-muted text-sm mb-6">
+                      {past.length > 0 ? 'Check back soon for new dates — or look back at past events.' : 'Check back soon for new dates.'}
+                    </p>
+                    {past.length > 0 && (
+                      <button onClick={() => { setView('past'); setShowAll(false); }}
+                        className="px-6 py-3 rounded-2xl bg-marigold text-aubergine font-semibold text-sm hover:bg-[#d4891b] transition-colors">
+                        View past events
+                      </button>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <p className="font-display text-2xl font-bold text-ink mb-2">No events found</p>
+                    <p className="font-ui text-ink-muted text-sm mb-6">Try adjusting your filters.</p>
+                    <button onClick={() => { setSearch(''); setActiveCategory('All'); setActiveCity('All Cities'); }}
+                      className="px-6 py-3 rounded-2xl bg-marigold text-aubergine font-semibold text-sm hover:bg-[#d4891b] transition-colors">
+                      Clear all filters
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-                  {displayed.map(ev => <EventCard key={ev.id} event={ev} />)}
+                  {displayed.map(ev => <EventCard key={ev.id} event={ev} isPast={view === 'past'} />)}
                 </div>
 
                 {filtered.length > 24 && !showAll && (
