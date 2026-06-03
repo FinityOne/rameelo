@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -13,12 +13,35 @@ type Event = {
   category: string;
   artist: string | null;
   start_date: string;
+  end_date: string | null;
   city: string;
   state: string;
   status: string;
   cover_image_url: string | null;
   cover_gradient: string;
   created_at: string;
+};
+
+type Bucket = "active" | "draft" | "past";
+
+// Active = live/in-review & upcoming · Draft = draft/rejected & upcoming · Past = date passed or cancelled
+function bucketOf(e: Event, today: string): Bucket {
+  const lastDay = e.end_date ?? e.start_date;
+  if (e.status === "cancelled" || lastDay < today) return "past";
+  if (e.status === "draft" || e.status === "rejected") return "draft";
+  return "active";
+}
+
+const TABS: { key: Bucket; label: string }[] = [
+  { key: "active", label: "Active" },
+  { key: "draft",  label: "Drafts" },
+  { key: "past",   label: "Past" },
+];
+
+const EMPTY_COPY: Record<Bucket, { icon: string; title: string; body: string }> = {
+  active: { icon: "🎉", title: "No active events", body: "Published, upcoming events show here. Create one or publish a draft." },
+  draft:  { icon: "📝", title: "No drafts", body: "Events you're still building (or that need changes) live here." },
+  past:   { icon: "📦", title: "No past events", body: "Wrapped-up and cancelled events are archived here." },
 };
 
 const STATUS_STYLES: Record<string, { label: string; cls: string }> = {
@@ -38,6 +61,7 @@ export default function OrganizerEventsPage() {
   const { activeOrg } = useOrg();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<Bucket>("active");
 
   useEffect(() => {
     setLoading(true);
@@ -47,8 +71,8 @@ export default function OrganizerEventsPage() {
       if (!user) return;
       const q = supabase
         .from('events')
-        .select('id, title, category, artist, start_date, city, state, status, cover_image_url, cover_gradient, created_at')
-        .order('created_at', { ascending: false });
+        .select('id, title, category, artist, start_date, end_date, city, state, status, cover_image_url, cover_gradient, created_at')
+        .order('start_date', { ascending: false });
       const { data } = await (activeOrg
         ? q.eq('org_id', activeOrg.id)
         : q.eq('organizer_id', user.id));
@@ -58,12 +82,25 @@ export default function OrganizerEventsPage() {
     load();
   }, [activeOrg]);
 
+  const today = new Date().toISOString().slice(0, 10);
+  const counts = useMemo(() => {
+    const c: Record<Bucket, number> = { active: 0, draft: 0, past: 0 };
+    for (const e of events) c[bucketOf(e, today)]++;
+    return c;
+  }, [events, today]);
+
+  // Active/Drafts soonest-first; Past most-recent-first
+  const visible = useMemo(() => {
+    const list = events.filter(e => bucketOf(e, today) === tab);
+    return list.sort((a, b) => tab === "past" ? b.start_date.localeCompare(a.start_date) : a.start_date.localeCompare(b.start_date));
+  }, [events, tab, today]);
+
   return (
     <div className="space-y-5">
       {/* Header */}
       <div className="flex items-center justify-between gap-4">
         <div>
-          <h2 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: '-0.02em' }}>My Events</h2>
+          <h2 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: '-0.02em' }}>Events</h2>
           {!loading && <p className="font-ui text-ink-muted text-sm mt-0.5">{events.length} event{events.length !== 1 ? 's' : ''}</p>}
         </div>
         <Link
@@ -75,12 +112,31 @@ export default function OrganizerEventsPage() {
         </Link>
       </div>
 
+      {/* Active / Drafts / Past tabs */}
+      {!loading && events.length > 0 && (
+        <div className="flex gap-1 bg-ivory rounded-2xl p-1 w-fit border border-ivory-200">
+          {TABS.map(t => (
+            <button key={t.key} type="button" onClick={() => setTab(t.key)}
+              className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl font-ui font-semibold text-sm transition-all ${
+                tab === t.key ? 'bg-white text-ink shadow-sm border border-ivory-200' : 'text-ink-muted hover:text-ink'
+              }`}>
+              {t.label}
+              {counts[t.key] > 0 && (
+                <span className={`text-[9px] font-bold font-mono px-1.5 py-0.5 rounded-full ${tab === t.key ? 'bg-marigold/20 text-marigold-dark' : 'bg-ivory-200 text-ink-muted'}`}>
+                  {counts[t.key]}
+                </span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="w-8 h-8 rounded-full border-4 border-ivory-200 border-t-marigold animate-spin" />
         </div>
       ) : events.length === 0 ? (
-        /* Empty state */
+        /* First-run empty state */
         <div className="bg-white rounded-2xl border-2 border-dashed border-ivory-200 p-16 text-center">
           <div className="w-16 h-16 rounded-2xl bg-marigold/10 border border-marigold/20 flex items-center justify-center mx-auto mb-4 text-3xl">🎉</div>
           <p className="font-display font-semibold text-ink text-xl mb-2" style={{ letterSpacing: '-0.015em' }}>Create your first event</p>
@@ -90,10 +146,17 @@ export default function OrganizerEventsPage() {
             Get started →
           </Link>
         </div>
+      ) : visible.length === 0 ? (
+        /* Empty for the selected tab */
+        <div className="bg-white rounded-2xl border-2 border-dashed border-ivory-200 p-14 text-center">
+          <div className="text-3xl mb-3">{EMPTY_COPY[tab].icon}</div>
+          <p className="font-display font-semibold text-ink text-lg mb-1" style={{ letterSpacing: '-0.015em' }}>{EMPTY_COPY[tab].title}</p>
+          <p className="font-ui text-ink-muted text-sm max-w-xs mx-auto">{EMPTY_COPY[tab].body}</p>
+        </div>
       ) : (
         /* Events grid */
         <div className="space-y-3">
-          {events.map(ev => {
+          {visible.map(ev => {
             const gradient = GRADIENTS.find(g => g.id === ev.cover_gradient) ?? GRADIENTS[0];
             const status = STATUS_STYLES[ev.status] ?? STATUS_STYLES.draft;
             return (

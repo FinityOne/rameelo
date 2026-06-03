@@ -364,9 +364,9 @@ export default function OrganizerHubPage() {
           {/* Quick actions */}
           <div className="grid grid-cols-2 gap-2">
             {[
-              { href: "/organizer/financials", label: "Earnings",   emoji: "💰" },
-              { href: "/organizer/payouts",    label: "Payouts",    emoji: "🏦" },
+              { href: "/organizer/financials", label: "Earnings & Payouts", emoji: "💰" },
               { href: "/organizer/tickets",    label: "Orders",     emoji: "🧾" },
+              { href: "/organizer/customers",  label: "Customers",  emoji: "👥" },
               { href: "/organizer/organization", label: "Org Setup", emoji: "🏢" },
             ].map((a) => (
               <Link key={a.href} href={a.href}

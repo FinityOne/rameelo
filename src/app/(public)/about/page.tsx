@@ -26,28 +26,25 @@ export const metadata: Metadata = {
 
 const team = [
   {
-    name: "Arjun Mehta",
-    role: "Co-Founder & CEO",
-    bio: "Born in Ahmedabad, raised in New Jersey. Built Rameelo because he missed the community after moving to San Francisco.",
-    avatar: "AM",
+    name: "Heran Patel",
+    role: "Co-Founder",
+    location: "Los Angeles, CA",
+    bio: "A lifelong garba dancer from Los Angeles, building Rameelo so every Navratri night is easy to find and never sold out from under you.",
+    avatar: "HP",
   },
   {
-    name: "Priya Kothari",
-    role: "Co-Founder & CPO",
-    bio: "Former event organizer who ran the largest Navratri in New England. Obsessed with building tools that help organizers succeed.",
-    avatar: "PK",
+    name: "Suchit Desai",
+    role: "Co-Founder",
+    location: "New Jersey",
+    bio: "From the heart of the New Jersey garba scene — focused on giving organizers the tools and respect they deserve.",
+    avatar: "SD",
   },
   {
-    name: "Dev Patel",
-    role: "Head of Engineering",
-    bio: "Full-stack engineer and avid Garba dancer. Believes technology should be invisible — culture should take center stage.",
-    avatar: "DP",
-  },
-  {
-    name: "Nisha Shah",
-    role: "Head of Community",
-    bio: "Community builder who has connected thousands of South Asians across 30+ US cities. Her superpower is making everyone feel at home.",
-    avatar: "NS",
+    name: "Bhrugesh Desai",
+    role: "Co-Founder",
+    location: "Los Angeles, CA",
+    bio: "Los Angeles–raised and obsessed with the details, making sure the Rameelo experience feels as warm as the dance floor.",
+    avatar: "BD",
   },
 ];
 
@@ -178,10 +175,10 @@ export default async function AboutPage() {
       <section className="bg-cream-surface py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <p className="text-gold-dark text-xs font-bold uppercase tracking-widest mb-3">The People</p>
-            <h2 className="text-3xl md:text-4xl font-bold text-ink tracking-tight">Meet the Team</h2>
+            <p className="text-gold-dark text-xs font-bold uppercase tracking-widest mb-3">The Founders</p>
+            <h2 className="text-3xl md:text-4xl font-bold text-ink tracking-tight">Meet the Founders</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
             {team.map((member) => (
               <div
                 key={member.name}
@@ -194,7 +191,11 @@ export default async function AboutPage() {
                   {member.avatar}
                 </div>
                 <h3 className="font-bold text-ink tracking-tight">{member.name}</h3>
-                <p className="text-brand text-sm font-medium mb-3">{member.role}</p>
+                <p className="text-brand text-sm font-medium">{member.role}</p>
+                <p className="text-ink-muted/70 text-xs font-medium mb-3 inline-flex items-center gap-1 justify-center">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                  {member.location}
+                </p>
                 <p className="text-ink-muted text-sm leading-relaxed">{member.bio}</p>
               </div>
             ))}

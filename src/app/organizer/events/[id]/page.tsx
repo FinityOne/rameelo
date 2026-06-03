@@ -21,11 +21,21 @@ type EventData = {
   title: string;
   category: string;
   artist: string | null;
+  description: string | null;
   start_date: string;
   end_date: string | null;
+  start_time: string | null;
+  end_time: string | null;
+  doors_open_time: string | null;
+  is_multi_day: boolean;
+  venue_name: string | null;
+  address_line1: string | null;
+  address_line2: string | null;
   city: string;
   state: string;
+  zip: string | null;
   status: string;
+  selling_on_rameelo: boolean;
   review_note: string | null;
   cover_image_url: string | null;
   cover_gradient: string;
@@ -79,6 +89,29 @@ function timeAgo(d: string) {
 
 function daysUntil(dateStr: string) {
   return Math.ceil((new Date(dateStr + "T00:00:00").getTime() - Date.now()) / 86400000);
+}
+
+// Date-only string (YYYY-MM-DD) without timezone drift
+function fmtDay(d: string) {
+  return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+}
+function fmt12(t: string | null) {
+  if (!t) return null;
+  const [h, m] = t.split(":").map(Number);
+  return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h >= 12 ? "PM" : "AM"}`;
+}
+
+const CATEGORY_LABELS: Record<string, string> = {
+  garba: "Garba", dandiya: "Dandiya", raas: "Raas", workshop: "Workshop", community: "Community", other: "Other",
+};
+
+function Field({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-1.5 border-b border-ivory-200 last:border-0">
+      <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted shrink-0 pt-0.5">{label}</span>
+      <span className="font-ui text-sm text-ink text-right min-w-0">{value}</span>
+    </div>
+  );
 }
 
 // ─── Status configs ────────────────────────────────────────────────────────────
@@ -152,7 +185,7 @@ export default function EventDashboardPage() {
       const [evRes, ordRes, grpRes] = await Promise.all([
         supabase
           .from("events")
-          .select("id, title, category, artist, start_date, end_date, city, state, status, review_note, cover_image_url, cover_gradient, capacity, ticket_tiers(id, name, price, quantity, quantity_sold)")
+          .select("id, title, category, artist, description, start_date, end_date, start_time, end_time, doors_open_time, is_multi_day, venue_name, address_line1, address_line2, city, state, zip, status, selling_on_rameelo, review_note, cover_image_url, cover_gradient, capacity, ticket_tiers(id, name, price, quantity, quantity_sold)")
           .eq("id", id)
           .eq("organizer_id", user.id)
           .single(),
@@ -224,7 +257,7 @@ export default function EventDashboardPage() {
             <Link href="/organizer/events"
               className="font-ui text-xs text-ink-muted hover:text-ink flex items-center gap-1 transition-colors">
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-              My Events
+              Events
             </Link>
             <span className="text-ink-muted/40 text-xs">/</span>
             <span className="font-ui text-xs text-ink truncate max-w-[220px]">{ev.title}</span>
@@ -275,6 +308,98 @@ export default function EventDashboardPage() {
           )}
         </div>
       )}
+
+      {/* ── Overview: Event Information · Venue · Capacity · Visibility ── */}
+      <div className="space-y-3">
+        <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted px-1">Overview</p>
+
+        <div className="grid lg:grid-cols-2 gap-4">
+          {/* Event Information */}
+          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+            <div className="px-5 py-3 bg-ivory border-b border-ivory-200 flex items-center justify-between">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Event Information</p>
+              <Link href={`/organizer/events/${id}/edit`} className="font-ui text-xs font-semibold text-aubergine hover:underline">Edit</Link>
+            </div>
+            <div className="px-5 py-3">
+              <Field label="Type" value={CATEGORY_LABELS[ev.category] ?? ev.category} />
+              {ev.artist && <Field label="Artist" value={ev.artist} />}
+              <Field label="Date" value={ev.is_multi_day && ev.end_date && ev.end_date !== ev.start_date ? `${fmtDay(ev.start_date)} – ${fmtDay(ev.end_date)}` : fmtDay(ev.start_date)} />
+              <Field label="Time" value={[ev.doors_open_time && `Doors ${fmt12(ev.doors_open_time)}`, fmt12(ev.start_time) && `Start ${fmt12(ev.start_time)}`, ev.end_time && `Ends ${fmt12(ev.end_time)}`].filter(Boolean).join(" · ") || "Time TBA"} />
+              {ev.description && <Field label="About" value={<span className="line-clamp-3 text-left">{ev.description}</span>} />}
+            </div>
+          </div>
+
+          {/* Venue */}
+          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+            <div className="px-5 py-3 bg-ivory border-b border-ivory-200 flex items-center justify-between">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Venue</p>
+              <Link href={`/organizer/events/${id}/edit`} className="font-ui text-xs font-semibold text-aubergine hover:underline">Edit</Link>
+            </div>
+            <div className="px-5 py-3">
+              <Field label="Venue" value={ev.venue_name || <span className="text-ink-muted">Not set</span>} />
+              {[ev.address_line1, ev.address_line2].filter(Boolean).length > 0 && (
+                <Field label="Address" value={[ev.address_line1, ev.address_line2].filter(Boolean).join(", ")} />
+              )}
+              <Field label="City" value={`${ev.city}, ${ev.state}${ev.zip ? ` ${ev.zip}` : ""}`} />
+              {ev.venue_name && (
+                <div className="pt-2">
+                  <a
+                    href={`https://maps.google.com/?q=${encodeURIComponent([ev.venue_name, ev.address_line1, ev.city, ev.state].filter(Boolean).join(" "))}`}
+                    target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 font-ui text-xs font-semibold text-aubergine hover:underline"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                    Open in Maps
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        <div className="grid lg:grid-cols-2 gap-4">
+          {/* Capacity */}
+          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+            <div className="px-5 py-3 bg-ivory border-b border-ivory-200">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Capacity</p>
+            </div>
+            <div className="px-5 py-3">
+              <Field label="Venue capacity" value={ev.capacity ? `${ev.capacity.toLocaleString()} attendees` : <span className="text-ink-muted">Not set</span>} />
+              <Field label="Ticket inventory" value={`${totalCap.toLocaleString()} ticket${totalCap !== 1 ? "s" : ""}`} />
+              <Field label="Sold" value={`${totalSold.toLocaleString()} (${Math.round(fillPct)}%)`} />
+              <Field label="Remaining" value={`${Math.max(0, totalCap - totalSold).toLocaleString()}`} />
+              {totalCap > 0 && (
+                <div className="pt-2.5">
+                  <div className="relative h-2 rounded-full overflow-hidden" style={{ backgroundColor: "#EBE6DB" }}>
+                    <div className="absolute inset-y-0 left-0 rounded-full" style={{ width: `${Math.min(100, fillPct)}%`, backgroundColor: fillColor, minWidth: totalSold > 0 ? 4 : 0 }} />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Visibility Status */}
+          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+            <div className="px-5 py-3 bg-ivory border-b border-ivory-200">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Visibility Status</p>
+            </div>
+            <div className="px-5 py-3">
+              <Field label="Status" value={<span className={`font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${statusMeta.pillCls}`}>{statusMeta.label}</span>} />
+              <Field label="Public listing" value={ev.status === "published" ? "Visible to everyone" : ev.status === "cancelled" ? "Removed from listing" : "Hidden from public"} />
+              <Field label="Ticketing" value={ev.selling_on_rameelo ? "Selling on Rameelo" : "Interest collection only"} />
+              {ev.status === "published" && (
+                <div className="pt-2">
+                  <a href={`/events/${id}`} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 font-ui text-xs font-semibold text-aubergine hover:underline">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                    View public page
+                  </a>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ── KPI strip ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
@@ -469,9 +594,9 @@ export default function EventDashboardPage() {
         <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
           <div className="px-5 py-4 border-b border-ivory-200 flex items-center justify-between">
             <div>
-              <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Ticket Tiers</p>
+              <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Tickets</p>
               <p className="font-display font-semibold text-ink text-base mt-0.5" style={{ letterSpacing: "-0.015em" }}>
-                Performance by tier
+                Types · Pricing · Inventory · Sales
               </p>
             </div>
             <Link
