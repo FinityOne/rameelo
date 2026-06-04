@@ -289,9 +289,13 @@ export async function saveOrder(params: {
   paymentMethod: "card" | "ach";
   grandTotal: number;
   isTest?: boolean;
+  purchaseIp?: string | null;
+  termsVersion?: string | null;
+  termsAcceptedIp?: string | null;
 }): Promise<{ orderId: string | null; error: string | null }> {
   const supabase = createClient();
 
+  const nowIso = new Date().toISOString();
   const { data, error } = await supabase
     .from("orders")
     .insert({
@@ -313,6 +317,12 @@ export async function saveOrder(params: {
       grand_total: params.grandTotal,
       is_test: params.isTest ?? false,
       status: "confirmed",
+      // Dispute-evidence: IP + terms acceptance captured at checkout
+      purchase_ip: params.purchaseIp ?? null,
+      terms_version: params.termsVersion ?? null,
+      terms_accepted_at: params.termsVersion ? nowIso : null,
+      terms_accepted_ip: params.termsAcceptedIp ?? params.purchaseIp ?? null,
+      confirmation_email_sent_at: nowIso,
     })
     .select("id")
     .single();

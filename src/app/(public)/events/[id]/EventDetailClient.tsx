@@ -1620,6 +1620,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                     <p className="text-center font-mono text-[10px] text-ink-muted">
                       Secure checkout · No hidden fees · Instant e-tickets
                     </p>
+                    <p className="text-center font-ui text-[10px] text-ink-muted/70 -mt-1">All sales are final · no refunds except event cancellation</p>
                   </div>
                 )}
 

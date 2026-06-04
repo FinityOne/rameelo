@@ -42,6 +42,9 @@ export async function GET(
     return NextResponse.json({ error: "Order not found" }, { status: 404 });
   }
 
+  // Record Apple Wallet pass generation (dispute evidence) — best effort
+  await supabase.rpc("mark_wallet_generated", { p_order_id: orderId });
+
   const raw = data as unknown as {
     id: string; buyer_name: string; buyer_email: string; qty: number;
     unit_price: number; grand_total: number; status: string; created_at: string;

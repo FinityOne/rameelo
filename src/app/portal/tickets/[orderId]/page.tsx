@@ -111,6 +111,9 @@ export default function ReceiptPage() {
         tier: raw.ticket_tiers,
       });
       setLoading(false);
+
+      // Record ticket-view activity (dispute evidence) — best effort
+      supabase.rpc("mark_ticket_viewed", { p_order_id: orderId }).then(() => {});
     }
     load();
   }, [orderId, router]);

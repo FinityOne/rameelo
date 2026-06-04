@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { saveOrder, markMemberPaid } from "@/lib/group-orders";
+import { TERMS_VERSION, TERMS_SUMMARY, TERMS_TEXT, NO_REFUND_NOTICE } from "@/lib/terms";
 
 interface CheckoutPayload {
   eventId: string;
@@ -107,6 +108,14 @@ export default function CheckoutPage() {
   const [accountType, setAccountType]     = useState<"checking" | "savings">("checking");
   const [accountName, setAccountName]     = useState("");
 
+  // Terms acceptance + IP (for dispute evidence)
+  const [agreedTerms, setAgreedTerms] = useState(false);
+  const [showTerms, setShowTerms]     = useState(false);
+  const [clientIp, setClientIp]       = useState<string | null>(null);
+  useEffect(() => {
+    fetch("https://api.ipify.org?format=json").then(r => r.json()).then((d: { ip?: string }) => setClientIp(d.ip ?? null)).catch(() => {});
+  }, []);
+
   useEffect(() => {
     try {
       const raw = localStorage.getItem("rameelo_checkout");
@@ -154,6 +163,7 @@ export default function CheckoutPage() {
   async function handlePurchase(e: React.FormEvent) {
     e.preventDefault();
     if (!payload) return;
+    if (!agreedTerms) return;
     setLoading(true);
 
     const isTest = isTestPayment({ method: paymentMethod, cardNumber, routingNumber, accountNumber });
@@ -176,6 +186,9 @@ export default function CheckoutPage() {
       paymentMethod,
       grandTotal,
       isTest,
+      purchaseIp: clientIp,
+      termsVersion: TERMS_VERSION,
+      termsAcceptedIp: clientIp,
     });
 
     if (orderId && payload.groupId && payload.groupEmail) {
@@ -491,16 +504,48 @@ export default function CheckoutPage() {
                   <p className="font-ui text-xs text-ink-muted">Your payment info is encrypted with 256-bit SSL. We never store your full payment details.</p>
                 </div>
 
+                {/* Required Terms acceptance */}
+                <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${agreedTerms ? "border-aubergine/30 bg-aubergine/5" : "border-ivory-200 hover:border-aubergine/20"}`}>
+                  <input type="checkbox" checked={agreedTerms} onChange={e => setAgreedTerms(e.target.checked)} className="mt-0.5 w-4 h-4 accent-aubergine shrink-0" />
+                  <span className="font-ui text-xs text-ink-muted leading-relaxed">
+                    I have read and agree to the{" "}
+                    <button type="button" onClick={() => setShowTerms(true)} className="font-semibold text-aubergine hover:underline">Terms &amp; Conditions</button>.{" "}
+                    {TERMS_SUMMARY}
+                  </span>
+                </label>
+
                 <button
                   type="submit"
-                  disabled={!paymentValid}
-                  className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all flex items-center justify-center gap-2 ${paymentValid ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-sm" : "bg-ivory-200 text-ink-muted cursor-not-allowed"}`}
+                  disabled={!paymentValid || !agreedTerms}
+                  className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all flex items-center justify-center gap-2 ${paymentValid && agreedTerms ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-sm" : "bg-ivory-200 text-ink-muted cursor-not-allowed"}`}
                 >
                   Complete Purchase · ${grandTotal.toFixed(2)}
                 </button>
 
-                <p className="text-center font-mono text-[10px] text-ink-muted">By completing purchase you agree to our Terms of Service</p>
+                <p className="text-center font-mono text-[10px] text-ink-muted">Acceptance is recorded with version {TERMS_VERSION}, a timestamp, and your IP for your protection and ours.</p>
               </form>
+            )}
+
+            {/* Terms modal */}
+            {showTerms && (
+              <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-4" onClick={() => setShowTerms(false)}>
+                <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" />
+                <div className="relative bg-white rounded-2xl w-full max-w-lg max-h-[85dvh] shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+                  <div className="px-5 py-4 border-b border-ivory-200 flex items-center justify-between shrink-0">
+                    <div>
+                      <p className="font-display font-bold text-ink text-base" style={{ letterSpacing: "-0.015em" }}>Terms &amp; Conditions</p>
+                      <p className="font-mono text-[10px] text-ink-muted">Version {TERMS_VERSION}</p>
+                    </div>
+                    <button onClick={() => setShowTerms(false)} className="w-8 h-8 rounded-xl border border-ivory-200 flex items-center justify-center text-ink-muted hover:text-ink"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                  </div>
+                  <div className="px-5 py-4 overflow-y-auto">
+                    <pre className="font-ui text-xs text-ink whitespace-pre-wrap break-words leading-relaxed">{TERMS_TEXT}</pre>
+                  </div>
+                  <div className="px-5 py-3 border-t border-ivory-200 shrink-0">
+                    <button onClick={() => { setAgreedTerms(true); setShowTerms(false); }} className="w-full py-2.5 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:bg-aubergine/90 transition-colors">Agree &amp; close</button>
+                  </div>
+                </div>
+              </div>
             )}
           </div>
 
@@ -577,6 +622,7 @@ export default function CheckoutPage() {
                       <span className="font-display font-bold text-ink">Total</span>
                       <span className="font-display font-bold text-ink text-lg">${grandTotal.toFixed(2)}</span>
                     </div>
+                    <p className="font-ui text-[10px] text-ink-muted/70 text-center pt-1">{NO_REFUND_NOTICE}</p>
                   </div>
                 )}
 
