@@ -27,6 +27,7 @@ type DBEvent = {
   navratri_nights: number[] | null;
   capacity: number | null;
   selling_on_rameelo: boolean;
+  featured_on_events: boolean;
   ticket_tiers: { price: number; quantity: number }[];
   artists: { name: string; tagline: string | null; profile_image_url: string | null; is_featured: boolean } | null;
 };
@@ -55,6 +56,7 @@ type EventVM = {
   ageRestriction: string;
   navratriNights: number[];
   sellingOnRameelo: boolean;
+  featuredOnEvents: boolean;
 };
 
 const CATEGORY_LABELS: Record<string, string> = {
@@ -118,11 +120,18 @@ function EventCard({ event, isPast = false }: { event: EventVM; isPast?: boolean
         )}
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/10 to-transparent" />
 
-        <div className="relative flex items-start justify-between">
-          <span className="font-mono text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full text-white/90"
-            style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(4px)' }}>
-            {CATEGORY_LABELS[event.category] ?? event.category}
-          </span>
+        <div className="relative flex items-start justify-between gap-2">
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="font-mono text-[10px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full text-white/90"
+              style={{ background: 'rgba(255,255,255,0.12)', backdropFilter: 'blur(4px)' }}>
+              {CATEGORY_LABELS[event.category] ?? event.category}
+            </span>
+            {!isPast && event.featuredOnEvents && (
+              <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full bg-marigold text-aubergine">
+                ⭐ Featured
+              </span>
+            )}
+          </div>
           {isPast ? (
             <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full text-white/85"
               style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}>
@@ -241,7 +250,7 @@ export default function EventsPage() {
           id, title, category, artist, artist_id, description,
           start_date, end_date, is_multi_day, city, state, venue_name, start_time,
           cover_image_url, cover_gradient, dress_code, dandiya_sticks,
-          age_restriction, navratri_nights, capacity, selling_on_rameelo,
+          age_restriction, navratri_nights, capacity, selling_on_rameelo, featured_on_events,
           ticket_tiers (price, quantity),
           artists (name, tagline, profile_image_url, is_featured)
         `)
@@ -276,6 +285,7 @@ export default function EventsPage() {
           ageRestriction: ev.age_restriction,
           navratriNights: ev.navratri_nights ?? [],
           sellingOnRameelo: ev.selling_on_rameelo,
+          featuredOnEvents: ev.featured_on_events ?? false,
         };
       });
 
@@ -359,8 +369,10 @@ export default function EventsPage() {
       );
     }
     result.sort((a, b) => {
-      // Upcoming surfaces live-selling events first; past doesn't.
+      // Upcoming surfaces featured, then live-selling events first; past doesn't.
       if (view !== 'past') {
+        const featured = (b.featuredOnEvents ? 1 : 0) - (a.featuredOnEvents ? 1 : 0);
+        if (featured !== 0) return featured;
         const selling = (b.sellingOnRameelo ? 1 : 0) - (a.sellingOnRameelo ? 1 : 0);
         if (selling !== 0) return selling;
       }

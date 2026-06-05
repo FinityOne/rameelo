@@ -51,6 +51,8 @@ export default function AdminCreateEventPage() {
   // Admin-specific publish settings
   const [publishStatus, setPublishStatus]       = useState<'published' | 'draft'>('published');
   const [sellingOnRameelo, setSellingOnRameelo] = useState(true);
+  const [featuredOnTour, setFeaturedOnTour]     = useState(false);
+  const [featuredOnEvents, setFeaturedOnEvents] = useState(false);
   const [locationTba, setLocationTba]           = useState(false);
 
   useEffect(() => {
@@ -132,6 +134,8 @@ export default function AdminCreateEventPage() {
           capacity:           form.capacity ? parseInt(form.capacity) : null,
           status:             publishStatus,
           selling_on_rameelo: sellingOnRameelo,
+          featured_on_tour:   featuredOnTour,
+          featured_on_events: featuredOnEvents,
         })
         .select('id')
         .single();
@@ -199,7 +203,7 @@ export default function AdminCreateEventPage() {
             Back to events
           </button>
           <button
-            onClick={() => { setSubmitted(false); setForm(DEFAULT_FORM); setStep(0); setPublishStatus('published'); setSellingOnRameelo(true); setLocationTba(false); }}
+            onClick={() => { setSubmitted(false); setForm(DEFAULT_FORM); setStep(0); setPublishStatus('published'); setSellingOnRameelo(true); setFeaturedOnTour(false); setFeaturedOnEvents(false); setLocationTba(false); }}
             className="border border-ivory-200 text-ink font-ui font-semibold text-sm px-6 py-3 rounded-xl hover:bg-ivory transition-colors">
             Create another
           </button>
@@ -377,6 +381,28 @@ export default function AdminCreateEventPage() {
                       Interest mode: attendees fill a &quot;Claim My Spot&quot; form. You can flip this to ticket-selling anytime from the event review page.
                     </p>
                   )}
+                </div>
+
+                {/* Featured placement */}
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2">Featured placement</p>
+                  <div className="space-y-2">
+                    {([
+                      { key: 'tour',   label: '⭐ Feature on the tour page',   desc: 'Show in the homepage “Featured this Navratri” showcase', checked: featuredOnTour,   set: setFeaturedOnTour },
+                      { key: 'events', label: '⭐ Feature on the events list', desc: 'Pin to the top of the public Events page with a badge',     checked: featuredOnEvents, set: setFeaturedOnEvents },
+                    ] as const).map(opt => (
+                      <button key={opt.key} type="button" onClick={() => opt.set(!opt.checked)}
+                        className={`w-full flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all ${opt.checked ? 'border-aubergine bg-aubergine/5' : 'border-ivory-200 hover:border-aubergine/30'}`}>
+                        <span className={`mt-0.5 shrink-0 w-4 h-4 rounded-md border flex items-center justify-center ${opt.checked ? 'bg-aubergine border-aubergine' : 'border-ink-muted/40'}`}>
+                          {opt.checked && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                        </span>
+                        <span className="flex-1 min-w-0">
+                          <span className="block font-ui text-sm font-semibold text-ink">{opt.label}</span>
+                          <span className="block font-mono text-[9px] text-ink-muted mt-0.5">{opt.desc}</span>
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>

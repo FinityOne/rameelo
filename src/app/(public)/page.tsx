@@ -70,6 +70,7 @@ type LiveEvent = {
   city: string; state: string; start_date: string; start_time: string; venue_name: string;
   artists: { name: string } | null;
   selling_on_rameelo: boolean;
+  featured_on_tour: boolean;
   ticket_tiers: { price: number; quantity: number; quantity_sold: number }[];
 };
 
@@ -91,9 +92,10 @@ export default async function HomePage() {
   const [platformStats, { data: rawEvents }] = await Promise.all([
     getPlatformStats(),
     supabase.from("events")
-      .select("id, title, category, city, state, start_date, start_time, venue_name, selling_on_rameelo, artists(name), ticket_tiers(price, quantity, quantity_sold)")
+      .select("id, title, category, city, state, start_date, start_time, venue_name, selling_on_rameelo, featured_on_tour, artists(name), ticket_tiers(price, quantity, quantity_sold)")
       .eq("status", "published")
       .gte("start_date", today)
+      .order("featured_on_tour", { ascending: false })
       .order("start_date")
       .limit(6),
   ]);
@@ -558,7 +560,7 @@ export default async function HomePage() {
                 body:
                   "Chapter profiles, team orders, and a live leaderboard that lets your crew see where they stand against college raas teams nationwide.",
                 cta: "See standings",
-                href: "/community",
+                href: "/collegiate",
                 bg: "bg-ivory-200",
                 eyebrowColor: "marigold" as const,
               },

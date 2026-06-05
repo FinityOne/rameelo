@@ -55,6 +55,8 @@ type EventData = {
   capacity: string;
   status: string;
   selling_on_rameelo: boolean;
+  featured_on_tour: boolean;
+  featured_on_events: boolean;
   organizer_id: string | null;
   org_id: string | null;
 };
@@ -240,6 +242,25 @@ function TierCard({ tier, idx, onChange }: {
   );
 }
 
+// ─── Toggle row ───────────────────────────────────────────────────────────────
+
+function ToggleRow({ title, desc, checked, onChange }: {
+  title: string; desc: string; checked: boolean; onChange: (v: boolean) => void;
+}) {
+  return (
+    <button type="button" onClick={() => onChange(!checked)}
+      className="w-full flex items-start gap-3 text-left group">
+      <span className={`mt-0.5 shrink-0 w-10 h-6 rounded-full transition-colors relative ${checked ? "bg-peacock" : "bg-ivory-200"}`}>
+        <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-all ${checked ? "left-[18px]" : "left-0.5"}`} />
+      </span>
+      <span className="flex-1 min-w-0">
+        <span className="block font-ui text-sm font-semibold text-ink">{title}</span>
+        <span className="block font-ui text-xs text-ink-muted leading-relaxed mt-0.5">{desc}</span>
+      </span>
+    </button>
+  );
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 type ActiveTab = "details" | "schedule" | "venue" | "cover" | "tickets";
@@ -275,7 +296,7 @@ export default function AdminEventEditPage() {
             venue_name, address_line1, address_line2, city, state, zip,
             parking, parking_notes, website_url, cover_image_url, cover_gradient,
             dress_code, dress_code_details, dandiya_sticks, age_restriction,
-            capacity, status, selling_on_rameelo, organizer_id, org_id
+            capacity, status, selling_on_rameelo, featured_on_tour, featured_on_events, organizer_id, org_id
           `)
           .eq("id", id)
           .single(),
@@ -429,6 +450,9 @@ export default function AdminEventEditPage() {
             dandiya_sticks:     ev.dandiya_sticks,
             age_restriction:    ev.age_restriction,
             capacity:           ev.capacity ? parseInt(ev.capacity) : null,
+            selling_on_rameelo: ev.selling_on_rameelo,
+            featured_on_tour:   ev.featured_on_tour,
+            featured_on_events: ev.featured_on_events,
             organizer_id:       ev.organizer_id || null,
             org_id:             ev.org_id || null,
           }).eq("id", id);
@@ -734,6 +758,37 @@ export default function AdminEventEditPage() {
                   );
                 })()}
               </div>
+            </div>
+          </div>
+
+          {/* Ticketing & promotion */}
+          <div className={sectionCls}>
+            <div className={sectionHead}>
+              <span className="text-base">🎟️</span>
+              <p className="font-display font-semibold text-ink text-sm" style={{ letterSpacing: "-0.01em" }}>Ticketing &amp; Promotion</p>
+              <span className="ml-auto font-mono text-[8px] bg-durga/10 text-durga px-2 py-0.5 rounded-full">Admin only</span>
+            </div>
+            <div className="p-5 space-y-3">
+              <ToggleRow
+                title="Sell tickets on Rameelo"
+                desc="Attendees buy tickets directly here. Turn off to list the event for interest/discovery only (no checkout)."
+                checked={ev.selling_on_rameelo}
+                onChange={v => patchEv({ selling_on_rameelo: v })}
+              />
+              <div className="h-px bg-ivory-200" />
+              <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Featured placement</p>
+              <ToggleRow
+                title="Feature on the tour page"
+                desc="Highlight this event in the homepage “Featured this Navratri” showcase."
+                checked={ev.featured_on_tour}
+                onChange={v => patchEv({ featured_on_tour: v })}
+              />
+              <ToggleRow
+                title="Feature on the events list"
+                desc="Pin this event to the top of the public Events page with a Featured badge."
+                checked={ev.featured_on_events}
+                onChange={v => patchEv({ featured_on_events: v })}
+              />
             </div>
           </div>
 
