@@ -766,12 +766,14 @@ function OnboardingSubmission({ row, draft }: { row: OnboardingRow; draft: boole
       <Group title="Organizer">
         <dl className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
           <DL label="Organization" value={r.organizationName} />
+          <DL label="Year founded" value={r.foundedYear} />
           <DL label="Primary contact" value={r.primaryContactName} />
           <DL label="Email" value={r.email} />
           <DL label="Phone" value={r.phone} />
           <DL label="Website" value={r.website} />
           <DL label="Instagram" value={r.instagram ? `@${r.instagram}` : ""} />
           <DL label="Facebook" value={r.facebook} />
+          <div className="sm:col-span-2"><DL label="Description" value={r.organizationDescription} /></div>
         </dl>
       </Group>
 

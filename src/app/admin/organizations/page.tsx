@@ -14,6 +14,8 @@ const ORG_TYPES = [
   { value: "government",   label: "Government" },
 ];
 
+type OnboardingState = "none" | "pending" | "draft" | "submitted";
+
 type OrgRow = {
   id: string;
   name: string;
@@ -25,6 +27,7 @@ type OrgRow = {
   status: string;
   created_at: string;
   member_count: number;
+  onboarding: OnboardingState;
 };
 
 const STATUS_STYLES: Record<string, string> = {
@@ -32,6 +35,38 @@ const STATUS_STYLES: Record<string, string> = {
   inactive:  "bg-ivory-200 text-ink-muted",
   suspended: "bg-durga/12 text-durga",
 };
+
+// ── Onboarding questionnaire status indicator ────────────────────────────────
+const ONB_CONFIG: Record<Exclude<OnboardingState, "none">, { cls: string; label: string; icon: React.ReactNode }> = {
+  submitted: {
+    cls: "bg-peacock/12 text-peacock",
+    label: "Submitted",
+    icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />,
+  },
+  draft: {
+    cls: "bg-aubergine/10 text-aubergine",
+    label: "Draft",
+    icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />,
+  },
+  pending: {
+    cls: "bg-marigold/15 text-marigold-dark",
+    label: "Link sent",
+    icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />,
+  },
+};
+
+function OnboardingIndicator({ state }: { state: OnboardingState }) {
+  if (state === "none") {
+    return <span className="font-mono text-[9px] uppercase tracking-wide text-ink-muted/40">Not started</span>;
+  }
+  const cfg = ONB_CONFIG[state];
+  return (
+    <span className={`inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-wide px-2 py-1 rounded-full font-bold ${cfg.cls}`}>
+      <svg className="w-3 h-3 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">{cfg.icon}</svg>
+      {cfg.label}
+    </span>
+  );
+}
 
 function fmtDate(d: string) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
@@ -72,12 +107,24 @@ export default function AdminOrganizationsPage() {
       .from("organization_members")
       .select("org_id");
 
+    const { data: onbData } = await supabase
+      .from("org_onboarding")
+      .select("org_id, status, draft_saved_at")
+      .order("created_at", { ascending: false });
+
     const countMap: Record<string, number> = {};
     for (const m of (membersData ?? [])) {
       countMap[m.org_id] = (countMap[m.org_id] ?? 0) + 1;
     }
 
-    setOrgs((orgsData ?? []).map(o => ({ ...o, member_count: countMap[o.id] ?? 0 })));
+    // Latest row per org wins (query is ordered newest-first).
+    const onbMap: Record<string, OnboardingState> = {};
+    for (const r of (onbData ?? []) as { org_id: string; status: string; draft_saved_at: string | null }[]) {
+      if (onbMap[r.org_id]) continue;
+      onbMap[r.org_id] = r.status === "submitted" ? "submitted" : r.draft_saved_at ? "draft" : "pending";
+    }
+
+    setOrgs((orgsData ?? []).map(o => ({ ...o, member_count: countMap[o.id] ?? 0, onboarding: onbMap[o.id] ?? "none" })));
     setLoading(false);
   }
 
@@ -280,7 +327,7 @@ export default function AdminOrganizationsPage() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-ivory-200 bg-ivory/50">
-                {["Organization", "Type", "Location", "Members", "Status", "Created"].map(h => (
+                {["Organization", "Type", "Location", "Members", "Status", "Onboarding", "Created"].map(h => (
                   <th key={h} className="px-4 py-3 text-left font-mono text-[10px] uppercase tracking-widest text-ink-muted">{h}</th>
                 ))}
               </tr>
@@ -307,6 +354,9 @@ export default function AdminOrganizationsPage() {
                     <span className={`font-mono text-[9px] uppercase tracking-wide px-2 py-1 rounded-full font-bold ${STATUS_STYLES[org.status] ?? "bg-ivory-200 text-ink-muted"}`}>
                       {org.status}
                     </span>
+                  </td>
+                  <td className="px-4 py-3.5">
+                    <OnboardingIndicator state={org.onboarding} />
                   </td>
                   <td className="px-4 py-3.5">
                     <span className="font-ui text-xs text-ink-muted">{fmtDate(org.created_at)}</span>

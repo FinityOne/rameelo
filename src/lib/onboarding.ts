@@ -214,6 +214,8 @@ export function achFeeLine(achFreeTickets?: number | null): string {
 export type OnboardingResponses = {
   // Organizer information
   organizationName: string;
+  organizationDescription: string;
+  foundedYear: string;
   primaryContactName: string;
   email: string;
   phone: string;
@@ -323,6 +325,8 @@ export function emptyEvent(): OnboardingEvent {
 export function emptyResponses(): OnboardingResponses {
   return {
     organizationName: "",
+    organizationDescription: "",
+    foundedYear: "",
     primaryContactName: "",
     email: "",
     phone: "",

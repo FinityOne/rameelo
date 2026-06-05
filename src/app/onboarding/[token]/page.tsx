@@ -116,14 +116,13 @@ export default function OnboardingPage() {
       setOffer((res.offer ?? {}) as OnboardingOffer);
       setConfig((res.config ?? {}) as OnboardingConfig);
 
-      // Always open on step 1 (the default) — the ONLY exception is a returning
-      // organizer who has saved a draft, who resumes straight at the form.
-      const hasSavedDraft = typeof res.draft_saved_at === "string" && !!res.draft_saved_at;
-      if (hasSavedDraft) {
-        setResumedAt(res.draft_saved_at as string);
-        setStep(3); setMaxStep(3);
-      } else {
-        setStep(1); setMaxStep(1);
+      // Always start at step 1, for everyone, on every visit. A saved draft's
+      // data still loads below; the "welcome back" banner shows once they reach
+      // the form — we just never auto-advance past the beginning.
+      setStep(1);
+      setMaxStep(1);
+      if (typeof res.draft_saved_at === "string" && res.draft_saved_at) {
+        setResumedAt(res.draft_saved_at);
       }
       const savedDocs = (res.documents ?? []) as OnboardingDocument[];
       if (savedDocs.length) setDocs(savedDocs);
@@ -136,12 +135,14 @@ export default function OnboardingPage() {
         : [{ ...emptyEvent(), city: org.city ?? "", state: org.state ?? "" }];
       setForm({
         ...base,
-        organizationName: saved.organizationName ?? org.name ?? "",
-        email:            saved.email           ?? org.email ?? "",
-        phone:            saved.phone           ?? org.phone ?? "",
-        website:          saved.website         ?? org.website ?? "",
-        instagram:        saved.instagram       ?? org.instagram ?? "",
-        facebook:         saved.facebook        ?? org.facebook ?? "",
+        organizationName:        saved.organizationName        ?? org.name ?? "",
+        organizationDescription: saved.organizationDescription ?? org.description ?? "",
+        foundedYear:             saved.foundedYear             ?? (org.founded_year != null ? String(org.founded_year) : ""),
+        email:                   saved.email                  ?? org.email ?? "",
+        phone:                   saved.phone                  ?? org.phone ?? "",
+        website:                 saved.website                ?? org.website ?? "",
+        instagram:               saved.instagram              ?? org.instagram ?? "",
+        facebook:                saved.facebook               ?? org.facebook ?? "",
         ...saved,
         events: seededEvents,
       });
@@ -367,6 +368,8 @@ export default function OnboardingPage() {
           <Section step={1} eyebrow="About you" title="Organizer Information" subtitle="Some of this may already be filled in — just confirm or tweak.">
             <div className="grid sm:grid-cols-2 gap-4">
               <Field label="Organization Name *"><input value={form.organizationName} onChange={e => set("organizationName", e.target.value)} className={inputCls} placeholder="Garba Nights LLC" /></Field>
+              <Field label="Year Founded"><input type="number" min="1900" max={new Date().getFullYear()} value={form.foundedYear} onChange={e => set("foundedYear", e.target.value)} className={inputCls} placeholder="2010" /></Field>
+              <Field label="Organization Description" className="sm:col-span-2"><textarea rows={3} value={form.organizationDescription} onChange={e => set("organizationDescription", e.target.value)} className={`${inputCls} resize-none`} placeholder="Tell us about your organization — who you are and what you're about." /></Field>
               <Field label="Primary Contact Name *"><input value={form.primaryContactName} onChange={e => set("primaryContactName", e.target.value)} className={inputCls} placeholder="Your name" /></Field>
               <Field label="Email Address *"><input type="email" value={form.email} onChange={e => set("email", e.target.value)} className={inputCls} placeholder="you@org.com" /></Field>
               <Field label="Phone Number"><input type="tel" value={form.phone} onChange={e => set("phone", e.target.value)} className={inputCls} placeholder="(555) 000-0000" /></Field>
