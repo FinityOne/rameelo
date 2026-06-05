@@ -564,18 +564,13 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
 
         {/* ── SHOWS ────────────────────────────────────────────────────────── */}
         <section id="shows">
-          <div className="flex items-end justify-between mb-6">
-            <div>
-              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1">
-                {events.length > 0 ? "Tour Dates" : allEvents.length > 0 ? "Past Shows" : "2026 Season"}
-              </p>
-              <h2 className="font-display font-bold text-ink text-2xl sm:text-3xl" style={{ letterSpacing: "-0.02em" }}>
-                {events.length > 0 ? "Upcoming Shows" : allEvents.length > 0 ? "Shows on Rameelo" : "Upcoming Shows"}
-              </h2>
-            </div>
-            <Link href="/events" className="font-ui text-sm font-semibold text-ink-muted hover:text-aubergine transition-colors">
-              All events →
-            </Link>
+          <div className="mb-6">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1">
+              {events.length > 0 ? "Tour Dates" : allEvents.length > 0 ? "Past Shows" : "2026 Season"}
+            </p>
+            <h2 className="font-display font-bold text-ink text-2xl sm:text-3xl" style={{ letterSpacing: "-0.02em" }}>
+              {events.length > 0 ? "Upcoming Shows" : allEvents.length > 0 ? "Shows on Rameelo" : "Upcoming Shows"}
+            </h2>
           </div>
 
           {/* Upcoming */}

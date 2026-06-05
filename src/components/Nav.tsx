@@ -128,7 +128,7 @@ export default function Nav() {
     { href: "/events",     label: "Events",      sub: "Buy tickets",          live: true  },
     { href: "/artists",    label: "Artists",      sub: "Singers · DJs · Dholis", live: true  },
     { href: "/collegiate", label: "Collegiate",   sub: "Teams & competitions", live: true, badge: "NEW" },
-    { href: "/community",  label: "Communities",  sub: "Circles · chats",      live: true  },
+    { href: "/community",  label: "Communities",  sub: "Circles · chats",      live: false },
     { href: "/photos",     label: "Photos",       sub: "Garba memory book",    live: false },
     { href: "/blog",       label: "Blog",         sub: "Culture & guides",     live: true  },
   ];
