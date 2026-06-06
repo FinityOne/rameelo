@@ -125,9 +125,9 @@ export default function Nav() {
       : null;
 
   const CATEGORIES = [
-    { href: "/events",     label: "Events",      sub: "Buy tickets",          live: true  },
+    { href: "/events",     label: "Events",      sub: "Buy tickets",          live: true, badge: "NEW" },
     { href: "/artists",    label: "Artists",      sub: "Singers · DJs · Dholis", live: true  },
-    { href: "/collegiate", label: "Collegiate",   sub: "Teams & competitions", live: true, badge: "NEW" },
+    { href: "/collegiate", label: "Collegiate",   sub: "Teams & competitions", live: true },
     { href: "/community",  label: "Communities",  sub: "Circles · chats",      live: false },
     { href: "/photos",     label: "Photos",       sub: "Garba memory book",    live: false },
     { href: "/blog",       label: "Blog",         sub: "Culture & guides",     live: true  },

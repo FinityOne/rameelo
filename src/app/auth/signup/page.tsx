@@ -39,6 +39,17 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [emailSent, setEmailSent] = useState(false);
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+
+  // Org-team invite: prefill (and lock) the email, and remember the invite so we
+  // can claim it and route the new member into the organizer portal after signup.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const invitedEmail = params.get("email");
+    const invite = params.get("invite");
+    if (invitedEmail) setEmail(invitedEmail);
+    if (invite) setInviteToken(invite);
+  }, []);
 
   useEffect(() => {
     if (!navigator.geolocation) return;
@@ -108,8 +119,13 @@ export default function SignUpPage() {
     }).catch(() => { /* silent — welcome email failure shouldn't block onboarding */ });
 
     if (data.session) {
-      // Email confirmation disabled — go straight to portal
-      router.push("/portal");
+      // Email confirmation disabled — claim any team invite, then route.
+      if (inviteToken) {
+        try { await supabase.rpc("claim_org_invitations"); } catch { /* organizer layout will retry */ }
+        router.push("/organizer");
+      } else {
+        router.push("/portal");
+      }
       router.refresh();
     } else {
       // Email confirmation enabled — show check-email screen
@@ -224,7 +240,9 @@ export default function SignUpPage() {
                 </div>
                 <div>
                   <label className={labelCls}>Email</label>
-                  <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="priya@example.com" className={inputCls} required />
+                  <input type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="priya@example.com"
+                    className={`${inputCls} ${inviteToken ? "bg-ivory/60 cursor-not-allowed" : ""}`} required readOnly={!!inviteToken} />
+                  {inviteToken && <p className="mt-1 font-mono text-[10px] text-peacock uppercase tracking-widest">Team invite · sign up with this email to join</p>}
                 </div>
                 <div>
                   <label className={labelCls}>Phone</label>

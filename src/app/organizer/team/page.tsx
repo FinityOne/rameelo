@@ -132,6 +132,22 @@ export default function TeamPage() {
     setMembers(prev => prev.filter(m => m.id !== member.id));
   }
 
+  async function resendInvite(inv: Invite) {
+    if (!activeOrg) return;
+    setBusyId(inv.id);
+    const res = await fetch("/api/org-invite", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      // Re-send to the same pending invitee with their existing role. The API
+      // reuses the existing pending invitation rather than creating a new one.
+      body: JSON.stringify({ orgId: activeOrg.id, email: inv.email, role: inv.role }),
+    });
+    setBusyId(null);
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) { flash(json.error ?? "Couldn't resend invite."); return; }
+    flash(json.emailed === false ? "Invite re-created (email may be delayed)." : `Invitation re-sent to ${inv.email}.`);
+  }
+
   async function revokeInvite(inv: Invite) {
     setBusyId(inv.id);
     const supabase = createClient();
@@ -257,10 +273,18 @@ export default function TeamPage() {
                   {ROLE_LABEL[inv.role] ?? inv.role}
                 </span>
                 {canManage && (
-                  <button onClick={() => revokeInvite(inv)} disabled={busyId === inv.id}
-                    className="font-ui text-xs text-ink-muted hover:text-durga transition-colors shrink-0 disabled:opacity-50">
-                    Revoke
-                  </button>
+                  <div className="flex items-center gap-3 shrink-0">
+                    <button onClick={() => resendInvite(inv)} disabled={busyId === inv.id}
+                      className="inline-flex items-center gap-1.5 font-ui text-xs font-semibold text-aubergine hover:text-aubergine-light transition-colors disabled:opacity-50">
+                      {busyId === inv.id
+                        ? <><span className="w-3 h-3 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" />Sending…</>
+                        : <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>Resend</>}
+                    </button>
+                    <button onClick={() => revokeInvite(inv)} disabled={busyId === inv.id}
+                      className="font-ui text-xs text-ink-muted hover:text-durga transition-colors disabled:opacity-50">
+                      Revoke
+                    </button>
+                  </div>
                 )}
               </div>
             ))}

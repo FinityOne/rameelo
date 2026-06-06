@@ -17,6 +17,8 @@ interface EventCardProps {
   soldOut?: boolean;
   isLive?: boolean;
   href?: string;
+  /** Event cover photo; shown when uploaded, otherwise the gradient fallback. */
+  coverImageUrl?: string | null;
 }
 
 export function EventCard({
@@ -32,19 +34,34 @@ export function EventCard({
   soldOut = false,
   isLive = false,
   href = "/events",
+  coverImageUrl = null,
 }: EventCardProps) {
   return (
     <div className="bg-ivory rounded-[16px] overflow-hidden border border-ivory-200 hover:shadow-md transition-all group">
-      {/* Ticket header — gradient */}
+      {/* Ticket header — cover photo if uploaded, else gradient */}
       <div
-        className="h-40 relative flex flex-col justify-between p-4"
+        className="h-40 relative flex flex-col justify-between p-4 overflow-hidden"
         style={{
           background: isLive
             ? "linear-gradient(145deg, #0E8C7A 0%, #0a4f46 100%)"
             : "linear-gradient(145deg, #2E1B30 0%, #7C1F2C 60%, #F5A623 130%)",
         }}
       >
-        <div className="flex items-center justify-between">
+        {coverImageUrl && (
+          <>
+            <img
+              src={coverImageUrl}
+              alt={title}
+              className="absolute inset-0 w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-300"
+            />
+            {/* Readability scrim — darkest at the bottom where the title sits */}
+            <div
+              className="absolute inset-0"
+              style={{ background: "linear-gradient(to top, rgba(0,0,0,0.78) 0%, rgba(0,0,0,0.25) 45%, rgba(0,0,0,0.45) 100%)" }}
+            />
+          </>
+        )}
+        <div className="relative z-10 flex items-center justify-between">
           <Badge variant={isLive ? "peacock" : "marigold"} dot={isLive}>
             {isLive ? "Live now" : category}
           </Badge>
@@ -58,8 +75,8 @@ export function EventCard({
           )}
         </div>
 
-        <div>
-          <p className="font-mono text-[10px] text-white/60 tracking-widest uppercase mb-1">
+        <div className="relative z-10">
+          <p className="font-mono text-[10px] text-white/70 tracking-widest uppercase mb-1">
             {date} · {city}, {state}
           </p>
           <h3

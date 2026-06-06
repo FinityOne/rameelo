@@ -71,6 +71,7 @@ type LiveEvent = {
   artists: { name: string } | null;
   selling_on_rameelo: boolean;
   featured_on_tour: boolean;
+  cover_image_url: string | null;
   ticket_tiers: { price: number; quantity: number; quantity_sold: number }[];
 };
 
@@ -92,7 +93,7 @@ export default async function HomePage() {
   const [platformStats, { data: rawEvents }] = await Promise.all([
     getPlatformStats(),
     supabase.from("events")
-      .select("id, title, category, city, state, start_date, start_time, venue_name, selling_on_rameelo, featured_on_tour, artists(name), ticket_tiers(price, quantity, quantity_sold)")
+      .select("id, title, category, city, state, start_date, start_time, venue_name, selling_on_rameelo, featured_on_tour, cover_image_url, artists(name), ticket_tiers(price, quantity, quantity_sold)")
       .eq("status", "published")
       .gte("start_date", today)
       .order("featured_on_tour", { ascending: false })
@@ -205,6 +206,77 @@ export default async function HomePage() {
               <span className="font-mono text-[10px] text-white/25 tracking-widest uppercase">Founding members open</span>
             </div>
           </div>
+        </div>
+      </section>
+
+      {/* ══════════════════════════════════════════
+          CITY TICKER
+      ══════════════════════════════════════════ */}
+      <CityTicker />
+
+      {/* ══════════════════════════════════════════
+          FEATURED EVENTS
+      ══════════════════════════════════════════ */}
+      <section className="bg-ivory-200 py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-end justify-between mb-10">
+            <div>
+              <Eyebrow className="mb-3">Events near you</Eyebrow>
+              <h2
+                className="font-display font-semibold text-ink"
+                style={{ fontSize: "clamp(28px, 4vw, 40px)", letterSpacing: "-0.022em", lineHeight: 1.1 }}
+              >
+                Featured this Navratri
+              </h2>
+            </div>
+            <Link
+              href="/events"
+              className="font-ui text-sm font-semibold text-ink-muted hover:text-ink hidden sm:flex items-center gap-1 transition-colors"
+            >
+              View all
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          </div>
+
+          {liveEvents.length === 0 ? (
+            <div className="rounded-2xl border-2 border-dashed border-ivory-200 p-16 text-center">
+              <p className="text-4xl mb-3">🎪</p>
+              <p className="font-display font-semibold text-ink text-lg mb-1" style={{ letterSpacing: "-0.015em" }}>Events coming soon</p>
+              <p className="font-ui text-sm text-ink-muted mb-4">Organizers are listing events now — check back soon.</p>
+              <Link href="/events" className="font-ui text-sm font-semibold text-aubergine hover:underline">Browse all events →</Link>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+              {liveEvents.slice(0, 3).map((event) => {
+                const tiers = event.ticket_tiers;
+                const total = tiers.reduce((s, t) => s + t.quantity, 0);
+                const sold  = tiers.reduce((s, t) => s + t.quantity_sold, 0);
+                const pct   = total > 0 ? Math.round((sold / total) * 100) : 0;
+                const minPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : null;
+                const maxPrice = tiers.length > 0 ? Math.max(...tiers.map(t => t.price)) : null;
+                const dateStr  = new Date(event.start_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+                return (
+                  <EventCard
+                    key={event.id}
+                    title={event.title}
+                    category={event.category}
+                    city={event.city}
+                    state={event.state}
+                    date={dateStr}
+                    minPrice={minPrice}
+                    maxPrice={maxPrice}
+                    sellingOnRameelo={event.selling_on_rameelo}
+                    soldPct={pct}
+                    soldOut={total > 0 && sold >= total}
+                    coverImageUrl={event.cover_image_url}
+                    href={`/events/${event.id}`}
+                  />
+                );
+              })}
+            </div>
+          )}
         </div>
       </section>
 
@@ -424,11 +496,6 @@ export default async function HomePage() {
       </section>
 
       {/* ══════════════════════════════════════════
-          CITY TICKER
-      ══════════════════════════════════════════ */}
-      <CityTicker />
-
-      {/* ══════════════════════════════════════════
           STATS
       ══════════════════════════════════════════ */}
       <section className="bg-ivory py-14">
@@ -448,71 +515,6 @@ export default async function HomePage() {
               </div>
             ))}
           </div>
-        </div>
-      </section>
-
-      {/* ══════════════════════════════════════════
-          FEATURED EVENTS
-      ══════════════════════════════════════════ */}
-      <section className="bg-ivory-200 py-20">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-end justify-between mb-10">
-            <div>
-              <Eyebrow className="mb-3">Events near you</Eyebrow>
-              <h2
-                className="font-display font-semibold text-ink"
-                style={{ fontSize: "clamp(28px, 4vw, 40px)", letterSpacing: "-0.022em", lineHeight: 1.1 }}
-              >
-                Featured this Navratri
-              </h2>
-            </div>
-            <Link
-              href="/events"
-              className="font-ui text-sm font-semibold text-ink-muted hover:text-ink hidden sm:flex items-center gap-1 transition-colors"
-            >
-              View all
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.6} d="M9 5l7 7-7 7" />
-              </svg>
-            </Link>
-          </div>
-
-          {liveEvents.length === 0 ? (
-            <div className="rounded-2xl border-2 border-dashed border-ivory-200 p-16 text-center">
-              <p className="text-4xl mb-3">🎪</p>
-              <p className="font-display font-semibold text-ink text-lg mb-1" style={{ letterSpacing: "-0.015em" }}>Events coming soon</p>
-              <p className="font-ui text-sm text-ink-muted mb-4">Organizers are listing events now — check back soon.</p>
-              <Link href="/events" className="font-ui text-sm font-semibold text-aubergine hover:underline">Browse all events →</Link>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-              {liveEvents.slice(0, 3).map((event) => {
-                const tiers = event.ticket_tiers;
-                const total = tiers.reduce((s, t) => s + t.quantity, 0);
-                const sold  = tiers.reduce((s, t) => s + t.quantity_sold, 0);
-                const pct   = total > 0 ? Math.round((sold / total) * 100) : 0;
-                const minPrice = tiers.length > 0 ? Math.min(...tiers.map(t => t.price)) : null;
-                const maxPrice = tiers.length > 0 ? Math.max(...tiers.map(t => t.price)) : null;
-                const dateStr  = new Date(event.start_date + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-                return (
-                  <EventCard
-                    key={event.id}
-                    title={event.title}
-                    category={event.category}
-                    city={event.city}
-                    state={event.state}
-                    date={dateStr}
-                    minPrice={minPrice}
-                    maxPrice={maxPrice}
-                    sellingOnRameelo={event.selling_on_rameelo}
-                    soldPct={pct}
-                    soldOut={total > 0 && sold >= total}
-                    href={`/events/${event.id}`}
-                  />
-                );
-              })}
-            </div>
-          )}
         </div>
       </section>
 

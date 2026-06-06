@@ -7,6 +7,7 @@ import { GRADIENTS } from "@/app/organizer/events/create/types";
 import { getUser, type RameeloUser } from "@/lib/auth";
 import { loadMyOrders, loadMyPendingGroups, type PortalOrderRow, type PendingGroup } from "@/lib/group-orders";
 import { loadIncomingTransfers, type IncomingTransfer } from "@/lib/transfers";
+import OrganizerAccessBanner from "./OrganizerAccessBanner";
 
 // Resolve an event's saved cover into a CSS background (image preferred, else gradient).
 function coverBg(coverImageUrl: string | null, coverGradient: string): string {
@@ -392,6 +393,9 @@ export default function PortalDashboard() {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+
+      {/* ── Organizer access (claims pending team invites) ── */}
+      <OrganizerAccessBanner />
 
       {/* ── Hero ── */}
       <div className="rounded-3xl overflow-hidden relative" style={{ background: "linear-gradient(135deg,#1e0f20 0%,#2E1B30 55%,#1a1230 100%)" }}>
