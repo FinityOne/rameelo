@@ -39,6 +39,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     trigger: "automatic",
     fires: "When an organizer or admin invites a team member",
   },
+  {
+    key: "password-reset",
+    name: "Password reset",
+    description: "A secure link (valid 24 hours) for a member to set a new password — branded, not Supabase's default email.",
+    audience: "Members",
+    category: "Member",
+    status: "live",
+    trigger: "manual",
+    fires: "Triggered by an admin from a user's detail page",
+  },
 
   // ── Planned (not yet built) ──
   {

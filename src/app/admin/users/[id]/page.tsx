@@ -84,6 +84,7 @@ type NavSection = "overview" | "tickets" | "activity" | "groups";
 const EMAIL_TYPE_LABEL: Record<string, string> = {
   welcome: "Welcome email",
   org_invite: "Organization invite",
+  password_reset: "Password reset",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -145,6 +146,8 @@ export default function AdminUserDetailPage() {
   const [notifSent, setNotifSent]   = useState(false);
   const [sendingWelcome, setSendingWelcome] = useState(false);
   const [welcomeStatus, setWelcomeStatus]   = useState<"" | "sent" | "error">("");
+  const [sendingReset, setSendingReset]     = useState(false);
+  const [resetStatus, setResetStatus]       = useState<"" | "sent" | "error">("");
   const [emailLogs, setEmailLogs]   = useState<EmailLog[]>([]);
 
   const loadEmailLogs = useCallback(async () => {
@@ -271,6 +274,25 @@ export default function AdminUserDetailPage() {
     }
     setSendingWelcome(false);
     setTimeout(() => setWelcomeStatus(""), 4000);
+  }
+
+  async function sendPasswordReset() {
+    if (!profile) return;
+    setSendingReset(true);
+    setResetStatus("");
+    try {
+      const res = await fetch("/api/admin/send-password-reset", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: profile.id }),
+      });
+      setResetStatus(res.ok ? "sent" : "error");
+      if (res.ok) loadEmailLogs();
+    } catch {
+      setResetStatus("error");
+    }
+    setSendingReset(false);
+    setTimeout(() => setResetStatus(""), 4000);
   }
 
   async function sendNotification() {
@@ -641,6 +663,32 @@ export default function AdminUserDetailPage() {
               )}
               {welcomeStatus === "error" && <p className="font-mono text-[9px] text-durga uppercase tracking-widest mt-2">Failed to send — try again</p>}
               {!profile.email && <p className="font-mono text-[9px] text-durga uppercase tracking-widest mt-2">No email on file</p>}
+            </div>
+
+            {/* Password reset */}
+            <div className="rounded-xl border border-ivory-200 p-4 mb-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-7 h-7 rounded-lg bg-durga/10 text-durga flex items-center justify-center shrink-0">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                </span>
+                <p className="font-ui text-sm font-semibold text-ink">Reset password</p>
+              </div>
+              <p className="font-ui text-xs text-ink-muted leading-relaxed mb-3">
+                Emails {profile.first_name || "this member"} a secure link (valid 24 hours) to set a new password.
+              </p>
+              <button onClick={sendPasswordReset} disabled={sendingReset || !profile.email}
+                className={`w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl font-ui font-semibold text-sm transition-all ${!sendingReset && profile.email ? "bg-aubergine text-white hover:opacity-90" : "bg-ivory text-ink-muted cursor-not-allowed"}`}>
+                {sendingReset
+                  ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Sending…</>
+                  : "Send reset link"}
+              </button>
+              {resetStatus === "sent" && (
+                <p className="font-mono text-[9px] text-peacock uppercase tracking-widest mt-2 flex items-center gap-1.5">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                  Reset link sent to {profile.email}
+                </p>
+              )}
+              {resetStatus === "error" && <p className="font-mono text-[9px] text-durga uppercase tracking-widest mt-2">Failed to send — try again</p>}
             </div>
 
             {/* In-app notification */}

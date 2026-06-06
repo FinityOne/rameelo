@@ -17,12 +17,19 @@ export default function ResetPasswordPage() {
   useEffect(() => { document.title = "Reset Password | Rameelo"; }, []);
   const [sessionReady, setSessionReady] = useState(false);
   const [sessionError, setSessionError] = useState(false);
+  // Admin-triggered branded reset carries a ?token= (custom flow); the native
+  // Supabase recovery link instead establishes a PASSWORD_RECOVERY session.
+  const [customToken, setCustomToken] = useState<string | null>(null);
 
   const inputCls = "w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3.5 font-ui text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-marigold/50 focus:border-marigold/50 transition-all";
 
   // Supabase writes the recovery session from the URL hash automatically.
   // Listen for the PASSWORD_RECOVERY event to confirm the session is active.
   useEffect(() => {
+    // Custom (admin-triggered) reset link — no Supabase session needed.
+    const t = new URLSearchParams(window.location.search).get("token");
+    if (t) { setCustomToken(t); setSessionReady(true); return; }
+
     const supabase = createClient();
 
     // Check if there's already an active session (e.g. user revisits the page)
@@ -59,15 +66,24 @@ export default function ResetPasswordPage() {
     setError("");
 
     const supabase = createClient();
-    const { error: updateError } = await supabase.auth.updateUser({ password });
+    let submitError: string | null = null;
+    if (customToken) {
+      // Custom branded flow: redeem the one-time token (user isn't logged in).
+      const { error: e } = await supabase.rpc("redeem_password_reset", { p_token: customToken, p_new_password: password });
+      submitError = e?.message ?? null;
+    } else {
+      // Native Supabase recovery session.
+      const { error: e } = await supabase.auth.updateUser({ password });
+      submitError = e?.message ?? null;
+    }
 
     setLoading(false);
-    if (updateError) {
-      setError(updateError.message);
+    if (submitError) {
+      setError(submitError);
       return;
     }
     setDone(true);
-    setTimeout(() => router.push("/portal"), 2500);
+    setTimeout(() => router.push(customToken ? "/auth/signin" : "/portal"), 2500);
   }
 
   return (
@@ -92,7 +108,7 @@ export default function ResetPasswordPage() {
               Password updated!
             </h1>
             <p className="font-ui text-white/50 text-sm">
-              Redirecting you to your portal…
+              {customToken ? "Redirecting you to sign in…" : "Redirecting you to your portal…"}
             </p>
             <div className="mt-4 flex justify-center">
               <div className="w-5 h-5 rounded-full border-2 border-white/20 border-t-marigold animate-spin" />
