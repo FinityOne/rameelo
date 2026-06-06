@@ -68,7 +68,23 @@ type Friendship = {
   created_at: string;
 };
 
+type EmailLog = {
+  id: string;
+  to_email: string;
+  type: string;
+  subject: string | null;
+  status: "sent" | "failed";
+  trigger: "automatic" | "manual";
+  created_at: string;
+  sender: { first_name: string | null; last_name: string | null } | null;
+};
+
 type NavSection = "overview" | "tickets" | "activity" | "groups";
+
+const EMAIL_TYPE_LABEL: Record<string, string> = {
+  welcome: "Welcome email",
+  org_invite: "Organization invite",
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const ROLE_STYLES: Record<UserRole, { pill: string; dot: string; label: string }> = {
@@ -127,6 +143,20 @@ export default function AdminUserDetailPage() {
   const [notifTitle, setNotifTitle] = useState("");
   const [notifBody, setNotifBody]   = useState("");
   const [notifSent, setNotifSent]   = useState(false);
+  const [sendingWelcome, setSendingWelcome] = useState(false);
+  const [welcomeStatus, setWelcomeStatus]   = useState<"" | "sent" | "error">("");
+  const [emailLogs, setEmailLogs]   = useState<EmailLog[]>([]);
+
+  const loadEmailLogs = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("email_logs")
+      .select("id, to_email, type, subject, status, trigger, created_at, sender:profiles!email_logs_sent_by_fkey(first_name, last_name)")
+      .eq("user_id", id)
+      .order("created_at", { ascending: false })
+      .limit(50);
+    setEmailLogs((data as unknown as EmailLog[]) ?? []);
+  }, [id]);
 
   const load = useCallback(async () => {
     const supabase = createClient();
@@ -211,7 +241,7 @@ export default function AdminUserDetailPage() {
     setLoading(false);
   }, [id, router]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { load(); loadEmailLogs(); }, [load, loadEmailLogs]);
 
   async function updateRole(role: UserRole) {
     if (!profile) return;
@@ -222,6 +252,25 @@ export default function AdminUserDetailPage() {
     setRoleUpdating(false);
     setRoleSaved(true);
     setTimeout(() => setRoleSaved(false), 2500);
+  }
+
+  async function sendWelcomeEmail() {
+    if (!profile) return;
+    setSendingWelcome(true);
+    setWelcomeStatus("");
+    try {
+      const res = await fetch("/api/send-welcome", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: profile.id }),
+      });
+      setWelcomeStatus(res.ok ? "sent" : "error");
+      if (res.ok) loadEmailLogs();
+    } catch {
+      setWelcomeStatus("error");
+    }
+    setSendingWelcome(false);
+    setTimeout(() => setWelcomeStatus(""), 4000);
   }
 
   async function sendNotification() {
@@ -266,7 +315,7 @@ export default function AdminUserDetailPage() {
   ];
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-7xl mx-auto space-y-6">
 
       {/* Back */}
       <Link href="/admin/users"
@@ -342,6 +391,10 @@ export default function AdminUserDetailPage() {
         </div>
       </div>
 
+      {/* ── CRM body: content (left) + actions & email log (right) ── */}
+      <div className="lg:grid lg:grid-cols-3 lg:gap-6 lg:items-start space-y-6 lg:space-y-0">
+        <div className="lg:col-span-2 space-y-6">
+
       {/* Sub-nav */}
       <div className="flex gap-1 bg-ivory-200 rounded-2xl p-1">
         {NAV_SECTIONS.map(n => (
@@ -409,27 +462,6 @@ export default function AdminUserDetailPage() {
                   </div>
                 );
               })}
-            </div>
-          </div>
-
-          {/* Send notification */}
-          <div className="bg-white rounded-2xl border border-ivory-200 p-5 shadow-sm">
-            <h3 className="font-display font-bold text-ink text-base mb-4">Send Notification to Member</h3>
-            <div className="space-y-3">
-              <input type="text" placeholder="Notification title" value={notifTitle} onChange={e => setNotifTitle(e.target.value)}
-                className="w-full rounded-xl border border-ivory-200 px-4 py-3 font-ui text-sm text-ink placeholder-ink/30 focus:outline-none focus:ring-2 focus:ring-aubergine/25 focus:border-aubergine transition-all" />
-              <textarea rows={2} placeholder="Optional message body…" value={notifBody} onChange={e => setNotifBody(e.target.value)}
-                className="w-full rounded-xl border border-ivory-200 px-4 py-3 font-ui text-sm text-ink placeholder-ink/30 focus:outline-none focus:ring-2 focus:ring-aubergine/25 focus:border-aubergine transition-all resize-none" />
-              {notifSent && (
-                <p className="font-mono text-[9px] text-peacock uppercase tracking-widest flex items-center gap-1.5">
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
-                  Notification sent
-                </p>
-              )}
-              <button onClick={sendNotification} disabled={!notifTitle.trim() || sendingNotif}
-                className={`w-full py-3 rounded-xl font-ui font-semibold text-sm transition-all ${notifTitle.trim() && !sendingNotif ? "bg-aubergine text-white hover:opacity-90" : "bg-ivory text-ink-muted cursor-not-allowed"}`}>
-                {sendingNotif ? "Sending…" : "Send notification"}
-              </button>
             </div>
           </div>
         </div>
@@ -573,6 +605,113 @@ export default function AdminUserDetailPage() {
           )}
         </div>
       )}
+
+        </div>{/* ── end main column ── */}
+
+        {/* ── Actions + Email Log sidebar ── */}
+        <aside className="space-y-6">
+
+          {/* Actions */}
+          <div className="bg-white rounded-2xl border border-ivory-200 p-5 shadow-sm">
+            <h3 className="font-display font-bold text-ink text-base">Actions</h3>
+            <p className="font-ui text-xs text-ink-muted mt-0.5 mb-4">Manual actions for this member.</p>
+
+            {/* Welcome email */}
+            <div className="rounded-xl border border-ivory-200 p-4 mb-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-7 h-7 rounded-lg bg-marigold/15 text-marigold-dark flex items-center justify-center shrink-0">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                </span>
+                <p className="font-ui text-sm font-semibold text-ink">Welcome email</p>
+              </div>
+              <p className="font-ui text-xs text-ink-muted leading-relaxed mb-3">
+                Branded intro inviting them to log in, explore Garba 2026 events, buy tickets, and start their Garba Passport.
+              </p>
+              <button onClick={sendWelcomeEmail} disabled={sendingWelcome || !profile.email}
+                className={`w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl font-ui font-semibold text-sm transition-all ${!sendingWelcome && profile.email ? "bg-marigold text-aubergine hover:opacity-90" : "bg-ivory text-ink-muted cursor-not-allowed"}`}>
+                {sendingWelcome
+                  ? <><div className="w-4 h-4 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" />Sending…</>
+                  : "Send welcome email"}
+              </button>
+              {welcomeStatus === "sent" && (
+                <p className="font-mono text-[9px] text-peacock uppercase tracking-widest mt-2 flex items-center gap-1.5">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                  Sent to {profile.email}
+                </p>
+              )}
+              {welcomeStatus === "error" && <p className="font-mono text-[9px] text-durga uppercase tracking-widest mt-2">Failed to send — try again</p>}
+              {!profile.email && <p className="font-mono text-[9px] text-durga uppercase tracking-widest mt-2">No email on file</p>}
+            </div>
+
+            {/* In-app notification */}
+            <div className="rounded-xl border border-ivory-200 p-4">
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className="w-7 h-7 rounded-lg bg-aubergine/10 text-aubergine flex items-center justify-center shrink-0">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                </span>
+                <p className="font-ui text-sm font-semibold text-ink">In-app notification</p>
+              </div>
+              <div className="space-y-2.5">
+                <input type="text" placeholder="Notification title" value={notifTitle} onChange={e => setNotifTitle(e.target.value)}
+                  className="w-full rounded-lg border border-ivory-200 px-3 py-2 font-ui text-sm text-ink placeholder-ink/30 focus:outline-none focus:ring-2 focus:ring-aubergine/25 focus:border-aubergine transition-all" />
+                <textarea rows={2} placeholder="Optional message…" value={notifBody} onChange={e => setNotifBody(e.target.value)}
+                  className="w-full rounded-lg border border-ivory-200 px-3 py-2 font-ui text-sm text-ink placeholder-ink/30 focus:outline-none focus:ring-2 focus:ring-aubergine/25 focus:border-aubergine transition-all resize-none" />
+                {notifSent && (
+                  <p className="font-mono text-[9px] text-peacock uppercase tracking-widest flex items-center gap-1.5">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                    Notification sent
+                  </p>
+                )}
+                <button onClick={sendNotification} disabled={!notifTitle.trim() || sendingNotif}
+                  className={`w-full py-2.5 rounded-xl font-ui font-semibold text-sm transition-all ${notifTitle.trim() && !sendingNotif ? "bg-aubergine text-white hover:opacity-90" : "bg-ivory text-ink-muted cursor-not-allowed"}`}>
+                  {sendingNotif ? "Sending…" : "Send notification"}
+                </button>
+              </div>
+            </div>
+
+            <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted/40 mt-3 text-center">More actions coming soon</p>
+          </div>
+
+          {/* Email Log */}
+          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden shadow-sm">
+            <div className="px-5 py-4 border-b border-ivory-200 flex items-center justify-between">
+              <h3 className="font-display font-bold text-ink text-base">Email Log</h3>
+              <span className="font-mono text-[10px] text-ink/40 uppercase tracking-widest">{emailLogs.length} sent</span>
+            </div>
+            {emailLogs.length === 0 ? (
+              <div className="py-10 text-center">
+                <p className="text-2xl mb-2">📭</p>
+                <p className="font-ui text-sm text-ink/40">No emails sent yet</p>
+                <p className="font-mono text-[9px] text-ink/25 mt-1">Welcome &amp; future emails will appear here</p>
+              </div>
+            ) : (
+              <div className="divide-y divide-ivory-200 max-h-[460px] overflow-y-auto">
+                {emailLogs.map(log => (
+                  <div key={log.id} className="px-5 py-3.5">
+                    <div className="flex items-center justify-between gap-2 mb-0.5">
+                      <p className="font-ui font-semibold text-ink text-sm leading-tight">{EMAIL_TYPE_LABEL[log.type] ?? log.type}</p>
+                      <span className={`shrink-0 inline-flex items-center px-2 py-0.5 rounded-full font-mono text-[8px] font-bold uppercase tracking-wide ${log.status === "sent" ? "bg-peacock/10 text-peacock" : "bg-durga/12 text-durga"}`}>
+                        {log.status}
+                      </span>
+                    </div>
+                    {log.subject && <p className="font-ui text-xs text-ink-muted truncate">{log.subject}</p>}
+                    <div className="flex items-center gap-x-2 gap-y-1 mt-1.5 flex-wrap">
+                      <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded ${log.trigger === "automatic" ? "bg-peacock/10 text-peacock" : "bg-marigold/15 text-marigold-dark"}`}>
+                        {log.trigger}
+                      </span>
+                      <span className="font-mono text-[9px] text-ink/40">{fmtTime(log.created_at)}</span>
+                      {log.trigger === "manual" && log.sender && (
+                        <span className="font-mono text-[9px] text-ink/30">· by {[log.sender.first_name, log.sender.last_name].filter(Boolean).join(" ")}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+        </aside>
+      </div>{/* ── end CRM grid ── */}
     </div>
   );
 }

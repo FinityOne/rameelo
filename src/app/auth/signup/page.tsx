@@ -95,10 +95,15 @@ export default function SignUpPage() {
     const user = createUser({ firstName, lastName, email, phone, city, state });
     saveUser(user);
 
-    // Fire welcome email (non-blocking — don't delay registration on failure)
+    // Fire welcome email (non-blocking — don't delay registration on failure).
+    // Pass the new user's access token so the API can verify them immediately.
+    const accessToken = data.session?.access_token;
     fetch("/api/send-welcome", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+      },
       body: JSON.stringify({ firstName, email }),
     }).catch(() => { /* silent — welcome email failure shouldn't block onboarding */ });
 

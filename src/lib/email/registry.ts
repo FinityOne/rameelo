@@ -1,0 +1,114 @@
+// ── Platform email registry ──────────────────────────────────────────────────
+// One transparent catalog of every Rameelo email: what it is, who it's for,
+// how it fires (automatic vs manual), and whether it's live yet. Powers the
+// admin Emails page. When you ship a new email, add/flip an entry here.
+
+export type EmailTrigger = "automatic" | "manual" | "both";
+export type EmailStatus = "live" | "planned";
+export type EmailCategory = "Member" | "Orders & Tickets" | "Organizer" | "Payments";
+
+export type EmailDef = {
+  key: string;
+  name: string;
+  description: string;
+  audience: string;
+  category: EmailCategory;
+  status: EmailStatus;
+  trigger: EmailTrigger;
+  fires: string; // plain-language: when/how it sends
+};
+
+export const EMAIL_REGISTRY: EmailDef[] = [
+  {
+    key: "welcome",
+    name: "Welcome email",
+    description: "Warm intro inviting a new member to log in, explore Garba 2026 events, buy tickets, and start their Garba Passport.",
+    audience: "New members",
+    category: "Member",
+    status: "live",
+    trigger: "both",
+    fires: "Automatically on account creation · Manual resend from a user's detail page",
+  },
+  {
+    key: "org-invite",
+    name: "Organization invite",
+    description: "Invites someone to join an organization's team, with a claim-on-login link.",
+    audience: "Organizers",
+    category: "Organizer",
+    status: "live",
+    trigger: "automatic",
+    fires: "When an organizer or admin invites a team member",
+  },
+
+  // ── Planned (not yet built) ──
+  {
+    key: "order-confirmation",
+    name: "Order confirmation & tickets",
+    description: "Receipt with tickets/QR codes after a successful purchase.",
+    audience: "Buyers",
+    category: "Orders & Tickets",
+    status: "planned",
+    trigger: "automatic",
+    fires: "On a confirmed order",
+  },
+  {
+    key: "event-reminder",
+    name: "Event reminder",
+    description: "A nudge a few days before an event the member holds tickets to.",
+    audience: "Buyers",
+    category: "Orders & Tickets",
+    status: "planned",
+    trigger: "automatic",
+    fires: "Scheduled before the event date",
+  },
+  {
+    key: "ticket-transfer",
+    name: "Ticket transfer",
+    description: "Notifies the recipient when a ticket is transferred to them.",
+    audience: "Members",
+    category: "Orders & Tickets",
+    status: "planned",
+    trigger: "automatic",
+    fires: "On a ticket transfer",
+  },
+  {
+    key: "tickets-live",
+    name: "Tickets-now-live alert",
+    description: "Tells interested fans when a “coming soon” event's tickets go on sale.",
+    audience: "Interested fans",
+    category: "Orders & Tickets",
+    status: "planned",
+    trigger: "manual",
+    fires: "When an admin flips an event to selling and notifies its interest list",
+  },
+  {
+    key: "payout-status",
+    name: "Payout status",
+    description: "Updates an organizer when a payout request is approved, paid, or declined.",
+    audience: "Organizers",
+    category: "Payments",
+    status: "planned",
+    trigger: "automatic",
+    fires: "On a payout status change",
+  },
+  {
+    key: "refund-dispute",
+    name: "Refund & dispute notice",
+    description: "Notifies the buyer and organizer on refunds, chargebacks, and dispute updates.",
+    audience: "Members & Organizers",
+    category: "Payments",
+    status: "planned",
+    trigger: "automatic",
+    fires: "On a refund or dispute event",
+  },
+  {
+    key: "onboarding-invite",
+    name: "Organizer onboarding link",
+    description: "Emails a lead the onboarding questionnaire link (currently copy-pasted from the admin org page).",
+    audience: "Organizer leads",
+    category: "Organizer",
+    status: "planned",
+    trigger: "manual",
+    fires: "Sent by an admin from the organization page",
+  },
+];

@@ -51,9 +51,14 @@ function JoinPageInner() {
     if (data.user) {
       const user = createUser({ firstName, lastName, email, phone: "", city: "", state: "" });
       saveUser(user);
+      // Welcome email — pass the new user's token so the API verifies them.
+      const accessToken = data.session?.access_token;
       fetch("/api/send-welcome", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
+        },
         body: JSON.stringify({ firstName, email }),
       }).catch(() => {});
     }
