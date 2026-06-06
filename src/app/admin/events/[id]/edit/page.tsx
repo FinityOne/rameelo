@@ -57,6 +57,7 @@ type EventData = {
   selling_on_rameelo: boolean;
   featured_on_tour: boolean;
   featured_on_events: boolean;
+  featured_on_artist: boolean;
   organizer_id: string | null;
   org_id: string | null;
 };
@@ -296,7 +297,7 @@ export default function AdminEventEditPage() {
             venue_name, address_line1, address_line2, city, state, zip,
             parking, parking_notes, website_url, cover_image_url, cover_gradient,
             dress_code, dress_code_details, dandiya_sticks, age_restriction,
-            capacity, status, selling_on_rameelo, featured_on_tour, featured_on_events, organizer_id, org_id
+            capacity, status, selling_on_rameelo, featured_on_tour, featured_on_events, featured_on_artist, organizer_id, org_id
           `)
           .eq("id", id)
           .single(),
@@ -453,6 +454,7 @@ export default function AdminEventEditPage() {
             selling_on_rameelo: ev.selling_on_rameelo,
             featured_on_tour:   ev.featured_on_tour,
             featured_on_events: ev.featured_on_events,
+            featured_on_artist: ev.featured_on_artist,
             organizer_id:       ev.organizer_id || null,
             org_id:             ev.org_id || null,
           }).eq("id", id);
@@ -789,6 +791,12 @@ export default function AdminEventEditPage() {
                 checked={ev.featured_on_events}
                 onChange={v => patchEv({ featured_on_events: v })}
               />
+              <ToggleRow
+                title="Feature on the artist page"
+                desc="Pin this event to the top of the artist's tour list on their detail page, with a Featured badge."
+                checked={ev.featured_on_artist}
+                onChange={v => patchEv({ featured_on_artist: v })}
+              />
             </div>
           </div>
 
@@ -1013,6 +1021,12 @@ export default function AdminEventEditPage() {
               <p className="font-display font-semibold text-ink text-sm" style={{ letterSpacing: "-0.01em" }}>Cover Photo</p>
             </div>
             <div className="p-5 space-y-4">
+              <div className="flex items-start gap-2.5 rounded-xl bg-aubergine/5 border border-aubergine/15 px-3.5 py-3">
+                <svg className="w-4 h-4 text-aubergine shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div className="font-ui text-xs text-ink-muted leading-relaxed">
+                  <span className="font-semibold text-ink">Recommended: 1600 × 900 px (16:9 landscape), JPG or PNG under 8 MB.</span> The cover fills the event hero edge-to-edge. Keep faces and key visuals <span className="font-medium text-ink">centered or slightly right</span>, and leave the left side and outer edges clear — the title &amp; details overlay the left on desktop, and the sides crop on mobile.
+                </div>
+              </div>
               <div className="relative w-full h-44 rounded-2xl overflow-hidden"
                 style={{ background: ev.cover_image_url ? undefined : gradient.css }}>
                 {ev.cover_image_url && (

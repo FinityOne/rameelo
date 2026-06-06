@@ -52,6 +52,14 @@ export default function Step4Cover({ data, onChange, organizerId }: Props) {
       <div>
         <label className={labelCls}>Cover Photo</label>
 
+        {/* Sizing guidance */}
+        <div className="flex items-start gap-2.5 rounded-xl bg-aubergine/5 border border-aubergine/15 px-3.5 py-3 mb-4">
+          <svg className="w-4 h-4 text-aubergine shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+          <div className="font-ui text-xs text-ink-muted leading-relaxed">
+            <span className="font-semibold text-ink">Recommended: 1600 × 900 px (16:9 landscape), JPG/PNG/WEBP under 8 MB.</span> The cover fills the event hero edge-to-edge. Keep faces and key visuals <span className="font-medium text-ink">centered or slightly right</span>, and leave the left side and outer edges clear — the title &amp; details overlay the left on desktop, and the sides crop on mobile.
+          </div>
+        </div>
+
         {/* Preview */}
         <div
           className="relative w-full h-48 rounded-2xl overflow-hidden mb-4 flex items-end"

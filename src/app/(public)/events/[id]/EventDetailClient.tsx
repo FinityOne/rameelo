@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
+import EventInterestView from "./EventInterestView";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -16,6 +17,9 @@ type Artist = {
   bio: string | null;
   profile_image_url: string | null;
   genres: string[] | null;
+  years_active_since: number | null;
+  follower_count: number | null;
+  performance_style: string | null;
 };
 
 type Organization = {
@@ -633,7 +637,7 @@ export default function EventDetailClient({ id }: { id: string }) {
         cover_image_url, cover_gradient,
         dress_code, dress_code_details, dandiya_sticks, age_restriction, capacity, selling_on_rameelo,
         artist:artists!events_artist_id_fkey (
-          id, name, slug, tagline, bio, profile_image_url, genres
+          id, name, slug, tagline, bio, profile_image_url, genres, years_active_since, follower_count, performance_style
         ),
         organization:organizations!events_org_id_fkey (
           id, name, description, logo_url, city, state, website, instagram, facebook
@@ -824,6 +828,12 @@ export default function EventDetailClient({ id }: { id: string }) {
         </div>
       </div>
     );
+  }
+
+  // ── INTEREST MODE ── event not selling tickets on Rameelo (and not past):
+  // a "Tickets Coming Soon" interest page with a notify-me form.
+  if (!event.selling_on_rameelo && !isEventPast(event)) {
+    return <EventInterestView event={event} />;
   }
 
   const totalSoldOut = event.ticket_tiers.every(t => t.quantity_sold >= t.quantity);

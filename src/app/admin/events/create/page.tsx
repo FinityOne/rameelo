@@ -53,6 +53,7 @@ export default function AdminCreateEventPage() {
   const [sellingOnRameelo, setSellingOnRameelo] = useState(true);
   const [featuredOnTour, setFeaturedOnTour]     = useState(false);
   const [featuredOnEvents, setFeaturedOnEvents] = useState(false);
+  const [featuredOnArtist, setFeaturedOnArtist] = useState(false);
   const [locationTba, setLocationTba]           = useState(false);
 
   useEffect(() => {
@@ -136,6 +137,7 @@ export default function AdminCreateEventPage() {
           selling_on_rameelo: sellingOnRameelo,
           featured_on_tour:   featuredOnTour,
           featured_on_events: featuredOnEvents,
+          featured_on_artist: featuredOnArtist,
         })
         .select('id')
         .single();
@@ -203,7 +205,7 @@ export default function AdminCreateEventPage() {
             Back to events
           </button>
           <button
-            onClick={() => { setSubmitted(false); setForm(DEFAULT_FORM); setStep(0); setPublishStatus('published'); setSellingOnRameelo(true); setFeaturedOnTour(false); setFeaturedOnEvents(false); setLocationTba(false); }}
+            onClick={() => { setSubmitted(false); setForm(DEFAULT_FORM); setStep(0); setPublishStatus('published'); setSellingOnRameelo(true); setFeaturedOnTour(false); setFeaturedOnEvents(false); setFeaturedOnArtist(false); setLocationTba(false); }}
             className="border border-ivory-200 text-ink font-ui font-semibold text-sm px-6 py-3 rounded-xl hover:bg-ivory transition-colors">
             Create another
           </button>
@@ -390,6 +392,7 @@ export default function AdminCreateEventPage() {
                     {([
                       { key: 'tour',   label: '⭐ Feature on the tour page',   desc: 'Show in the homepage “Featured this Navratri” showcase', checked: featuredOnTour,   set: setFeaturedOnTour },
                       { key: 'events', label: '⭐ Feature on the events list', desc: 'Pin to the top of the public Events page with a badge',     checked: featuredOnEvents, set: setFeaturedOnEvents },
+                      { key: 'artist', label: '⭐ Feature on the artist page', desc: 'Pin to the top of the artist’s tour list with a badge',     checked: featuredOnArtist, set: setFeaturedOnArtist },
                     ] as const).map(opt => (
                       <button key={opt.key} type="button" onClick={() => opt.set(!opt.checked)}
                         className={`w-full flex items-start gap-3 p-3 rounded-xl border-2 text-left transition-all ${opt.checked ? 'border-aubergine bg-aubergine/5' : 'border-ivory-200 hover:border-aubergine/30'}`}>

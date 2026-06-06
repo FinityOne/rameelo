@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { personSchema, breadcrumbSchema, ld } from "@/lib/jsonld";
+import FollowButton, { ShareButton } from "./FollowButton";
+import { GRADIENTS } from "@/app/organizer/events/create/types";
 
 type Props = { params: Promise<{ slug: string }>; searchParams: Promise<{ via?: string }> };
 
@@ -75,6 +77,8 @@ type ArtistFull = {
   performance_style: string | null;
   instruments: string[];
   years_active_since: number | null;
+  follower_count: number | null;
+  monthly_listeners: number | null;
   based_in: string | null;
   hometown_city: string | null;
   hometown_state: string | null;
@@ -109,6 +113,9 @@ type EventRow = {
   city: string;
   state: string;
   cover_gradient: string | null;
+  cover_image_url: string | null;
+  featured_on_artist: boolean;
+  selling_on_rameelo: boolean;
   ticket_tiers: Tier[];
 };
 
@@ -139,11 +146,18 @@ function genreColor(genres: string[]): string {
   return "#2E1B30";
 }
 
+// Compact count for vanity stats, e.g. 125000 → "125K+", 1_250_000 → "1.3M+".
+function fmtCount(n: number): string {
+  const c = new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }).format(n);
+  return n >= 1000 ? `${c}+` : c;
+}
+
 function fmtDate(iso: string) {
   const d = new Date(iso + "T00:00:00");
   return {
     month: d.toLocaleString("en-US", { month: "short" }),
     day: String(d.getDate()),
+    weekday: d.toLocaleString("en-US", { weekday: "short" }),
   };
 }
 
@@ -157,77 +171,6 @@ function eventStats(tiers: Tier[]) {
   return { soldPct, totalQty, totalSold, minPrice, isSoldOut };
 }
 
-type BadgeStyle = 'urgent' | 'hot' | 'social' | 'neutral';
-type EventBadge = { text: string; dot?: boolean; style: BadgeStyle };
-
-// Deterministic seed from event ID — same event always gets the same badge variant
-function idSeed(id: string): number {
-  return id.split('').reduce((acc, c) => acc + c.charCodeAt(0), 0);
-}
-
-function getEventBadge(
-  soldPct: number, totalQty: number, totalSold: number,
-  isSoldOut: boolean, city: string | null, eventId: string
-): EventBadge {
-  if (isSoldOut) return { text: 'Sold out', style: 'urgent' };
-
-  const remaining  = totalQty > 0 ? totalQty - totalSold : null;
-  const cityLabel  = city ?? null;
-  const seed       = idSeed(eventId);
-
-  // ── Real scarcity: hard ticket counts ──────────────────────────────────────
-  if (remaining !== null && remaining <= 25 && remaining > 0)
-    return { text: `${remaining} tickets left`, dot: true, style: 'urgent' };
-
-  if (remaining !== null && remaining <= 60 && soldPct >= 80)
-    return { text: 'Last few tickets', dot: true, style: 'urgent' };
-
-  // ── High velocity ───────────────────────────────────────────────────────────
-  if (soldPct >= 75) {
-    const opts: EventBadge[] = [
-      { text: cityLabel ? `Selling fast in ${cityLabel}` : 'Selling fast', dot: true, style: 'hot' },
-      { text: '🔥 High demand this season', style: 'hot' },
-    ];
-    return opts[seed % opts.length];
-  }
-
-  // ── Mid-range momentum ──────────────────────────────────────────────────────
-  if (soldPct >= 45) {
-    const opts: EventBadge[] = [
-      { text: cityLabel ? `Popular in ${cityLabel}` : 'Popular event', dot: true, style: 'hot' },
-      { text: 'Trending this Navratri', dot: true, style: 'hot' },
-      { text: cityLabel ? `${cityLabel}'s top event` : 'Top event nearby', style: 'hot' },
-    ];
-    return opts[seed % opts.length];
-  }
-
-  // ── Social proof with real attendee count ───────────────────────────────────
-  if (soldPct >= 15 && totalSold > 0) {
-    const opts: EventBadge[] = [
-      { text: `${totalSold}+ people going`, style: 'social' },
-      { text: cityLabel ? `${totalSold}+ from ${cityLabel} going` : `${totalSold}+ attending`, style: 'social' },
-    ];
-    return opts[seed % opts.length];
-  }
-
-  // ── Aspirational interest signals (no sales data — never show empty/cold) ──
-  const aspirational: EventBadge[] = [
-    { text: 'Featured Garba event', style: 'neutral' },
-    { text: 'Limited capacity venue', style: 'neutral' },
-    { text: cityLabel ? `${cityLabel} exclusive` : 'Regional headliner', style: 'neutral' },
-    { text: 'Navratri season pick', style: 'neutral' },
-    { text: 'Early access open', dot: true, style: 'neutral' },
-  ];
-  return aspirational[seed % aspirational.length];
-}
-
-const BADGE_STYLES: Record<BadgeStyle, string> = {
-  urgent:  'bg-durga/10 text-durga border border-durga/20',
-  hot:     'bg-amber-500/12 text-amber-700 border border-amber-500/20',
-  social:  'bg-peacock/10 text-peacock border border-peacock/20',
-  neutral: 'bg-aubergine/8 text-aubergine border border-aubergine/15',
-};
-
 function extractYouTubeId(url: string): string | null {
   const m = url.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/)([^&?\s]+)/);
   return m ? m[1] : null;
@@ -235,79 +178,141 @@ function extractYouTubeId(url: string): string | null {
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
-function StatPill({ value, label }: { value: string; label: string }) {
+// ── FA-style icons (inline SVG to match the codebase's no-dependency convention) ──
+type IconName = "star" | "music" | "calendar" | "sparkles";
+function StatIcon({ name }: { name: IconName }) {
+  const cls = "w-5 h-5";
+  switch (name) {
+    case "star": // fa-star (regular)
+      return <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11.48 3.5l2.2 4.46 4.92.72-3.56 3.47.84 4.9-4.4-2.31-4.4 2.31.84-4.9L4.36 8.68l4.92-.72L11.48 3.5z" /></svg>;
+    case "music": // fa-music
+      return <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z" /></svg>;
+    case "calendar": // fa-calendar-days
+      return <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>;
+    case "sparkles": // fa-wand-magic-sparkles
+      return <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 3v4M3 5h4M6 17v4m-2-2h4m6-13l2.5 5.5L22 14l-5.5 2.5L14 22l-2.5-5.5L6 14l5.5-2.5L14 6z" /></svg>;
+  }
+}
+
+function StatCard({ icon, value, label }: { icon: IconName; value: string; label: string }) {
   return (
-    <div className="text-center px-6 py-4 rounded-2xl bg-white/10 border border-white/15">
-      <p className="font-display font-bold text-white text-2xl sm:text-3xl leading-none" style={{ letterSpacing: "-0.02em" }}>{value}</p>
-      <p className="font-mono text-[10px] uppercase tracking-widest text-white/50 mt-1.5">{label}</p>
+    <div className="rounded-2xl border border-ivory-200 bg-white px-4 py-4 text-center">
+      <div className="text-marigold flex justify-center mb-2">
+        <StatIcon name={icon} />
+      </div>
+      <p className="font-display font-bold text-ink text-xl sm:text-2xl leading-none truncate" style={{ letterSpacing: "-0.02em" }}>{value}</p>
+      <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted mt-1.5">{label}</p>
     </div>
   );
 }
 
-function ArtistAvatar({ artist, size = 64 }: { artist: ArtistFull | OtherArtist; size?: number }) {
-  const initials = artist.name.split(" ").map((w) => w[0]).join("").slice(0, 2).toUpperCase();
-  if (artist.profile_image_url) {
-    return <img src={artist.profile_image_url} alt={artist.name} className="rounded-2xl object-cover border-2 border-white/30" style={{ width: size, height: size }} />;
-  }
+// Dark translucent stat card for the hero (icon left, value + label right).
+function HeroStat({ icon, value, label }: { icon: IconName; value: string; label: string }) {
   return (
-    <div className="rounded-2xl bg-white/20 backdrop-blur-sm border border-white/30 flex items-center justify-center shrink-0" style={{ width: size, height: size }}>
-      <span className="font-display font-bold text-white" style={{ fontSize: size * 0.38, letterSpacing: "-0.02em" }}>{initials}</span>
+    <div className="flex items-center gap-3.5 rounded-2xl bg-white/[0.08] border border-white/15 backdrop-blur-sm px-4 py-3.5">
+      <span className="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-marigold shrink-0">
+        <StatIcon name={icon} />
+      </span>
+      <div className="min-w-0">
+        <p className="font-display font-bold text-white text-xl leading-none truncate" style={{ letterSpacing: "-0.02em" }}>{value}</p>
+        <p className="font-mono text-[9px] uppercase tracking-widest text-white/55 mt-1">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+// Small labelled meta row for the About card.
+function MetaRow({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="flex items-start gap-2.5">
+      <span className="text-marigold shrink-0 mt-0.5">{icon}</span>
+      <div className="min-w-0">
+        <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">{label}</p>
+        <p className="font-ui text-sm text-ink mt-0.5 break-words">{value}</p>
+      </div>
     </div>
   );
 }
 
 function EventRow({ event, heroColor, past = false }: { event: EventRow; heroColor: string; past?: boolean }) {
-  const { soldPct, totalQty, totalSold, minPrice, isSoldOut } = eventStats(event.ticket_tiers ?? []);
-  const badge = !past ? getEventBadge(soldPct, totalQty, totalSold, isSoldOut, event.city, event.id) : null;
+  const { minPrice, isSoldOut } = eventStats(event.ticket_tiers ?? []);
   const date  = fmtDate(event.start_date);
+  const featured = !past && event.featured_on_artist;
+  const selling = event.selling_on_rameelo;
+  const cityState = [event.city, event.state].filter(Boolean).join(", ");
+  const eventGradient = GRADIENTS.find((g) => g.id === event.cover_gradient)?.css ?? `linear-gradient(135deg, ${heroColor}, #1a0a1f)`;
   return (
     <Link
       href={`/events/${event.id}`}
-      className={`group flex items-center gap-4 p-4 rounded-2xl border hover:shadow-md transition-all ${past ? "bg-ivory/60 border-ivory-200 opacity-70 hover:opacity-100" : "bg-white border-ivory-200 hover:border-marigold/30"}`}
+      className={`group flex items-stretch gap-4 sm:gap-5 py-4 transition-colors ${past ? "opacity-70 hover:opacity-100" : ""}`}
     >
-      <div
-        className="w-14 h-14 rounded-xl flex flex-col items-center justify-center shrink-0 text-white"
-        style={{ backgroundColor: past ? "#9ca3af" : heroColor }}
-      >
-        <p className="font-display font-bold text-xl leading-none">{date.day}</p>
-        <p className="font-mono text-[9px] uppercase tracking-wide opacity-70">{date.month}</p>
-      </div>
-
-      <div className="flex-1 min-w-0">
-        <h3 className="font-display font-bold text-ink text-sm leading-tight group-hover:text-aubergine transition-colors truncate">
-          {event.title}
-        </h3>
-        <p className="font-ui text-xs text-ink-muted mt-0.5 truncate">
-          {[event.venue_name, event.city, event.state].filter(Boolean).join(" · ")}
-        </p>
-        {badge && (
-          <div className="mt-2">
-            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full font-mono text-[9px] font-semibold uppercase tracking-wide ${BADGE_STYLES[badge.style]}`}>
-              {badge.dot && (
-                <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${badge.style === 'urgent' ? 'bg-durga animate-pulse' : badge.style === 'hot' ? 'bg-amber-500 animate-pulse' : badge.style === 'social' ? 'bg-peacock' : 'bg-aubergine'}`} />
-              )}
-              {badge.text}
-            </span>
-          </div>
-        )}
-      </div>
-
-      {!past && (
-        <div className="text-right shrink-0">
-          {minPrice !== null ? (
-            <>
-              <p className="font-display font-bold text-ink text-base">${minPrice}</p>
-              <p className="font-mono text-[9px] uppercase tracking-wide text-ink-muted">from</p>
-            </>
+      {/* Date tile + event image (gradient fallback) */}
+      <div className="relative h-16 sm:h-[72px] w-[88px] sm:w-36 rounded-lg overflow-hidden shrink-0 self-center flex">
+        <div
+          className="w-12 sm:w-14 h-full flex flex-col items-center justify-center shrink-0 text-white z-10"
+          style={{ backgroundColor: past ? "#9ca3af" : heroColor }}
+        >
+          <p className="font-mono text-[9px] uppercase tracking-widest opacity-75">{date.month}</p>
+          <p className="font-display font-bold text-xl sm:text-2xl leading-none">{date.day}</p>
+          <p className="font-mono text-[8px] uppercase tracking-widest opacity-60 mt-0.5">{date.weekday}</p>
+        </div>
+        <div className="flex-1 h-full relative">
+          {event.cover_image_url ? (
+            <img src={event.cover_image_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
           ) : (
-            <p className="font-mono text-[9px] uppercase tracking-wide text-ink-muted">TBA</p>
+            <div className="absolute inset-0" style={{ background: eventGradient }} />
           )}
         </div>
-      )}
+      </div>
 
-      <svg className="w-4 h-4 text-ink-muted group-hover:text-aubergine transition-colors shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-      </svg>
+      {/* Details */}
+      <div className="flex-1 min-w-0 flex flex-col justify-center">
+        {featured && (
+          <span className="inline-flex items-center w-fit mb-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-marigold-dark bg-marigold/15 border border-marigold/30 px-2 py-0.5 rounded-md">
+            Featured Event
+          </span>
+        )}
+        <h3 className="font-display font-bold text-ink text-base sm:text-lg leading-tight group-hover:text-aubergine transition-colors truncate">
+          {event.title}
+        </h3>
+        <div className="mt-1.5 space-y-1">
+          {event.venue_name && (
+            <p className="flex items-center gap-1.5 font-ui text-xs sm:text-sm font-medium text-ink truncate">
+              {/* fa-location-dot */}
+              <svg className="w-3.5 h-3.5 text-aubergine shrink-0" fill="currentColor" viewBox="0 0 384 512"><path d="M215.7 499.2C267 435 384 279.4 384 192 384 86 298 0 192 0S0 86 0 192c0 87.4 117 243 168.3 307.2 12.3 15.3 35.1 15.3 47.4 0zM192 128a64 64 0 110 128 64 64 0 110-128z" /></svg>
+              <span className="truncate">{event.venue_name}</span>
+            </p>
+          )}
+          {cityState && (
+            <p className="flex items-center gap-1.5 font-ui text-xs sm:text-sm font-medium text-ink-muted truncate">
+              {/* fa-map-pin */}
+              <svg className="w-3.5 h-3.5 text-durga shrink-0" fill="currentColor" viewBox="0 0 320 512"><path d="M112 316.9V456c0 30.9 21.5 56 48 56s48-25.1 48-56V316.9c54.7-15.6 96-69.3 96-132.9C352 82.5 273.5 0 176 0S0 82.5 0 184c0 63.6 41.3 117.3 96 132.9zM176 96a88 88 0 110 176 88 88 0 110-176z" /></svg>
+              <span className="truncate">{cityState}</span>
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* Price (top) + CTA pinned bottom-right */}
+      {past ? (
+        <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted shrink-0 self-center">Ended</span>
+      ) : (
+        <div className="flex flex-col items-end shrink-0 self-stretch">
+          {/* Price text only when a price exists and tickets sell on Rameelo */}
+          {selling && minPrice !== null && (
+            <div className="text-right leading-none">
+              <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted/70 mb-1">From</p>
+              <p className="font-display font-bold text-ink text-xl sm:text-2xl leading-none">${minPrice}</p>
+            </div>
+          )}
+          <span
+            className={`mt-auto inline-flex items-center justify-center px-4 sm:px-5 py-2 rounded-lg font-display font-bold text-xs sm:text-sm text-white transition-all ${isSoldOut ? "opacity-60" : "group-hover:opacity-90"}`}
+            style={{ backgroundColor: isSoldOut ? "#9ca3af" : heroColor }}
+          >
+            {isSoldOut ? "Sold Out" : "Get Tickets"}
+          </span>
+        </div>
+      )}
     </Link>
   );
 }
@@ -338,11 +343,12 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
   const { data: eventsRaw } = await supabase
     .from("events")
     .select(`
-      id, title, start_date, start_time, venue_name, city, state, cover_gradient,
+      id, title, start_date, start_time, venue_name, city, state, cover_gradient, cover_image_url, featured_on_artist, selling_on_rameelo,
       ticket_tiers (id, name, price, quantity, quantity_sold, is_visible)
     `)
     .eq("status", "published")
     .or(`artist_id.eq.${artist.id},artist.ilike.${artist.name}`)
+    .order("featured_on_artist", { ascending: false })
     .order("start_date", { ascending: true });
 
   // Other active artists
@@ -357,6 +363,12 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
   const events       = allEvents.filter(e => e.start_date >= today);
   const pastEvents   = allEvents.filter(e => e.start_date < today).reverse(); // most recent first
   const otherArtists = (othersRaw ?? []) as OtherArtist[];
+
+  // Follow button needs contrast against the near-black hero; if the artist's
+  // accent is the darkest plum, use durga so the CTA pops.
+  const followAccent = heroColor === "#2E1B30" ? "#7C1F2C" : heroColor;
+  // Cities for the "Upcoming in …" strip (deduped, in chronological order).
+  const tourCities = Array.from(new Set(events.map(e => e.city).filter(Boolean))).slice(0, 6);
 
   const awardsList = artist.awards
     ? artist.awards.split("\n").map((s) => s.trim()).filter(Boolean)
@@ -415,170 +427,185 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
         </div>
       )}
 
-      {/* ── HERO ─────────────────────────────────────────────────────────── */}
-      <section className="relative overflow-hidden">
-        {/* Background — cover image or gradient */}
-        {artist.cover_image_url ? (
-          <>
-            <img src={artist.cover_image_url} alt="" className="absolute inset-0 w-full h-full object-cover" />
-            <div className="absolute inset-0" style={{ background: "linear-gradient(135deg, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.4) 100%)" }} />
-          </>
-        ) : (
-          <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${heroColor} 0%, #1a0a1f 60%, #2E1B30 100%)` }} />
+      {/* ── HERO — overlay (rich on desktop, stacked on mobile) ────────────── */}
+      <section className="relative overflow-hidden" style={{ backgroundColor: "#1a0a1f" }}>
+        {/* Background photo */}
+        {(artist.cover_image_url || artist.profile_image_url) && (
+          <img
+            src={artist.cover_image_url || artist.profile_image_url || ""}
+            alt={artist.name}
+            className="absolute inset-0 w-full h-full object-cover object-top lg:object-[78%_top]"
+          />
         )}
+        {/* Readability gradients — strong on the left (desktop), bottom (mobile) */}
+        <div className="absolute inset-0" style={{ background: `linear-gradient(100deg, ${heroColor}f2 0%, ${heroColor}d9 30%, rgba(26,10,31,0.6) 58%, rgba(26,10,31,0.12) 100%)` }} />
+        <div className="absolute inset-0" style={{ background: "linear-gradient(180deg, rgba(26,10,31,0.3) 0%, rgba(26,10,31,0) 32%, rgba(26,10,31,0.45) 100%)" }} />
+        {/* Decorative ring */}
+        <div className="absolute top-0 right-0 w-[480px] h-[480px] -translate-y-1/3 translate-x-1/3 rounded-full opacity-10 border-2 border-white pointer-events-none" />
 
-        {/* Decorative rings */}
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] -translate-y-1/3 translate-x-1/3 rounded-full opacity-10 border-2 border-white" />
-        <div className="absolute top-0 right-0 w-[400px] h-[400px] -translate-y-1/4 translate-x-1/4 rounded-full opacity-10 border border-white" />
-        <div className="absolute bottom-0 left-0 w-[300px] h-[300px] translate-y-1/2 -translate-x-1/2 rounded-full opacity-10 border-2 border-white" />
-
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-12 pb-16">
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-10 lg:pt-7 lg:pb-14 lg:min-h-[500px] flex flex-col">
           {/* Breadcrumb */}
-          <div className="flex items-center gap-2 mb-10">
-            <Link href="/artists" className="flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-widest text-white/40 hover:text-white/70 transition-colors">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-              All Artists
-            </Link>
-            <span className="text-white/20">/</span>
-            <span className="font-mono text-[11px] uppercase tracking-widest text-white/40">{artist.name}</span>
-          </div>
+          <Link href="/artists" className="inline-flex items-center gap-1.5 font-mono text-[11px] uppercase tracking-widest text-white/70 hover:text-white transition-colors w-fit">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+            All Artists
+          </Link>
 
-          <div className="flex flex-col lg:flex-row gap-10 lg:gap-16 items-start lg:items-end">
-            {/* Left: Identity */}
-            <div className="flex-1">
-              {/* Profile portrait */}
-              <div className="mb-5">
-                <div className="inline-block rounded-3xl p-1 bg-white/10 border border-white/20 shadow-xl">
-                  <ArtistAvatar artist={artist} size={104} />
+          <div className="flex-1 lg:grid lg:grid-cols-12 lg:gap-8 lg:items-center mt-10 lg:mt-8">
+            {/* Identity */}
+            <div className="lg:col-span-7">
+              {(artist.verified || via) && (
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  {artist.verified && (
+                    <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-peacock bg-peacock/15 border border-peacock/30 px-2.5 py-1 rounded-full">
+                      <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                      Verified Artist
+                    </span>
+                  )}
+                  {via && (
+                    <span className="inline-flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-widest text-marigold bg-marigold/15 border border-marigold/30 px-2.5 py-1 rounded-full">Official Site</span>
+                  )}
                 </div>
-              </div>
-              {/* Genre + status pills */}
-              <div className="flex flex-wrap gap-2 mb-5">
-                {artist.genres.slice(0, 3).map((g) => (
-                  <div key={g} className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-white/20 bg-white/10">
-                    <span className="w-1.5 h-1.5 rounded-full bg-marigold animate-pulse" />
-                    <span className="font-mono text-[11px] uppercase tracking-widest text-white/70">{g}</span>
-                  </div>
-                ))}
-                {artist.verified && (
-                  <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-peacock/40 bg-peacock/20">
-                    <svg className="w-3 h-3 text-peacock" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M6.267 3.455a3.066 3.066 0 001.745-.723 3.066 3.066 0 013.976 0 3.066 3.066 0 001.745.723 3.066 3.066 0 012.812 2.812c.051.643.304 1.254.723 1.745a3.066 3.066 0 010 3.976 3.066 3.066 0 00-.723 1.745 3.066 3.066 0 01-2.812 2.812 3.066 3.066 0 00-1.745.723 3.066 3.066 0 01-3.976 0 3.066 3.066 0 00-1.745-.723 3.066 3.066 0 01-2.812-2.812 3.066 3.066 0 00-.723-1.745 3.066 3.066 0 010-3.976 3.066 3.066 0 00.723-1.745 3.066 3.066 0 012.812-2.812zm7.44 5.252a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
-                    <span className="font-mono text-[11px] uppercase tracking-widest text-peacock">Verified Artist</span>
-                  </div>
-                )}
-                {via && (
-                  <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-marigold/40 bg-marigold/15">
-                    <span className="font-mono text-[11px] uppercase tracking-widest text-marigold">Official Site</span>
-                  </div>
-                )}
-              </div>
+              )}
 
-              {/* Name */}
-              <h1 className="font-display font-bold text-white leading-none mb-2" style={{ fontSize: "clamp(2.5rem, 7vw, 5rem)", letterSpacing: "-0.04em" }}>
+              <h1 className="font-display font-bold text-white leading-[0.98] mb-3"
+                style={{ fontSize: "clamp(2.5rem, 6.5vw, 4.5rem)", letterSpacing: "-0.04em" }}>
                 {artist.name}
               </h1>
 
-              {artist.tagline && (
-                <p className="font-mono text-[13px] uppercase tracking-widest mb-6" style={{ color: "#F5A623", opacity: 0.9 }}>
-                  {artist.tagline}{location ? ` · ${location}` : ""}
+              {artist.genres.length > 0 && (
+                <p className="font-display font-bold text-marigold text-lg sm:text-xl">
+                  {artist.genres.slice(0, 4).join("   ·   ")}
                 </p>
               )}
 
-              {/* Bio */}
               {artist.bio && (
-                <p className="font-ui text-white/70 text-base sm:text-lg leading-relaxed max-w-2xl mb-8">
-                  {artist.bio}
+                <p className="font-ui text-white/75 text-base leading-relaxed max-w-xl mt-5">{artist.bio}</p>
+              )}
+
+              {/* Actions */}
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3 mt-7">
+                <FollowButton accent={followAccent} />
+                <ShareButton title={artist.name} />
+              </div>
+
+              {/* Follower / listener stats (admin-set; hidden when unset) */}
+              {(artist.follower_count || artist.monthly_listeners) && (
+                <p className="font-ui text-sm text-white/70 mt-4">
+                  {[
+                    artist.follower_count ? <><span className="font-semibold text-white">{fmtCount(artist.follower_count)}</span> followers</> : null,
+                    artist.monthly_listeners ? <><span className="font-semibold text-white">{fmtCount(artist.monthly_listeners)}</span> monthly listeners</> : null,
+                  ].filter(Boolean).map((node, i, arr) => (
+                    <span key={i}>{node}{i < arr.length - 1 && <span className="text-white/40 mx-2">·</span>}</span>
+                  ))}
                 </p>
               )}
 
-              {/* Social links */}
-              <div className="flex flex-wrap gap-3">
-                {artist.youtube_url && (
-                  <a href={artist.youtube_url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-red-600 hover:bg-red-700 text-white font-ui font-semibold text-sm transition-all">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-2.75 12.56 12.56 0 00-4.56-.88A12.56 12.56 0 006.7 3.94a4.83 4.83 0 01-3.77 2.75A22.1 22.1 0 002 12a22.1 22.1 0 00.93 5.31 4.83 4.83 0 003.77 2.75 12.56 12.56 0 004.56.88 12.56 12.56 0 004.56-.88 4.83 4.83 0 003.77-2.75A22.1 22.1 0 0022 12a22.1 22.1 0 00-.41-5.31zM9.75 15.02V8.98L15.5 12z" /></svg>
-                    YouTube
-                  </a>
+              {/* Meta + social */}
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-3 mt-6">
+                {(location || events.length > 0) && (
+                  <p className="font-ui text-sm text-white/55">
+                    {[location, events.length > 0 ? `${events.length} upcoming show${events.length !== 1 ? "s" : ""}` : null].filter(Boolean).join("   ·   ")}
+                  </p>
                 )}
-                {artist.instagram_url && (
-                  <a href={artist.instagram_url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-ui font-semibold text-sm transition-all">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" /></svg>
-                    Instagram
-                  </a>
-                )}
-                {artist.spotify_url && (
-                  <a href={artist.spotify_url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-ui font-semibold text-sm transition-all">
-                    <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" /></svg>
-                    Spotify
-                  </a>
-                )}
-                {artist.website_url && (
-                  <a href={artist.website_url} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white/10 hover:bg-white/20 border border-white/20 text-white font-ui font-semibold text-sm transition-all">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" /></svg>
-                    Website
-                  </a>
-                )}
+                <div className="flex items-center gap-2">
+                  {artist.youtube_url && (
+                    <a href={artist.youtube_url} target="_blank" rel="noopener noreferrer" aria-label="YouTube"
+                      className="w-9 h-9 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white/80 hover:bg-white/20 transition-all">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M19.59 6.69a4.83 4.83 0 01-3.77-2.75 12.56 12.56 0 00-4.56-.88A12.56 12.56 0 006.7 3.94a4.83 4.83 0 01-3.77 2.75A22.1 22.1 0 002 12a22.1 22.1 0 00.93 5.31 4.83 4.83 0 003.77 2.75 12.56 12.56 0 004.56.88 12.56 12.56 0 004.56-.88 4.83 4.83 0 003.77-2.75A22.1 22.1 0 0022 12a22.1 22.1 0 00-.41-5.31zM9.75 15.02V8.98L15.5 12z" /></svg>
+                    </a>
+                  )}
+                  {artist.instagram_url && (
+                    <a href={artist.instagram_url} target="_blank" rel="noopener noreferrer" aria-label="Instagram"
+                      className="w-9 h-9 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white/80 hover:bg-white/20 transition-all">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z" /></svg>
+                    </a>
+                  )}
+                  {artist.spotify_url && (
+                    <a href={artist.spotify_url} target="_blank" rel="noopener noreferrer" aria-label="Spotify"
+                      className="w-9 h-9 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white/80 hover:bg-white/20 transition-all">
+                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" /></svg>
+                    </a>
+                  )}
+                  {artist.website_url && (
+                    <a href={artist.website_url} target="_blank" rel="noopener noreferrer" aria-label="Website"
+                      className="w-9 h-9 rounded-lg bg-white/10 border border-white/15 flex items-center justify-center text-white/80 hover:bg-white/20 transition-all">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9" /></svg>
+                    </a>
+                  )}
+                </div>
               </div>
             </div>
 
-            {/* Right: Stats */}
-            <div className="flex flex-wrap lg:flex-col gap-3 lg:min-w-[200px]">
-              {yearsActive !== null && (
-                <StatPill value={`${yearsActive}+`} label="Years performing" />
-              )}
-              {artist.years_active_since && (
-                <StatPill value={String(artist.years_active_since)} label="Active since" />
-              )}
-              {allEvents.length > 0 ? (
-                <StatPill value={String(allEvents.length)} label={events.length > 0 ? "Upcoming shows" : "Shows on Rameelo"} />
-              ) : (
-                <StatPill value="2026" label="Season coming" />
-              )}
-              {artist.genres.length > 0 && (
-                <StatPill value={artist.genres.join(" · ")} label="Style" />
-              )}
+            {/* Stat cards */}
+            <div className="lg:col-span-4 lg:col-start-9 mt-8 lg:mt-0 grid grid-cols-2 lg:grid-cols-1 gap-3">
+              {yearsActive !== null && <HeroStat icon="star" value={`${yearsActive}+`} label="Years Performing" />}
+              {artist.years_active_since && <HeroStat icon="music" value={String(artist.years_active_since)} label="Active Since" />}
+              <HeroStat icon="calendar" value={String(events.length)} label="Upcoming Shows" />
+              <HeroStat icon="sparkles" value={artist.genres.slice(0, 3).join(" · ") || "Garba"} label="Style" />
             </div>
           </div>
-        </div>
-
-        {/* Wave bottom */}
-        <div className="relative h-12 overflow-hidden">
-          <svg viewBox="0 0 1440 48" fill="none" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none" className="absolute inset-0 w-full h-full">
-            <path d="M0 48L1440 48L1440 0C1440 0 1080 48 720 48C360 48 0 0 0 0L0 48Z" fill="#FCF9F2" />
-          </svg>
         </div>
       </section>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 space-y-16">
-
-        {/* ── FULL BIO ─────────────────────────────────────────────────────── */}
-        {artist.bio_long && (
-          <section className="rounded-3xl p-6 sm:p-10 bg-white border border-ivory-200">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-3">About</p>
-            <p className="font-ui text-ink text-base sm:text-lg leading-relaxed whitespace-pre-line">{artist.bio_long}</p>
-          </section>
-        )}
-
-        {/* ── SHOWS ────────────────────────────────────────────────────────── */}
-        <section id="shows">
-          <div className="mb-6">
-            <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1">
-              {events.length > 0 ? "Tour Dates" : allEvents.length > 0 ? "Past Shows" : "2026 Season"}
-            </p>
-            <h2 className="font-display font-bold text-ink text-2xl sm:text-3xl" style={{ letterSpacing: "-0.02em" }}>
-              {events.length > 0 ? "Upcoming Shows" : allEvents.length > 0 ? "Shows on Rameelo" : "Upcoming Shows"}
-            </h2>
-          </div>
-
-          {/* Upcoming */}
-          {events.length > 0 && (
-            <div className="space-y-3">
-              {events.map((event) => <EventRow key={event.id} event={event} heroColor={heroColor} />)}
+      {/* ── TOUR CITIES + SECTION NAV ──────────────────────────────────────── */}
+      <div className="border-b border-ivory-200 bg-ivory/40">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          {tourCities.length > 0 && (
+            <div className="flex flex-wrap items-center gap-y-1 py-4">
+              <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mr-2">Upcoming in</span>
+              {tourCities.map((c, i) => (
+                <span key={c} className="font-ui text-sm font-semibold text-ink">
+                  {c}{i < tourCities.length - 1 && <span className="text-ink-muted/40 mx-1.5">·</span>}
+                </span>
+              ))}
+              <a href="#shows" className="ml-auto hidden sm:inline-flex items-center gap-1.5 font-ui text-sm font-semibold text-aubergine hover:text-aubergine-light transition-colors">
+                View all tour dates
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </a>
             </div>
           )}
+          <nav className="flex items-center gap-1 overflow-x-auto">
+            {([
+              { id: "overview", label: "Overview", active: true,  icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /> },
+              { id: "shows", label: "Shows", active: false, icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /> },
+              { id: "about", label: "About", active: false, icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /> },
+              ...(youtubeVideos.length > 0 ? [{ id: "videos", label: "Videos", active: false, icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" /> }] : []),
+            ]).map(tab => (
+              <a key={tab.id} href={`#${tab.id}`}
+                className={`flex items-center gap-2 px-4 py-3 font-ui text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${tab.active ? "border-aubergine text-ink" : "border-transparent text-ink-muted hover:text-ink"}`}>
+                <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">{tab.icon}</svg>
+                {tab.label}
+              </a>
+            ))}
+          </nav>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-12">
+
+        {/* ── OVERVIEW — shows + about ─────────────────────────────────────── */}
+        <div id="overview" className="grid lg:grid-cols-3 gap-8 items-start">
+          {/* Upcoming shows */}
+          <section id="shows" className="lg:col-span-2">
+            <div className="bg-white rounded-3xl border border-ivory-200 p-5 sm:p-6">
+              <div className="flex items-center justify-between mb-5">
+                <h2 className="font-display font-bold text-ink text-xl sm:text-2xl" style={{ letterSpacing: "-0.02em" }}>
+                  {events.length > 0 ? "Upcoming Shows" : allEvents.length > 0 ? "Shows on Rameelo" : "Upcoming Shows"}
+                </h2>
+                {events.length > 0 && (
+                  <a href="/events" className="inline-flex items-center gap-1.5 font-ui text-sm font-semibold text-aubergine hover:text-aubergine-light transition-colors">
+                    View all shows
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </a>
+                )}
+              </div>
+
+              {/* Upcoming */}
+              {events.length > 0 && (
+                <div className="divide-y divide-ivory-200">
+                  {events.map((event) => <EventRow key={event.id} event={event} heroColor={heroColor} />)}
+                </div>
+              )}
 
           {/* No upcoming — teaser state */}
           {events.length === 0 && allEvents.length === 0 && (
@@ -641,28 +668,65 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
           {pastEvents.length > 0 && (
             <div className="mt-8">
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-3">Past Shows</p>
-              <div className="space-y-2">
+              <div className="divide-y divide-ivory-200">
                 {pastEvents.map((event) => <EventRow key={event.id} event={event} heroColor={heroColor} past />)}
               </div>
             </div>
           )}
 
-          {events.length > 0 && (
-            <div className="mt-6 text-center">
-              <Link
-                href="/events"
-                className="inline-flex items-center gap-2 px-6 py-3.5 rounded-2xl font-display font-bold text-sm text-white hover:opacity-90 transition-all"
-                style={{ backgroundColor: heroColor }}
-              >
-                Get tickets →
-              </Link>
             </div>
-          )}
-        </section>
+          </section>
+
+          {/* About sidebar */}
+          <aside id="about" className="lg:sticky lg:top-6 space-y-4">
+            <div className="bg-white rounded-3xl border border-ivory-200 p-5 sm:p-6">
+              <h2 className="font-display font-bold text-ink text-lg mb-4" style={{ letterSpacing: "-0.015em" }}>About {artist.name}</h2>
+              {(artist.profile_image_url || artist.bio_long || artist.bio) && (
+                <div className="flex gap-4">
+                  {artist.profile_image_url && (
+                    <img src={artist.profile_image_url} alt={artist.name} className="w-20 h-20 rounded-2xl object-cover shrink-0" />
+                  )}
+                  {(artist.bio_long || artist.bio) && (
+                    <p className="font-ui text-sm text-ink/75 leading-relaxed line-clamp-6">{artist.bio_long || artist.bio}</p>
+                  )}
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-4 mt-5 pt-5 border-t border-ivory-200">
+                {location && (
+                  <MetaRow label="Origin" value={location}
+                    icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17.657 16.657L13.414 20.9a2 2 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>} />
+                )}
+                {artist.genres.length > 0 && (
+                  <MetaRow label="Genres" value={artist.genres.join(", ")}
+                    icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z" /></svg>} />
+                )}
+                {artist.years_active_since && (
+                  <MetaRow label="Active Since" value={String(artist.years_active_since)}
+                    icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>} />
+                )}
+                {yearsActive !== null && (
+                  <MetaRow label="Years Performing" value={`${yearsActive}+`}
+                    icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11.48 3.5l2.2 4.46 4.92.72-3.56 3.47.84 4.9-4.4-2.31-4.4 2.31.84-4.9L4.36 8.68l4.92-.72L11.48 3.5z" /></svg>} />
+                )}
+                {artist.performance_style && (
+                  <MetaRow label="Style" value={artist.performance_style}
+                    icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M5 3v4M3 5h4M6 17v4m-2-2h4m6-13l2.5 5.5L22 14l-5.5 2.5L14 22l-2.5-5.5L6 14l5.5-2.5L14 6z" /></svg>} />
+                )}
+                {artist.instruments && artist.instruments.length > 0 && (
+                  <MetaRow label="Instruments" value={artist.instruments.join(", ")}
+                    icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 18V5l12-2v13M9 18a3 3 0 11-6 0 3 3 0 016 0zm12-2a3 3 0 11-6 0 3 3 0 016 0z" /></svg>} />
+                )}
+              </div>
+            </div>
+          </aside>
+        </div>
+
+        {/* ── Supporting sections ──────────────────────────────────────────── */}
+        <div className="space-y-16 mt-16">
 
         {/* ── VIDEOS ───────────────────────────────────────────────────────── */}
         {youtubeVideos.length > 0 && (
-          <section>
+          <section id="videos">
             <div className="flex items-end justify-between mb-6">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1">Watch</p>
@@ -808,6 +872,7 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
           </section>
         )}
 
+        </div>
       </div>
     </div>
   );

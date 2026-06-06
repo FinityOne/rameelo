@@ -23,6 +23,8 @@ type Artist = {
   performance_style: string | null;
   instruments: string[];
   years_active_since: number | null;
+  follower_count: number | null;
+  monthly_listeners: number | null;
   website_url: string | null;
   instagram_url: string | null;
   youtube_url: string | null;
@@ -48,7 +50,8 @@ const EMPTY_ARTIST: Omit<Artist, 'id' | 'created_at'> = {
   profile_image_url: '', cover_image_url: '', gallery_image_urls: [], video_urls: [],
   press_kit_url: '', hometown_city: '', hometown_state: '', hometown_country: 'USA',
   based_in: '', genres: [], performance_style: null, instruments: [],
-  years_active_since: null, website_url: '', instagram_url: '', youtube_url: '',
+  years_active_since: null, follower_count: null, monthly_listeners: null,
+  website_url: '', instagram_url: '', youtube_url: '',
   spotify_url: '', apple_music_url: '', facebook_url: '', tiktok_url: '',
   booking_email: '', booking_phone: '', management_name: '', management_email: '',
   notable_events: '', awards: '',
@@ -151,6 +154,8 @@ function ArtistPanel({ artist, onClose, onSave }: PanelProps) {
         performance_style: form.performance_style || null,
         instruments: form.instruments,
         years_active_since: form.years_active_since || null,
+        follower_count: form.follower_count ?? null,
+        monthly_listeners: form.monthly_listeners ?? null,
         website_url: form.website_url || null,
         instagram_url: form.instagram_url || null,
         youtube_url: form.youtube_url || null,
@@ -441,6 +446,24 @@ function ArtistPanel({ artist, onClose, onSave }: PanelProps) {
                   onChange={e => patch({ years_active_since: e.target.value ? parseInt(e.target.value) : null })}
                   className={inputCls} />
               </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className={labelCls}>Follower Count</label>
+                  <input type="number" min={0} placeholder="125000"
+                    value={form.follower_count ?? ''}
+                    onChange={e => patch({ follower_count: e.target.value ? parseInt(e.target.value) : null })}
+                    className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Monthly Listeners</label>
+                  <input type="number" min={0} placeholder="250000"
+                    value={form.monthly_listeners ?? ''}
+                    onChange={e => patch({ monthly_listeners: e.target.value ? parseInt(e.target.value) : null })}
+                    className={inputCls} />
+                </div>
+              </div>
+              <p className="font-mono text-[10px] text-ink-muted/70 -mt-2">Shown on the public artist page (e.g. 125,000 → “125K+”). Leave blank to hide.</p>
             </>
           )}
 
