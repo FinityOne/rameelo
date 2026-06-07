@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import { saveOrder, markGroupPaid, createGroupAllocations } from "@/lib/group-orders";
 import { TERMS_VERSION, TERMS_SUMMARY, TERMS_TEXT, NO_REFUND_NOTICE } from "@/lib/terms";
 import { money } from "@/lib/money";
+import { computeFees } from "@/lib/fees";
 import { getStripe, stripeConfigured, STRIPE_TEST_MODE } from "@/lib/stripe/client";
 
 const stripePromise = getStripe();
@@ -51,17 +52,8 @@ interface CheckoutPayload {
 
 type PaymentMethod = "card" | "ach";
 
-const RAMEELO_FEE_PCT  = 0.03;
-const CARD_FEE_PCT     = 0.05;
-
-function calcFees(subtotalAfterDiscount: number, method: PaymentMethod) {
-  const rameeloFee    = Math.round(subtotalAfterDiscount * RAMEELO_FEE_PCT * 100) / 100;
-  const processingFee = method === "card"
-    ? Math.round(subtotalAfterDiscount * CARD_FEE_PCT * 100) / 100
-    : 0;
-  const grandTotal = subtotalAfterDiscount + rameeloFee + processingFee;
-  return { rameeloFee, processingFee, grandTotal };
-}
+// Fee math is centralized in src/lib/fees.ts — 3% Rameelo fee always on FACE value.
+const CARD_FEE_PCT = 0.05; // kept for the "+5% processing fee" toggle label
 
 function formatPhone(digits: string): string {
   const d = digits.replace(/\D/g, "").slice(0, 10);
@@ -236,7 +228,10 @@ export default function CheckoutPage() {
   }, []);
 
   const subtotal = payload?.subtotalAfterDiscount ?? payload?.grandTotal ?? 0;
-  const { rameeloFee, processingFee, grandTotal } = calcFees(subtotal, paymentMethod);
+  // Face value (pre-discount) = discounted subtotal + the discount that was applied.
+  // The 3% Rameelo fee is charged on this face value regardless of the discount.
+  const faceSubtotal = subtotal + (payload?.discountAmount ?? 0);
+  const { rameeloFee, processingFee, grandTotal } = computeFees(faceSubtotal, subtotal, paymentMethod);
   const isFree = grandTotal <= 0; // free tickets skip Stripe entirely
 
   // Paying as a group member who has an account: lock + mask their contact details

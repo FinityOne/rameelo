@@ -8,6 +8,7 @@ import { GRADIENTS } from "@/app/organizer/events/create/types";
 import { salesClosedForEvent } from "@/lib/event-time";
 import { money } from "@/lib/money";
 import { groupDiscountPct, groupDiscountAmount, groupScalingLevels } from "@/lib/group-orders";
+import { computeFees } from "@/lib/fees";
 import EventInterestView from "./EventInterestView";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -187,6 +188,20 @@ function EventCountdown({ dateStr }: { dateStr: string }) {
     return () => clearInterval(id);
   }, [dateStr]);
 
+  // Event is today → drop the day/hour grid and show a loud "today / last chance"
+  // urgency message instead of a tiny countdown.
+  if (timeLeft.days === 0) {
+    return (
+      <div className="flex items-center gap-2.5 rounded-xl bg-durga/10 border border-durga/25 px-3.5 py-2.5">
+        <span className="w-2 h-2 bg-durga rounded-full animate-pulse shrink-0" />
+        <div>
+          <p className="font-display font-bold text-durga text-base leading-tight">It&rsquo;s today! 🔥</p>
+          <p className="font-ui text-[11px] text-durga/80 leading-tight">Last chance to grab your tickets</p>
+        </div>
+      </div>
+    );
+  }
+
   const units = [
     { label: "Days",    value: timeLeft.days },
     { label: "Hours",   value: timeLeft.hours },
@@ -285,7 +300,7 @@ function UrgencyBanner({
         </div>
         <p className="font-ui text-sm text-ink">
           <strong>{rem} tickets remaining.</strong>
-          {soldToday > 0 && <> {soldToday} sold today</>}{days <= 30 ? ` — only ${days} days to go.` : "."}
+          {soldToday > 0 && <> {soldToday} sold today</>}{days === 0 ? <> — <strong className="text-durga">it&rsquo;s today — last chance!</strong></> : days <= 30 ? ` — only ${days} days to go.` : "."}
         </p>
         {nextCheapestPrice !== null && rem <= Math.ceil(lowestTier.quantity * 0.25) && (
           <p className="font-mono text-[10px] text-marigold-dark bg-marigold/10 px-3 py-1.5 rounded-lg">
@@ -303,7 +318,7 @@ function UrgencyBanner({
         {/* Countdown */}
         <div className="flex items-center justify-between">
           <div>
-            <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1">Event countdown</p>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1">{days === 0 ? "Happening today" : "Event countdown"}</p>
             <EventCountdown dateStr={event.start_date} />
           </div>
           <div className="text-right">
@@ -336,8 +351,8 @@ function UrgencyBanner({
     <div className="rounded-2xl border border-ivory-200 bg-white overflow-hidden">
       {/* Countdown header */}
       <div className="px-4 pt-4 pb-3 border-b border-ivory-200">
-        <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2">
-          {days > 60 ? "Lock in your spot early" : days > 30 ? "Getting close" : "Coming up fast"}
+        <p className={`font-mono text-[10px] uppercase tracking-widest mb-2 ${days === 0 ? "text-durga font-bold" : "text-ink-muted"}`}>
+          {days === 0 ? "Last chance — tonight!" : days > 60 ? "Lock in your spot early" : days > 30 ? "Getting close" : "Coming up fast"}
         </p>
         <EventCountdown dateStr={event.start_date} />
       </div>
@@ -739,16 +754,13 @@ export default function EventDetailClient({ id }: { id: string }) {
   const soldOut = selectedTier ? remaining <= 0 : false;
 
   const unitPrice = selectedTier?.price ?? 0;
-  const subtotal = unitPrice * qty;
+  const subtotal = unitPrice * qty;              // face value (pre-discount)
   const discountAmount = getTierDiscountAmount(selectedTier, qty, subtotal);
   const discountPct = getTierDiscount(selectedTier, qty);
   const afterDiscount = subtotal - discountAmount;
-  const RAMEELO_FEE_PCT = 0.03;
-  const CARD_FEE_PCT   = 0.05;
-  const rameeloFee   = Math.round(afterDiscount * RAMEELO_FEE_PCT * 100) / 100;
-  const processingFee = Math.round(afterDiscount * CARD_FEE_PCT * 100) / 100;
+  // 3% Rameelo fee on FACE value; 5% card processing on the discounted subtotal.
+  const { rameeloFee, processingFee, grandTotal } = computeFees(subtotal, afterDiscount, "card");
   const serviceFee   = rameeloFee + processingFee; // kept for backward compat
-  const grandTotal   = afterDiscount + rameeloFee + processingFee;
   const nextScalingTier = selectedTier?.group_discount_mode === 'scaling' ? getNextScalingTier(selectedTier, qty) : null;
 
   const maxQty = Math.min(20, selectedTier ? Math.max(0, remaining) : 0);

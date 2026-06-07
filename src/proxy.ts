@@ -91,10 +91,34 @@ export async function proxy(request: NextRequest) {
   // Refresh session — must call getUser() not getSession() for security
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user && request.nextUrl.pathname.startsWith('/portal')) {
+  const path = request.nextUrl.pathname
+  const isAdmin     = path === '/admin' || path.startsWith('/admin/')
+  const isOrganizer = path === '/organizer' || path.startsWith('/organizer/')
+
+  // Not signed in → send to sign-in (return here after) for any gated area.
+  if (!user && (isAdmin || isOrganizer || path.startsWith('/portal'))) {
     const url = request.nextUrl.clone()
     url.pathname = '/auth/signin'
+    url.search = `?next=${encodeURIComponent(path)}`
     return NextResponse.redirect(url)
+  }
+
+  // Signed in → enforce role for organizer/admin areas; wrong role lands on the
+  // member portal (never a dead end).
+  if (user && (isAdmin || isOrganizer)) {
+    // Claim any pending org invites first, so a freshly-invited member is
+    // promoted to organizer before we check their role.
+    if (isOrganizer) {
+      try { await supabase.rpc('claim_org_invitations') } catch { /* best-effort */ }
+    }
+    const { data: role } = await supabase.rpc('get_my_role')
+    const allowed = isAdmin ? role === 'admin' : (role === 'organizer' || role === 'admin')
+    if (!allowed) {
+      const url = request.nextUrl.clone()
+      url.pathname = '/portal'
+      url.search = ''
+      return NextResponse.redirect(url)
+    }
   }
 
   return supabaseResponse

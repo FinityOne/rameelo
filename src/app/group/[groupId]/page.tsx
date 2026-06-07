@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import Logo from "@/components/Logo";
 import { loadGroupOrder, joinGroupOrder, updateGroupMember, updateGroupName, tierHasGroupDiscount, groupDiscountPct, groupDiscountSummary, groupScalingLevels, type GroupOrder } from "@/lib/group-orders";
 import { salesClosedForEvent } from "@/lib/event-time";
+import { computeFees } from "@/lib/fees";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
 
 
@@ -157,8 +158,8 @@ export default function GroupLandingPage() {
     const discount = groupDiscountPct(tier, totalTickets);
     const subtotalFull = group.members.reduce((s, m) => s + priceFor(m.tierId) * m.qty, 0);
     const subtotalAfterDiscount = Math.round(subtotalFull * (1 - discount / 100));
-    const rameeloFee    = Math.round(subtotalAfterDiscount * 0.03 * 100) / 100;
-    const processingFee = Math.round(subtotalAfterDiscount * 0.05 * 100) / 100;
+    // 3% Rameelo fee on the FACE subtotal (pre-discount); 5% card on discounted.
+    const { rameeloFee, processingFee, grandTotal } = computeFees(subtotalFull, subtotalAfterDiscount, "card");
     const blendedUnit   = totalTickets ? Math.round(subtotalFull / totalTickets) : tier.price;
     const payload = {
       eventId: ev.id,
@@ -177,7 +178,7 @@ export default function GroupLandingPage() {
       subtotalAfterDiscount,
       rameeloFee,
       serviceFee: rameeloFee + processingFee,
-      grandTotal: subtotalAfterDiscount + rameeloFee + processingFee,
+      grandTotal,
       groupId,
       groupEmail: payerEmail,
       isGroupPay: true,

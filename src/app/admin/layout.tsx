@@ -185,6 +185,16 @@ const SECTIONS: NavSection[] = [
     label: "Platform",
     items: [
       {
+        href: "/admin/status",
+        label: "System Status",
+        match: (p) => p.startsWith("/admin/status"),
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 12h4l2 5 4-10 2 5h6" />
+          </svg>
+        ),
+      },
+      {
         href: "/admin/notifications",
         label: "Notifications",
         icon: (
@@ -268,6 +278,7 @@ const PAGE_TITLES: Array<{ test: (p: string) => boolean; title: string }> = [
   { test: (p) => /^\/admin\/payouts\/[^/]+$/.test(p),            title: "Payout Request" },
   { test: (p) => /^\/admin\/orders\/[^/]+$/.test(p),             title: "Order Details" },
   { test: (p) => p === "/admin/financials",                       title: "Revenue" },
+  { test: (p) => p === "/admin/status",                           title: "System Status" },
   { test: (p) => p === "/admin/notifications",                    title: "Notifications" },
   { test: (p) => p === "/admin/emails",                           title: "Platform Emails" },
   { test: (p) => p === "/admin/platform",                         title: "Platform Settings" },
