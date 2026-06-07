@@ -42,34 +42,67 @@ export interface GroupOrder {
     id: string;
     name: string;
     price: number;
+    group_discount_mode: "simple" | "scaling" | null;
     group_discount_min_qty: number | null;
     group_discount_type: "percentage" | "fixed" | null;
     group_discount_value: number | null;
+    group_discount_tiers: ScalingLevel[] | null;
   };
 }
 
 // ── Group discounts ───────────────────────────────────────────────────────────
 // Discounts are NEVER hardcoded — they come entirely from the event's ticket
-// tier. A tier offers a group discount when it has a minimum quantity and a
-// positive value; it applies once the group reaches that many tickets. The
-// discount can be a percentage off or a fixed dollar amount off per ticket.
+// tier. Two modes (driven by group_discount_mode):
+//  • "simple": one threshold (group_discount_min_qty) with a flat % OR $ off
+//    (group_discount_type / group_discount_value).
+//  • "scaling": multiple percentage-only levels (group_discount_tiers), each a
+//    {min_qty, percent} — the highest level the group qualifies for applies.
+// Legacy rows with no mode but a min_qty/value are treated as "simple".
+export interface ScalingLevel { minQty: number; percent: number }
+
 export interface TierDiscountFields {
   price: number;
+  group_discount_mode?: "simple" | "scaling" | null;
   group_discount_min_qty: number | null;
   group_discount_type: "percentage" | "fixed" | null;
   group_discount_value: number | null;
+  group_discount_tiers?: ScalingLevel[] | { min_qty?: number; minQty?: number; percent?: number }[] | null;
+}
+
+// Normalize the scaling levels jsonb (snake_case from DB) → sorted, valid list.
+export function groupScalingLevels(t: TierDiscountFields | null | undefined): ScalingLevel[] {
+  const raw = t?.group_discount_tiers;
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(r => ({
+      minQty: Math.round(Number((r as { min_qty?: number; minQty?: number }).min_qty ?? (r as { minQty?: number }).minQty ?? 0)),
+      percent: Math.round(Number((r as { percent?: number }).percent ?? 0)),
+    }))
+    .filter(l => l.minQty > 0 && l.percent > 0)
+    .sort((a, b) => a.minQty - b.minQty);
+}
+
+function isScaling(t: TierDiscountFields | null | undefined): boolean {
+  return t?.group_discount_mode === "scaling" && groupScalingLevels(t).length > 0;
 }
 
 // Does this tier offer a group discount at all (at some quantity)?
 export function tierHasGroupDiscount(t: TierDiscountFields | null | undefined): boolean {
-  return !!t && !!t.group_discount_min_qty && t.group_discount_value != null && t.group_discount_value > 0;
+  if (!t) return false;
+  if (t.group_discount_mode === "scaling") return groupScalingLevels(t).length > 0;
+  return !!t.group_discount_min_qty && t.group_discount_value != null && t.group_discount_value > 0;
 }
 
 // Per-ticket discount as a percentage of the tier price (orders are %-based),
-// for a group of `qty` tickets. Returns 0 below the tier's minimum quantity.
-// A fixed dollar discount is converted to the equivalent % of the tier price.
+// for a group of `qty` tickets. Returns 0 below the qualifying minimum.
+// A fixed dollar discount (simple mode) is converted to the equivalent %.
 export function groupDiscountPct(t: TierDiscountFields | null | undefined, qty: number): number {
   if (!t || !tierHasGroupDiscount(t)) return 0;
+  if (isScaling(t)) {
+    let pct = 0;
+    for (const lvl of groupScalingLevels(t)) if (qty >= lvl.minQty) pct = lvl.percent;
+    return Math.min(100, pct);
+  }
   if (qty < (t.group_discount_min_qty ?? Infinity)) return 0;
   const val = t.group_discount_value ?? 0;
   if (t.group_discount_type === "fixed") {
@@ -79,12 +112,30 @@ export function groupDiscountPct(t: TierDiscountFields | null | undefined, qty: 
   return Math.min(100, Math.round(val));
 }
 
-// Human description of a tier's group discount, e.g. { minQty: 10, amount: "15% off" }
-// or { minQty: 8, amount: "$5.00 off" }. Returns null when there's no discount.
+// Exact discount in dollars for `qty` tickets at a given pre-discount subtotal.
+// Keeps fixed-$ math exact; percentage/scaling derive from the live %.
+export function groupDiscountAmount(t: TierDiscountFields | null | undefined, qty: number, subtotal: number): number {
+  if (!t || !tierHasGroupDiscount(t)) return 0;
+  if (!isScaling(t) && t.group_discount_type === "fixed") {
+    if (qty < (t.group_discount_min_qty ?? Infinity)) return 0;
+    return Math.min(subtotal, Math.round((t.group_discount_value ?? 0) * qty * 100) / 100);
+  }
+  return Math.round(subtotal * (groupDiscountPct(t, qty) / 100) * 100) / 100;
+}
+
+// Human one-line summary at the ENTRY level (lowest threshold), e.g.
+// { minQty: 5, amount: "10% off" } or { minQty: 8, amount: "$5.00 off" }.
+// For scaling, the entry level is the lowest level; use groupScalingLevels for
+// the full ladder.
 export function groupDiscountSummary(
   t: TierDiscountFields | null | undefined,
 ): { minQty: number; amount: string } | null {
   if (!tierHasGroupDiscount(t) || !t) return null;
+  if (isScaling(t)) {
+    const levels = groupScalingLevels(t);
+    const entry = levels[0];
+    return { minQty: entry.minQty, amount: `${entry.percent}% off` };
+  }
   const val = t.group_discount_value ?? 0;
   return {
     minQty: t.group_discount_min_qty ?? 0,
@@ -160,7 +211,7 @@ export async function loadGroupOrder(groupId: string): Promise<GroupOrder | null
         venue_name, cover_gradient, cover_image_url, category,
         artists (name, profile_image_url)
       ),
-      ticket_tiers (id, name, price, group_discount_min_qty, group_discount_type, group_discount_value)
+      ticket_tiers (id, name, price, group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value, group_discount_tiers)
     `)
     .eq("id", groupId)
     .single();

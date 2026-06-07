@@ -17,6 +17,7 @@ export type TicketTier = {
   groupDiscountMinQty: string;
   groupDiscountType: 'percentage' | 'fixed';
   groupDiscountValue: string;
+  groupDiscountTiers: { minQty: string; percent: string }[]; // scaling levels (% only)
 };
 
 export type EventFormData = {
@@ -74,6 +75,7 @@ export const EMPTY_TIER = (): TicketTier => ({
   groupDiscountMinQty: '',
   groupDiscountType: 'percentage',
   groupDiscountValue: '',
+  groupDiscountTiers: [{ minQty: '5', percent: '10' }, { minQty: '8', percent: '12' }, { minQty: '10', percent: '15' }],
 });
 
 export const DEFAULT_FORM: EventFormData = {

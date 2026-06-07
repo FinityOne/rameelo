@@ -89,6 +89,7 @@ const EMAIL_TYPE_LABEL: Record<string, string> = {
   group_joined: "Group member joined",
   group_ticket_claim: "Group ticket claim",
   order_confirmation: "Order confirmation",
+  sponsorship_inquiry: "Sponsorship inquiry",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

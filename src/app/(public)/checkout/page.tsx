@@ -3,10 +3,26 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
 import { createClient } from "@/lib/supabase/client";
 import { saveOrder, markGroupPaid, createGroupAllocations } from "@/lib/group-orders";
 import { TERMS_VERSION, TERMS_SUMMARY, TERMS_TEXT, NO_REFUND_NOTICE } from "@/lib/terms";
 import { money } from "@/lib/money";
+import { getStripe, stripeConfigured, STRIPE_TEST_MODE } from "@/lib/stripe/client";
+
+const stripePromise = getStripe();
+
+// Brand-matched Stripe Elements appearance.
+const STRIPE_APPEARANCE = {
+  theme: "stripe" as const,
+  variables: {
+    colorPrimary: "#2E1B30",
+    colorText: "#2E1B30",
+    colorDanger: "#7C1F2C",
+    fontFamily: "ui-sans-serif, system-ui, sans-serif",
+    borderRadius: "12px",
+  },
+};
 
 interface CheckoutPayload {
   eventId: string;
@@ -38,23 +54,6 @@ type PaymentMethod = "card" | "ach";
 const RAMEELO_FEE_PCT  = 0.03;
 const CARD_FEE_PCT     = 0.05;
 
-// Documented sandbox/test credentials — orders paid with these are flagged as test.
-const TEST_CARD_NUMBER    = "4242424242424242";
-const TEST_ACH_ROUTING    = "110000000";
-const TEST_ACH_ACCOUNT    = "000123456789";
-
-function isTestPayment(args: {
-  method: PaymentMethod;
-  cardNumber: string;
-  routingNumber: string;
-  accountNumber: string;
-}): boolean {
-  if (args.method === "card") {
-    return args.cardNumber.replace(/\D/g, "") === TEST_CARD_NUMBER;
-  }
-  return args.routingNumber === TEST_ACH_ROUTING && args.accountNumber === TEST_ACH_ACCOUNT;
-}
-
 function calcFees(subtotalAfterDiscount: number, method: PaymentMethod) {
   const rameeloFee    = Math.round(subtotalAfterDiscount * RAMEELO_FEE_PCT * 100) / 100;
   const processingFee = method === "card"
@@ -64,13 +63,6 @@ function calcFees(subtotalAfterDiscount: number, method: PaymentMethod) {
   return { rameeloFee, processingFee, grandTotal };
 }
 
-function formatCardNumber(v: string) {
-  return v.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim();
-}
-function formatExpiry(v: string) {
-  const d = v.replace(/\D/g, "").slice(0, 4);
-  return d.length > 2 ? d.slice(0, 2) + "/" + d.slice(2) : d;
-}
 function formatPhone(digits: string): string {
   const d = digits.replace(/\D/g, "").slice(0, 10);
   if (d.length <= 3) return d;
@@ -83,6 +75,82 @@ function maskLastName(last: string): string {
   const l = (last ?? "").trim();
   if (!l) return "";
   return `${l[0]}${"•".repeat(Math.max(l.length - 1, 1))}`;
+}
+
+// ── Stripe payment section (lives inside <Elements>) ──────────────────────────
+// Renders the Payment Element + the "Complete Purchase" button. Confirms the
+// payment with Stripe, then hands off to the parent's finalizeOrder() which
+// records the order exactly as before.
+function StripePaymentSection({
+  grandTotalLabel, billingName, email, disabled, onPaid,
+}: {
+  grandTotalLabel: string;
+  billingName: string;
+  email: string;
+  disabled: boolean;
+  onPaid: () => Promise<void>;
+}) {
+  const stripe = useStripe();
+  const elements = useElements();
+  const [error, setError] = useState("");
+  const [processing, setProcessing] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!stripe || !elements || disabled) return;
+    setProcessing(true);
+    setError("");
+
+    // Confirm the payment. `redirect: "if_required"` keeps the buyer on-page for
+    // cards (and instant bank verification); only redirects if truly necessary.
+    const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
+      elements,
+      redirect: "if_required",
+      confirmParams: {
+        return_url: `${window.location.origin}/confirmation`,
+        payment_method_data: {
+          billing_details: { name: billingName, email },
+        },
+      },
+    });
+
+    if (confirmError) {
+      setError(confirmError.message ?? "Payment could not be completed. Please try again.");
+      setProcessing(false);
+      return;
+    }
+
+    // succeeded = card cleared; processing = ACH initiated (settles in days, but
+    // the ticket is reserved now — matching the existing ACH copy).
+    if (paymentIntent && (paymentIntent.status === "succeeded" || paymentIntent.status === "processing")) {
+      await onPaid();
+      return;
+    }
+    setError("Payment didn't complete. Please try again.");
+    setProcessing(false);
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-5">
+      {/* We already collected name + email in the contact step, so hide them here
+          and pass them at confirm (also satisfies the ACH mandate requirement). */}
+      <PaymentElement options={{ layout: "tabs", fields: { billingDetails: { name: "never", email: "never" } } }} />
+
+      {error && (
+        <div className="rounded-xl bg-durga/8 border border-durga/20 px-4 py-3">
+          <p className="font-ui text-sm text-durga">{error}</p>
+        </div>
+      )}
+
+      <button
+        type="submit"
+        disabled={!stripe || disabled || processing}
+        className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all flex items-center justify-center gap-2 ${!disabled && stripe && !processing ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-sm" : "bg-ivory-200 text-ink-muted cursor-not-allowed"}`}
+      >
+        {processing ? "Processing…" : `Complete Purchase · $${grandTotalLabel}`}
+      </button>
+    </form>
+  );
 }
 
 export default function CheckoutPage() {
@@ -108,18 +176,9 @@ export default function CheckoutPage() {
   // Payment method
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
 
-  // Card fields
-  const [cardNumber, setCardNumber] = useState("");
-  const [expiry, setExpiry]         = useState("");
-  const [cvv, setCvv]               = useState("");
-  const [nameOnCard, setNameOnCard] = useState("");
-  const [billingZip, setBillingZip] = useState("");
-
-  // ACH fields
-  const [routingNumber, setRoutingNumber] = useState("");
-  const [accountNumber, setAccountNumber] = useState("");
-  const [accountType, setAccountType]     = useState<"checking" | "savings">("checking");
-  const [accountName, setAccountName]     = useState("");
+  // Stripe: clientSecret for the current PaymentIntent (recreated per method/amount)
+  const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [intentError, setIntentError]   = useState("");
 
   // Terms acceptance + IP (for dispute evidence)
   const [agreedTerms, setAgreedTerms] = useState(false);
@@ -176,36 +235,60 @@ export default function CheckoutPage() {
     });
   }, []);
 
-  useEffect(() => {
-    if (firstName && lastName && !nameOnCard) setNameOnCard(`${firstName} ${lastName}`);
-    if (firstName && lastName && !accountName) setAccountName(`${firstName} ${lastName}`);
-  }, [firstName, lastName]);
-
   const subtotal = payload?.subtotalAfterDiscount ?? payload?.grandTotal ?? 0;
   const { rameeloFee, processingFee, grandTotal } = calcFees(subtotal, paymentMethod);
+  const isFree = grandTotal <= 0; // free tickets skip Stripe entirely
 
   // Paying as a group member who has an account: lock + mask their contact details
   // (the purchaser may not be them). Doesn't apply when the buyer is signed in.
   const groupPayerLocked = !!payload?.isGroupPay && !!payload?.groupPayerHasAccount && !isSignedIn;
 
   const contactValid = firstName && lastName && email.includes("@") && phoneDigits.length === 10;
-  const cardValid    = cardNumber.replace(/\s/g, "").length === 16 && expiry.length === 5 && cvv.length >= 3 && nameOnCard && billingZip.length === 5;
-  const achValid     = routingNumber.length === 9 && accountNumber.length >= 4 && accountName.trim().length > 0;
-  const paymentValid = paymentMethod === "card" ? cardValid : achValid;
-  const testDetected = isTestPayment({ method: paymentMethod, cardNumber, routingNumber, accountNumber });
 
   function handleContactNext(e: React.FormEvent) {
     e.preventDefault();
     if (contactValid) setStep("payment");
   }
 
-  async function handlePurchase(e: React.FormEvent) {
-    e.preventDefault();
+  // Create / refresh the Stripe PaymentIntent whenever we're on the payment step
+  // and the amount or method changes (card carries a fee, ACH doesn't).
+  useEffect(() => {
+    if (step !== "payment" || !payload || isFree || !stripeConfigured) return;
+    let cancelled = false;
+    setClientSecret(null);
+    setIntentError("");
+    fetch("/api/checkout/create-payment-intent", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        amount: Math.round(grandTotal * 100),
+        paymentMethod,
+        email,
+        eventId: payload.eventId,
+        tierId: payload.tierId,
+        groupId: payload.groupId,
+        qty: payload.qty,
+      }),
+    })
+      .then(r => r.json())
+      .then(d => {
+        if (cancelled) return;
+        if (d.clientSecret) setClientSecret(d.clientSecret);
+        else setIntentError(d.error ?? "Could not start payment.");
+      })
+      .catch(() => { if (!cancelled) setIntentError("Could not start payment."); });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [step, paymentMethod, grandTotal, isFree, payload?.eventId]);
+
+  // Records the order after a successful (or processing, for ACH) Stripe payment —
+  // or immediately for free tickets. Everything downstream (group allocation,
+  // confirmation email, redirect) is unchanged from the prior flow.
+  async function finalizeOrder() {
     if (!payload) return;
-    if (!agreedTerms) return;
     setLoading(true);
 
-    const isTest = isTestPayment({ method: paymentMethod, cardNumber, routingNumber, accountNumber });
+    const isTest = STRIPE_TEST_MODE;
 
     const { orderId, error } = await saveOrder({
       userId: authedUserId,
@@ -299,6 +382,15 @@ export default function CheckoutPage() {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FCF9F2" }}>
+      {/* Test-environment banner — only shows when running on Stripe TEST keys */}
+      {STRIPE_TEST_MODE && (
+        <div className="bg-marigold text-aubergine text-center py-1.5 px-4">
+          <p className="font-mono text-[10px] sm:text-[11px] font-bold uppercase tracking-widest">
+            ⚠ Test environment · Stripe test mode — no real charges
+          </p>
+        </div>
+      )}
+
       {/* Top bar */}
       <div className="bg-white border-b border-ivory-200">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
@@ -439,7 +531,7 @@ export default function CheckoutPage() {
                 </button>
               </form>
             ) : (
-              <form onSubmit={handlePurchase} className="space-y-5">
+              <div className="space-y-5">
                 <div className="flex items-center gap-3">
                   {!groupPayerLocked && (
                     <button type="button" onClick={() => setStep("contact")} className="w-9 h-9 rounded-xl border border-ivory-200 flex items-center justify-center text-ink-muted hover:border-aubergine hover:text-aubergine transition-all">←</button>
@@ -473,7 +565,8 @@ export default function CheckoutPage() {
                   </div>
                 )}
 
-                {/* ── Payment method toggle ── */}
+                {/* ── Payment method toggle (free tickets skip payment) ── */}
+                {!isFree && (
                 <div>
                   <label className={labelCls}>How would you like to pay?</label>
                   <div className="grid grid-cols-2 gap-3">
@@ -513,93 +606,7 @@ export default function CheckoutPage() {
                     </div>
                   )}
                 </div>
-
-                {/* Test mode hint */}
-                <div className="rounded-xl bg-marigold/8 border border-marigold/20 px-4 py-3">
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-marigold-dark font-bold mb-1">Test Mode</p>
-                  {paymentMethod === "card" ? (
-                    <p className="font-ui text-xs text-ink-muted">
-                      Card: <span className="font-mono font-bold text-ink">4242 4242 4242 4242</span>, any future date, any CVV.
-                    </p>
-                  ) : (
-                    <p className="font-ui text-xs text-ink-muted">
-                      Routing: <span className="font-mono font-bold text-ink">110000000</span> · Account: <span className="font-mono font-bold text-ink">000123456789</span>
-                    </p>
-                  )}
-                  {testDetected && (
-                    <p className="font-ui text-[11px] text-marigold-dark font-semibold mt-1.5 flex items-center gap-1">
-                      <span aria-hidden>⚑</span> Test credentials detected — this order will be recorded as a test order.
-                    </p>
-                  )}
-                </div>
-
-                {/* ── Card fields ── */}
-                {paymentMethod === "card" && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className={labelCls}>Card number</label>
-                      <div className="relative">
-                        <input type="text" autoComplete="cc-number" value={cardNumber} onChange={e => setCardNumber(formatCardNumber(e.target.value))} placeholder="1234 5678 9012 3456" className={`${inputCls} pr-14`} required />
-                        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex gap-1">
-                          <div className="w-6 h-4 rounded bg-[#1A1F71] opacity-60" />
-                          <div className="w-6 h-4 rounded bg-[#FF5F00] opacity-60" />
-                        </div>
-                      </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className={labelCls}>Expiry</label>
-                        <input type="text" autoComplete="cc-exp" value={expiry} onChange={e => setExpiry(formatExpiry(e.target.value))} placeholder="MM/YY" className={inputCls} required />
-                      </div>
-                      <div>
-                        <label className={labelCls}>CVV</label>
-                        <input type="text" autoComplete="cc-csc" value={cvv} onChange={e => setCvv(e.target.value.replace(/\D/g, "").slice(0, 4))} placeholder="123" className={inputCls} required />
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Name on card</label>
-                      <input type="text" autoComplete="cc-name" value={nameOnCard} onChange={e => setNameOnCard(e.target.value)} placeholder="Priya Patel" className={inputCls} required />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Billing ZIP code</label>
-                      <input type="text" autoComplete="postal-code" value={billingZip} onChange={e => setBillingZip(e.target.value.replace(/\D/g, "").slice(0, 5))} placeholder="94105" className={inputCls} required />
-                    </div>
-                  </div>
                 )}
-
-                {/* ── ACH fields ── */}
-                {paymentMethod === "ach" && (
-                  <div className="space-y-4">
-                    <div>
-                      <label className={labelCls}>Account holder name</label>
-                      <input type="text" value={accountName} onChange={e => setAccountName(e.target.value)} placeholder="Priya Patel" className={inputCls} required />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Account type</label>
-                      <div className="grid grid-cols-2 gap-3">
-                        {(["checking", "savings"] as const).map(t => (
-                          <button key={t} type="button" onClick={() => setAccountType(t)}
-                            className={`py-2.5 rounded-xl border-2 font-ui font-semibold text-sm capitalize transition-all ${accountType === t ? "border-aubergine bg-aubergine/5 text-aubergine" : "border-ivory-200 text-ink-muted hover:border-aubergine/40"}`}>
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                    <div>
-                      <label className={labelCls}>Routing number (9 digits)</label>
-                      <input type="text" inputMode="numeric" value={routingNumber} onChange={e => setRoutingNumber(e.target.value.replace(/\D/g, "").slice(0, 9))} placeholder="110000000" className={inputCls} required />
-                    </div>
-                    <div>
-                      <label className={labelCls}>Account number</label>
-                      <input type="text" inputMode="numeric" value={accountNumber} onChange={e => setAccountNumber(e.target.value.replace(/\D/g, "").slice(0, 17))} placeholder="000123456789" className={inputCls} required />
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center gap-3 p-4 rounded-xl bg-peacock/5 border border-peacock/20">
-                  <svg className="w-5 h-5 text-peacock shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                  <p className="font-ui text-xs text-ink-muted">Your payment info is encrypted with 256-bit SSL. We never store your full payment details.</p>
-                </div>
 
                 {/* Required Terms acceptance */}
                 <label className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition-all ${agreedTerms ? "border-aubergine/30 bg-aubergine/5" : "border-ivory-200 hover:border-aubergine/20"}`}>
@@ -611,16 +618,47 @@ export default function CheckoutPage() {
                   </span>
                 </label>
 
-                <button
-                  type="submit"
-                  disabled={!paymentValid || !agreedTerms}
-                  className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all flex items-center justify-center gap-2 ${paymentValid && agreedTerms ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-sm" : "bg-ivory-200 text-ink-muted cursor-not-allowed"}`}
-                >
-                  Complete Purchase · ${money(grandTotal)}
-                </button>
+                {/* ── Payment ── */}
+                {isFree ? (
+                  <button
+                    type="button"
+                    onClick={() => { if (agreedTerms) finalizeOrder(); }}
+                    disabled={!agreedTerms}
+                    className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all ${agreedTerms ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-sm" : "bg-ivory-200 text-ink-muted cursor-not-allowed"}`}
+                  >
+                    Reserve {payload?.qty ?? 1} Free Ticket{(payload?.qty ?? 1) > 1 ? "s" : ""} →
+                  </button>
+                ) : !stripeConfigured ? (
+                  <div className="rounded-xl bg-durga/8 border border-durga/20 px-4 py-3">
+                    <p className="font-ui text-sm text-durga">Payments aren&rsquo;t set up yet. Add your Stripe keys to enable checkout.</p>
+                  </div>
+                ) : intentError ? (
+                  <div className="rounded-xl bg-durga/8 border border-durga/20 px-4 py-3">
+                    <p className="font-ui text-sm text-durga">{intentError}</p>
+                  </div>
+                ) : clientSecret ? (
+                  <Elements key={clientSecret} stripe={stripePromise} options={{ clientSecret, appearance: STRIPE_APPEARANCE }}>
+                    <StripePaymentSection
+                      grandTotalLabel={money(grandTotal)}
+                      billingName={`${firstName} ${lastName}`.trim()}
+                      email={email}
+                      disabled={!agreedTerms}
+                      onPaid={finalizeOrder}
+                    />
+                  </Elements>
+                ) : (
+                  <div className="flex items-center justify-center py-8">
+                    <div className="w-7 h-7 rounded-full border-4 border-ivory-200 border-t-marigold animate-spin" />
+                  </div>
+                )}
+
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-peacock/5 border border-peacock/20">
+                  <svg className="w-5 h-5 text-peacock shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                  <p className="font-ui text-xs text-ink-muted">Payments are processed securely by Stripe. Rameelo never sees or stores your full card or bank details.</p>
+                </div>
 
                 <p className="text-center font-mono text-[10px] text-ink-muted">Acceptance is recorded with version {TERMS_VERSION}, a timestamp, and your IP for your protection and ours.</p>
-              </form>
+              </div>
             )}
 
             {/* Terms modal */}

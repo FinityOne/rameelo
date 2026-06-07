@@ -5,7 +5,7 @@
 
 export type EmailTrigger = "automatic" | "manual" | "both";
 export type EmailStatus = "live" | "planned";
-export type EmailCategory = "Member" | "Orders & Tickets" | "Organizer" | "Payments";
+export type EmailCategory = "Member" | "Orders & Tickets" | "Organizer" | "Payments" | "Platform";
 
 export type EmailDef = {
   key: string;
@@ -88,8 +88,8 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     audience: "Buyers",
     category: "Orders & Tickets",
     status: "live",
-    trigger: "automatic",
-    fires: "On a confirmed order — sent to the buyer",
+    trigger: "both",
+    fires: "Automatically on a confirmed order · Manual resend from an order's detail page",
   },
   {
     key: "event-reminder",
@@ -140,6 +140,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     status: "planned",
     trigger: "automatic",
     fires: "On a refund or dispute event",
+  },
+  {
+    key: "sponsorship-inquiry",
+    name: "Sponsorship inquiry alert",
+    description: "Notifies all platform admins, with the full form details, when someone submits the /sponsor advertising form.",
+    audience: "Admins",
+    category: "Platform",
+    status: "live",
+    trigger: "automatic",
+    fires: "When a sponsorship inquiry is submitted",
   },
   {
     key: "onboarding-invite",

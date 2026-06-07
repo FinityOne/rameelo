@@ -11,6 +11,7 @@ import {
   tierHasGroupDiscount,
   groupDiscountPct,
   groupDiscountSummary,
+  groupScalingLevels,
 } from "@/lib/group-orders";
 import { salesClosedForEvent } from "@/lib/event-time";
 
@@ -50,7 +51,7 @@ type EventSummary = {
   start_time: string | null;
   city: string;
   state: string;
-  ticket_tiers: { id: string; name: string; price: number; quantity: number; quantity_sold: number; is_visible: boolean; sort_order: number; sale_start_date: string | null; sale_end_date: string | null; group_discount_min_qty: number | null; group_discount_type: "percentage" | "fixed" | null; group_discount_value: number | null }[];
+  ticket_tiers: { id: string; name: string; price: number; quantity: number; quantity_sold: number; is_visible: boolean; sort_order: number; sale_start_date: string | null; sale_end_date: string | null; group_discount_mode: "simple" | "scaling" | null; group_discount_min_qty: number | null; group_discount_type: "percentage" | "fixed" | null; group_discount_value: number | null; group_discount_tiers: { min_qty: number; percent: number }[] | null }[];
   artists: { name: string; profile_image_url: string | null } | null;
 };
 
@@ -89,7 +90,7 @@ function CreateGroupInner() {
         .select(`
           id, title, start_date, start_time, city, state,
           artists:artists!events_artist_id_fkey (name, profile_image_url),
-          ticket_tiers (id, name, price, quantity, quantity_sold, is_visible, sort_order, sale_start_date, sale_end_date, group_discount_min_qty, group_discount_type, group_discount_value)
+          ticket_tiers (id, name, price, quantity, quantity_sold, is_visible, sort_order, sale_start_date, sale_end_date, group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value, group_discount_tiers)
         `)
         .eq("id", eventId)
         .eq("status", "published")
@@ -134,7 +135,8 @@ function CreateGroupInner() {
   const selectedTier = event?.ticket_tiers.find(t => t.id === selectedTierId) ?? null;
   // Discounts come straight from the event's active tiers — never hardcoded.
   const discountTier = event?.ticket_tiers.find(t => tierHasGroupDiscount(t)) ?? null;
-  const discountInfo = groupDiscountSummary(discountTier); // { minQty, amount } | null
+  const discountInfo = groupDiscountSummary(discountTier); // entry level { minQty, amount } | null
+  const discountLevels = groupScalingLevels(discountTier);  // full scaling ladder (empty if simple)
   const anyTierHasDiscount = !!discountInfo;
 
   const emailValid = email.trim().includes("@");
@@ -290,18 +292,36 @@ function CreateGroupInner() {
           {/* How group discounts work */}
           {discountInfo && (
             <div className="rounded-2xl border border-aubergine/15 bg-aubergine/4 p-4">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-aubergine font-bold mb-3">Group Discount</p>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-full bg-aubergine/10 flex items-center justify-center">
-                    <span className="font-mono text-[10px] font-bold text-aubergine">{discountInfo.minQty}+</span>
-                  </div>
-                  <span className="font-ui text-sm text-ink">{discountInfo.minQty}+ tickets</span>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-aubergine font-bold mb-3">
+                {discountLevels.length > 1 ? "Group Discounts — the more, the more you save" : "Group Discount"}
+              </p>
+              {discountLevels.length > 0 ? (
+                <div className="space-y-2">
+                  {discountLevels.map(lvl => (
+                    <div key={lvl.minQty} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full bg-aubergine/10 flex items-center justify-center">
+                          <span className="font-mono text-[10px] font-bold text-aubergine">{lvl.minQty}+</span>
+                        </div>
+                        <span className="font-ui text-sm text-ink">{lvl.minQty}+ tickets</span>
+                      </div>
+                      <span className="font-display font-bold text-aubergine">{lvl.percent}% off</span>
+                    </div>
+                  ))}
                 </div>
-                <span className="font-display font-bold text-aubergine">{discountInfo.amount}</span>
-              </div>
+              ) : (
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-aubergine/10 flex items-center justify-center">
+                      <span className="font-mono text-[10px] font-bold text-aubergine">{discountInfo.minQty}+</span>
+                    </div>
+                    <span className="font-ui text-sm text-ink">{discountInfo.minQty}+ tickets</span>
+                  </div>
+                  <span className="font-display font-bold text-aubergine">{discountInfo.amount}</span>
+                </div>
+              )}
               <p className="font-ui text-xs text-ink-muted mt-3 pt-3 border-t border-aubergine/10">
-                Once the group reaches {discountInfo.minQty} tickets, one person pays for everyone at the discounted rate — and each person gets their own ticket.
+                One person pays for everyone at the discounted rate once the group qualifies — and each person gets their own ticket.
               </p>
             </div>
           )}

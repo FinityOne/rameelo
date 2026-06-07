@@ -16,9 +16,11 @@ type Tier = {
   quantity: number;
   sale_start_date: string;
   sale_end_date: string;
+  group_discount_mode: "simple" | "scaling" | null;
   group_discount_min_qty: number | null;
   group_discount_type: "percentage" | "fixed" | null;
   group_discount_value: number | null;
+  group_discount_tiers: { min_qty: number; percent: number }[] | null;
   sort_order: number;
   _dirty: boolean;
   _new?: boolean;
@@ -131,12 +133,42 @@ function LockedField({ label, value }: { label: string; value: string }) {
   );
 }
 
+const DEFAULT_SCALING: { min_qty: number; percent: number }[] = [
+  { min_qty: 5, percent: 10 },
+  { min_qty: 8, percent: 12 },
+  { min_qty: 10, percent: 15 },
+];
+
 function TierCard({ tier, idx, onChange }: {
   tier: Tier; idx: number;
   onChange: (patch: Partial<Tier>) => void;
 }) {
   const price = tier.price || 0;
-  const hasGroup = tier.group_discount_min_qty !== null;
+  const mode: "none" | "simple" | "scaling" =
+    tier.group_discount_mode === "scaling" ? "scaling"
+    : tier.group_discount_mode === "simple" || tier.group_discount_min_qty != null ? "simple"
+    : "none";
+  const levels = tier.group_discount_tiers ?? [];
+
+  function setMode(next: "none" | "simple" | "scaling") {
+    if (next === "none") {
+      onChange({ group_discount_mode: null, group_discount_min_qty: null, group_discount_type: null, group_discount_value: null, group_discount_tiers: null });
+    } else if (next === "simple") {
+      onChange({ group_discount_mode: "simple", group_discount_min_qty: tier.group_discount_min_qty ?? 4, group_discount_type: tier.group_discount_type ?? "percentage", group_discount_value: tier.group_discount_value ?? 10, group_discount_tiers: null });
+    } else {
+      onChange({ group_discount_mode: "scaling", group_discount_min_qty: null, group_discount_type: null, group_discount_value: null, group_discount_tiers: levels.length ? levels : DEFAULT_SCALING });
+    }
+  }
+  function updateLevel(i: number, patch: Partial<{ min_qty: number; percent: number }>) {
+    onChange({ group_discount_tiers: levels.map((l, j) => j === i ? { ...l, ...patch } : l) });
+  }
+  function addLevel() {
+    const lastQty = levels.length ? levels[levels.length - 1].min_qty : 4;
+    onChange({ group_discount_tiers: [...levels, { min_qty: lastQty + 2, percent: 15 }] });
+  }
+  function removeLevel(i: number) {
+    onChange({ group_discount_tiers: levels.filter((_, j) => j !== i) });
+  }
 
   return (
     <div className={`rounded-2xl border overflow-hidden transition-all ${tier._dirty ? "border-aubergine/35 shadow-sm" : "border-ivory-200"}`}>
@@ -205,13 +237,19 @@ function TierCard({ tier, idx, onChange }: {
           </div>
         </div>
 
-        {hasGroup ? (
-          <div className="rounded-xl bg-peacock/5 border border-peacock/15 p-3 space-y-3">
-            <div className="flex items-center justify-between">
-              <p className="font-mono text-[9px] uppercase tracking-widest text-peacock">Group Discount</p>
-              <button type="button" onClick={() => onChange({ group_discount_min_qty: null, group_discount_type: null, group_discount_value: null })}
-                className="font-ui text-[11px] text-durga hover:underline">Remove</button>
-            </div>
+        {/* ── Group discount ── */}
+        <div className="rounded-xl bg-peacock/5 border border-peacock/15 p-3 space-y-3">
+          <p className="font-mono text-[9px] uppercase tracking-widest text-peacock">Group Discount</p>
+          <div className="grid grid-cols-3 gap-2">
+            {([["none", "None"], ["simple", "Flat rate"], ["scaling", "Scaling"]] as const).map(([m, label]) => (
+              <button key={m} type="button" onClick={() => setMode(m)}
+                className={`py-2 rounded-lg border-2 font-ui font-semibold text-xs transition-all ${mode === m ? "border-peacock bg-peacock/10 text-peacock" : "border-ivory-200 text-ink-muted hover:border-peacock/30"}`}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {mode === "simple" && (
             <div className="grid grid-cols-3 gap-2">
               <div>
                 <label className={labelCls}>Min qty</label>
@@ -235,14 +273,38 @@ function TierCard({ tier, idx, onChange }: {
                   className={inputCls} />
               </div>
             </div>
-          </div>
-        ) : (
-          <button type="button"
-            onClick={() => onChange({ group_discount_min_qty: 4, group_discount_type: "percentage", group_discount_value: 10 })}
-            className="w-full py-2 rounded-xl border border-dashed border-ivory-200 font-ui text-xs text-ink-muted hover:border-peacock/40 hover:text-peacock hover:bg-peacock/5 transition-all">
-            + Add group discount
-          </button>
-        )}
+          )}
+
+          {mode === "scaling" && (
+            <div className="space-y-2">
+              <p className="font-ui text-[11px] text-ink-muted">Percentage-only. The highest level the group reaches applies.</p>
+              {levels.map((lvl, i) => (
+                <div key={i} className="flex items-end gap-2">
+                  <div className="flex-1">
+                    <label className={labelCls}>Min qty</label>
+                    <input type="number" min="2" value={lvl.min_qty || ""}
+                      onChange={e => updateLevel(i, { min_qty: parseInt(e.target.value) || 0 })}
+                      className={inputCls} />
+                  </div>
+                  <div className="flex-1">
+                    <label className={labelCls}>% off</label>
+                    <input type="number" min="0" max="100" value={lvl.percent || ""}
+                      onChange={e => updateLevel(i, { percent: parseInt(e.target.value) || 0 })}
+                      className={inputCls} />
+                  </div>
+                  <button type="button" onClick={() => removeLevel(i)}
+                    className="mb-0.5 w-9 h-9 rounded-lg border border-ivory-200 flex items-center justify-center text-durga hover:bg-durga/5 shrink-0">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                  </button>
+                </div>
+              ))}
+              <button type="button" onClick={addLevel}
+                className="w-full py-2 rounded-lg border border-dashed border-peacock/40 font-ui text-xs text-peacock hover:bg-peacock/5 transition-all">
+                + Add level
+              </button>
+            </div>
+          )}
+        </div>
 
         {price > 0 && (
           <div className="rounded-xl bg-aubergine/5 border border-aubergine/12 px-4 py-3 flex items-center justify-between">
@@ -374,7 +436,7 @@ export default function OrganizerEventEditPage() {
       id: `new-${Date.now()}`,
       name: "", description: "", price: 0, quantity: 100,
       sale_start_date: "", sale_end_date: "",
-      group_discount_min_qty: null, group_discount_type: null, group_discount_value: null,
+      group_discount_mode: null, group_discount_min_qty: null, group_discount_type: null, group_discount_value: null, group_discount_tiers: null,
       sort_order: prev.length,
       _dirty: true, _new: true,
     }]);
@@ -442,9 +504,11 @@ export default function OrganizerEventEditPage() {
           quantity:               tier.quantity,
           sale_start_date:        tier.sale_start_date || null,
           sale_end_date:          tier.sale_end_date || null,
+          group_discount_mode:    tier.group_discount_mode,
           group_discount_min_qty: tier.group_discount_min_qty,
           group_discount_type:    tier.group_discount_type,
           group_discount_value:   tier.group_discount_value,
+          group_discount_tiers:   tier.group_discount_mode === "scaling" ? (tier.group_discount_tiers ?? []) : null,
           sort_order:             tier.sort_order,
         };
         if (tier._new) {

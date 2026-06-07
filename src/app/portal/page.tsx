@@ -15,13 +15,6 @@ function coverBg(coverImageUrl: string | null, coverGradient: string): string {
   return GRADIENTS.find(g => g.id === coverGradient)?.css ?? "linear-gradient(135deg, #7C1F2C 0%, #B84A22 55%, #F5A623 120%)";
 }
 
-// ── Sponsor ads ───────────────────────────────────────────────────────────────
-
-const SPONSOR_ADS = [
-  { id: "realty", biz: "Priya Singh Realty", tag: "Real Estate", tagline: "Your dream home in the community you love.", desc: "Specializing in first-generation homebuyers across NJ, NY & CA. Free consultation for Rameelo members.", cta: "Free Consultation", color: "#0E8C7A", accent: "#FCF9F2", emoji: "🏡", sponsor: "Keller Williams · Sponsored" },
-  { id: "dental", biz: "Dr. Patel's Family Dentistry", tag: "Dentistry", tagline: "Your community's smile since 2003.", desc: "New patient special: $99 cleaning + whitening. Edison · Fremont · Chicago.", cta: "Book Appointment", color: "#2E1B30", accent: "#F5A623", emoji: "🦷", sponsor: "Sponsored" },
-  { id: "chiro",  biz: "Bay Area Chiro & Wellness", tag: "Chiropractic", tagline: "Back pain after Garba? We've got you.", desc: "Dr. Meera Choksi, DC — performance recovery. First visit free.", cta: "Schedule Now", color: "#3D2543", accent: "#0E8C7A", emoji: "💆", sponsor: "Sponsored" },
-];
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -250,15 +243,13 @@ function QuickActions({ orderCount }: { orderCount: number }) {
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d={d} /></svg>
   );
   const actions = [
-    { label: "Find Events",    href: "/events",           desc: "Near you",       tint: "#F5A623", svg: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" },
-    { label: "My Tickets",     href: "/portal/tickets",   desc: orderCount > 0 ? `${orderCount} order${orderCount !== 1 ? "s" : ""}` : "None yet", tint: "#7C1F2C", svg: "M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" },
-    { label: "Group Order",    href: "/events",           desc: "Save 15%",       tint: "#0E8C7A", svg: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4 0m4 0a4 4 0 014 4M9 12a4 4 0 110-8 4 4 0 010 8z" },
-    { label: "Invite Friends", href: "/portal/refer",     desc: "Share the vibe", tint: "#F5A623", svg: "M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 1010 8h2zm-7 5h14M5 21h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v11a2 2 0 002 2z" },
-    { label: "Earnings",       href: "/portal/organizer", desc: "Organizer",      tint: "#0E8C7A", svg: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
+    { label: "Find Events",  href: "/events",              desc: "Near you",          tint: "#F5A623", svg: "M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" },
+    { label: "My Tickets",   href: "/portal/tickets",      desc: orderCount > 0 ? `${orderCount} order${orderCount !== 1 ? "s" : ""}` : "None yet", tint: "#7C1F2C", svg: "M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" },
+    { label: "Group Orders", href: "/portal/group-orders", desc: "Yours & joined",    tint: "#0E8C7A", svg: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-1.13a4 4 0 10-4 0m4 0a4 4 0 014 4M9 12a4 4 0 110-8 4 4 0 010 8z" },
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
       {actions.map(a => (
         <Link
           key={a.label}
@@ -573,44 +564,23 @@ export default function PortalDashboard() {
         </div>
       )}
 
-      {/* ── Sponsors ── */}
+      {/* ── Sponsor this space ── */}
       {!loading && (
       <div>
-        <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted/40 mb-2 px-1">From our community partners</p>
-        <div className="rounded-2xl overflow-hidden border border-ivory-200 mb-3">
-          <div className="px-6 py-6 flex flex-col sm:flex-row items-start sm:items-center gap-5" style={{ backgroundColor: SPONSOR_ADS[0].color }}>
-            <div className="text-5xl">{SPONSOR_ADS[0].emoji}</div>
+        <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted/40 mb-2 px-1">Advertise with Rameelo</p>
+        <Link href="/sponsor" className="block rounded-2xl overflow-hidden border-2 border-dashed border-marigold/40 hover:border-marigold transition-all group">
+          <div className="px-6 py-7 flex flex-col sm:flex-row items-start sm:items-center gap-5" style={{ background: "linear-gradient(135deg, #2E1B30 0%, #3D2543 100%)" }}>
+            <div className="text-5xl">📣</div>
             <div className="flex-1">
-              <p className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: SPONSOR_ADS[0].accent, opacity: 0.6 }}>{SPONSOR_ADS[0].tag}</p>
-              <h4 className="font-display font-bold text-2xl mb-1" style={{ color: SPONSOR_ADS[0].accent }}>{SPONSOR_ADS[0].tagline}</h4>
-              <p className="font-ui text-sm" style={{ color: SPONSOR_ADS[0].accent, opacity: 0.7 }}>{SPONSOR_ADS[0].desc}</p>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-marigold/80 mb-1">Your business could be here</p>
+              <h4 className="font-display font-bold text-2xl text-white mb-1 leading-snug">Reach thousands of Garba &amp; Navratri-goers</h4>
+              <p className="font-ui text-sm text-white/65">Put your brand in front of an engaged Gujarati-diaspora community across the US. Become a Rameelo sponsor.</p>
             </div>
-            <button className="shrink-0 px-5 py-3 rounded-xl font-ui font-bold text-sm transition-all whitespace-nowrap" style={{ backgroundColor: SPONSOR_ADS[0].accent, color: SPONSOR_ADS[0].color }}>
-              {SPONSOR_ADS[0].cta} →
-            </button>
+            <span className="shrink-0 px-5 py-3 rounded-xl font-ui font-bold text-sm bg-marigold text-aubergine group-hover:bg-marigold-dark transition-all whitespace-nowrap">
+              Sponsor Rameelo →
+            </span>
           </div>
-          <div className="px-5 py-2 bg-ivory border-t border-ivory-200">
-            <p className="font-mono text-[9px] text-ink-muted">{SPONSOR_ADS[0].sponsor} · {SPONSOR_ADS[0].biz}</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          {SPONSOR_ADS.slice(1).map(ad => (
-            <div key={ad.id} className="rounded-2xl overflow-hidden border border-ivory-200">
-              <div className="px-5 py-5 flex gap-4" style={{ backgroundColor: ad.color }}>
-                <div className="text-3xl">{ad.emoji}</div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-mono text-[9px] uppercase tracking-widest mb-1" style={{ color: ad.accent, opacity: 0.6 }}>{ad.tag}</p>
-                  <p className="font-display font-bold text-base leading-snug mb-1" style={{ color: ad.accent }}>{ad.tagline}</p>
-                  <p className="font-ui text-xs mb-3" style={{ color: ad.accent, opacity: 0.6 }}>{ad.desc}</p>
-                  <button className="px-4 py-2 rounded-lg font-ui font-semibold text-xs" style={{ backgroundColor: ad.accent, color: ad.color }}>{ad.cta} →</button>
-                </div>
-              </div>
-              <div className="px-4 py-1.5 bg-white border-t border-ivory-200">
-                <p className="font-mono text-[9px] text-ink-muted">{ad.sponsor}</p>
-              </div>
-            </div>
-          ))}
-        </div>
+        </Link>
       </div>
       )}
 

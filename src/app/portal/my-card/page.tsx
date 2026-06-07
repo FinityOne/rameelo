@@ -43,7 +43,11 @@ function memberSince(iso: string): string {
 }
 
 function stampDate(iso: string): string {
-  return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  if (!iso) return "";
+  // Date-only values ("YYYY-MM-DD") must parse as LOCAL midnight, not UTC —
+  // otherwise US timezones render the day before. Append a local time component.
+  const d = /^\d{4}-\d{2}-\d{2}$/.test(iso) ? new Date(iso + "T00:00:00") : new Date(iso);
+  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
 // ── Brand palette (matches brand guide) ────────────────────────────────────────
@@ -286,7 +290,7 @@ function AddStampModal({ artists, userId, editing, onClose, onAdded, onUpdated }
     title: eventName.trim() || "Your Garba",
     city: city.trim() || null,
     state: stateField.trim() || null,
-    start_date: date || new Date().toISOString().slice(0, 10),
+    start_date: date || new Date().toLocaleDateString("en-CA"),
     artist: heroLabel || "Artist",
     artists: null,
     source: "custom",
@@ -444,7 +448,7 @@ export default function GarbaPassportPage() {
   const [userId,  setUserId]  = useState("");
   const [showAdd, setShowAdd] = useState(false);
   const [editingStamp, setEditingStamp] = useState<EventStamp | null>(null);
-  const [manageMode, setManageMode] = useState(false);
+  const [actionStamp, setActionStamp] = useState<EventStamp | null>(null); // tapped stamp → edit/delete sheet
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error,   setError]   = useState(false);
@@ -532,7 +536,10 @@ export default function GarbaPassportPage() {
     setRemovingId(id);
     const supabase = createClient();
     const { error: err } = await supabase.from("passport_stamps").delete().eq("id", id);
-    if (!err) setStamps(prev => prev.filter(s => s.id !== id));
+    if (!err) {
+      setStamps(prev => prev.filter(s => s.id !== id));
+      setActionStamp(null);
+    }
     setRemovingId(null);
   }
 
@@ -567,7 +574,6 @@ export default function GarbaPassportPage() {
   const compact   = stamps.length > 9;
   const stampCols = stamps.length > 16 ? 5 : stamps.length > 9 ? 4 : 3;
   const stampGap  = compact ? 4 : 6; // px
-  const hasCustom = stamps.some(s => s.source === "custom"); // only custom stamps are editable/removable
 
   const whatsappMsg = encodeURIComponent(
     `Hey! I just joined Rameelo — the platform for garba & navratri events across the US 🪈\n\nCheck out my Garba Passport: ${referralUrl}`
@@ -611,6 +617,55 @@ export default function GarbaPassportPage() {
         />
       )}
 
+      {/* Tap-a-stamp action sheet — edit or delete (mobile-friendly bottom sheet) */}
+      {actionStamp && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm"
+          onClick={() => { if (removingId === null) setActionStamp(null); }}
+        >
+          <div
+            className="w-full sm:max-w-xs bg-[#FDFAF2] sm:rounded-3xl rounded-t-3xl shadow-2xl overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="px-5 pt-5 pb-4 text-center border-b border-black/[0.06]">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-[#2E1B30]/50 mb-0.5">Your stamp</p>
+              <p className="font-display font-bold text-ink text-base leading-tight truncate">{actionStamp.title}</p>
+              <p className="font-ui text-xs text-ink-muted mt-0.5 truncate">
+                {actionStamp.artist ?? actionStamp.artists?.name}{actionStamp.city ? ` · ${actionStamp.city}` : ""} · {stampDate(actionStamp.start_date)}
+              </p>
+            </div>
+            <div className="p-3 space-y-2">
+              <button
+                onClick={() => { setEditingStamp(actionStamp); setActionStamp(null); }}
+                disabled={removingId !== null}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-aubergine text-white font-ui font-semibold text-sm hover:opacity-90 active:scale-[0.98] transition-all disabled:opacity-60"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                Edit stamp
+              </button>
+              <button
+                onClick={() => handleRemoveStamp(actionStamp.id)}
+                disabled={removingId !== null}
+                className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl border border-durga/30 text-durga font-ui font-semibold text-sm hover:bg-durga/5 active:scale-[0.98] transition-all disabled:opacity-60"
+              >
+                {removingId === actionStamp.id ? (
+                  <><div className="w-4 h-4 rounded-full border-2 border-durga/30 border-t-durga animate-spin" /> Deleting…</>
+                ) : (
+                  <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg> Delete stamp</>
+                )}
+              </button>
+              <button
+                onClick={() => setActionStamp(null)}
+                disabled={removingId !== null}
+                className="w-full py-3 rounded-2xl font-ui font-semibold text-sm text-ink-muted hover:text-ink transition-colors disabled:opacity-60"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Back */}
       <div className="flex items-center gap-3">
         <Link href="/portal" className="text-ink/30 hover:text-ink/60 transition-colors">
@@ -624,20 +679,6 @@ export default function GarbaPassportPage() {
             {stamps.length > 0 ? `${stamps.length} stamp${stamps.length !== 1 ? "s" : ""} collected` : "Collect stamps at every garba"}
           </p>
         </div>
-        {/* Manage toggle — keeps edit/remove controls hidden for clean screenshots */}
-        {hasCustom && (
-          <button
-            onClick={() => setManageMode(m => !m)}
-            className={`shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full font-ui font-semibold text-xs border transition-all ${manageMode ? "text-white border-transparent" : "text-ink/60 border-ink/15 hover:border-ink/30 hover:text-ink/80"}`}
-            style={manageMode ? { backgroundColor: PLUM } : undefined}
-          >
-            {manageMode ? (
-              <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>Done</>
-            ) : (
-              <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>Manage</>
-            )}
-          </button>
-        )}
       </div>
 
       {/* ── PASSPORT BOOK ─────────────────────────────────────────────────── */}
@@ -788,40 +829,22 @@ export default function GarbaPassportPage() {
           <div className="px-4 pb-5 grid"
             style={{ gridTemplateColumns: `repeat(${stampCols}, minmax(0, 1fr))`, gap: `${stampGap}px` }}>
             {stamps.map(s => (
-              <div key={s.id} className="relative">
-                <PassportStamp stamp={s} />
-                {/* Edit + remove controls — only visible in Manage mode so screenshots stay clean */}
-                {manageMode && s.source === "custom" && (
-                  <>
-                    <button
-                      onClick={() => setEditingStamp(s)}
-                      aria-label="Edit stamp"
-                      title="Edit this stamp"
-                      className="absolute top-0 left-1 w-5 h-5 rounded-full bg-white border border-aubergine/25 shadow-sm flex items-center justify-center text-aubergine hover:bg-aubergine hover:text-white transition-all"
-                    >
-                      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                    </button>
-                    <button
-                      onClick={() => handleRemoveStamp(s.id)}
-                      disabled={removingId === s.id}
-                      aria-label="Remove stamp"
-                      title="Remove this stamp"
-                      className="absolute top-0 right-1 w-5 h-5 rounded-full bg-white border border-durga/30 shadow-sm flex items-center justify-center text-durga hover:bg-durga hover:text-white transition-all"
-                    >
-                      {removingId === s.id
-                        ? <div className="w-2.5 h-2.5 rounded-full border border-durga/40 border-t-durga animate-spin" />
-                        : <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>}
-                    </button>
-                  </>
-                )}
-                {/* Locked badge for ticket stamps while managing */}
-                {manageMode && s.source === "purchase" && (
-                  <div className="absolute top-0 right-1 w-5 h-5 rounded-full bg-white/90 border border-ink/10 shadow-sm flex items-center justify-center text-ink/40"
-                    title="Ticket stamps are locked in">
-                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                  </div>
-                )}
-              </div>
+              s.source === "custom" ? (
+                // Custom stamps are tappable → edit/delete action sheet
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setActionStamp(s)}
+                  aria-label={`Edit or delete ${s.title}`}
+                  className="relative block w-full transition-transform hover:scale-[1.03] active:scale-[0.98] focus:outline-none"
+                >
+                  <PassportStamp stamp={s} />
+                </button>
+              ) : (
+                <div key={s.id} className="relative">
+                  <PassportStamp stamp={s} />
+                </div>
+              )
             ))}
             {/* Add a stamp tile */}
             <button
@@ -854,16 +877,6 @@ export default function GarbaPassportPage() {
           </div>
         </div>
       </div>
-
-      {/* Manage-mode hint — appears outside the book so it never lands in a screenshot */}
-      {manageMode && (
-        <div className="flex items-center gap-3 px-4 py-3 rounded-2xl border" style={{ backgroundColor: `${GOLD}14`, borderColor: `${GOLD}55` }}>
-          <svg className="w-4 h-4 shrink-0" fill="none" stroke={PLUM} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-          <p className="font-ui text-xs text-ink/70 flex-1">
-            <span className="font-semibold text-ink">Managing stamps.</span> Tap the pencil to edit or × to remove your own stamps. Tap <span className="font-semibold text-ink">Done</span> before screenshotting.
-          </p>
-        </div>
-      )}
 
       {/* Add a stamp — primary action */}
       <button
@@ -899,8 +912,8 @@ export default function GarbaPassportPage() {
               {stamps.length} garba{stamps.length !== 1 ? "s" : ""} stamped
             </p>
             <p className="font-ui text-xs text-ink-muted">
-              {hasCustom
-                ? <>Add more anytime — and tap <span className="font-semibold text-ink/75">Manage</span> up top to edit or remove your own stamps. Ticket stamps stay locked in.</>
+              {stamps.some(s => s.source === "custom")
+                ? <>Add more anytime — and <span className="font-semibold text-ink/75">tap any stamp you added</span> to edit or delete it. Ticket stamps stay locked in.</>
                 : <>Add a stamp for any garba you danced at. Ticket stamps are locked in automatically.</>}
             </p>
           </div>

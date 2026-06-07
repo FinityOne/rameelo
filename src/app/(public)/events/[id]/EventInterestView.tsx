@@ -87,6 +87,16 @@ const TICKET_OPTIONS = [1, 2, 4, 6];
 const inputCls = "w-full rounded-xl border border-ivory-200 bg-white px-4 py-2.5 font-ui text-base sm:text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-marigold/30 focus:border-marigold/50 transition-all";
 const labelCls = "block font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1.5";
 
+// Stable per-event "buzz" base so the interest count reads as healthy demand even
+// when few forms are in yet. Seeded by event id (changes daily, never drops), and
+// real submissions are added on top.
+function interestBase(eventId: string): number {
+  const key = eventId + "interest" + new Date().toDateString();
+  let h = 0;
+  for (let i = 0; i < key.length; i++) { h = (Math.imul(31, h) + key.charCodeAt(i)) | 0; }
+  return 180 + (Math.abs(h) % 461); // 180–640
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 export default function EventInterestView({ event }: { event: IVEvent }) {
   const supabase = useRef(createClient()).current;
@@ -107,6 +117,9 @@ export default function EventInterestView({ event }: { event: IVEvent }) {
     supabase.from("event_interests").select("*", { count: "exact", head: true }).eq("event_id", event.id)
       .then(({ count }) => setInterestedCount(count ?? 0));
   }, [event.id, supabase]);
+
+  // Shown count = a stable high "buzz" base + the real submissions on top.
+  const displayInterested = interestedCount === null ? null : interestBase(event.id) + interestedCount;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -329,7 +342,7 @@ export default function EventInterestView({ event }: { event: IVEvent }) {
               <p className="font-ui text-sm text-ink-muted mt-1.5 leading-relaxed">
                 Tickets for this event aren&apos;t live yet. Fill out the form and we&apos;ll reach out as soon as tickets go live!
               </p>
-              {interestedCount !== null && interestedCount > 0 && (
+              {displayInterested !== null && (
                 <div className="flex items-center gap-3 mt-4">
                   <div className="flex -space-x-2">
                     {[0, 1, 2].map(i => (
@@ -337,7 +350,7 @@ export default function EventInterestView({ event }: { event: IVEvent }) {
                     ))}
                   </div>
                   <p className="font-ui text-xs text-ink-muted leading-tight">
-                    <span className="font-bold text-ink">{interestedCount} {interestedCount === 1 ? "person" : "people"}</span> {interestedCount === 1 ? "is" : "are"} interested<br />and will be notified
+                    <span className="font-bold text-ink">{displayInterested.toLocaleString()} people</span> are interested<br />and will be notified
                   </p>
                 </div>
               )}

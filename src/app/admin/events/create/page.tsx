@@ -158,6 +158,12 @@ export default function AdminCreateEventPage() {
           group_discount_min_qty: t.groupDiscountEnabled && t.groupDiscountMode === 'simple' && t.groupDiscountMinQty ? parseInt(t.groupDiscountMinQty) : null,
           group_discount_type:    t.groupDiscountEnabled && t.groupDiscountMode === 'simple' && t.groupDiscountValue ? t.groupDiscountType : null,
           group_discount_value:   t.groupDiscountEnabled && t.groupDiscountMode === 'simple' && t.groupDiscountValue ? parseFloat(t.groupDiscountValue) : null,
+          group_discount_tiers:   t.groupDiscountEnabled && t.groupDiscountMode === 'scaling'
+            ? t.groupDiscountTiers
+                .map(l => ({ min_qty: parseInt(l.minQty) || 0, percent: parseInt(l.percent) || 0 }))
+                .filter(l => l.min_qty > 0 && l.percent > 0)
+                .sort((a, b) => a.min_qty - b.min_qty)
+            : null,
           sort_order:             i,
         }));
         const { error: tierErr } = await supabase.from('ticket_tiers').insert(tiers);

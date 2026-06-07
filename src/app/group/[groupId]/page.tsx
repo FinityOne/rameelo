@@ -5,7 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Logo from "@/components/Logo";
-import { loadGroupOrder, joinGroupOrder, updateGroupMember, updateGroupName, tierHasGroupDiscount, groupDiscountPct, groupDiscountSummary, type GroupOrder } from "@/lib/group-orders";
+import { loadGroupOrder, joinGroupOrder, updateGroupMember, updateGroupName, tierHasGroupDiscount, groupDiscountPct, groupDiscountSummary, groupScalingLevels, type GroupOrder } from "@/lib/group-orders";
 import { salesClosedForEvent } from "@/lib/event-time";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
 
@@ -221,6 +221,9 @@ export default function GroupLandingPage() {
   const discountActive = discount > 0;                          // threshold met → savings apply now
   const ticketsToUnlock = discountSummary ? Math.max(discountSummary.minQty - totalTickets, 0) : 0;
   const discountedPrice = Math.round(unitPrice * (1 - discount / 100));
+  const scalingLevels = groupScalingLevels(tier);               // full ladder (empty if simple)
+  // Label for the currently-applied discount (scaling shows the live %).
+  const liveAmountLabel = tier.group_discount_mode === "scaling" ? `${discount}% off` : (discountSummary?.amount ?? `${discount}% off`);
 
   // No fixed cap — a group can grow without limit. When the tier has a discount,
   // its minimum quantity is the milestone we nudge toward (for the progress bar).
@@ -570,13 +573,30 @@ export default function GroupLandingPage() {
             {groupPaid ? (
               <><strong className="text-peacock">All {totalTickets} ticket{totalTickets !== 1 ? "s" : ""} purchased</strong> — claim yours in your account.</>
             ) : hasGroupDiscount && discountActive ? (
-              <><strong className="text-peacock">{discountSummary!.amount} group rate unlocked</strong> — keep adding people, everyone saves.</>
+              <><strong className="text-peacock">{liveAmountLabel} group rate unlocked</strong> — keep adding people, everyone saves.</>
             ) : hasGroupDiscount && discountSummary ? (
               <><strong className="text-ink">{ticketsToUnlock} more ticket{ticketsToUnlock !== 1 ? "s" : ""}</strong> to unlock <strong className="text-peacock">{discountSummary.amount}</strong> for the group — add as many as you like!</>
             ) : (
               <>Add as many people as you like — the more the merrier.</>
             )}
           </p>
+
+          {/* Scaling ladder — show every level so members see the savings tiers */}
+          {!groupPaid && scalingLevels.length > 1 && (
+            <div className="mt-3 pt-3 border-t border-ivory-200 grid grid-cols-1 gap-1">
+              {scalingLevels.map(lvl => {
+                const reached = totalTickets >= lvl.minQty;
+                return (
+                  <div key={lvl.minQty} className="flex items-center justify-between">
+                    <span className={`font-ui text-xs ${reached ? "text-ink font-semibold" : "text-ink-muted"}`}>
+                      {reached ? "✓ " : ""}{lvl.minQty}+ tickets
+                    </span>
+                    <span className={`font-mono text-[11px] font-bold ${reached ? "text-peacock" : "text-ink-muted"}`}>{lvl.percent}% off</span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Who's In */}
@@ -687,7 +707,7 @@ export default function GroupLandingPage() {
             <div className="rounded-2xl border border-aubergine/15 bg-aubergine/5 px-4 py-3 flex items-start gap-3">
               <svg className="w-4 h-4 text-aubergine mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               <p className="font-ui text-sm text-aubergine/80 leading-relaxed">
-                <strong className="text-aubergine">One person pays for the whole group.</strong> Everyone adds the tickets they need, then a single checkout covers everybody{discountActive ? ` at the ${discountSummary!.amount} group rate` : ""} — no splitting payments.
+                <strong className="text-aubergine">One person pays for the whole group.</strong> Everyone adds the tickets they need, then a single checkout covers everybody{discountActive ? ` at the ${liveAmountLabel} group rate` : ""} — no splitting payments.
               </p>
             </div>
 
@@ -729,7 +749,7 @@ export default function GroupLandingPage() {
                     <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted font-bold mb-1">Group payment</p>
                     <p className="font-display font-bold text-ink text-base">Pay for all {totalTickets} ticket{totalTickets !== 1 ? "s" : ""}</p>
                     <p className="font-ui text-sm text-ink-muted mt-0.5">
-                      {memberCount} {memberCount === 1 ? "person" : "people"} · {discountActive ? `${discountSummary!.amount} applied` : "standard rate"}
+                      {memberCount} {memberCount === 1 ? "person" : "people"} · {discountActive ? `${liveAmountLabel} applied` : "standard rate"}
                     </p>
                   </div>
                   <div className="text-right shrink-0">
@@ -839,7 +859,7 @@ export default function GroupLandingPage() {
               className="w-full flex items-center justify-between gap-3 bg-aubergine text-white px-5 py-4 rounded-2xl shadow-xl shadow-aubergine/20 font-display font-bold active:scale-[0.98] transition-all">
               <div className="text-left">
                 <p className="text-base font-bold leading-tight">Pay for the whole group</p>
-                <p className="font-ui text-xs text-white/70 font-normal">{totalTickets} ticket{totalTickets !== 1 ? "s" : ""}{discountActive ? ` · ${discountSummary!.amount}` : ""}</p>
+                <p className="font-ui text-xs text-white/70 font-normal">{totalTickets} ticket{totalTickets !== 1 ? "s" : ""}{discountActive ? ` · ${liveAmountLabel}` : ""}</p>
               </div>
               <p className="text-xl font-bold">${groupPayTotal.toFixed(2)} →</p>
             </button>

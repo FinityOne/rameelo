@@ -312,11 +312,12 @@ export default function Nav() {
 
           {/* Right: utility links */}
           <div className="flex items-center gap-6 shrink-0 py-3">
-            <ComingSoon label="Sponsorship info coming soon">
-              <span className="font-ui text-[13px] font-medium text-ink/40 cursor-default whitespace-nowrap">
-                Sponsor with us
-              </span>
-            </ComingSoon>
+            <Link
+              href="/sponsor"
+              className={`font-ui text-[13px] font-medium transition-colors whitespace-nowrap ${pathname === "/sponsor" ? "text-aubergine" : "text-ink/55 hover:text-ink"}`}
+            >
+              Sponsor with us
+            </Link>
             <Link
               href="/pricing"
               className={`font-ui text-[13px] font-medium transition-colors whitespace-nowrap ${pathname === "/pricing" ? "text-aubergine" : "text-ink/55 hover:text-ink"}`}
@@ -375,10 +376,7 @@ export default function Nav() {
 
           <div className="border-t border-ink/6 pt-2 mt-2 space-y-0.5">
             <Link href="/organizers" onClick={() => setMobileOpen(false)} className="block px-4 py-2.5 rounded-[8px] font-ui text-sm text-ink-muted hover:text-ink hover:bg-ivory-200 transition-colors">Sell on Rameelo</Link>
-            <div className="flex items-center justify-between px-4 py-2.5 rounded-[8px] text-ink/30">
-              <span className="font-ui text-sm">Sponsor with us</span>
-              <span className="font-mono text-[9px] bg-ink/6 px-2 py-0.5 rounded">Coming soon</span>
-            </div>
+            <Link href="/sponsor" onClick={() => setMobileOpen(false)} className="block px-4 py-2.5 rounded-[8px] font-ui text-sm text-ink-muted hover:text-ink hover:bg-ivory-200 transition-colors">Sponsor with us</Link>
             <Link href="/pricing" onClick={() => setMobileOpen(false)} className="block px-4 py-2.5 rounded-[8px] font-ui text-sm text-ink-muted hover:text-ink hover:bg-ivory-200 transition-colors">Pricing</Link>
             <Link href="/about" onClick={() => setMobileOpen(false)} className="block px-4 py-2.5 rounded-[8px] font-ui text-sm text-ink-muted hover:text-ink hover:bg-ivory-200 transition-colors">About</Link>
           </div>

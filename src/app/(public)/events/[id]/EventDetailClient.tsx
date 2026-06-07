@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
 import { salesClosedForEvent } from "@/lib/event-time";
 import { money } from "@/lib/money";
+import { groupDiscountPct, groupDiscountAmount, groupScalingLevels } from "@/lib/group-orders";
 import EventInterestView from "./EventInterestView";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -51,6 +52,7 @@ type Tier = {
   group_discount_min_qty: number | null;
   group_discount_type: 'percentage' | 'fixed' | null;
   group_discount_value: number | null;
+  group_discount_tiers: { min_qty: number; percent: number }[] | null;
 };
 
 type Event = {
@@ -86,49 +88,22 @@ type Event = {
 };
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const SCALING_TIERS = [
-  { min: 10, label: "10+ tickets", discount: 15, tag: "Best Value" },
-  { min: 8,  label: "8–9 tickets",  discount: 12, tag: "Great Deal" },
-  { min: 5,  label: "5–7 tickets",  discount: 10, tag: "Group Rate" },
-];
-
-function getScalingDiscount(qty: number): number {
-  for (const t of SCALING_TIERS) if (qty >= t.min) return t.discount;
-  return 0;
-}
-function getNextScalingTier(qty: number) {
-  for (let i = SCALING_TIERS.length - 1; i >= 0; i--)
-    if (qty < SCALING_TIERS[i].min) return SCALING_TIERS[i];
-  return null;
-}
+// Discount math is centralized in src/lib/group-orders.ts so the event page,
+// group flow, and checkout all behave identically. These thin wrappers adapt the
+// page's Tier shape to the shared helpers.
 
 function getTierDiscount(tier: Tier | null, qty: number): number {
-  if (!tier || !tier.group_discount_mode) return 0;
-  if (tier.group_discount_mode === 'scaling') return getScalingDiscount(qty);
-  if (tier.group_discount_mode === 'simple') {
-    const min = tier.group_discount_min_qty ?? 0;
-    if (qty < min || !tier.group_discount_value) return 0;
-    if (tier.group_discount_type === 'percentage') return tier.group_discount_value;
-    // fixed: convert $ off to effective pct for downstream math
-    return tier.price > 0 ? (tier.group_discount_value / tier.price) * 100 : 0;
-  }
-  return 0;
+  return groupDiscountPct(tier, qty);
 }
-
 function getTierDiscountAmount(tier: Tier | null, qty: number, subtotal: number): number {
-  if (!tier || !tier.group_discount_mode) return 0;
-  if (tier.group_discount_mode === 'scaling') {
-    const pct = getScalingDiscount(qty);
-    return Math.round(subtotal * (pct / 100));
+  return groupDiscountAmount(tier, qty, subtotal);
+}
+// The next scaling level the buyer hasn't reached yet (for the "add N more" nudge).
+function getNextScalingTier(tier: Tier | null, qty: number): { min: number; discount: number } | null {
+  for (const lvl of groupScalingLevels(tier)) {
+    if (qty < lvl.minQty) return { min: lvl.minQty, discount: lvl.percent };
   }
-  if (tier.group_discount_mode === 'simple') {
-    const min = tier.group_discount_min_qty ?? 0;
-    if (qty < min || !tier.group_discount_value) return 0;
-    if (tier.group_discount_type === 'percentage') return Math.round(subtotal * (tier.group_discount_value / 100));
-    return Math.round(tier.group_discount_value * qty);
-  }
-  return 0;
+  return null;
 }
 
 function fmtDate(d: string) {
@@ -647,7 +622,7 @@ export default function EventDetailClient({ id }: { id: string }) {
         ticket_tiers (
           id, name, description, price, quantity, quantity_sold,
           sale_start_date, sale_end_date, is_visible, sort_order,
-          group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value
+          group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value, group_discount_tiers
         )
       `)
       .eq("id", id)
@@ -767,7 +742,7 @@ export default function EventDetailClient({ id }: { id: string }) {
   const processingFee = Math.round(afterDiscount * CARD_FEE_PCT * 100) / 100;
   const serviceFee   = rameeloFee + processingFee; // kept for backward compat
   const grandTotal   = afterDiscount + rameeloFee + processingFee;
-  const nextScalingTier = selectedTier?.group_discount_mode === 'scaling' ? getNextScalingTier(qty) : null;
+  const nextScalingTier = selectedTier?.group_discount_mode === 'scaling' ? getNextScalingTier(selectedTier, qty) : null;
 
   const maxQty = Math.min(20, selectedTier ? Math.max(0, remaining) : 0);
 
@@ -1474,23 +1449,23 @@ export default function EventDetailClient({ id }: { id: string }) {
                           <p className="font-mono text-[10px] uppercase tracking-widest text-aubergine font-bold">Group Discounts</p>
                         </div>
                         <div className="divide-y divide-ivory-200">
-                          {SCALING_TIERS.slice().reverse().map(st => {
-                            const active = qty >= st.min;
-                            const isNext = nextScalingTier?.min === st.min;
+                          {groupScalingLevels(selectedTier).slice().reverse().map(st => {
+                            const active = qty >= st.minQty;
+                            const isNext = nextScalingTier?.min === st.minQty;
                             return (
-                              <div key={st.min} className={`flex items-center justify-between px-3 py-2.5 ${active ? "bg-peacock/5" : isNext ? "bg-marigold/5" : ""}`}>
+                              <div key={st.minQty} className={`flex items-center justify-between px-3 py-2.5 ${active ? "bg-peacock/5" : isNext ? "bg-marigold/5" : ""}`}>
                                 <div className="flex items-center gap-2">
                                   <span className={`w-4 h-4 rounded-full flex items-center justify-center text-[9px] ${active ? "bg-peacock text-white" : "bg-ivory-200 text-ink-muted"}`}>
                                     {active ? "✓" : "·"}
                                   </span>
-                                  <span className={`font-ui text-xs ${active ? "text-ink font-semibold" : "text-ink-muted"}`}>{st.label}</span>
+                                  <span className={`font-ui text-xs ${active ? "text-ink font-semibold" : "text-ink-muted"}`}>{st.minQty}+ tickets</span>
                                   {isNext && (
                                     <span className="font-mono text-[9px] uppercase tracking-wide text-marigold-dark bg-marigold/15 px-1.5 py-0.5 rounded-full">
-                                      Add {st.min - qty}
+                                      Add {st.minQty - qty}
                                     </span>
                                   )}
                                 </div>
-                                <span className={`font-display font-bold text-sm ${active ? "text-peacock" : "text-ink-muted"}`}>{st.discount}% off</span>
+                                <span className={`font-display font-bold text-sm ${active ? "text-peacock" : "text-ink-muted"}`}>{st.percent}% off</span>
                               </div>
                             );
                           })}
@@ -1627,8 +1602,8 @@ export default function EventDetailClient({ id }: { id: string }) {
                       <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
                       {existingGroups.length > 0
                         ? "Start a new group"
-                        : selectedTier?.group_discount_mode === 'scaling'
-                          ? "Start a Group Order — Save up to 15%"
+                        : selectedTier?.group_discount_mode === 'scaling' && groupScalingLevels(selectedTier).length > 0
+                          ? `Start a Group Order — Save up to ${Math.max(...groupScalingLevels(selectedTier).map(l => l.percent))}%`
                           : "Start a Group Order"}
                     </Link>
 

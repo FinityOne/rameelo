@@ -26,7 +26,7 @@ const STATUS_META: Record<EmailStatus, { label: string; cls: string }> = {
   planned: { label: "Coming soon", cls: "bg-ink/[0.05] text-ink-muted" },
 };
 
-const CATEGORY_ORDER = ["Member", "Orders & Tickets", "Organizer", "Payments"] as const;
+const CATEGORY_ORDER = ["Member", "Orders & Tickets", "Organizer", "Payments", "Platform"] as const;
 
 type Filter = "all" | "live" | "planned" | "automatic" | "manual";
 

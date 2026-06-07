@@ -35,14 +35,14 @@ export async function POST(request: Request) {
     .select(`
       id, organizer_name, organizer_email, organizer_user_id, created_at,
       events ( title, start_date, start_time, city, state, venue_name ),
-      ticket_tiers ( name, price, group_discount_min_qty, group_discount_type, group_discount_value )
+      ticket_tiers ( name, price, group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value, group_discount_tiers )
     `)
     .eq("id", groupId)
     .single();
 
   if (error || !data) return NextResponse.json({ error: "Group not found" }, { status: 404 });
 
-  type TierRow = { name: string; price: number; group_discount_min_qty: number | null; group_discount_type: "percentage" | "fixed" | null; group_discount_value: number | null };
+  type TierRow = { name: string; price: number; group_discount_mode: "simple" | "scaling" | null; group_discount_min_qty: number | null; group_discount_type: "percentage" | "fixed" | null; group_discount_value: number | null; group_discount_tiers: { min_qty: number; percent: number }[] | null };
   const g = data as unknown as {
     organizer_name: string; organizer_email: string; organizer_user_id: string | null;
     created_at: string;

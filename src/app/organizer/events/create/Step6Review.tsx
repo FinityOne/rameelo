@@ -125,9 +125,11 @@ export default function Step6Review({ data, onEdit }: Props) {
                 <p className="font-ui font-semibold text-ink text-sm">{tier.name || `Tier ${i + 1}`}</p>
                 <p className="font-ui text-xs text-ink-muted mt-0.5">
                   {fmtCurrency(tier.price)} · {tier.quantity || '—'} tickets
-                  {tier.groupDiscountEnabled && tier.groupDiscountValue && tier.groupDiscountMinQty
-                    ? ` · Group: ${tier.groupDiscountType === 'percentage' ? `${tier.groupDiscountValue}% off` : `$${tier.groupDiscountValue} off`} for ${tier.groupDiscountMinQty}+`
-                    : ''}
+                  {tier.groupDiscountEnabled && tier.groupDiscountMode === 'scaling'
+                    ? ` · Scaling: ${tier.groupDiscountTiers.filter(l => l.minQty && l.percent).map(l => `${l.minQty}+→${l.percent}%`).join(' · ')}`
+                    : tier.groupDiscountEnabled && tier.groupDiscountValue && tier.groupDiscountMinQty
+                      ? ` · Group: ${tier.groupDiscountType === 'percentage' ? `${tier.groupDiscountValue}% off` : `$${tier.groupDiscountValue} off`} for ${tier.groupDiscountMinQty}+`
+                      : ''}
                 </p>
               </div>
               {tier.saleStartDate || tier.saleEndDate ? (

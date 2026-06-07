@@ -36,9 +36,11 @@ type TicketTier = {
   description: string | null;
   sale_start_date: string | null;
   sale_end_date: string | null;
+  group_discount_mode: "simple" | "scaling" | null;
   group_discount_min_qty: number | null;
   group_discount_type: string | null;
   group_discount_value: number | null;
+  group_discount_tiers: { min_qty: number; percent: number }[] | null;
 };
 
 type EventFull = {
@@ -154,7 +156,7 @@ export default function AdminEventReviewPage() {
           cover_image_url, cover_gradient,
           dress_code, dress_code_details, dandiya_sticks, age_restriction,
           capacity, status, selling_on_rameelo, review_note, reviewed_at, created_at,
-          ticket_tiers (id, name, price, quantity, description, sale_start_date, sale_end_date, group_discount_min_qty, group_discount_type, group_discount_value),
+          ticket_tiers (id, name, price, quantity, description, sale_start_date, sale_end_date, group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value, group_discount_tiers),
           organizer:profiles!events_organizer_id_fkey (first_name, last_name, email, phone, city, state)
         `)
         .eq('id', id)
@@ -505,9 +507,9 @@ export default function AdminEventReviewPage() {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <p className="font-display font-semibold text-ink text-sm">{tier.name}</p>
-                  {tier.group_discount_min_qty && (
+                  {(tier.group_discount_min_qty || (tier.group_discount_tiers?.length ?? 0) > 0) && (
                     <span className="font-mono text-[8px] uppercase tracking-widest bg-peacock/10 text-peacock px-1.5 py-0.5 rounded-full">
-                      Group discount
+                      {tier.group_discount_mode === "scaling" ? "Scaling discount" : "Group discount"}
                     </span>
                   )}
                 </div>
@@ -517,11 +519,15 @@ export default function AdminEventReviewPage() {
                     On sale: {tier.sale_start_date ? fmtDate(tier.sale_start_date) : '…'} → {tier.sale_end_date ? fmtDate(tier.sale_end_date) : 'event'}
                   </p>
                 )}
-                {tier.group_discount_min_qty && tier.group_discount_value && (
+                {tier.group_discount_mode === "scaling" && (tier.group_discount_tiers?.length ?? 0) > 0 ? (
+                  <p className="font-mono text-[9px] text-ink-muted mt-0.5">
+                    Scaling: {[...tier.group_discount_tiers!].sort((a, b) => a.min_qty - b.min_qty).map(l => `${l.min_qty}+→${l.percent}%`).join(" · ")}
+                  </p>
+                ) : tier.group_discount_min_qty && tier.group_discount_value ? (
                   <p className="font-mono text-[9px] text-ink-muted mt-0.5">
                     Group: {tier.group_discount_type === 'percentage' ? `${tier.group_discount_value}% off` : `$${tier.group_discount_value} off`} for {tier.group_discount_min_qty}+
                   </p>
-                )}
+                ) : null}
               </div>
               <div className="text-right shrink-0">
                 <p className="font-display font-bold text-ink text-base">${tier.price.toFixed(2)}</p>

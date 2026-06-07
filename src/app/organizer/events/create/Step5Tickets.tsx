@@ -163,22 +163,43 @@ function TierCard({ tier, idx, total, onChange, onRemove }: {
                 </div>
               )}
 
-              {/* Scaling mode info */}
+              {/* Scaling mode — custom percentage levels (% only) */}
               {tier.groupDiscountMode === 'scaling' && (
-                <div className="rounded-lg bg-white border border-ivory-200 divide-y divide-ivory-200 text-xs overflow-hidden">
-                  {[
-                    { range: '5–7 tickets', pct: '10% off', tag: 'Group Rate' },
-                    { range: '8–9 tickets', pct: '12% off', tag: 'Great Deal' },
-                    { range: '10+ tickets', pct: '15% off', tag: 'Best Value' },
-                  ].map(row => (
-                    <div key={row.range} className="flex items-center justify-between px-3 py-2">
-                      <span className="font-ui text-ink">{row.range}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono text-[9px] text-ink-muted bg-ivory px-1.5 py-0.5 rounded-full">{row.tag}</span>
-                        <span className="font-display font-bold text-peacock">{row.pct}</span>
+                <div className="space-y-2">
+                  <p className="font-mono text-[9px] text-ink-muted">Set your own levels. The highest one the group reaches applies. Percentage-only.</p>
+                  {tier.groupDiscountTiers.map((lvl, i) => (
+                    <div key={i} className="flex items-end gap-2">
+                      <div className="flex-1">
+                        <label className={labelCls}>Min tickets</label>
+                        <input type="number" min="2" placeholder="5" value={lvl.minQty}
+                          onChange={e => onChange({ groupDiscountTiers: tier.groupDiscountTiers.map((l, j) => j === i ? { ...l, minQty: e.target.value } : l) })}
+                          className={inputCls} />
                       </div>
+                      <div className="flex-1">
+                        <label className={labelCls}>% off</label>
+                        <div className="relative">
+                          <span className="absolute left-3.5 top-1/2 -translate-y-1/2 font-ui text-sm text-ink-muted">%</span>
+                          <input type="number" min="0" max="100" placeholder="10" value={lvl.percent}
+                            onChange={e => onChange({ groupDiscountTiers: tier.groupDiscountTiers.map((l, j) => j === i ? { ...l, percent: e.target.value } : l) })}
+                            className={`${inputCls} pl-7`} />
+                        </div>
+                      </div>
+                      <button type="button"
+                        onClick={() => onChange({ groupDiscountTiers: tier.groupDiscountTiers.filter((_, j) => j !== i) })}
+                        className="mb-0.5 w-10 h-10 rounded-xl border border-ivory-200 flex items-center justify-center text-durga hover:bg-durga/5 shrink-0">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
                     </div>
                   ))}
+                  <button type="button"
+                    onClick={() => {
+                      const last = tier.groupDiscountTiers[tier.groupDiscountTiers.length - 1];
+                      const nextQty = last ? (parseInt(last.minQty) || 4) + 2 : 5;
+                      onChange({ groupDiscountTiers: [...tier.groupDiscountTiers, { minQty: String(nextQty), percent: '15' }] });
+                    }}
+                    className="w-full py-2 rounded-xl border border-dashed border-aubergine/40 font-ui text-xs text-aubergine hover:bg-aubergine/5 transition-all">
+                    + Add level
+                  </button>
                 </div>
               )}
             </div>
@@ -227,16 +248,20 @@ function TierCard({ tier, idx, total, onChange, onRemove }: {
               {hasScalingDiscount && (
                 <div className="border-t border-aubergine/15 pt-2 mt-1">
                   <p className="font-mono text-[9px] text-marigold-dark uppercase tracking-widest mb-1.5">Scaling group discount</p>
-                  {[{ min: 5, pct: 10 }, { min: 8, pct: 12 }, { min: 10, pct: 15 }].map(({ min, pct }) => {
-                    const dp = groupPrice(price, 'percentage', pct);
-                    const df = feeBreakdown(dp);
-                    return (
-                      <div key={min} className="flex justify-between font-ui text-xs text-ink-muted">
-                        <span>{min}+ tickets</span>
-                        <span className="text-peacock font-semibold">${df.buyerPays}/ea</span>
-                      </div>
-                    );
-                  })}
+                  {tier.groupDiscountTiers
+                    .map(l => ({ min: parseInt(l.minQty) || 0, pct: parseInt(l.percent) || 0 }))
+                    .filter(l => l.min > 0 && l.pct > 0)
+                    .sort((a, b) => a.min - b.min)
+                    .map(({ min, pct }) => {
+                      const dp = groupPrice(price, 'percentage', pct);
+                      const df = feeBreakdown(dp);
+                      return (
+                        <div key={min} className="flex justify-between font-ui text-xs text-ink-muted">
+                          <span>{min}+ tickets ({pct}% off)</span>
+                          <span className="text-peacock font-semibold">${df.buyerPays}/ea</span>
+                        </div>
+                      );
+                    })}
                 </div>
               )}
             </div>
