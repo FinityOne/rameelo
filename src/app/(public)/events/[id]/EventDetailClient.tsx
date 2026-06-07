@@ -28,6 +28,7 @@ type Artist = {
 type Organization = {
   id: string;
   name: string;
+  slug: string | null;
   description: string | null;
   logo_url: string | null;
   city: string | null;
@@ -82,6 +83,7 @@ type Event = {
   age_restriction: string;
   capacity: number | null;
   selling_on_rameelo: boolean;
+  org_id: string | null;
   artist: Artist | null;
   organization: Organization | null;
   ticket_tiers: Tier[];
@@ -607,7 +609,7 @@ export default function EventDetailClient({ id }: { id: string }) {
     supabase
       .from("events")
       .select(`
-        id, title, category, description, navratri_nights,
+        id, title, category, description, navratri_nights, org_id,
         start_date, end_date, start_time, end_time, doors_open_time,
         venue_name, address_line1, city, state, zip,
         parking, parking_notes, website_url,
@@ -615,9 +617,6 @@ export default function EventDetailClient({ id }: { id: string }) {
         dress_code, dress_code_details, dandiya_sticks, age_restriction, capacity, selling_on_rameelo,
         artist:artists!events_artist_id_fkey (
           id, name, slug, tagline, bio, profile_image_url, genres, years_active_since, follower_count, performance_style
-        ),
-        organization:organizations!events_org_id_fkey (
-          id, name, description, logo_url, city, state, website, instagram, facebook
         ),
         ticket_tiers (
           id, name, description, price, quantity, quantity_sold,
@@ -640,6 +639,14 @@ export default function EventDetailClient({ id }: { id: string }) {
         );
         if (firstSelectable) setSelectedTierId(firstSelectable.id);
         setLoading(false);
+
+        // Public org details (RLS hides organizations from anon, so use the RPC).
+        if (ev.org_id) {
+          supabase.rpc("get_public_organization", { p_id: ev.org_id }).then(({ data: orgRows }) => {
+            const org = Array.isArray(orgRows) ? orgRows[0] : orgRows;
+            if (org) setEvent(prev => prev ? { ...prev, organization: org as Organization } : prev);
+          });
+        }
       });
   }, [id]);
 
@@ -901,25 +908,38 @@ export default function EventDetailClient({ id }: { id: string }) {
           {/* Artist — clickable to profile (kept for context & indexing) */}
           {event.artist && <ArtistCard artist={event.artist} />}
 
-          {/* Presented by */}
-          {event.organization && (
-            <div className="flex items-center gap-4 p-4 sm:p-5 rounded-2xl bg-white border border-ivory-200">
-              <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-aubergine/10 text-aubergine font-bold text-lg">
-                {event.organization.logo_url
-                  ? <img src={event.organization.logo_url} alt={event.organization.name} className="w-full h-full object-cover" />
-                  : event.organization.name.charAt(0)}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-0.5">Presented by</p>
-                <p className="font-display font-bold text-ink text-base">{event.organization.name}</p>
-                {(event.organization.city || event.organization.state) && (
-                  <p className="font-ui text-ink-muted text-xs">
-                    {[event.organization.city, event.organization.state].filter(Boolean).join(", ")}
-                  </p>
+          {/* Presented by — clickable to the organization's page when it has a slug */}
+          {event.organization && (() => {
+            const org = event.organization;
+            const inner = (
+              <>
+                <div className="w-12 h-12 rounded-xl overflow-hidden shrink-0 flex items-center justify-center bg-aubergine/10 text-aubergine font-bold text-lg">
+                  {org.logo_url
+                    ? <img src={org.logo_url} alt={org.name} className="w-full h-full object-cover" />
+                    : org.name.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-0.5">Presented by</p>
+                  <p className="font-display font-bold text-ink text-base">{org.name}</p>
+                  {(org.city || org.state) && (
+                    <p className="font-ui text-ink-muted text-xs">
+                      {[org.city, org.state].filter(Boolean).join(", ")}
+                    </p>
+                  )}
+                </div>
+                {org.slug && (
+                  <svg className="w-4 h-4 text-ink-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
                 )}
-              </div>
-            </div>
-          )}
+              </>
+            );
+            return org.slug ? (
+              <Link href={`/org/${org.slug}`} className="flex items-center gap-4 p-4 sm:p-5 rounded-2xl bg-white border border-ivory-200 hover:border-aubergine/30 hover:shadow-sm transition-all">
+                {inner}
+              </Link>
+            ) : (
+              <div className="flex items-center gap-4 p-4 sm:p-5 rounded-2xl bg-white border border-ivory-200">{inner}</div>
+            );
+          })()}
 
           {/* Description */}
           {event.description && (

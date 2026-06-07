@@ -1,7 +1,71 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+// Root domain(s) that serve the normal app (everything else hitting us is treated
+// as a potential artist vanity domain). Override with NEXT_PUBLIC_ROOT_DOMAIN.
+const ROOT_DOMAIN = (process.env.NEXT_PUBLIC_ROOT_DOMAIN ?? 'rameelo.com').toLowerCase()
+
+// Normalize a host header to a bare hostname: lowercase, no port, no leading www.
+function normalizeHost(raw: string | null): string {
+  if (!raw) return ''
+  return raw.split(':')[0].toLowerCase().replace(/^www\./, '').trim()
+}
+
+// Is this one of our own domains (not an artist vanity domain)?
+function isPrimaryHost(host: string): boolean {
+  return (
+    host === ROOT_DOMAIN ||
+    host === '' ||
+    host === 'localhost' ||
+    host === '127.0.0.1' ||
+    host.endsWith('.vercel.app')
+  )
+}
+
+// Tiny best-effort cache of host → artist slug (refetched if the instance is cold;
+// correctness never depends on it). null = looked up, no match.
+const vanityCache = new Map<string, { slug: string | null; at: number }>()
+const VANITY_TTL = 5 * 60 * 1000
+
+async function resolveArtistSlug(host: string): Promise<string | null> {
+  const cached = vanityCache.get(host)
+  if (cached && Date.now() - cached.at < VANITY_TTL) return cached.slug
+
+  let slug: string | null = null
+  try {
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+    const key = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY!
+    // Pull the (small) set of artists that have a custom domain and match in JS,
+    // so we tolerate however the domain was stored (protocol/www/trailing slash).
+    const res = await fetch(
+      `${url}/rest/v1/artists?select=slug,custom_domain&custom_domain=not.is.null&is_active=eq.true`,
+      { headers: { apikey: key, authorization: `Bearer ${key}` }, cache: 'no-store' }
+    )
+    if (res.ok) {
+      const rows = (await res.json()) as { slug: string; custom_domain: string | null }[]
+      const match = rows.find(r => normalizeHost((r.custom_domain ?? '').replace(/^https?:\/\//, '')) === host)
+      slug = match?.slug ?? null
+    }
+  } catch { /* fall through — no vanity match */ }
+
+  vanityCache.set(host, { slug, at: Date.now() })
+  return slug
+}
+
 export async function proxy(request: NextRequest) {
+  // ── Artist vanity-domain routing ──
+  // When a custom artist domain points at this app, land its homepage on that
+  // artist's page (deeper paths still work as the normal app).
+  const host = normalizeHost(request.headers.get('host'))
+  if (!isPrimaryHost(host) && request.nextUrl.pathname === '/') {
+    const slug = await resolveArtistSlug(host)
+    if (slug) {
+      const url = request.nextUrl.clone()
+      url.pathname = `/artists/${slug}`
+      return NextResponse.rewrite(url)
+    }
+  }
+
   let supabaseResponse = NextResponse.next({ request })
 
   const supabase = createServerClient(
