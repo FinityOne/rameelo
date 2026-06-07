@@ -71,6 +71,8 @@ export default function AdminOrderDetailPage() {
   const [buyer, setBuyer]     = useState<BuyerProfile>(null);
   const [loading, setLoading] = useState(true);
   const [toggling, setToggling] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<"sent" | "error" | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -114,6 +116,24 @@ export default function AdminOrderDetailPage() {
     const { error } = await supabase.from("orders").update({ is_test: next }).eq("id", order.id);
     if (!error) setOrder(prev => prev ? { ...prev, is_test: next } : prev);
     setToggling(false);
+  }
+
+  async function sendConfirmation() {
+    if (!order) return;
+    setSending(true);
+    setSendResult(null);
+    try {
+      const res = await fetch("/api/admin/send-order-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id }),
+      });
+      setSendResult(res.ok ? "sent" : "error");
+    } catch {
+      setSendResult("error");
+    }
+    setSending(false);
+    setTimeout(() => setSendResult(null), 4000);
   }
 
   if (loading) {
@@ -268,6 +288,36 @@ export default function AdminOrderDetailPage() {
               : "—"
           } mono />
           <Row label="Placed" value={fmtTS(order.created_at)} />
+        </div>
+
+        {/* Resend order confirmation / receipt to the buyer */}
+        <div className="px-5 py-4 border-t border-ivory-200 flex items-center justify-between gap-4">
+          <div className="min-w-0">
+            <p className="font-display font-bold text-ink text-sm" style={{ letterSpacing: "-0.01em" }}>
+              Order confirmation email
+            </p>
+            <p className="font-ui text-xs text-ink-muted mt-0.5">
+              {sendResult === "sent"
+                ? <span className="text-peacock font-semibold">Sent to {order.buyer_email} ✓</span>
+                : sendResult === "error"
+                  ? <span className="text-durga font-semibold">Couldn&rsquo;t send — try again.</span>
+                  : <>Resend the receipt &amp; ticket-access email to <span className="text-ink">{order.buyer_email}</span>.</>}
+            </p>
+          </div>
+          <button
+            onClick={sendConfirmation}
+            disabled={sending}
+            className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:bg-aubergine-light transition-all disabled:opacity-60"
+          >
+            {sending ? (
+              <><span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Sending…</>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                Send confirmation
+              </>
+            )}
+          </button>
         </div>
 
         {/* Test/live toggle — excludes from live totals platform-wide */}

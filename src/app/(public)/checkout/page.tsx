@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { saveOrder, markGroupPaid, createGroupAllocations } from "@/lib/group-orders";
 import { TERMS_VERSION, TERMS_SUMMARY, TERMS_TEXT, NO_REFUND_NOTICE } from "@/lib/terms";
+import { money } from "@/lib/money";
 
 interface CheckoutPayload {
   eventId: string;
@@ -242,6 +243,15 @@ export default function CheckoutPage() {
           body: JSON.stringify({ orderId }),
         }).catch(() => { /* non-blocking — claim emails shouldn't block confirmation */ });
       }
+    }
+
+    // Send the buyer their order confirmation / receipt (non-blocking).
+    if (orderId) {
+      fetch("/api/order-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      }).catch(() => { /* non-blocking — receipt email shouldn't block confirmation */ });
     }
 
     if (error) console.error("Order save error:", error);
@@ -487,7 +497,7 @@ export default function CheckoutPage() {
                             {isCard ? `+${(CARD_FEE_PCT * 100).toFixed(1)}% processing fee` : "No processing fee"}
                           </p>
                           {!isCard && (
-                            <p className="font-mono text-[9px] text-peacock font-bold pl-6 mt-0.5">Save ${processingFee.toFixed(2)}</p>
+                            <p className="font-mono text-[9px] text-peacock font-bold pl-6 mt-0.5">Save ${money(processingFee)}</p>
                           )}
                         </button>
                       );
@@ -606,7 +616,7 @@ export default function CheckoutPage() {
                   disabled={!paymentValid || !agreedTerms}
                   className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all flex items-center justify-center gap-2 ${paymentValid && agreedTerms ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-sm" : "bg-ivory-200 text-ink-muted cursor-not-allowed"}`}
                 >
-                  Complete Purchase · ${grandTotal.toFixed(2)}
+                  Complete Purchase · ${money(grandTotal)}
                 </button>
 
                 <p className="text-center font-mono text-[10px] text-ink-muted">Acceptance is recorded with version {TERMS_VERSION}, a timestamp, and your IP for your protection and ours.</p>
@@ -669,18 +679,18 @@ export default function CheckoutPage() {
                   <div className="border-t border-ivory-200 pt-3 space-y-2">
                     <div className="flex justify-between text-xs">
                       <span className="font-ui text-ink-muted">{payload.tierName} · {payload.qty} ticket{payload.qty > 1 ? "s" : ""}</span>
-                      <span className="font-ui text-ink">${(payload.unitPrice * payload.qty).toFixed(2)}</span>
+                      <span className="font-ui text-ink">${money((payload.unitPrice * payload.qty))}</span>
                     </div>
                     {payload.discount > 0 && (
                       <div className="flex justify-between text-xs">
                         <span className="font-ui text-peacock">Group discount ({payload.discount}%)</span>
-                        <span className="font-ui text-peacock">−${payload.discountAmount.toFixed(2)}</span>
+                        <span className="font-ui text-peacock">−${money(payload.discountAmount)}</span>
                       </div>
                     )}
                     {subtotal !== payload.unitPrice * payload.qty && (
                       <div className="flex justify-between text-xs border-t border-ivory-200 pt-1.5">
                         <span className="font-ui text-ink-muted">Subtotal</span>
-                        <span className="font-ui text-ink">${subtotal.toFixed(2)}</span>
+                        <span className="font-ui text-ink">${money(subtotal)}</span>
                       </div>
                     )}
 
@@ -688,7 +698,7 @@ export default function CheckoutPage() {
                     <div className="rounded-lg bg-ivory p-3 space-y-1.5 text-xs">
                       <div className="flex justify-between">
                         <span className="font-ui text-ink-muted">Rameelo fee (3%)</span>
-                        <span className="font-ui text-ink-muted">${rameeloFee.toFixed(2)}</span>
+                        <span className="font-ui text-ink-muted">${money(rameeloFee)}</span>
                       </div>
                       <div className="flex justify-between">
                         <div>
@@ -700,14 +710,14 @@ export default function CheckoutPage() {
                           )}
                         </div>
                         <span className={`font-ui shrink-0 ${paymentMethod === "ach" ? "text-peacock font-semibold" : "text-ink-muted"}`}>
-                          {paymentMethod === "ach" ? "FREE" : `$${processingFee.toFixed(2)}`}
+                          {paymentMethod === "ach" ? "FREE" : `$${money(processingFee)}`}
                         </span>
                       </div>
                     </div>
 
                     <div className="border-t border-ivory-200 pt-2 flex justify-between">
                       <span className="font-display font-bold text-ink">Total</span>
-                      <span className="font-display font-bold text-ink text-lg">${grandTotal.toFixed(2)}</span>
+                      <span className="font-display font-bold text-ink text-lg">${money(grandTotal)}</span>
                     </div>
                     <p className="font-ui text-[10px] text-ink-muted/70 text-center pt-1">{NO_REFUND_NOTICE}</p>
                   </div>
@@ -717,7 +727,7 @@ export default function CheckoutPage() {
                 {paymentMethod === "ach" && processingFee > 0 && (
                   <div className="rounded-xl bg-peacock/10 border border-peacock/25 p-3">
                     <p className="font-ui text-xs font-semibold text-peacock text-center">
-                      Saving ${processingFee.toFixed(2)} by paying with bank transfer!
+                      Saving ${money(processingFee)} by paying with bank transfer!
                     </p>
                   </div>
                 )}
@@ -725,7 +735,7 @@ export default function CheckoutPage() {
                 {payload && (payload.discount ?? 0) > 0 && (
                   <div className="rounded-xl bg-marigold/10 border border-marigold/25 p-3">
                     <p className="font-ui text-xs font-semibold text-marigold-dark text-center">
-                      Saving ${(payload.discountAmount ?? 0).toFixed(2)} with group pricing!
+                      Saving ${money((payload.discountAmount ?? 0))} with group pricing!
                     </p>
                   </div>
                 )}

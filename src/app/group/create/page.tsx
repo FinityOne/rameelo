@@ -12,6 +12,7 @@ import {
   groupDiscountPct,
   groupDiscountSummary,
 } from "@/lib/group-orders";
+import { salesClosedForEvent } from "@/lib/event-time";
 
 
 function fmtDate(d: string) {
@@ -46,6 +47,7 @@ type EventSummary = {
   id: string;
   title: string;
   start_date: string;
+  start_time: string | null;
   city: string;
   state: string;
   ticket_tiers: { id: string; name: string; price: number; quantity: number; quantity_sold: number; is_visible: boolean; sort_order: number; sale_start_date: string | null; sale_end_date: string | null; group_discount_min_qty: number | null; group_discount_type: "percentage" | "fixed" | null; group_discount_value: number | null }[];
@@ -85,7 +87,7 @@ function CreateGroupInner() {
       supabase
         .from("events")
         .select(`
-          id, title, start_date, city, state,
+          id, title, start_date, start_time, city, state,
           artists:artists!events_artist_id_fkey (name, profile_image_url),
           ticket_tiers (id, name, price, quantity, quantity_sold, is_visible, sort_order, sale_start_date, sale_end_date, group_discount_min_qty, group_discount_type, group_discount_value)
         `)
@@ -207,6 +209,19 @@ function CreateGroupInner() {
         <div className="text-center">
           <p className="font-display text-2xl font-bold text-ink mb-2">Event not found</p>
           <Link href="/events" className="text-marigold font-semibold hover:underline">← Browse events</Link>
+        </div>
+      </div>
+    );
+  }
+
+  // Online sales close when doors open in the event's city — no new groups after that.
+  if (salesClosedForEvent(event)) {
+    return (
+      <div className="min-h-screen flex items-center justify-center px-4" style={{ backgroundColor: "#FCF9F2" }}>
+        <div className="text-center max-w-sm">
+          <p className="font-display text-2xl font-bold text-ink mb-2">Sales are closed</p>
+          <p className="font-ui text-sm text-ink-muted mb-4">Online sales for {event.title} close when doors open. Tickets may be available at the door.</p>
+          <Link href={`/events/${event.id}`} className="text-marigold font-semibold hover:underline">← Back to event</Link>
         </div>
       </div>
     );

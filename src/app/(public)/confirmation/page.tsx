@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { money } from "@/lib/money";
 
 interface StoredOrder {
   orderId: string;
@@ -249,7 +250,7 @@ export default function ConfirmationPage() {
                 Purchased {formatTime(order.purchasedAt)} · Saved to {order.email}
               </p>
             </div>
-            <p className="font-display font-bold text-ink text-xl">${order.grandTotal.toLocaleString()}</p>
+            <p className="font-display font-bold text-ink text-xl">${money(order.grandTotal)}</p>
           </div>
         </div>
 

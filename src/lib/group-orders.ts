@@ -506,6 +506,101 @@ export async function loadMyPendingGroups(userId: string): Promise<PendingGroup[
     });
 }
 
+// ── My group-order links (portal "Group Orders" tab) ──────────────────────────
+export interface MyGroupSummary {
+  groupId: string;
+  name?: string;
+  eventId: string;
+  eventTitle: string;
+  eventDate: string;
+  eventTime: string;
+  city: string;
+  state: string;
+  venue: string;
+  coverGradient: string;
+  coverImageUrl: string | null;
+  artistName: string;
+  tierName: string;
+  isHost: boolean;
+  paid: boolean;          // group has been purchased
+  myQty: number;          // tickets reserved for this member
+  totalTickets: number;
+  memberCount: number;
+  members: { name: string; email: string; qty: number; paid: boolean; isOrganizer: boolean }[];
+  createdAt: string;
+}
+
+// Every group-order link the user belongs to (created OR joined), matched by
+// account id or email — so it's visible to everyone in the group.
+export async function loadMyGroupOrders(userId: string, email: string): Promise<MyGroupSummary[]> {
+  const supabase = createClient();
+  const lowEmail = (email ?? "").toLowerCase();
+
+  // Group ids the user is a member of (by account id or email).
+  const { data: mine } = await supabase
+    .from("group_order_members")
+    .select("group_id")
+    .or(`user_id.eq.${userId}${lowEmail ? `,email.eq.${lowEmail}` : ""}`);
+
+  const groupIds = Array.from(new Set((mine ?? []).map(m => (m as { group_id: string }).group_id)));
+  if (groupIds.length === 0) return [];
+
+  const { data } = await supabase
+    .from("group_orders")
+    .select(`
+      id, name, event_id, organizer_email, organizer_user_id, status, created_at,
+      events ( id, title, start_date, start_time, city, state, venue_name, cover_gradient, cover_image_url, artists (name) ),
+      ticket_tiers ( name ),
+      group_order_members ( name, email, qty, paid, is_organizer, joined_at )
+    `)
+    .in("id", groupIds);
+
+  type Row = {
+    id: string; name: string | null; event_id: string; organizer_email: string; organizer_user_id: string | null;
+    status: string; created_at: string;
+    events: { id: string; title: string; start_date: string; start_time: string | null; city: string; state: string; venue_name: string | null; cover_gradient: string | null; cover_image_url: string | null; artists: { name: string } | { name: string }[] | null } | null;
+    ticket_tiers: { name: string } | null;
+    group_order_members: { name: string; email: string; qty: number; paid: boolean; is_organizer: boolean; joined_at: string }[] | null;
+  };
+
+  const rows = (data ?? []) as unknown as Row[];
+
+  return rows.map(r => {
+    const ev = r.events;
+    const artist = ev ? (Array.isArray(ev.artists) ? ev.artists[0] : ev.artists) : null;
+    const members = (r.group_order_members ?? [])
+      .slice()
+      .sort((a, b) => (a.is_organizer === b.is_organizer ? a.joined_at.localeCompare(b.joined_at) : a.is_organizer ? -1 : 1))
+      .map(m => ({ name: m.name, email: m.email, qty: m.qty ?? 1, paid: m.paid, isOrganizer: m.is_organizer }));
+    const me = members.find(m => m.email.toLowerCase() === lowEmail);
+    return {
+      groupId: r.id,
+      name: r.name ?? undefined,
+      eventId: r.event_id,
+      eventTitle: ev?.title ?? "",
+      eventDate: ev?.start_date ?? "",
+      eventTime: ev?.start_time ?? "",
+      city: ev?.city ?? "",
+      state: ev?.state ?? "",
+      venue: ev?.venue_name ?? "",
+      coverGradient: ev?.cover_gradient ?? "",
+      coverImageUrl: ev?.cover_image_url ?? null,
+      artistName: artist?.name ?? "",
+      tierName: r.ticket_tiers?.name ?? "",
+      isHost: r.organizer_user_id === userId || r.organizer_email.toLowerCase() === lowEmail,
+      paid: r.status === "completed" || members.some(m => m.paid),
+      myQty: me?.qty ?? 0,
+      totalTickets: members.reduce((s, m) => s + m.qty, 0),
+      memberCount: members.length,
+      members,
+      createdAt: r.created_at,
+    };
+  }).sort((a, b) => {
+    if (a.paid !== b.paid) return a.paid ? -1 : 1;       // purchased first
+    return b.createdAt.localeCompare(a.createdAt);        // then newest
+  });
+}
+
 // ── Row types used by loadMyOrders ────────────────────────────────────────────
 interface RawOrderRow {
   id: string;

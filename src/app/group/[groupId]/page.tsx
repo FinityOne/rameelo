@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Logo from "@/components/Logo";
 import { loadGroupOrder, joinGroupOrder, updateGroupMember, updateGroupName, tierHasGroupDiscount, groupDiscountPct, groupDiscountSummary, type GroupOrder } from "@/lib/group-orders";
+import { salesClosedForEvent } from "@/lib/event-time";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
 
 
@@ -245,7 +246,11 @@ export default function GroupLandingPage() {
   const myMember = myEmail ? group.members.find(m => m.email === myEmail) : null;
   // Anyone in the group or with the link can pay once it's payable (≥2 people).
   const groupPaid = group.status === "completed" || group.members.some(m => m.paid);
-  const canPayGroup = memberCount >= 2 && !groupPaid;
+  // Online sales close when doors open in the event's city.
+  const salesClosed = salesClosedForEvent({ start_date: ev.start_date, start_time: ev.start_time, state: ev.state });
+  // No joining/paying once paid or once doors have opened.
+  const purchaseLocked = groupPaid || salesClosed;
+  const canPayGroup = memberCount >= 2 && !purchaseLocked;
   // Once paid, send visitors to their account to view/claim their tickets.
   const claimHref = authedUserId ? "/portal/tickets" : `/auth/signin?next=${encodeURIComponent("/portal/tickets")}`;
 
@@ -297,6 +302,13 @@ export default function GroupLandingPage() {
     // Remember this member for edit access
     localStorage.setItem(`rameelo_group_member_${groupId}`, joinEmail);
     setMyEmail(joinEmail);
+
+    // Let the host know someone joined (non-blocking).
+    fetch("/api/group-joined", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ groupId, email: joinEmail }),
+    }).catch(() => { /* silent — notification shouldn't block joining */ });
 
     // Refresh group data then show success state
     const refreshed = await loadGroupOrder(groupId);
@@ -451,6 +463,15 @@ export default function GroupLandingPage() {
                 <Link href={`/auth/signup?next=${encodeURIComponent("/portal/tickets")}`} className="text-peacock font-bold hover:underline">Create an account</Link>
               </p>
             )}
+          </div>
+        ) : salesClosed ? (
+          /* Doors have opened — online sales are closed */
+          <div className="rounded-2xl border border-ink/15 bg-ink/[0.04] p-5 text-center">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted font-bold mb-1">Sales closed</p>
+            <p className="font-display font-bold text-ink text-base">Doors have opened</p>
+            <p className="font-ui text-sm text-ink-muted mt-1">
+              Online sales for {ev.title} are closed. Tickets may be available at the door.
+            </p>
           </div>
         ) : (
           /* Share — front and center so it's one tap to spread the word */
@@ -639,8 +660,8 @@ export default function GroupLandingPage() {
                 </div>
               );
             })}
-            {/* Open spots — inviting placeholders to encourage more joins (hidden once paid) */}
-            {!groupPaid && Array.from({ length: 4 }).map((_, i) => (
+            {/* Open spots — inviting placeholders to encourage more joins (hidden once locked) */}
+            {!purchaseLocked && Array.from({ length: 4 }).map((_, i) => (
               <button
                 key={`open-${i}`}
                 type="button"
@@ -658,8 +679,8 @@ export default function GroupLandingPage() {
           </div>
         </div>
 
-        {/* ── View mode — main CTA (hidden once the group is paid/locked) ── */}
-        {mode === "view" && !groupPaid && (
+        {/* ── View mode — main CTA (hidden once the group is paid/closed) ── */}
+        {mode === "view" && !purchaseLocked && (
           <div className="space-y-3">
 
             {/* One-payer model explainer */}
@@ -806,6 +827,12 @@ export default function GroupLandingPage() {
               </div>
               <span className="text-lg">→</span>
             </Link>
+          ) : salesClosed ? (
+            /* Doors have opened — online sales closed */
+            <div className="w-full flex items-center justify-center gap-2 bg-ink/80 text-white px-5 py-4 rounded-2xl shadow-xl font-display font-bold">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <span className="text-base">Sales closed — doors have opened</span>
+            </div>
           ) : canPayGroup ? (
             /* Payable — anyone in the group or with the link can pay for everyone */
             <button onClick={startGroupPay}
@@ -853,7 +880,7 @@ export default function GroupLandingPage() {
       )}
 
       {/* ── Join modal ── */}
-      {mode === "join" && (
+      {mode === "join" && !salesClosed && (
         <div
           className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
           onClick={() => setMode("view")}

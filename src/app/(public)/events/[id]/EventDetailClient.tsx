@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
+import { salesClosedForEvent } from "@/lib/event-time";
+import { money } from "@/lib/money";
 import EventInterestView from "./EventInterestView";
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -276,7 +278,7 @@ function UrgencyBanner({
           <p className="font-ui text-xs text-ink-muted">
             {soldToday > 0 && <><strong className="text-ink">{soldToday} tickets</strong> sold in the last 24 hours. </>}
             {nextCheapestPrice !== null && (
-              <>Once {lowestTier.name} sells out, the next option is <strong className="text-ink">${nextCheapestPrice}</strong>.</>
+              <>Once {lowestTier.name} sells out, the next option is <strong className="text-ink">${money(nextCheapestPrice)}</strong>.</>
             )}
           </p>
           <div className="flex items-center gap-2 pt-1">
@@ -310,7 +312,7 @@ function UrgencyBanner({
         </p>
         {nextCheapestPrice !== null && rem <= Math.ceil(lowestTier.quantity * 0.25) && (
           <p className="font-mono text-[10px] text-marigold-dark bg-marigold/10 px-3 py-1.5 rounded-lg">
-            ⚠️ Once {lowestTier.name} sells out, next tier is ${nextCheapestPrice}
+            ⚠️ Once {lowestTier.name} sells out, next tier is ${money(nextCheapestPrice)}
           </p>
         )}
       </div>
@@ -500,7 +502,7 @@ function TierAvailabilityBar({ tier, isSelected, onClick, isBestDeal, isMostPopu
         </div>
         <div className="text-right shrink-0">
           <p className={`font-display font-bold text-base ${isSelected && !disabled ? "text-aubergine" : "text-ink"}`}>
-            {tier.price === 0 ? "Complimentary" : `$${tier.price.toFixed(2)}`}
+            {tier.price === 0 ? "Complimentary" : `$${money(tier.price)}`}
           </p>
         </div>
       </div>
@@ -786,6 +788,7 @@ export default function EventDetailClient({ id }: { id: string }) {
 
   const handleContinue = useCallback(() => {
     if (!event || !selectedTier) return;
+    if (salesClosedForEvent(event)) return; // doors have opened — sales closed
     const payload = {
       eventId: event.id,
       tierId: selectedTier.id,
@@ -837,6 +840,8 @@ export default function EventDetailClient({ id }: { id: string }) {
   }
 
   const totalSoldOut = event.ticket_tiers.every(t => t.quantity_sold >= t.quantity);
+  // Sales close once doors open in the event's local timezone.
+  const salesClosed = salesClosedForEvent(event);
 
   // ── PAST EVENT ── rich, indexable recap — keeps artist/org/details for SEO &
   // context, but drops every CTA, form, and urgency mechanic. ───────────────────
@@ -1402,7 +1407,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                           tier.quantity - tier.quantity_sold > 0
                         }
                         onClick={() => {
-                          if (isTierNotStarted(tier) || isTierExpired(tier)) return;
+                          if (isTierNotStarted(tier) || isTierExpired(tier) || salesClosed) return;
                           const rem = tier.quantity - tier.quantity_sold;
                           if (rem > 0) { setSelectedTierId(tier.id); setQty(Math.min(qty, rem)); }
                         }}
@@ -1411,7 +1416,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                   })()}
                 </div>
 
-                {selectedTier && !soldOut && (
+                {selectedTier && !soldOut && !salesClosed && (
                   <div className="p-4 sm:p-5 space-y-5">
                     {/* Quantity */}
                     <div>
@@ -1493,7 +1498,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                         {discountAmount > 0 && (
                           <div className="bg-peacock px-3 py-2">
                             <p className="font-ui text-xs text-white font-semibold text-center">
-                              Saving ${discountAmount.toLocaleString()} with group pricing!
+                              Saving ${money(discountAmount)} with group pricing!
                             </p>
                           </div>
                         )}
@@ -1538,7 +1543,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                             {unlocked && (
                               <div className="bg-peacock px-3 py-2">
                                 <p className="font-ui text-xs text-white font-semibold text-center">
-                                  Saving ${discountAmount.toLocaleString()} with group pricing!
+                                  Saving ${money(discountAmount)} with group pricing!
                                 </p>
                               </div>
                             )}
@@ -1551,29 +1556,29 @@ export default function EventDetailClient({ id }: { id: string }) {
                     {unitPrice > 0 && (
                       <div className="rounded-xl bg-ivory p-4 space-y-2">
                         <div className="flex justify-between text-sm">
-                          <span className="font-ui text-ink-muted">{qty} × ${unitPrice.toFixed(2)}</span>
-                          <span className="font-ui text-ink">${subtotal.toFixed(2)}</span>
+                          <span className="font-ui text-ink-muted">{qty} × ${money(unitPrice)}</span>
+                          <span className="font-ui text-ink">${money(subtotal)}</span>
                         </div>
                         {discountAmount > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="font-ui text-peacock">Group discount</span>
-                            <span className="font-ui text-peacock">−${discountAmount.toLocaleString()}</span>
+                            <span className="font-ui text-peacock">−${money(discountAmount)}</span>
                           </div>
                         )}
                         <div className="flex justify-between text-sm">
                           <span className="font-ui text-ink-muted">Rameelo fee (3%)</span>
-                          <span className="font-ui text-ink-muted">${rameeloFee.toFixed(2)}</span>
+                          <span className="font-ui text-ink-muted">${money(rameeloFee)}</span>
                         </div>
                         <div className="flex items-start justify-between text-sm gap-2">
                           <div>
                             <span className="font-ui text-ink-muted">Card processing (5%)</span>
                             <p className="font-mono text-[9px] text-peacock mt-0.5">Free with bank / ACH at checkout</p>
                           </div>
-                          <span className="font-ui text-ink-muted shrink-0">${processingFee.toFixed(2)}</span>
+                          <span className="font-ui text-ink-muted shrink-0">${money(processingFee)}</span>
                         </div>
                         <div className="border-t border-ivory-200 pt-2 flex justify-between">
                           <span className="font-display font-bold text-ink">Total</span>
-                          <span className="font-display font-bold text-ink text-lg">${grandTotal.toFixed(2)}</span>
+                          <span className="font-display font-bold text-ink text-lg">${money(grandTotal)}</span>
                         </div>
                       </div>
                     )}
@@ -1631,6 +1636,17 @@ export default function EventDetailClient({ id }: { id: string }) {
                       Secure checkout · No hidden fees · Instant e-tickets
                     </p>
                     <p className="text-center font-ui text-[10px] text-ink-muted/70 -mt-1">All sales are final · no refunds except event cancellation</p>
+                  </div>
+                )}
+
+                {salesClosed && !totalSoldOut && !(selectedTier && soldOut) && (
+                  <div className="p-5 space-y-2 text-center">
+                    <button disabled className="w-full py-4 rounded-2xl bg-ivory-200 text-ink-muted font-semibold text-sm cursor-not-allowed">
+                      Sales closed
+                    </button>
+                    <p className="font-ui text-xs text-ink-muted">
+                      Online sales close when doors open. Tickets may be available at the door.
+                    </p>
                   </div>
                 )}
 
