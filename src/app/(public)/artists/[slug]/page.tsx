@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { headers } from "next/headers";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { personSchema, breadcrumbSchema, ld } from "@/lib/jsonld";
@@ -13,7 +14,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const supabase = await createClient();
   const { data } = await supabase
     .from("artists")
-    .select("name, tagline, bio, profile_image_url, genres, based_in, hometown_city, hometown_state, instagram_url, website_url")
+    .select("name, tagline, bio, profile_image_url, cover_image_url, genres, based_in, hometown_city, hometown_state, instagram_url, website_url, custom_domain")
     .eq("slug", slug)
     .eq("is_active", true)
     .single();
@@ -25,12 +26,24 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const description = data.bio?.slice(0, 155) ??
     `${data.name} — ${genres.length ? genres.slice(0,2).join(" & ") + " " : ""}garba artist${location ? ` based in ${location}` : ""}. See upcoming events and buy tickets on Rameelo.`;
 
-  const ogImage = data.profile_image_url
-    ? [{ url: data.profile_image_url, width: 800, height: 800, alt: `${data.name} — Garba Artist` }]
+  // When served from the artist's own vanity domain, point canonical/og:url at it
+  // so shares resolve cleanly to the artist's domain (not rameelo.com).
+  const reqHost = (await headers()).get("host")?.split(":")[0].toLowerCase().replace(/^www\./, "") ?? "";
+  const vanity = (data.custom_domain ?? "").toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/^www\./, "");
+  const onVanity = !!vanity && reqHost === vanity;
+  const pageUrl = onVanity ? `https://${vanity}` : `https://rameelo.com/artists/${slug}`;
+
+  // Prefer the artist photo for the share card; fall back to cover, then default.
+  const shareImg = data.profile_image_url || data.cover_image_url;
+  const ogImage = shareImg
+    ? [{ url: shareImg, width: 800, height: 800, alt: `${data.name} — Garba Artist` }]
     : [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: `${data.name} on Rameelo` }];
 
+  const title = `${data.name} — ${genres[0] ?? "Garba"} Artist`;
+
   return {
-    title: `${data.name} — ${genres[0] ?? "Garba"} Artist | Rameelo`,
+    metadataBase: new URL(pageUrl),
+    title: `${title} | Rameelo`,
     description,
     keywords: [
       data.name,
@@ -44,18 +57,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ...(location ? [`garba artist ${location}`, `navratri ${location}`] : []),
       ...genres,
     ],
-    alternates: { canonical: `https://rameelo.com/artists/${slug}` },
+    alternates: { canonical: pageUrl },
     openGraph: {
-      title: `${data.name} — ${genres[0] ?? "Garba"} Artist | Rameelo`,
+      title: onVanity ? title : `${title} | Rameelo`,
       description,
       type: "profile",
-      url: `https://rameelo.com/artists/${slug}`,
-      siteName: "Rameelo",
+      url: pageUrl,
+      siteName: onVanity ? data.name : "Rameelo",
       images: ogImage,
     },
     twitter: {
       card: "summary_large_image",
-      title: `${data.name} — ${genres[0] ?? "Garba"} Artist | Rameelo`,
+      title: onVanity ? title : `${title} | Rameelo`,
       description,
       images: [ogImage[0].url],
     },
