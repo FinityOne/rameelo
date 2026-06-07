@@ -196,21 +196,21 @@ export default function OrganizerHubPage() {
           🎪
         </div>
         <h2 className="font-display font-black text-ink/85 text-2xl mb-2" style={{ letterSpacing: "-0.03em" }}>
-          Your first event is one click away.
+          No events yet.
         </h2>
         <p className="font-ui text-ink/45 text-sm mb-7 leading-relaxed">
-          Thousands of garba enthusiasts are waiting to find events like yours on Rameelo. Create your first listing in minutes.
+          Your events are set up by the Rameelo team. Once one is added for your organization, it&apos;ll show up here for you to manage, edit, and track.
         </p>
-        <Link
-          href="/organizer/events/create"
+        <a
+          href="mailto:support@rameelo.com"
           className="inline-flex items-center gap-2 font-ui font-semibold text-sm px-7 py-3.5 rounded-xl transition-all"
           style={{ background: "linear-gradient(135deg, #F5A623, #E8901A)", color: "#1A0826", boxShadow: "0 4px 20px rgba(245,166,35,0.35)" }}
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
           </svg>
-          Create your first event
-        </Link>
+          Contact Rameelo to list an event
+        </a>
       </div>
     );
   }
@@ -231,16 +231,6 @@ export default function OrganizerHubPage() {
           <p className="font-display font-black text-white text-lg mb-0.5" style={{ letterSpacing: "-0.02em" }}>{headline}</p>
           <p className="font-ui text-white/45 text-sm">{sub}</p>
         </div>
-        <Link
-          href="/organizer/events/create"
-          className="relative hidden sm:flex items-center gap-2 px-4 py-2.5 rounded-xl font-ui font-semibold text-[13px] shrink-0 transition-all hover:opacity-90"
-          style={{ background: "linear-gradient(135deg, #F5A623, #E8901A)", color: "#1A0826" }}
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-          New Event
-        </Link>
       </div>
 
       {/* ── KPI tiles ─────────────────────────────────────────────── */}

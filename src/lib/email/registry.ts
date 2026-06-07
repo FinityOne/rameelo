@@ -52,6 +52,26 @@ export const EMAIL_REGISTRY: EmailDef[] = [
 
   // ── Planned (not yet built) ──
   {
+    key: "group-created",
+    name: "Group link created",
+    description: "Sends the group's creator their shareable link, explains how group orders work, and (when the event has discounts) encourages hitting the headcount for bigger savings.",
+    audience: "Members",
+    category: "Orders & Tickets",
+    status: "live",
+    trigger: "automatic",
+    fires: "When someone creates a group order link",
+  },
+  {
+    key: "group-ticket-claim",
+    name: "Group ticket claim",
+    description: "Tells a group member that someone paid for the group and reserved tickets for them, with a link to sign in / create an account and claim them.",
+    audience: "Buyers",
+    category: "Orders & Tickets",
+    status: "live",
+    trigger: "automatic",
+    fires: "When one person checks out a group order — each other member gets a claim link",
+  },
+  {
     key: "order-confirmation",
     name: "Order confirmation & tickets",
     description: "Receipt with tickets/QR codes after a successful purchase.",

@@ -3,10 +3,9 @@ import { createClient } from "@/lib/supabase/client";
 export interface GroupMember {
   name: string;
   email: string;
-  phone?: string;
   qty: number;
-  notes?: string;
-  tierId?: string;   // member's chosen tier (falls back to group tier if null)
+  tierId?: string; // the active tier this member picked when joining
+  userId?: string; // set when this member was added by a logged-in account
   isOrganizer: boolean;
   paid: boolean;
   joinedAt: string;
@@ -24,8 +23,7 @@ export interface GroupOrder {
   discountPct: number;
   members: GroupMember[];
   createdAt: string;
-  deadline: string;
-  status: "open" | "completed" | "expired";
+  status: "open" | "completed";
   // Joined data (populated by loadGroup)
   event?: {
     id: string;
@@ -44,22 +42,54 @@ export interface GroupOrder {
     id: string;
     name: string;
     price: number;
-    group_discount_mode: "simple" | "scaling" | null;
     group_discount_min_qty: number | null;
+    group_discount_type: "percentage" | "fixed" | null;
+    group_discount_value: number | null;
   };
 }
 
-export const GROUP_TIERS = [
-  { min: 10, discount: 15, label: "10+ people" },
-  { min: 8,  discount: 12, label: "8–9 people" },
-  { min: 5,  discount: 10, label: "5–7 people" },
-];
+// ── Group discounts ───────────────────────────────────────────────────────────
+// Discounts are NEVER hardcoded — they come entirely from the event's ticket
+// tier. A tier offers a group discount when it has a minimum quantity and a
+// positive value; it applies once the group reaches that many tickets. The
+// discount can be a percentage off or a fixed dollar amount off per ticket.
+export interface TierDiscountFields {
+  price: number;
+  group_discount_min_qty: number | null;
+  group_discount_type: "percentage" | "fixed" | null;
+  group_discount_value: number | null;
+}
 
-export function discountForTarget(target: number): number {
-  for (const t of GROUP_TIERS) {
-    if (target >= t.min) return t.discount;
+// Does this tier offer a group discount at all (at some quantity)?
+export function tierHasGroupDiscount(t: TierDiscountFields | null | undefined): boolean {
+  return !!t && !!t.group_discount_min_qty && t.group_discount_value != null && t.group_discount_value > 0;
+}
+
+// Per-ticket discount as a percentage of the tier price (orders are %-based),
+// for a group of `qty` tickets. Returns 0 below the tier's minimum quantity.
+// A fixed dollar discount is converted to the equivalent % of the tier price.
+export function groupDiscountPct(t: TierDiscountFields | null | undefined, qty: number): number {
+  if (!t || !tierHasGroupDiscount(t)) return 0;
+  if (qty < (t.group_discount_min_qty ?? Infinity)) return 0;
+  const val = t.group_discount_value ?? 0;
+  if (t.group_discount_type === "fixed") {
+    if (!t.price) return 0;
+    return Math.min(100, Math.round((val / t.price) * 100));
   }
-  return 0;
+  return Math.min(100, Math.round(val));
+}
+
+// Human description of a tier's group discount, e.g. { minQty: 10, amount: "15% off" }
+// or { minQty: 8, amount: "$5.00 off" }. Returns null when there's no discount.
+export function groupDiscountSummary(
+  t: TierDiscountFields | null | undefined,
+): { minQty: number; amount: string } | null {
+  if (!tierHasGroupDiscount(t) || !t) return null;
+  const val = t.group_discount_value ?? 0;
+  return {
+    minQty: t.group_discount_min_qty ?? 0,
+    amount: t.group_discount_type === "fixed" ? `$${val.toFixed(2)} off` : `${val}% off`,
+  };
 }
 
 export function generateGroupId(): string {
@@ -80,9 +110,7 @@ export async function createGroupOrder(params: {
   organizerUserId: string | null;
   targetSize: number;
   discountPct: number;
-  deadline: string;
   hostQty: number;
-  hostNotes?: string;
 }): Promise<{ error: string | null }> {
   const supabase = createClient();
 
@@ -97,7 +125,6 @@ export async function createGroupOrder(params: {
     organizer_user_id: params.organizerUserId,
     target_size: params.targetSize,
     discount_pct: params.discountPct,
-    deadline: params.deadline,
     status: "open",
   });
 
@@ -110,7 +137,7 @@ export async function createGroupOrder(params: {
     email: params.organizerEmail,
     phone: params.organizerPhone || null,
     qty: params.hostQty,
-    notes: params.hostNotes || null,
+    member_tier_id: params.tierId,
     is_organizer: true,
     paid: false,
   });
@@ -127,13 +154,13 @@ export async function loadGroupOrder(groupId: string): Promise<GroupOrder | null
     .select(`
       id, name, event_id, tier_id,
       organizer_name, organizer_email, organizer_phone,
-      target_size, discount_pct, deadline, status, created_at,
+      target_size, discount_pct, status, created_at,
       events (
         id, title, start_date, start_time, city, state,
         venue_name, cover_gradient, cover_image_url, category,
         artists (name, profile_image_url)
       ),
-      ticket_tiers (id, name, price, group_discount_mode, group_discount_min_qty)
+      ticket_tiers (id, name, price, group_discount_min_qty, group_discount_type, group_discount_value)
     `)
     .eq("id", groupId)
     .single();
@@ -142,18 +169,17 @@ export async function loadGroupOrder(groupId: string): Promise<GroupOrder | null
 
   const { data: membersData } = await supabase
     .from("group_order_members")
-    .select("name, email, phone, qty, notes, member_tier_id, is_organizer, paid, joined_at")
+    .select("name, email, qty, member_tier_id, user_id, is_organizer, paid, joined_at")
     .eq("group_id", groupId)
     .order("joined_at");
 
-  type MemberRow = { name: string; email: string; phone: string | null; qty: number; notes: string | null; member_tier_id: string | null; is_organizer: boolean; paid: boolean; joined_at: string };
+  type MemberRow = { name: string; email: string; qty: number; member_tier_id: string | null; user_id: string | null; is_organizer: boolean; paid: boolean; joined_at: string };
   const members: GroupMember[] = ((membersData ?? []) as unknown as MemberRow[]).map(m => ({
     name: m.name,
     email: m.email,
-    phone: m.phone ?? undefined,
     qty: m.qty ?? 1,
-    notes: m.notes ?? undefined,
     tierId: m.member_tier_id ?? undefined,
+    userId: m.user_id ?? undefined,
     isOrganizer: m.is_organizer,
     paid: m.paid,
     joinedAt: m.joined_at,
@@ -162,7 +188,7 @@ export async function loadGroupOrder(groupId: string): Promise<GroupOrder | null
   const g = group as unknown as {
     id: string; event_id: string; tier_id: string;
     organizer_name: string; organizer_email: string; organizer_phone: string;
-    target_size: number; discount_pct: number; deadline: string;
+    target_size: number; discount_pct: number;
     status: string; created_at: string;
     events: GroupOrder["event"];
     ticket_tiers: GroupOrder["tier"];
@@ -180,7 +206,6 @@ export async function loadGroupOrder(groupId: string): Promise<GroupOrder | null
     discountPct: g.discount_pct,
     members,
     createdAt: g.created_at,
-    deadline: g.deadline,
     status: g.status as GroupOrder["status"],
     event: g.events ?? undefined,
     tier: g.ticket_tiers ?? undefined,
@@ -192,10 +217,8 @@ export async function joinGroupOrder(params: {
   userId: string | null;
   name: string;
   email: string;
-  phone?: string;
   qty: number;
   tierId?: string;
-  notes?: string;
 }): Promise<{ error: string | null }> {
   const supabase = createClient();
 
@@ -211,7 +234,7 @@ export async function joinGroupOrder(params: {
     if (existing.paid) return { error: null }; // paid — nothing to change
     await supabase
       .from("group_order_members")
-      .update({ qty: params.qty, notes: params.notes ?? null, member_tier_id: params.tierId ?? null })
+      .update({ qty: params.qty, member_tier_id: params.tierId ?? null })
       .eq("group_id", params.groupId)
       .eq("email", params.email);
     return { error: null };
@@ -222,9 +245,7 @@ export async function joinGroupOrder(params: {
     user_id: params.userId,
     name: params.name,
     email: params.email,
-    phone: params.phone || null,
     qty: params.qty,
-    notes: params.notes || null,
     member_tier_id: params.tierId ?? null,
     is_organizer: false,
     paid: false,
@@ -246,29 +267,37 @@ export async function updateGroupMember(params: {
   groupId: string;
   email: string;
   qty: number;
-  notes?: string;
+  tierId?: string;
 }): Promise<{ error: string | null }> {
   const supabase = createClient();
   const { error } = await supabase
     .from("group_order_members")
-    .update({ qty: params.qty, notes: params.notes ?? null })
+    .update({ qty: params.qty, ...(params.tierId !== undefined ? { member_tier_id: params.tierId } : {}) })
     .eq("group_id", params.groupId)
     .eq("email", params.email)
     .eq("paid", false);
   return { error: error?.message ?? null };
 }
 
-export async function markMemberPaid(params: {
+// One-payer model: a single transaction covers the whole group, so this marks
+// every member of the group paid at once. Goes through a SECURITY DEFINER RPC
+// because the group_order_members UPDATE policy forbids the client setting paid=true.
+export async function markGroupPaid(params: {
   groupId: string;
-  email: string;
   orderId: string;
 }): Promise<void> {
   const supabase = createClient();
-  await supabase
-    .from("group_order_members")
-    .update({ paid: true, order_id: params.orderId })
-    .eq("group_id", params.groupId)
-    .eq("email", params.email);
+  await supabase.rpc("mark_group_paid", {
+    p_group_id: params.groupId,
+    p_order_id: params.orderId,
+  });
+}
+
+// Split a paid group order into per-member ticket allocations (pending transfers
+// the other members claim). The purchaser keeps their own seats. Idempotent.
+export async function createGroupAllocations(orderId: string): Promise<void> {
+  const supabase = createClient();
+  await supabase.rpc("create_group_ticket_allocations", { p_order_id: orderId });
 }
 
 export async function saveOrder(params: {
@@ -295,10 +324,18 @@ export async function saveOrder(params: {
 }): Promise<{ orderId: string | null; error: string | null }> {
   const supabase = createClient();
 
+  // Generate the id client-side so we don't need to read the row back. Guest
+  // orders (user_id null) aren't SELECT-able under RLS, so `.select().single()`
+  // would fail and we'd lose the id (breaking group mark-paid + allocations).
+  const id =
+    globalThis.crypto?.randomUUID?.() ??
+    `${Date.now().toString(16)}-${Math.random().toString(16).slice(2)}`;
+
   const nowIso = new Date().toISOString();
-  const { data, error } = await supabase
+  const { error } = await supabase
     .from("orders")
     .insert({
+      id,
       user_id: params.userId,
       event_id: params.eventId,
       tier_id: params.tierId,
@@ -323,12 +360,10 @@ export async function saveOrder(params: {
       terms_accepted_at: params.termsVersion ? nowIso : null,
       terms_accepted_ip: params.termsAcceptedIp ?? params.purchaseIp ?? null,
       confirmation_email_sent_at: nowIso,
-    })
-    .select("id")
-    .single();
+    });
 
   if (error) return { orderId: null, error: error.message };
-  return { orderId: data.id, error: null };
+  return { orderId: id, error: null };
 }
 
 export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
@@ -374,14 +409,14 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
       if (o.group_id) {
         const { data: members } = await supabase
           .from("group_order_members")
-          .select("name, email, qty, notes, is_organizer, paid, joined_at")
+          .select("name, email, qty, member_tier_id, is_organizer, paid, joined_at")
           .eq("group_id", o.group_id)
           .order("joined_at");
         groupMembers = (members ?? []).map(m => ({
           name: m.name,
           email: m.email,
           qty: (m as unknown as Record<string, number>).qty ?? 1,
-          notes: (m as unknown as Record<string, string | null>).notes ?? undefined,
+          tierId: (m as unknown as Record<string, string | null>).member_tier_id ?? undefined,
           isOrganizer: m.is_organizer,
           paid: m.paid,
           joinedAt: m.joined_at,
@@ -429,7 +464,7 @@ export async function loadMyPendingGroups(userId: string): Promise<PendingGroup[
     .select(`
       id, group_id, is_organizer, paid, joined_at,
       group_orders (
-        id, target_size, discount_pct, deadline, status,
+        id, target_size, discount_pct, status,
         events (title, start_date, city, state),
         ticket_tiers (name, price)
       )
@@ -450,7 +485,7 @@ export async function loadMyPendingGroups(userId: string): Promise<PendingGroup[
         is_organizer: boolean;
         group_orders: {
           id: string; target_size: number; discount_pct: number;
-          deadline: string; status: string;
+          status: string;
           events: { title: string; start_date: string; city: string; state: string } | null;
           ticket_tiers: { name: string; price: number } | null;
         };
@@ -461,7 +496,6 @@ export async function loadMyPendingGroups(userId: string): Promise<PendingGroup[
         isOrganizer: raw.is_organizer,
         targetSize: g.target_size,
         discountPct: g.discount_pct,
-        deadline: g.deadline,
         eventTitle: g.events?.title ?? "",
         eventDate: g.events?.start_date ?? "",
         city: g.events?.city ?? "",
@@ -542,7 +576,6 @@ export interface PendingGroup {
   isOrganizer: boolean;
   targetSize: number;
   discountPct: number;
-  deadline: string;
   eventTitle: string;
   eventDate: string;
   city: string;

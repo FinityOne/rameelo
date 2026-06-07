@@ -1,14 +1,18 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import { createClient } from "@/lib/supabase/client";
 import { createUser, saveUser } from "@/lib/auth";
 
-export default function SignInPage() {
+function SignInInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  // Only allow same-site relative paths as a post-login destination.
+  const rawNext = searchParams.get("next") ?? "";
+  const nextDest = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "";
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -54,7 +58,10 @@ export default function SignInPage() {
     });
     saveUser(rameeloUser);
 
-    const destination = role === "admin" ? "/admin" : role === "organizer" ? "/organizer" : "/portal";
+    // Attach any guest orders bought with this email to the account (best-effort).
+    try { await supabase.rpc("claim_my_guest_orders"); } catch { /* non-blocking */ }
+
+    const destination = nextDest || (role === "admin" ? "/admin" : role === "organizer" ? "/organizer" : "/portal");
     router.push(destination);
     router.refresh();
   }
@@ -114,7 +121,7 @@ export default function SignInPage() {
             <h1 className="font-display font-bold text-white text-3xl mb-2">Sign in</h1>
             <p className="font-ui text-white/50 text-sm">
               New here?{" "}
-              <Link href="/auth/signup" className="text-marigold hover:text-marigold-dark transition-colors font-semibold">
+              <Link href={nextDest ? `/auth/signup?next=${encodeURIComponent(nextDest)}` : "/auth/signup"} className="text-marigold hover:text-marigold-dark transition-colors font-semibold">
                 Create an account →
               </Link>
             </p>
@@ -188,5 +195,17 @@ export default function SignInPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function SignInPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: "#2E1B30" }}>
+        <div className="w-10 h-10 rounded-full border-4 border-white/15 border-t-marigold animate-spin" />
+      </div>
+    }>
+      <SignInInner />
+    </Suspense>
   );
 }

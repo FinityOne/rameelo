@@ -85,6 +85,8 @@ const EMAIL_TYPE_LABEL: Record<string, string> = {
   welcome: "Welcome email",
   org_invite: "Organization invite",
   password_reset: "Password reset",
+  group_created: "Group link created",
+  group_ticket_claim: "Group ticket claim",
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

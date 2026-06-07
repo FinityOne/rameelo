@@ -160,10 +160,6 @@ function GroupOrderBanner({ group }: { group: PendingGroup }) {
   const discounted = Math.round(group.tierPrice * (1 - group.discountPct / 100));
   const tickets = Math.max(1, group.targetSize);
   const total = discounted * tickets;
-  const hoursLeft = Math.max(0, Math.round((new Date(group.deadline).getTime() - Date.now()) / 3600000));
-  const daysLeft = Math.floor(hoursLeft / 24);
-  const timeLabel = daysLeft > 0 ? `${daysLeft} day${daysLeft !== 1 ? "s" : ""} left` : `${hoursLeft}h left`;
-  const urgent = hoursLeft < 48;
 
   return (
     <div className="rounded-2xl border border-marigold/30 bg-gradient-to-br from-marigold/[0.07] to-marigold/[0.02] p-5">
@@ -174,10 +170,6 @@ function GroupOrderBanner({ group }: { group: PendingGroup }) {
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-display font-bold text-ink text-base" style={{ letterSpacing: "-0.015em" }}>Finish your group order</p>
-            <span className={`inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full ${urgent ? "bg-durga/10 text-durga" : "bg-marigold/15 text-marigold-dark"}`}>
-              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              {timeLabel}
-            </span>
           </div>
           <p className="font-ui text-sm text-ink-muted mt-0.5">
             <span className="font-semibold text-ink">{group.eventTitle}</span> · {fmtDate(group.eventDate)}
@@ -225,20 +217,15 @@ function PassportCard() {
 
 function PendingGroupCard({ group }: { group: PendingGroup }) {
   const discountedPrice = Math.round(group.tierPrice * (1 - group.discountPct / 100));
-  const hoursLeft = Math.max(0, Math.round((new Date(group.deadline).getTime() - Date.now()) / 3600000));
-  const daysLeft = Math.floor(hoursLeft / 24);
-  const timeLabel = daysLeft > 0 ? `${daysLeft}d left` : `${hoursLeft}h left`;
-  const urgent = hoursLeft < 48;
 
   return (
-    <div className={`rounded-2xl border-2 p-5 ${urgent ? "border-durga/30 bg-durga/3" : "border-marigold/25 bg-marigold/4"}`}>
+    <div className="rounded-2xl border-2 p-5 border-marigold/25 bg-marigold/4">
       <div className="flex items-start justify-between gap-3 mb-4">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="font-mono text-[9px] uppercase tracking-widest font-bold px-2 py-0.5 rounded-full bg-marigold/20 text-[#a06b00]">
               {group.isOrganizer ? "You started this" : "You were invited"}
             </span>
-            <span className={`font-mono text-[9px] font-bold ${urgent ? "text-durga" : "text-ink-muted"}`}>{timeLabel}</span>
           </div>
           <p className="font-display font-bold text-ink text-sm">{group.eventTitle}</p>
           <p className="font-mono text-[10px] text-ink-muted">{fmtDate(group.eventDate)} · {group.city}, {group.state}</p>

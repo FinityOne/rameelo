@@ -22,7 +22,6 @@ type GroupOrder = {
   organizer_phone: string;
   target_size: number;
   discount_pct: number;
-  deadline: string;
   status: string;
   created_at: string;
   ticket_tiers: { name: string; price: number } | null;
@@ -31,17 +30,9 @@ type GroupOrder = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function fmtDate(d: string) {
-  return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
 function fmtDateTime(d: string) {
   return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " · " +
     new Date(d).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
-}
-
-function isPast(d: string) {
-  return new Date(d) < new Date();
 }
 
 const GROUP_STATUS: Record<string, { label: string; cls: string }> = {
@@ -72,7 +63,7 @@ export default function EventGroupsPage() {
       const [evRes, grpRes] = await Promise.all([
         supabase.from("events").select("title").eq("id", id).eq("organizer_id", user.id).single(),
         supabase.from("group_orders")
-          .select("id, organizer_name, organizer_email, organizer_phone, target_size, discount_pct, deadline, status, created_at, ticket_tiers(name, price), group_order_members(id, name, email, is_organizer, paid)")
+          .select("id, organizer_name, organizer_email, organizer_phone, target_size, discount_pct, status, created_at, ticket_tiers(name, price), group_order_members(id, name, email, is_organizer, paid)")
           .eq("event_id", id)
           .order("created_at", { ascending: false }),
       ]);
@@ -189,7 +180,6 @@ export default function EventGroupsPage() {
             const paidCount = members.filter(m => m.paid).length;
             const isExpanded = expanded === group.id;
             const tierPrice = group.ticket_tiers?.price ?? 0;
-            const deadlinePast = isPast(group.deadline);
 
             return (
               <div key={group.id} className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
@@ -230,8 +220,7 @@ export default function EventGroupsPage() {
                       )}
                     </div>
                     <p className="font-mono text-[10px] text-ink-muted">
-                      {group.ticket_tiers?.name ?? "—"} · {members.length}/{group.target_size} members
-                      {" · "}Deadline {fmtDate(group.deadline)}{deadlinePast ? " (past)" : ""}
+                      {group.ticket_tiers?.name ?? "—"} · {members.length} {members.length === 1 ? "member" : "members"}
                     </p>
                   </div>
 

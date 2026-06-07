@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { saveOrder, markMemberPaid } from "@/lib/group-orders";
+import { saveOrder, markGroupPaid, createGroupAllocations } from "@/lib/group-orders";
 import { TERMS_VERSION, TERMS_SUMMARY, TERMS_TEXT, NO_REFUND_NOTICE } from "@/lib/terms";
 
 interface CheckoutPayload {
@@ -27,6 +27,9 @@ interface CheckoutPayload {
   grandTotal: number;
   groupId?: string;
   groupEmail?: string;
+  isGroupPay?: boolean;
+  groupPayerName?: string;        // the group member being paid as
+  groupPayerHasAccount?: boolean; // that member already has a Rameelo account
 }
 
 type PaymentMethod = "card" | "ach";
@@ -74,6 +77,13 @@ function formatPhone(digits: string): string {
   return `(${d.slice(0, 3)}) ${d.slice(3, 6)}-${d.slice(6)}`;
 }
 
+// Privacy masks for paying as an account-holding group member.
+function maskLastName(last: string): string {
+  const l = (last ?? "").trim();
+  if (!l) return "";
+  return `${l[0]}${"•".repeat(Math.max(l.length - 1, 1))}`;
+}
+
 export default function CheckoutPage() {
   const router = useRouter();
   const [payload, setPayload] = useState<CheckoutPayload | null>(null);
@@ -91,6 +101,8 @@ export default function CheckoutPage() {
   const [lastName, setLastName]   = useState("");
   const [email, setEmail]         = useState("");
   const [phoneDigits, setPhoneDigits] = useState("");
+  // Group payer: the email is fixed to the chosen group member and can't be edited.
+  const [lockedEmail, setLockedEmail] = useState<string | null>(null);
 
   // Payment method
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
@@ -117,9 +129,27 @@ export default function CheckoutPage() {
   }, []);
 
   useEffect(() => {
+    let groupLockedEmail: string | null = null;
     try {
       const raw = localStorage.getItem("rameelo_checkout");
-      if (raw) setPayload(JSON.parse(raw) as CheckoutPayload);
+      if (raw) {
+        const parsed = JSON.parse(raw) as CheckoutPayload;
+        setPayload(parsed);
+        // Group payment: lock the email to the selected group member's email.
+        if (parsed.isGroupPay && parsed.groupEmail) {
+          groupLockedEmail = parsed.groupEmail;
+          setLockedEmail(parsed.groupEmail);
+          setEmail(parsed.groupEmail);
+        }
+        // Paying as a member who already has an account → everything's on file:
+        // prefill their name and jump straight to payment (details shown masked).
+        if (parsed.isGroupPay && parsed.groupPayerHasAccount && parsed.groupPayerName) {
+          const [f, ...rest] = parsed.groupPayerName.trim().split(" ");
+          setFirstName(f ?? "");
+          setLastName(rest.join(" "));
+          setStep("payment");
+        }
+      }
     } catch {}
 
     const supabase = createClient();
@@ -127,6 +157,9 @@ export default function CheckoutPage() {
       if (!user) return;
       setAuthedUserId(user.id);
       setIsSignedIn(true);
+      // Signed-in buyers don't re-enter contact info — jump straight to payment
+      // (their details are shown there; the back arrow returns to the form).
+      setStep("payment");
       supabase
         .from("profiles")
         .select("first_name, last_name, email, phone")
@@ -135,7 +168,8 @@ export default function CheckoutPage() {
         .then(({ data: profile }) => {
           if (profile?.first_name) setFirstName(profile.first_name);
           if (profile?.last_name)  setLastName(profile.last_name);
-          if (profile?.email || user.email) setEmail(profile?.email || user.email || "");
+          // Don't override a locked group-payer email with the account's email.
+          if (!groupLockedEmail && (profile?.email || user.email)) setEmail(profile?.email || user.email || "");
           if (profile?.phone) setPhoneDigits(profile.phone.replace(/\D/g, "").slice(0, 10));
         });
     });
@@ -148,6 +182,10 @@ export default function CheckoutPage() {
 
   const subtotal = payload?.subtotalAfterDiscount ?? payload?.grandTotal ?? 0;
   const { rameeloFee, processingFee, grandTotal } = calcFees(subtotal, paymentMethod);
+
+  // Paying as a group member who has an account: lock + mask their contact details
+  // (the purchaser may not be them). Doesn't apply when the buyer is signed in.
+  const groupPayerLocked = !!payload?.isGroupPay && !!payload?.groupPayerHasAccount && !isSignedIn;
 
   const contactValid = firstName && lastName && email.includes("@") && phoneDigits.length === 10;
   const cardValid    = cardNumber.replace(/\s/g, "").length === 16 && expiry.length === 5 && cvv.length >= 3 && nameOnCard && billingZip.length === 5;
@@ -191,8 +229,19 @@ export default function CheckoutPage() {
       termsAcceptedIp: clientIp,
     });
 
-    if (orderId && payload.groupId && payload.groupEmail) {
-      await markMemberPaid({ groupId: payload.groupId, email: payload.groupEmail, orderId });
+    // One-payer group model: this single order covers everyone, so mark the
+    // whole group paid, split the tickets into per-member allocations the others
+    // claim, and email each of them a claim link.
+    if (orderId && payload.groupId) {
+      await markGroupPaid({ groupId: payload.groupId, orderId });
+      if (payload.isGroupPay) {
+        await createGroupAllocations(orderId);
+        fetch("/api/group-tickets-distributed", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId }),
+        }).catch(() => { /* non-blocking — claim emails shouldn't block confirmation */ });
+      }
     }
 
     if (error) console.error("Order save error:", error);
@@ -211,6 +260,7 @@ export default function CheckoutPage() {
       qty: payload.qty,
       tierName: payload.tierName,
       groupId: payload.groupId,
+      isGroupPay: payload.isGroupPay ?? false,
       purchasedAt: new Date().toISOString(),
     };
     localStorage.setItem("rameelo_order", JSON.stringify(orderSnapshot));
@@ -333,8 +383,20 @@ export default function CheckoutPage() {
 
                 <div>
                   <label className={labelCls}>Email address</label>
-                  <input type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="priya@example.com" className={inputCls} required />
-                  <p className="font-mono text-[10px] text-ink-muted mt-1.5">Tickets sent here as PDF + QR code</p>
+                  {lockedEmail ? (
+                    <>
+                      <div className={`${inputCls} flex items-center justify-between gap-2 bg-ivory/60 cursor-not-allowed`}>
+                        <span className="truncate text-ink">{lockedEmail}</span>
+                        <svg className="w-4 h-4 text-ink-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 11c0-1.105-.895-2-2-2H8m8 2V7a4 4 0 00-8 0v4m-1 0h10a1 1 0 011 1v7a1 1 0 01-1 1H7a1 1 0 01-1-1v-7a1 1 0 011-1z" /></svg>
+                      </div>
+                      <p className="font-mono text-[10px] text-ink-muted mt-1.5">You&rsquo;re paying for the group — tickets go to each member.</p>
+                    </>
+                  ) : (
+                    <>
+                      <input type="email" autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="priya@example.com" className={inputCls} required />
+                      <p className="font-mono text-[10px] text-ink-muted mt-1.5">Tickets sent here as PDF + QR code</p>
+                    </>
+                  )}
                 </div>
 
                 <div>
@@ -369,12 +431,37 @@ export default function CheckoutPage() {
             ) : (
               <form onSubmit={handlePurchase} className="space-y-5">
                 <div className="flex items-center gap-3">
-                  <button type="button" onClick={() => setStep("contact")} className="w-9 h-9 rounded-xl border border-ivory-200 flex items-center justify-center text-ink-muted hover:border-aubergine hover:text-aubergine transition-all">←</button>
+                  {!groupPayerLocked && (
+                    <button type="button" onClick={() => setStep("contact")} className="w-9 h-9 rounded-xl border border-ivory-200 flex items-center justify-center text-ink-muted hover:border-aubergine hover:text-aubergine transition-all">←</button>
+                  )}
                   <div>
                     <h2 className="font-display font-bold text-ink text-xl">Payment details</h2>
-                    <p className="font-ui text-ink-muted text-sm">{firstName} {lastName} · {email}</p>
+                    <p className="font-ui text-ink-muted text-sm">
+                      {firstName} {groupPayerLocked ? maskLastName(lastName) : lastName} · {email}
+                    </p>
                   </div>
                 </div>
+
+                {/* Paying as an account-holding member — details on file, masked for privacy */}
+                {groupPayerLocked && (
+                  <div className="rounded-2xl border border-ivory-200 bg-ivory/50 p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted font-bold">Paying as</p>
+                      <span className="inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-widest text-peacock font-bold">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        Rameelo member
+                      </span>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="font-ui text-sm text-ink">{firstName} {maskLastName(lastName)}</p>
+                      <p className="font-ui text-sm text-ink-muted">{email}</p>
+                      <p className="font-ui text-sm text-ink-muted">+1 (•••) •••-••••</p>
+                    </div>
+                    <p className="font-mono text-[10px] text-ink-muted mt-2.5 leading-relaxed">
+                      This member already has an account — their details are on file and hidden for privacy. Their tickets go straight to their wallet.
+                    </p>
+                  </div>
+                )}
 
                 {/* ── Payment method toggle ── */}
                 <div>

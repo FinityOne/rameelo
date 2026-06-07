@@ -103,13 +103,6 @@ export default function OrganizerEventsPage() {
           <h2 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: '-0.02em' }}>Events</h2>
           {!loading && <p className="font-ui text-ink-muted text-sm mt-0.5">{events.length} event{events.length !== 1 ? 's' : ''}</p>}
         </div>
-        <Link
-          href="/organizer/events/create"
-          className="flex items-center gap-2 bg-aubergine text-white font-ui font-semibold text-sm px-5 py-2.5 rounded-xl hover:bg-aubergine-light transition-colors shadow-sm"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          Create event
-        </Link>
       </div>
 
       {/* Active / Drafts / Past tabs */}
@@ -139,12 +132,12 @@ export default function OrganizerEventsPage() {
         /* First-run empty state */
         <div className="bg-white rounded-2xl border-2 border-dashed border-ivory-200 p-16 text-center">
           <div className="w-16 h-16 rounded-2xl bg-marigold/10 border border-marigold/20 flex items-center justify-center mx-auto mb-4 text-3xl">🎉</div>
-          <p className="font-display font-semibold text-ink text-xl mb-2" style={{ letterSpacing: '-0.015em' }}>Create your first event</p>
-          <p className="font-ui text-ink-muted text-sm max-w-xs mx-auto mb-6">Build your Navratri event in minutes — multi-step, polished, and built for the garba community.</p>
-          <Link href="/organizer/events/create"
+          <p className="font-display font-semibold text-ink text-xl mb-2" style={{ letterSpacing: '-0.015em' }}>No events yet</p>
+          <p className="font-ui text-ink-muted text-sm max-w-xs mx-auto mb-6">The Rameelo team sets up your events. Once one is added for your organization, it&apos;ll appear here to manage and edit.</p>
+          <a href="mailto:support@rameelo.com"
             className="inline-flex items-center gap-2 bg-marigold text-aubergine font-display font-bold text-sm px-6 py-3 rounded-xl hover:bg-marigold-dark transition-colors shadow-sm">
-            Get started →
-          </Link>
+            Contact Rameelo to list an event →
+          </a>
         </div>
       ) : visible.length === 0 ? (
         /* Empty for the selected tab */

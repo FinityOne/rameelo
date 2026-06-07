@@ -40,15 +40,18 @@ export default function SignUpPage() {
   const [error, setError] = useState("");
   const [emailSent, setEmailSent] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [nextDest, setNextDest] = useState<string>("");
 
-  // Org-team invite: prefill (and lock) the email, and remember the invite so we
-  // can claim it and route the new member into the organizer portal after signup.
+  // Prefill email from a link (org invite or group-ticket flow), remember an org
+  // invite token, and capture a same-site `next` destination to return to.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const invitedEmail = params.get("email");
     const invite = params.get("invite");
+    const next = params.get("next");
     if (invitedEmail) setEmail(invitedEmail);
     if (invite) setInviteToken(invite);
+    if (next && next.startsWith("/") && !next.startsWith("//")) setNextDest(next);
   }, []);
 
   useEffect(() => {
@@ -119,13 +122,12 @@ export default function SignUpPage() {
     }).catch(() => { /* silent — welcome email failure shouldn't block onboarding */ });
 
     if (data.session) {
-      // Email confirmation disabled — claim any team invite, then route.
+      // Email confirmation disabled — claim any team invite + guest orders, then route.
       if (inviteToken) {
         try { await supabase.rpc("claim_org_invitations"); } catch { /* organizer layout will retry */ }
-        router.push("/organizer");
-      } else {
-        router.push("/portal");
       }
+      try { await supabase.rpc("claim_my_guest_orders"); } catch { /* non-blocking */ }
+      router.push(nextDest || (inviteToken ? "/organizer" : "/portal"));
       router.refresh();
     } else {
       // Email confirmation enabled — show check-email screen

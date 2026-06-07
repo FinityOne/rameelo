@@ -545,11 +545,11 @@ export default function OrganizerSalesPage() {
         <div className="rounded-2xl border-2 border-dashed border-ivory-200 p-16 text-center">
           <p className="text-4xl mb-4">📊</p>
           <p className="font-display font-semibold text-ink text-lg mb-2" style={{ letterSpacing: "-0.015em" }}>No events yet</p>
-          <p className="font-ui text-ink-muted text-sm max-w-xs mx-auto mb-6">Create an event with ticket tiers and your analytics will appear here — revenue projections, fill rates, and pacing insights.</p>
-          <Link href="/organizer/events/create"
+          <p className="font-ui text-ink-muted text-sm max-w-xs mx-auto mb-6">Once the Rameelo team lists an event for your organization, your analytics will appear here — revenue projections, fill rates, and pacing insights.</p>
+          <a href="mailto:support@rameelo.com"
             className="inline-flex items-center gap-2 bg-aubergine text-white font-display font-bold text-sm px-6 py-3 rounded-xl hover:bg-aubergine-light transition-colors">
-            Create event →
-          </Link>
+            Contact Rameelo →
+          </a>
         </div>
       ) : (
         <>

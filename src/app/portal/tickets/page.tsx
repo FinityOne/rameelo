@@ -614,6 +614,7 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
   const ticketId = `${order.orderId}-T${seat}`;
   const isPending = transfer?.status === "pending";
   const isTransferred = transfer?.status === "accepted";
+  const isGroup = !!order.groupId; // group allocations use "claim" wording
   const isUpcoming = order.eventDate >= new Date().toISOString().slice(0, 10);
   const [cancelling, setCancelling] = useState(false);
 
@@ -626,9 +627,9 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
   }
 
   const statusBadge = isTransferred
-    ? { label: "Sent", cls: "text-ink-muted" }
+    ? { label: isGroup ? "Claimed" : "Sent", cls: "text-ink-muted" }
     : isPending
-      ? { label: "Pending", cls: "text-marigold-dark" }
+      ? { label: isGroup ? "To claim" : "Pending", cls: "text-marigold-dark" }
       : { label: "Valid", cls: "text-peacock" };
 
   return (
@@ -695,14 +696,14 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
                 {isPending ? "✈️" : "✓"}
               </div>
               <p className="font-display font-bold text-ink text-sm">
-                {isPending ? "Transfer pending" : "Transferred"}
+                {isPending ? (isGroup ? "Pending claim" : "Transfer pending") : (isGroup ? "Claimed" : "Transferred")}
               </p>
               <p className="font-ui text-xs text-ink-muted leading-snug">
                 {isPending
-                  ? `Waiting for ${transfer!.toName || transfer!.toEmail} to accept.`
-                  : `Now belongs to ${transfer!.toName || transfer!.toEmail}.`}
+                  ? `Waiting for ${transfer!.toName || transfer!.toEmail} to ${isGroup ? "claim" : "accept"}.`
+                  : `${isGroup ? "Claimed by" : "Now belongs to"} ${transfer!.toName || transfer!.toEmail}.`}
               </p>
-              {isPending && (
+              {isPending && !isGroup && (
                 <button disabled={cancelling} onClick={handleCancel} className="font-mono text-[10px] text-durga/70 hover:text-durga transition-colors flex items-center gap-1">
                   {cancelling ? "Cancelling…" : "Cancel transfer"}
                 </button>
@@ -1059,10 +1060,11 @@ export default function TicketsPage() {
       loadReceivedTickets(uid),
     ]);
 
-    // Auto-expire pending transfers older than 24 hours (checked from sender's view)
+    // Auto-expire pending transfers older than 24 hours (checked from sender's view).
+    // Group-order allocations are excluded — those are claimable indefinitely.
     const cutoff = Date.now() - 24 * 60 * 60 * 1000;
     const stale = ordersData.flatMap(o =>
-      (o.transfers ?? []).filter(t => t.status === "pending" && new Date(t.createdAt).getTime() < cutoff)
+      o.groupId ? [] : (o.transfers ?? []).filter(t => t.status === "pending" && new Date(t.createdAt).getTime() < cutoff)
     );
     if (stale.length > 0) {
       await Promise.all(stale.map(t => cancelTransfer(t.id)));

@@ -116,7 +116,6 @@ const SCANNER_ONLY_SECTIONS: NavSection[] = [
 const PAGE_TITLES: Array<{ test: (p: string) => boolean; title: string }> = [
   { test: (p) => p === "/organizer",                               title: "Dashboard" },
   { test: (p) => p === "/organizer/events",                        title: "Events" },
-  { test: (p) => p === "/organizer/events/create",                 title: "Create Event" },
   { test: (p) => /^\/organizer\/events\/[^/]+$/.test(p),          title: "Event Overview" },
   { test: (p) => /^\/organizer\/events\/[^/]+\/edit$/.test(p),    title: "Edit Event" },
   { test: (p) => /^\/organizer\/events\/[^/]+\/groups$/.test(p),  title: "Group Orders" },
@@ -340,7 +339,6 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
   }, []);
 
   const pageTitle = getPageTitle(pathname);
-  const isCreateEvent = pathname === "/organizer/events/create";
 
   // Caller's role in the active org. Scanners get the door scanner only.
   const activeRole = activeOrg ? (roles[activeOrg.id] ?? null) : null;
@@ -564,19 +562,6 @@ export default function OrganizerLayout({ children }: { children: React.ReactNod
             <div className="flex-1" />
 
             <div className="flex items-center gap-2">
-              {!isCreateEvent && !scannerOnly && (
-                <Link
-                  href="/organizer/events/create"
-                  className="hidden sm:flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg font-ui font-semibold text-[12px] transition-all"
-                  style={{ background: "linear-gradient(135deg, #F5A623, #E8901A)", color: "#1A0826", boxShadow: "0 1px 8px rgba(245,166,35,0.3)" }}
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-                  </svg>
-                  New Event
-                </Link>
-              )}
-
               <div
                 className="w-7 h-7 rounded-full overflow-hidden flex items-center justify-center text-white text-[10px] font-bold shrink-0 ring-2 ring-white/80 ring-offset-1"
                 style={{ backgroundColor: user.avatarColor }}

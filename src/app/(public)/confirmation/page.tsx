@@ -2,12 +2,15 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import { createClient } from "@/lib/supabase/client";
 
 interface StoredOrder {
   orderId: string;
   firstName: string;
   lastName: string;
   email: string;
+  groupId?: string;
+  isGroupPay?: boolean;
   // flat fields written by current checkout
   eventTitle?: string;
   eventDate?: string;
@@ -36,8 +39,14 @@ export default function ConfirmationPage() {
   const [order, setOrder] = useState<StoredOrder | null>(null);
   const [confettiActive, setConfettiActive] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [isSignedIn, setIsSignedIn] = useState<boolean | null>(null); // null = unknown
 
   useEffect(() => { document.title = "Order Confirmed | Rameelo"; }, []);
+
+  useEffect(() => {
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data: { user } }) => setIsSignedIn(!!user));
+  }, []);
 
   useEffect(() => {
     try {
@@ -112,12 +121,51 @@ export default function ConfirmationPage() {
             <span className="text-marigold">{order.firstName}!</span>
           </h1>
           <p className="font-ui text-white/60 text-sm">
-            Your tickets are on their way to <strong className="text-white/80">{order.email}</strong>
+            Your tickets are saved to your Rameelo account
           </p>
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-5">
+
+        {/* Where the tickets live — no QR here; drive to the account */}
+        <div className="rounded-2xl border-2 border-marigold/30 bg-marigold/[0.06] p-5 sm:p-6 text-center">
+          <div className="w-12 h-12 rounded-2xl bg-marigold/20 flex items-center justify-center mx-auto mb-3 text-2xl">🎟️</div>
+          <p className="font-display font-bold text-ink text-lg">Your tickets are in your account</p>
+          <p className="font-ui text-sm text-ink-muted mt-1 mb-4">
+            {isSignedIn === false
+              ? "We've reserved your tickets and QR codes. Create your free account to open your wallet — use the email below so they're waiting for you."
+              : "Your tickets and QR codes are ready in your Rameelo wallet."}
+          </p>
+
+          {/* Showcase the account email */}
+          <div className="inline-flex flex-col items-center gap-0.5 px-5 py-3 rounded-xl bg-white border border-ivory-200 mb-4">
+            <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Account email</span>
+            <span className="font-display font-bold text-ink text-base break-all">{order.email}</span>
+          </div>
+
+          {isSignedIn === false ? (
+            <>
+              <Link
+                href={`/auth/signup?email=${encodeURIComponent(order.email)}&next=${encodeURIComponent("/portal/tickets")}`}
+                className="block w-full py-3.5 rounded-2xl bg-marigold text-aubergine font-display font-bold text-sm text-center hover:bg-marigold-dark active:scale-[0.98] shadow-sm transition-all"
+              >
+                Create my account &amp; open my tickets →
+              </Link>
+              <p className="font-mono text-[10px] text-ink-muted mt-2">
+                Already have one?{" "}
+                <Link href={`/auth/signin?next=${encodeURIComponent("/portal/tickets")}`} className="text-marigold-dark font-bold hover:underline">Sign in</Link>
+              </p>
+            </>
+          ) : (
+            <Link
+              href="/portal/tickets"
+              className="block w-full py-3.5 rounded-2xl bg-marigold text-aubergine font-display font-bold text-sm text-center hover:bg-marigold-dark active:scale-[0.98] shadow-sm transition-all"
+            >
+              Open my tickets →
+            </Link>
+          )}
+        </div>
 
         {/* Order ID card */}
         <div className="rounded-2xl bg-white border border-ivory-200 overflow-hidden">
@@ -198,30 +246,11 @@ export default function ConfirmationPage() {
                 {order.qty} × {order.tierName ?? (order.type === "combo" ? "Bundle" : order.type) ?? "Ticket"}{order.qty !== 1 ? "s" : ""}
               </p>
               <p className="font-ui text-xs text-ink-muted">
-                Purchased {formatTime(order.purchasedAt)} · Sent to {order.email}
+                Purchased {formatTime(order.purchasedAt)} · Saved to {order.email}
               </p>
             </div>
             <p className="font-display font-bold text-ink text-xl">${order.grandTotal.toLocaleString()}</p>
           </div>
-        </div>
-
-        {/* QR ticket mock */}
-        <div className="rounded-2xl bg-white border-2 border-dashed border-ivory-200 p-6 text-center">
-          <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-4">Your Entry Ticket</p>
-          <div className="w-32 h-32 mx-auto rounded-xl bg-aubergine/5 border border-ivory-200 flex items-center justify-center mb-4">
-            <div className="grid grid-cols-5 gap-0.5 opacity-60">
-              {Array.from({ length: 25 }).map((_, i) => (
-                <div
-                  key={i}
-                  className="w-4 h-4 rounded-sm"
-                  style={{ backgroundColor: Math.random() > 0.5 ? "#2E1B30" : "transparent" }}
-                />
-              ))}
-            </div>
-          </div>
-          <p className="font-display font-bold text-ink text-sm mb-1">{order.orderId}</p>
-          <p className="font-ui text-xs text-ink-muted">Show this at the venue entrance</p>
-          <p className="font-mono text-[10px] text-ink-muted mt-2">Full tickets sent to your email</p>
         </div>
 
         {/* Action buttons */}

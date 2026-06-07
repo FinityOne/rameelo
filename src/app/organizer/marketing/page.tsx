@@ -355,10 +355,10 @@ export default function MarketingPage() {
         <div className="rounded-2xl border-2 border-dashed border-ivory-200 p-16 text-center">
           <div className="w-16 h-16 rounded-2xl bg-marigold/10 border border-marigold/20 flex items-center justify-center mx-auto mb-4 text-3xl">📣</div>
           <p className="font-display font-semibold text-ink text-xl mb-2" style={{ letterSpacing: "-0.015em" }}>No events to promote yet</p>
-          <p className="font-ui text-ink-muted text-sm max-w-xs mx-auto mb-6">Create an event and your marketing kit — flyer, QR, captions — appears here instantly.</p>
-          <Link href="/organizer/events/create" className="inline-flex items-center gap-2 bg-marigold text-aubergine font-display font-bold text-sm px-6 py-3 rounded-xl hover:bg-marigold-dark transition-colors shadow-sm">
-            Create an event →
-          </Link>
+          <p className="font-ui text-ink-muted text-sm max-w-xs mx-auto mb-6">Once the Rameelo team lists an event for your organization, your marketing kit — flyer, QR, captions — appears here instantly.</p>
+          <a href="mailto:support@rameelo.com" className="inline-flex items-center gap-2 bg-marigold text-aubergine font-display font-bold text-sm px-6 py-3 rounded-xl hover:bg-marigold-dark transition-colors shadow-sm">
+            Contact Rameelo →
+          </a>
         </div>
       ) : (
         <>
