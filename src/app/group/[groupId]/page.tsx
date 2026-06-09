@@ -6,7 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import Logo from "@/components/Logo";
 import { loadGroupOrder, joinGroupOrder, updateGroupMember, updateGroupName, tierHasGroupDiscount, groupDiscountPct, groupDiscountSummary, groupScalingLevels, type GroupOrder } from "@/lib/group-orders";
-import { salesClosedForEvent } from "@/lib/event-time";
+import { salesClosedForEvent, tierSaleClosed } from "@/lib/event-time";
 import { computeFees } from "@/lib/fees";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
 
@@ -99,10 +99,13 @@ export default function GroupLandingPage() {
           .eq("is_visible", true)
           .order("sort_order")
           .then(({ data: tiers }) => {
+            const gev = groupData?.event;
+            const evCtx = { start_date: gev?.start_date ?? "", start_time: gev?.start_time ?? null, state: gev?.state ?? "" };
             const available = (tiers ?? []).filter(t => {
               if (t.quantity_sold >= t.quantity) return false;
               if (t.sale_start_date && new Date(t.sale_start_date + "T00:00:00") > now) return false;
-              if (t.sale_end_date   && new Date(t.sale_end_date   + "T23:59:59") < now) return false;
+              // sale window closes at 23:59 in the event's tz, capped by doors-open
+              if (tierSaleClosed(evCtx, t.sale_end_date)) return false;
               return true;
             }).map(t => ({ id: t.id, name: t.name, price: t.price })) as TierOption[];
             setEventTiers(available);

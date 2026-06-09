@@ -73,3 +73,21 @@ export function salesClosedForEvent(ev: EventTimeFields): boolean {
   if (!ev.start_date) return false;
   return Date.now() >= eventDoorsEpoch(ev);
 }
+
+// End of the given calendar day (23:59:59) in the event's local timezone.
+export function localDayEndEpoch(dateStr: string, state: string | null | undefined): number {
+  const [y, mo, d] = dateStr.split("-").map(Number);
+  return wallTimeToEpoch(y, mo, d, 23, 59, tzForState(state));
+}
+
+// Is a ticket tier's sale window over? A tier with a sale_end_date stays open
+// until 23:59 of that date IN THE EVENT'S TIMEZONE — but never past doors-open
+// (no tier can be bought once the event has started, even if its end date is later
+// or unset). So the effective close = min(sale-end-of-day, doors). No end_date →
+// it simply rides the event's doors cutoff.
+export function tierSaleClosed(ev: EventTimeFields, saleEndDate: string | null | undefined): boolean {
+  if (!ev.start_date) return false;
+  const doors = eventDoorsEpoch(ev);
+  const effectiveEnd = saleEndDate ? Math.min(localDayEndEpoch(saleEndDate, ev.state), doors) : doors;
+  return Date.now() >= effectiveEnd;
+}

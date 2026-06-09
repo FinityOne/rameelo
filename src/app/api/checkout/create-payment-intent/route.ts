@@ -17,7 +17,10 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const amount = Math.round(Number(body.amount)); // smallest currency unit (cents)
   const method = body.paymentMethod === "ach" ? "us_bank_account" : "card";
-  const email = typeof body.email === "string" ? body.email : undefined;
+  // Only forward a genuinely valid email as the Stripe receipt address — an empty
+  // or malformed value makes Stripe reject the whole PaymentIntent.
+  const rawEmail = typeof body.email === "string" ? body.email.trim() : "";
+  const email = rawEmail.includes("@") ? rawEmail : undefined;
 
   if (!Number.isFinite(amount) || amount < 50) {
     // Stripe's minimum charge is $0.50; free tickets are handled without Stripe.

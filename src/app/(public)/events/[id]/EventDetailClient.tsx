@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
-import { salesClosedForEvent } from "@/lib/event-time";
+import { salesClosedForEvent, tierSaleClosed } from "@/lib/event-time";
 import { money } from "@/lib/money";
 import { groupDiscountPct, groupDiscountAmount, groupScalingLevels } from "@/lib/group-orders";
 import { computeFees } from "@/lib/fees";
@@ -389,9 +389,13 @@ function UrgencyBanner({
 
         {/* Historical FOMO — educational, never deceptive */}
         <p className="font-ui text-xs text-ink-muted leading-relaxed">
-          {days <= 45
-            ? `Only ${days} days away. Navratri events in ${event.city} typically sell out before the date — prices don't drop.`
-            : `Tickets for ${CATEGORY_LABELS[event.category] ?? "Navratri"} events in ${event.city} regularly sell out weeks in advance. Early buyers never worry.`
+          {days === 0
+            ? `It's today — last chance to grab tickets! Navratri events in ${event.city} sell out, and prices never drop.`
+            : days === 1
+              ? `Tomorrow! Navratri events in ${event.city} typically sell out before the date — prices don't drop.`
+              : days <= 45
+                ? `Only ${days} days away. Navratri events in ${event.city} typically sell out before the date — prices don't drop.`
+                : `Tickets for ${CATEGORY_LABELS[event.category] ?? "Navratri"} events in ${event.city} regularly sell out weeks in advance. Early buyers never worry.`
           }
         </p>
       </div>
@@ -410,26 +414,29 @@ function isTierNotStarted(tier: Tier): boolean {
   return new Date(tier.sale_start_date + "T00:00:00") > new Date();
 }
 
-function isTierExpired(tier: Tier): boolean {
-  if (!tier.sale_end_date) return false;
-  // treat end date as end of that day
-  const end = new Date(tier.sale_end_date + "T23:59:59");
-  return end < new Date();
+// A tier is "expired" once its sale window closes — its sale_end_date at 23:59
+// IN THE EVENT'S TIMEZONE, and never past the event's doors (so a tier can't be
+// bought after the event has started even if its end date is later or unset).
+function isTierExpired(tier: Tier, ev: TierTimeCtx): boolean {
+  return tierSaleClosed({ start_date: ev.start_date, start_time: ev.start_time, state: ev.state }, tier.sale_end_date);
 }
+
+type TierTimeCtx = { start_date: string; start_time: string | null; state: string };
 
 function daysUntilDate(d: string): number {
   return Math.ceil((new Date(d + "T00:00:00").getTime() - Date.now()) / 86400000);
 }
 
-function TierAvailabilityBar({ tier, isSelected, onClick, isBestDeal, isMostPopular }: {
+function TierAvailabilityBar({ tier, ev, isSelected, onClick, isBestDeal, isMostPopular }: {
   tier: Tier;
+  ev: TierTimeCtx;
   isSelected: boolean;
   onClick: () => void;
   isBestDeal: boolean;
   isMostPopular: boolean;
 }) {
   const notStarted = isTierNotStarted(tier);
-  const expired    = isTierExpired(tier);
+  const expired    = isTierExpired(tier, ev);
   const locked     = notStarted || expired;
 
   const rem  = tier.quantity - tier.quantity_sold;
@@ -620,49 +627,71 @@ export default function EventDetailClient({ id }: { id: string }) {
 
   useEffect(() => {
     if (!id) return;
+    let cancelled = false;
     const supabase = createClient();
-    supabase
-      .from("events")
-      .select(`
-        id, title, category, description, navratri_nights, org_id,
-        start_date, end_date, start_time, end_time, doors_open_time,
-        venue_name, address_line1, city, state, zip,
-        parking, parking_notes, website_url,
-        cover_image_url, cover_gradient,
-        dress_code, dress_code_details, dandiya_sticks, age_restriction, capacity, selling_on_rameelo,
-        artist:artists!events_artist_id_fkey (
-          id, name, slug, tagline, bio, profile_image_url, genres, years_active_since, follower_count, performance_style
-        ),
-        ticket_tiers (
-          id, name, description, price, quantity, quantity_sold,
-          sale_start_date, sale_end_date, is_visible, sort_order,
-          group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value, group_discount_tiers
-        )
-      `)
-      .eq("id", id)
-      .eq("status", "published")
-      .single()
-      .then(({ data, error }) => {
-        if (error || !data) { setNotFound(true); setLoading(false); return; }
-        const ev = data as unknown as Event;
-        ev.ticket_tiers = ev.ticket_tiers
-          .filter(t => t.is_visible)
-          .sort((a, b) => a.sort_order - b.sort_order || a.price - b.price);
-        setEvent(ev);
+
+    // `initial` controls first-load behavior (spinner, default tier, org fetch);
+    // silent reloads just refresh live inventory (quantity/sold) without disrupting
+    // the buyer's current tier selection.
+    async function loadEvent(initial: boolean) {
+      const { data, error } = await supabase
+        .from("events")
+        .select(`
+          id, title, category, description, navratri_nights, org_id,
+          start_date, end_date, start_time, end_time, doors_open_time,
+          venue_name, address_line1, city, state, zip,
+          parking, parking_notes, website_url,
+          cover_image_url, cover_gradient,
+          dress_code, dress_code_details, dandiya_sticks, age_restriction, capacity, selling_on_rameelo,
+          artist:artists!events_artist_id_fkey (
+            id, name, slug, tagline, bio, profile_image_url, genres, years_active_since, follower_count, performance_style
+          ),
+          ticket_tiers (
+            id, name, description, price, quantity, quantity_sold,
+            sale_start_date, sale_end_date, is_visible, sort_order,
+            group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value, group_discount_tiers
+          )
+        `)
+        .eq("id", id)
+        .eq("status", "published")
+        .single();
+
+      if (cancelled) return;
+      if (error || !data) { if (initial) { setNotFound(true); setLoading(false); } return; }
+      const ev = data as unknown as Event;
+      ev.ticket_tiers = ev.ticket_tiers
+        .filter(t => t.is_visible)
+        .sort((a, b) => a.sort_order - b.sort_order || a.price - b.price);
+      // Keep any already-loaded org so a silent refresh doesn't blank it.
+      setEvent(prev => (prev ? { ...ev, organization: prev.organization ?? ev.organization } : ev));
+
+      if (initial) {
         const firstSelectable = ev.ticket_tiers.find(t =>
-          !isTierNotStarted(t) && !isTierExpired(t) && t.quantity - t.quantity_sold > 0
+          !isTierNotStarted(t) && !isTierExpired(t, ev) && t.quantity - t.quantity_sold > 0
         );
         if (firstSelectable) setSelectedTierId(firstSelectable.id);
         setLoading(false);
-
         // Public org details (RLS hides organizations from anon, so use the RPC).
         if (ev.org_id) {
           supabase.rpc("get_public_organization", { p_id: ev.org_id }).then(({ data: orgRows }) => {
             const org = Array.isArray(orgRows) ? orgRows[0] : orgRows;
-            if (org) setEvent(prev => prev ? { ...prev, organization: org as Organization } : prev);
+            if (org && !cancelled) setEvent(prev => prev ? { ...prev, organization: org as Organization } : prev);
           });
         }
-      });
+      }
+    }
+
+    loadEvent(true);
+    // Refresh live inventory when the buyer returns to this tab (e.g. after an
+    // admin edits the tier in another tab) — so the available count is never stale.
+    const onVisible = () => { if (document.visibilityState === "visible") loadEvent(false); };
+    document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    return () => {
+      cancelled = true;
+      document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+    };
   }, [id]);
 
   // Detect group invite via ?groupId= param
@@ -1389,8 +1418,9 @@ export default function EventDetailClient({ id }: { id: string }) {
                     <p className="font-ui text-sm text-ink-muted py-2">No tickets available yet.</p>
                   ) : (() => {
                     // Compute cross-tier signals once
+                    const evCtx = { start_date: event.start_date, start_time: event.start_time, state: event.state };
                     const available = event.ticket_tiers.filter(t =>
-                      !isTierNotStarted(t) && !isTierExpired(t) && t.quantity - t.quantity_sold > 0
+                      !isTierNotStarted(t) && !isTierExpired(t, evCtx) && t.quantity - t.quantity_sold > 0
                     );
                     const minPrice = available.length ? Math.min(...available.map(t => t.price)) : null;
                     const maxSold  = available.length ? Math.max(...available.map(t => t.quantity_sold)) : null;
@@ -1398,23 +1428,24 @@ export default function EventDetailClient({ id }: { id: string }) {
                       <TierAvailabilityBar
                         key={tier.id}
                         tier={tier}
+                        ev={evCtx}
                         isSelected={selectedTierId === tier.id}
                         isBestDeal={
                           available.length > 1 &&
                           minPrice !== null &&
                           tier.price === minPrice &&
-                          !isTierNotStarted(tier) && !isTierExpired(tier) &&
+                          !isTierNotStarted(tier) && !isTierExpired(tier, evCtx) &&
                           tier.quantity - tier.quantity_sold > 0
                         }
                         isMostPopular={
                           available.length > 1 &&
                           maxSold !== null && maxSold > 0 &&
                           tier.quantity_sold === maxSold &&
-                          !isTierNotStarted(tier) && !isTierExpired(tier) &&
+                          !isTierNotStarted(tier) && !isTierExpired(tier, evCtx) &&
                           tier.quantity - tier.quantity_sold > 0
                         }
                         onClick={() => {
-                          if (isTierNotStarted(tier) || isTierExpired(tier) || salesClosed) return;
+                          if (isTierNotStarted(tier) || isTierExpired(tier, evCtx) || salesClosed) return;
                           const rem = tier.quantity - tier.quantity_sold;
                           if (rem > 0) { setSelectedTierId(tier.id); setQty(Math.min(qty, rem)); }
                         }}

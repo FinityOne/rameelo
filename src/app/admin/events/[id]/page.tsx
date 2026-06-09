@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
+import SalesReportTable from "@/components/SalesReportTable";
+import { buildSalesReport, salesReportCSV, salesReportFilename } from "@/lib/sales-report";
 
 type InterestSubmission = {
   id: string;
@@ -20,11 +22,17 @@ type OrderRow = {
   id: string;
   buyer_name: string;
   buyer_email: string;
+  tier_id: string | null;
   qty: number;
+  unit_price: number | null;
+  discount_amount: number | null;
+  rameelo_fee: number | null;
+  processing_fee: number | null;
   grand_total: number;
   payment_method: string;
   status: string;
   is_test: boolean;
+  dispute_status: string | null;
   created_at: string;
 };
 
@@ -146,39 +154,40 @@ export default function AdminEventReviewPage() {
   useEffect(() => {
     async function load() {
       const supabase = createClient();
-      const { data } = await supabase
-        .from('events')
-        .select(`
-          id, title, category, description, artist, navratri_nights, is_multi_day,
-          start_date, end_date, start_time, end_time, doors_open_time,
-          venue_name, address_line1, address_line2, city, state, zip,
-          parking, parking_notes, website_url,
-          cover_image_url, cover_gradient,
-          dress_code, dress_code_details, dandiya_sticks, age_restriction,
-          capacity, status, selling_on_rameelo, review_note, reviewed_at, created_at,
-          ticket_tiers (id, name, price, quantity, description, sale_start_date, sale_end_date, group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value, group_discount_tiers),
-          organizer:profiles!events_organizer_id_fkey (first_name, last_name, email, phone, city, state)
-        `)
-        .eq('id', id)
-        .single();
+      // Fetch event, interest submissions, and orders in parallel — they're
+      // independent, so there's no reason to wait for one before the next.
+      const [eventRes, interestRes, orderRes] = await Promise.all([
+        supabase
+          .from('events')
+          .select(`
+            id, title, category, description, artist, navratri_nights, is_multi_day,
+            start_date, end_date, start_time, end_time, doors_open_time,
+            venue_name, address_line1, address_line2, city, state, zip,
+            parking, parking_notes, website_url,
+            cover_image_url, cover_gradient,
+            dress_code, dress_code_details, dandiya_sticks, age_restriction,
+            capacity, status, selling_on_rameelo, review_note, reviewed_at, created_at,
+            ticket_tiers (id, name, price, quantity, description, sale_start_date, sale_end_date, group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value, group_discount_tiers),
+            organizer:profiles!events_organizer_id_fkey (first_name, last_name, email, phone, city, state)
+          `)
+          .eq('id', id)
+          .single(),
+        supabase
+          .from('event_interests')
+          .select('id, name, email, phone, city, qty_interested, created_at')
+          .eq('event_id', id)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('orders')
+          .select('id, buyer_name, buyer_email, tier_id, qty, unit_price, discount_amount, rameelo_fee, processing_fee, grand_total, payment_method, status, is_test, dispute_status, created_at')
+          .eq('event_id', id)
+          .order('created_at', { ascending: false }),
+      ]);
 
-      if (!data) { router.replace('/admin/events'); return; }
-      setEvent(data as unknown as EventFull);
-
-      const { data: interestData } = await supabase
-        .from('event_interests')
-        .select('id, name, email, phone, city, qty_interested, created_at')
-        .eq('event_id', id)
-        .order('created_at', { ascending: false });
-      setInterests((interestData ?? []) as InterestSubmission[]);
-
-      const { data: orderData } = await supabase
-        .from('orders')
-        .select('id, buyer_name, buyer_email, qty, grand_total, payment_method, status, is_test, created_at')
-        .eq('event_id', id)
-        .order('created_at', { ascending: false });
-      setOrders((orderData ?? []) as OrderRow[]);
-
+      if (!eventRes.data) { router.replace('/admin/events'); return; }
+      setEvent(eventRes.data as unknown as EventFull);
+      setInterests((interestRes.data ?? []) as InterestSubmission[]);
+      setOrders((orderRes.data ?? []) as OrderRow[]);
       setLoading(false);
     }
     load();
@@ -250,6 +259,47 @@ export default function AdminEventReviewPage() {
     setTogglingOrderId(null);
   }
 
+  // Build the sales report from the event's tiers + orders, memoized so it's only
+  // recomputed when that data changes (money rules — test/refunded/disputed
+  // excluded from revenue — are enforced inside buildSalesReport).
+  const report = useMemo(() => {
+    if (!event) return null;
+    return buildSalesReport(
+      {
+        title: event.title,
+        venue_name: event.venue_name,
+        city: event.city,
+        state: event.state,
+        start_date: event.start_date,
+        status: event.status,
+        selling_on_rameelo: event.selling_on_rameelo,
+      },
+      event.ticket_tiers.map(t => ({
+        id: t.id, name: t.name, price: t.price, quantity: t.quantity,
+        sale_start_date: t.sale_start_date, sale_end_date: t.sale_end_date,
+      })),
+      orders.map(o => ({
+        tier_id: o.tier_id, qty: o.qty, unit_price: o.unit_price,
+        discount_amount: o.discount_amount, rameelo_fee: o.rameelo_fee,
+        processing_fee: o.processing_fee, grand_total: o.grand_total,
+        status: o.status, is_test: o.is_test, dispute_status: o.dispute_status,
+      })),
+    );
+  }, [event, orders]);
+
+  function downloadSalesCsv() {
+    if (!report) return;
+    const blob = new Blob([salesReportCSV(report)], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = salesReportFilename(report, "csv");
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-24">
@@ -257,7 +307,7 @@ export default function AdminEventReviewPage() {
       </div>
     );
   }
-  if (!event) return null;
+  if (!event || !report) return null;
 
   const gradient   = GRADIENTS.find(g => g.id === event.cover_gradient) ?? GRADIENTS[0];
   const statusMeta = STATUS_META[event.status] ?? STATUS_META.draft;
@@ -544,6 +594,36 @@ export default function AdminEventReviewPage() {
             </span>
           </div>
         )}
+      </div>
+
+      {/* ── Sales Report — per-tier financials, black & white ── */}
+      <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+        <div className="px-5 py-3.5 bg-ivory border-b border-ivory-200 flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Sales Report</p>
+            <p className="font-ui text-[11px] text-ink-muted/70 mt-0.5">Face-value revenue by tier · test, refunded &amp; disputed orders excluded</p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={downloadSalesCsv}
+              title="Download as CSV (opens in Excel)"
+              className="inline-flex items-center gap-1.5 font-ui font-semibold text-xs px-3 py-2 rounded-xl border border-ink/15 bg-white text-ink hover:border-ink/40 hover:bg-ivory transition-all"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+              CSV
+            </button>
+            <Link
+              href={`/admin/events/${id}/report`}
+              title="Open the printable sales report"
+              className="inline-flex items-center gap-1.5 font-ui font-semibold text-xs px-3 py-2 rounded-xl bg-ink text-white hover:bg-ink/85 transition-all"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+              Print view
+            </Link>
+          </div>
+        </div>
+
+        <SalesReportTable report={report} />
       </div>
 
       {/* Orders */}

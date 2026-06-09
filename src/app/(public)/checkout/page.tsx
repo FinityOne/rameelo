@@ -249,6 +249,13 @@ export default function CheckoutPage() {
   // and the amount or method changes (card carries a fee, ACH doesn't).
   useEffect(() => {
     if (step !== "payment" || !payload || isFree || !stripeConfigured) return;
+    // Wait for a valid email before creating the intent. When a buyer is dropped
+    // straight onto the payment step (signed in, or an account-holding group payer),
+    // their email loads asynchronously from the profile — firing the intent with an
+    // empty email makes Stripe reject it ("invalid receipt_email") and the card/ACH
+    // form never renders. `email` is in the deps below, so the intent is created the
+    // moment the email is ready.
+    if (!email || !email.includes("@")) return;
     let cancelled = false;
     setClientSecret(null);
     setIntentError("");
@@ -274,7 +281,7 @@ export default function CheckoutPage() {
       .catch(() => { if (!cancelled) setIntentError("Could not start payment."); });
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, paymentMethod, grandTotal, isFree, payload?.eventId]);
+  }, [step, paymentMethod, grandTotal, isFree, payload?.eventId, email]);
 
   // Records the order after a successful (or processing, for ACH) Stripe payment —
   // or immediately for free tickets. Everything downstream (group allocation,

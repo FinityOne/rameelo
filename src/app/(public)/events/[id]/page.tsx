@@ -3,6 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import EventDetailClient from "./EventDetailClient";
 import { eventSchema, breadcrumbSchema, ld } from "@/lib/jsonld";
 
+// Always render fresh — event inventory (ticket quantities) changes in admin and
+// must never be served from a stale cache.
+export const dynamic = "force-dynamic";
+
 type Props = { params: Promise<{ id: string }> };
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {

@@ -13,7 +13,7 @@ import {
   groupDiscountSummary,
   groupScalingLevels,
 } from "@/lib/group-orders";
-import { salesClosedForEvent } from "@/lib/event-time";
+import { salesClosedForEvent, tierSaleClosed } from "@/lib/event-time";
 
 
 function fmtDate(d: string) {
@@ -100,12 +100,14 @@ function CreateGroupInner() {
       if (evData) {
         const ev = evData as unknown as EventSummary;
         const now = new Date();
+        const evCtx = { start_date: ev.start_date, start_time: ev.start_time, state: ev.state };
         ev.ticket_tiers = ev.ticket_tiers
           .filter(t => {
             if (!t.is_visible) return false;
             if (t.quantity_sold >= t.quantity) return false;
             if (t.sale_start_date && new Date(t.sale_start_date + "T00:00:00") > now) return false;
-            if (t.sale_end_date && new Date(t.sale_end_date + "T23:59:59") < now) return false;
+            // sale window closes at 23:59 in the event's tz, capped by doors-open
+            if (tierSaleClosed(evCtx, t.sale_end_date)) return false;
             return true;
           })
           .sort((a, b) => a.sort_order - b.sort_order || a.price - b.price);
