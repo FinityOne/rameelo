@@ -4,7 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { formatDateRange, emptyOffer } from "@/lib/onboarding";
+import { formatDateRange, emptyOffer, DEFAULT_PAYOUT_HOLD_DAYS } from "@/lib/onboarding";
 import type { OnboardingResponses, OnboardingEvent, OnboardingContact, OnboardingDocument, OnboardingOffer, OnboardingConfig } from "@/lib/onboarding";
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
@@ -549,6 +549,7 @@ function OnboardingConfigEditor({ orgId, initial, onSaved }: {
   orgId: string; initial: Partial<OnboardingConfig>; onSaved: (row: OnboardingRow) => void;
 }) {
   const [ach, setAch] = useState(initial.achFreeTickets != null ? String(initial.achFreeTickets) : "");
+  const [holdDays, setHoldDays] = useState(initial.payoutHoldDays != null ? String(initial.payoutHoldDays) : "");
   const [saving, setSaving] = useState(false);
   const [savedMsg, setSavedMsg] = useState("");
 
@@ -556,14 +557,16 @@ function OnboardingConfigEditor({ orgId, initial, onSaved }: {
     setSaving(true);
     setSavedMsg("");
     const supabase = createClient();
-    const parsed = ach.trim() === "" ? null : Math.max(0, parseInt(ach, 10) || 0);
+    const parsedAch = ach.trim() === "" ? null : Math.max(0, parseInt(ach, 10) || 0);
+    const parsedHold = holdDays.trim() === "" ? null : Math.max(0, parseInt(holdDays, 10) || 0);
+    // The RPC overwrites the whole config blob, so always send every field.
     const { data, error } = await supabase.rpc("upsert_onboarding_config", {
       p_org_id: orgId,
-      p_config: { achFreeTickets: parsed },
+      p_config: { achFreeTickets: parsedAch, payoutHoldDays: parsedHold },
     });
     setSaving(false);
     if (error) { setSavedMsg("error:" + error.message); return; }
-    setSavedMsg("ok:Saved — this updates the pricing shown on step 1.");
+    setSavedMsg("ok:Saved — applies to organizers who sign the agreement from now on.");
     setTimeout(() => setSavedMsg(""), 4000);
     onSaved(data as OnboardingRow);
   }
@@ -580,11 +583,24 @@ function OnboardingConfigEditor({ orgId, initial, onSaved }: {
 
       <div>
         <label className={labelCls}>Free ACH tickets (before 1% organizer fee)</label>
+        <input
+          type="number" min="0" value={ach}
+          onChange={e => setAch(e.target.value)}
+          placeholder="e.g. 500"
+          className={`${inputCls} max-w-[180px]`}
+        />
+        <p className="font-mono text-[10px] text-ink-muted/70 mt-1.5">
+          ACH-paid tickets are fee-free up to this count; a 1% fee (paid by the organizer) applies to ACH sales beyond it. Leave blank to show the generic &ldquo;promotional threshold&rdquo; wording.
+        </p>
+      </div>
+
+      <div className="pt-1 border-t border-ivory-200">
+        <label className={`${labelCls} mt-3`}>Payout hold — days before event with no payouts</label>
         <div className="flex items-center gap-2">
           <input
-            type="number" min="0" value={ach}
-            onChange={e => setAch(e.target.value)}
-            placeholder="e.g. 500"
+            type="number" min="0" value={holdDays}
+            onChange={e => setHoldDays(e.target.value)}
+            placeholder={`Default ${DEFAULT_PAYOUT_HOLD_DAYS}`}
             className={`${inputCls} max-w-[180px]`}
           />
           <button type="button" onClick={save} disabled={saving}
@@ -593,7 +609,7 @@ function OnboardingConfigEditor({ orgId, initial, onSaved }: {
           </button>
         </div>
         <p className="font-mono text-[10px] text-ink-muted/70 mt-1.5">
-          ACH-paid tickets are fee-free up to this count; a 1% fee (paid by the organizer) applies to ACH sales beyond it. Leave blank to show the generic &ldquo;promotional threshold&rdquo; wording.
+          No payouts are processed within this many days before the event date. Shown in the Payout Policy clause of the onboarding agreement and <strong>locked in</strong> when the organizer signs. Leave blank to use the platform default ({DEFAULT_PAYOUT_HOLD_DAYS} days). Changing it does not affect agreements already signed.
         </p>
         {savedMsg && <p className={`font-ui text-xs mt-1.5 ${savedMsg.startsWith("error:") ? "text-durga" : "text-peacock"}`}>{savedMsg.replace(/^(error|ok):/, "")}</p>}
       </div>

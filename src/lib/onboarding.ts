@@ -4,8 +4,8 @@
 // Rameelo organizer affiliation terms below. Bump ONBOARDING_AGREEMENT_VERSION
 // whenever the agreement text materially changes.
 
-export const ONBOARDING_AGREEMENT_VERSION = "2.3";
-export const ONBOARDING_AGREEMENT_EFFECTIVE = "June 5, 2026";
+export const ONBOARDING_AGREEMENT_VERSION = "2.4";
+export const ONBOARDING_AGREEMENT_EFFECTIVE = "June 9, 2026";
 
 // Short, friendly summary shown next to the acceptance control.
 export const ONBOARDING_AGREEMENT_SUMMARY =
@@ -19,10 +19,33 @@ export const ONBOARDING_AGREEMENT_CLOSING =
 
 export type AgreementSection = { n: number; title: string; points: string[] };
 
+// ── Payout-hold window (dynamic) ─────────────────────────────────────────────
+// Payouts are frozen for a configurable number of days before the event date.
+// Admins set this per-organization (org_onboarding.config.payoutHoldDays); when an
+// organizer signs, the resolved number is baked into the snapshotted agreement_text
+// and stays locked for that signature. Falls back to the platform default below.
+export const DEFAULT_PAYOUT_HOLD_DAYS = 14;
+
+export function payoutHoldPolicyLine(days: number): string {
+  const n = Math.max(0, Math.round(days));
+  return `No payouts will be processed within ${n} day${n === 1 ? "" : "s"} prior to the event date.`;
+}
+
+function payoutPolicyPoints(days: number): string[] {
+  return [
+    "All payout requests are subject to administrative review and approval.",
+    "Funds become eligible for payout only after applicable payment clearing periods have passed.",
+    "Organizer may request payouts on eligible cleared funds.",
+    payoutHoldPolicyLine(days),
+    "Remaining eligible funds are generally released following successful completion of the event and completion of any required reviews.",
+  ];
+}
+
 // The full Organizer Onboarding Acknowledgments & Agreements. Disclosed in step 2
 // of the questionnaire and bound by the typed signature at submit. The structured
-// form is rendered in the UI; ONBOARDING_AGREEMENT_TEXT is derived from it.
-export const ONBOARDING_AGREEMENT_SECTIONS: AgreementSection[] = [
+// form is rendered in the UI; the agreement text is derived from it. The payout
+// section (n=10) is parameterized — see buildAgreementSections / buildAgreementText.
+const AGREEMENT_SECTIONS_BASE: AgreementSection[] = [
   { n: 1, title: "Account Creation & Authority", points: [
     "Organizer is creating a Rameelo account and agrees to Rameelo's Terms of Service and Privacy Policy.",
     "Organizer represents and warrants that they have the legal authority to act on behalf of the organization, venue, artist, or event being listed.",
@@ -69,13 +92,7 @@ export const ONBOARDING_AGREEMENT_SECTIONS: AgreementSection[] = [
     "Rameelo may require additional verification at any time, including government-issued identification, business registration documents, EIN verification, bank account verification, venue agreements, artist agreements, and insurance documentation.",
     "Failure to provide requested documentation may result in delayed sales activation, payout delays, or account suspension.",
   ]},
-  { n: 10, title: "Payout Policy", points: [
-    "All payout requests are subject to administrative review and approval.",
-    "Funds become eligible for payout only after applicable payment clearing periods have passed.",
-    "Organizer may request payouts on eligible cleared funds.",
-    "No payouts will be processed within fourteen (14) days prior to the event date.",
-    "Remaining eligible funds are generally released following successful completion of the event and completion of any required reviews.",
-  ]},
+  { n: 10, title: "Payout Policy", points: payoutPolicyPoints(DEFAULT_PAYOUT_HOLD_DAYS) },
   { n: 11, title: "Reserve Requirements", points: [
     "Rameelo may maintain a reserve of up to twenty percent (20%) of event proceeds.",
     "Rameelo may increase reserve requirements when deemed necessary due to fraud risk, chargeback exposure, event size, organizer history, payment processor requirements, refund risk, or operational or financial risk factors.",
@@ -112,23 +129,42 @@ export const ONBOARDING_AGREEMENT_SECTIONS: AgreementSection[] = [
   { n: 20, title: "Limitation of Liability", points: [
     "To the fullest extent permitted by law, Rameelo's total liability arising out of or relating to the event shall not exceed the total platform fees retained by Rameelo for the applicable event.",
   ]},
-  { n: 21, title: "Electronic Consent", points: [
+  { n: 21, title: "Platform Changes & Operational Discretion", points: [
+    "Rameelo may, at its sole discretion, modify pricing, fees, platform features, policies, processes, and operational practices in order to improve the platform, smooth out operations, and ensure a seamless experience for organizers, users, and attendees.",
+    "Such changes may include adjustments to checkout flows, payout processes, fee structures, promotional terms, and other operational matters, and may be made with or without prior notice where reasonable.",
+    "Rameelo will use good-faith efforts to provide notice of material changes affecting the Organizer and to minimize disruption to active events.",
+  ]},
+  { n: 22, title: "Electronic Consent", points: [
     "Organizer agrees that electronic acceptance, digital signatures, and online acknowledgments shall be deemed legally binding and enforceable.",
   ]},
 ];
 
-export const ONBOARDING_AGREEMENT_TEXT = [
-  `RAMEELO ORGANIZER ONBOARDING ACKNOWLEDGMENTS & AGREEMENTS`,
-  `Version ${ONBOARDING_AGREEMENT_VERSION} · Effective ${ONBOARDING_AGREEMENT_EFFECTIVE}`,
-  ``,
-  ONBOARDING_AGREEMENT_PREAMBLE,
-  ``,
-  ...ONBOARDING_AGREEMENT_SECTIONS.map(s =>
-    `${s.n}. ${s.title.toUpperCase()}\n${s.points.map(p => `   • ${p}`).join("\n")}`
-  ),
-  ``,
-  ONBOARDING_AGREEMENT_CLOSING,
-].join("\n");
+// Build the agreement personalized by the payout-hold days. Pass the org's
+// configured value (resolvePayoutHoldDays) so the signed snapshot locks it in.
+export function buildAgreementSections(holdDays: number = DEFAULT_PAYOUT_HOLD_DAYS): AgreementSection[] {
+  return AGREEMENT_SECTIONS_BASE.map(s =>
+    s.n === 10 ? { ...s, points: payoutPolicyPoints(holdDays) } : s
+  );
+}
+
+export function buildAgreementText(holdDays: number = DEFAULT_PAYOUT_HOLD_DAYS): string {
+  return [
+    `RAMEELO ORGANIZER ONBOARDING ACKNOWLEDGMENTS & AGREEMENTS`,
+    `Version ${ONBOARDING_AGREEMENT_VERSION} · Effective ${ONBOARDING_AGREEMENT_EFFECTIVE}`,
+    ``,
+    ONBOARDING_AGREEMENT_PREAMBLE,
+    ``,
+    ...buildAgreementSections(holdDays).map(s =>
+      `${s.n}. ${s.title.toUpperCase()}\n${s.points.map(p => `   • ${p}`).join("\n")}`
+    ),
+    ``,
+    ONBOARDING_AGREEMENT_CLOSING,
+  ].join("\n");
+}
+
+// Defaults (platform hold window) — kept for callers that don't personalize.
+export const ONBOARDING_AGREEMENT_SECTIONS: AgreementSection[] = buildAgreementSections();
+export const ONBOARDING_AGREEMENT_TEXT: string = buildAgreementText();
 
 // ── Form data shapes ─────────────────────────────────────────────────────────
 
@@ -196,10 +232,20 @@ export type OnboardingConfig = {
   // Number of ACH-paid tickets that are free of the ACH fee. Beyond this
   // threshold, a 1% fee (paid by the organizer) applies to ACH transactions.
   achFreeTickets: number | null;
+  // Days before the event date during which payouts are frozen. Admin-set per org
+  // and locked into the signed agreement at submission. Null → platform default.
+  payoutHoldDays: number | null;
 };
 
 export function emptyConfig(): OnboardingConfig {
-  return { achFreeTickets: null };
+  return { achFreeTickets: null, payoutHoldDays: null };
+}
+
+// Resolve the effective payout-hold days for an org's config, falling back to the
+// platform default when the admin hasn't set a value.
+export function resolvePayoutHoldDays(config?: Partial<OnboardingConfig> | null): number {
+  const v = config?.payoutHoldDays;
+  return typeof v === "number" && v >= 0 ? Math.round(v) : DEFAULT_PAYOUT_HOLD_DAYS;
 }
 
 // The ACH fee line shown in step 1, personalized by the configured threshold.

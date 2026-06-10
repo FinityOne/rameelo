@@ -11,7 +11,6 @@ import {
   formatDateRange,
   MARKETING_ASSET_OPTIONS,
   PAYMENT_METHOD_OPTIONS,
-  ONBOARDING_AGREEMENT_TEXT,
   ONBOARDING_AGREEMENT_SUMMARY,
   ONBOARDING_AGREEMENT_VERSION,
   RAMEELO_WELCOME,
@@ -20,7 +19,9 @@ import {
   RAMEELO_FEE_POINTS,
   RAMEELO_PROMO_NOTE,
   achFeeLine,
-  ONBOARDING_AGREEMENT_SECTIONS,
+  buildAgreementSections,
+  buildAgreementText,
+  resolvePayoutHoldDays,
   ONBOARDING_AGREEMENT_PREAMBLE,
   ONBOARDING_SCAN_TIP,
   ONBOARDING_SUPPORT_EMAIL,
@@ -77,6 +78,9 @@ export default function OnboardingPage() {
   const [orgName, setOrgName] = useState("");
   const [offer, setOffer] = useState<OnboardingOffer | null>(null);
   const [config, setConfig] = useState<OnboardingConfig | null>(null);
+  // Payout-hold days set by the admin for this org (default if unset). Baked into
+  // the agreement shown + the snapshot stored at signing, locking it for this org.
+  const payoutHoldDays = resolvePayoutHoldDays(config);
   const [form, setForm] = useState<OnboardingResponses>(emptyResponses());
   const [docs, setDocs] = useState<OnboardingDocument[]>([]);
   const [resumedAt, setResumedAt] = useState<string | null>(null);
@@ -228,7 +232,7 @@ export default function OnboardingPage() {
       p_agreement_name: signature.trim(),
       p_user_agent: typeof navigator !== "undefined" ? navigator.userAgent : "",
       p_agreement_version: ONBOARDING_AGREEMENT_VERSION,
-      p_agreement_text: ONBOARDING_AGREEMENT_TEXT,
+      p_agreement_text: buildAgreementText(payoutHoldDays),
     });
     setSubmitting(false);
     if (error) { setSubmitError(error.message || "Something went wrong. Please try again."); return; }
@@ -341,7 +345,7 @@ export default function OnboardingPage() {
         {step === 1 && <WelcomeStep orgName={orgName} offer={offer} config={config} onContinue={() => goStep(2)} />}
 
         {/* Step 2 — Rules & Tips */}
-        {step === 2 && <TermsStep onBack={() => goStep(1)} onContinue={() => goStep(3)} />}
+        {step === 2 && <TermsStep payoutHoldDays={payoutHoldDays} onBack={() => goStep(1)} onContinue={() => goStep(3)} />}
 
         {/* Step 3 — The form */}
         {step === 3 && (
@@ -587,6 +591,7 @@ export default function OnboardingPage() {
       {showConfirm && (
         <ConfirmModal
           orgName={form.organizationName || orgName}
+          payoutHoldDays={payoutHoldDays}
           signature={signature}
           setSignature={setSignature}
           agreed={agreed}
@@ -748,7 +753,7 @@ function WelcomeStep({ orgName, offer, config, onContinue }: { orgName: string; 
 }
 
 // ── Step 2 — Rules of engagement, device tips, support ────────────────────────
-function TermsStep({ onBack, onContinue }: { onBack: () => void; onContinue: () => void }) {
+function TermsStep({ payoutHoldDays, onBack, onContinue }: { payoutHoldDays: number; onBack: () => void; onContinue: () => void }) {
   return (
     <div className="space-y-5">
       <section className="bg-white rounded-2xl border border-ivory-200 p-5 sm:p-7">
@@ -756,7 +761,7 @@ function TermsStep({ onBack, onContinue }: { onBack: () => void; onContinue: () 
         <h2 className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.015em" }}>Onboarding Acknowledgments &amp; Agreements</h2>
         <p className="font-ui text-sm text-ink-muted mt-1.5 mb-4 leading-relaxed">{ONBOARDING_AGREEMENT_PREAMBLE}</p>
         <div className="space-y-4">
-          {ONBOARDING_AGREEMENT_SECTIONS.map((s) => (
+          {buildAgreementSections(payoutHoldDays).map((s) => (
             <div key={s.n} className="flex items-start gap-3">
               <span className="shrink-0 w-6 h-6 rounded-full bg-aubergine/10 text-aubergine font-mono text-[10px] font-bold flex items-center justify-center mt-0.5">{s.n}</span>
               <div className="flex-1 min-w-0">
@@ -902,8 +907,9 @@ function FileUploader({ token, docs, setDocs, categories }: {
 }
 
 // ── Confirmation + binding agreement modal ────────────────────────────────────
-function ConfirmModal({ orgName, signature, setSignature, agreed, setAgreed, submitting, error, onClose, onConfirm }: {
+function ConfirmModal({ orgName, payoutHoldDays, signature, setSignature, agreed, setAgreed, submitting, error, onClose, onConfirm }: {
   orgName: string;
+  payoutHoldDays: number;
   signature: string; setSignature: (v: string) => void;
   agreed: boolean; setAgreed: (v: boolean) => void;
   submitting: boolean; error: string;
@@ -930,7 +936,7 @@ function ConfirmModal({ orgName, signature, setSignature, agreed, setAgreed, sub
           <div>
             <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1.5">Onboarding Acknowledgments &amp; Agreements · v{ONBOARDING_AGREEMENT_VERSION}</p>
             <div className="rounded-xl border border-ivory-200 bg-ivory/40 px-4 py-3 max-h-44 overflow-y-auto">
-              <pre className="font-ui text-[11px] text-ink-muted leading-relaxed whitespace-pre-wrap">{ONBOARDING_AGREEMENT_TEXT}</pre>
+              <pre className="font-ui text-[11px] text-ink-muted leading-relaxed whitespace-pre-wrap">{buildAgreementText(payoutHoldDays)}</pre>
             </div>
           </div>
 
