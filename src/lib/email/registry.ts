@@ -92,6 +92,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     fires: "Automatically on a confirmed order · Manual resend from an order's detail page",
   },
   {
+    key: "payment-failed",
+    name: "Payment failed",
+    description: "Tells a buyer their payment didn't go through (most often a returned bank/ACH transfer caught after checkout) — their order was canceled, tickets aren't valid, and how to retry.",
+    audience: "Buyers",
+    category: "Orders & Tickets",
+    status: "live",
+    trigger: "automatic",
+    fires: "When the Stripe webhook reports a payment_intent.payment_failed / canceled",
+  },
+  {
     key: "order-team-notification",
     name: "New order — team alert",
     description: "Notifies an event's organizing team (org owners/admins + the event creator) on every new order, with the buyer's first name, ticket count, tier, event summary, and a small event banner.",

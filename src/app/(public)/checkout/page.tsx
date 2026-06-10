@@ -10,6 +10,7 @@ import { TERMS_VERSION, TERMS_SUMMARY, TERMS_TEXT, NO_REFUND_NOTICE } from "@/li
 import { money } from "@/lib/money";
 import { computeFees } from "@/lib/fees";
 import { getStripe, stripeConfigured, STRIPE_TEST_MODE } from "@/lib/stripe/client";
+import { friendlyStripeError, paymentIntentError } from "@/lib/stripe/errors";
 
 const stripePromise = getStripe();
 
@@ -106,20 +107,25 @@ function StripePaymentSection({
       },
     });
 
+    // A returned error = the card was declined / details invalid / auth failed.
+    // Stripe didn't charge anything; show the specific reason and let them retry.
     if (confirmError) {
-      setError(confirmError.message ?? "Payment could not be completed. Please try again.");
+      setError(friendlyStripeError(confirmError));
       setProcessing(false);
       return;
     }
 
-    // succeeded = card cleared; processing = ACH initiated (settles in days, but
-    // the ticket is reserved now — matching the existing ACH copy).
-    if (paymentIntent && (paymentIntent.status === "succeeded" || paymentIntent.status === "processing")) {
-      await onPaid(paymentIntent.id);
+    // No error object — inspect the PaymentIntent. Only `succeeded` (card cleared)
+    // and `processing` (ACH initiated, ticket reserved) are good. Any other status
+    // is a failure: surface why and DO NOT finalize — no order, no tickets.
+    const piError = paymentIntentError(paymentIntent);
+    if (piError || !paymentIntent) {
+      setError(piError ?? "We couldn't confirm your payment. No charge was made — please try again.");
+      setProcessing(false);
       return;
     }
-    setError("Payment didn't complete. Please try again.");
-    setProcessing(false);
+
+    await onPaid(paymentIntent.id);
   }
 
   return (
@@ -129,8 +135,13 @@ function StripePaymentSection({
       <PaymentElement options={{ layout: "tabs", fields: { billingDetails: { name: "never", email: "never" } } }} />
 
       {error && (
-        <div className="rounded-xl bg-durga/8 border border-durga/20 px-4 py-3">
-          <p className="font-ui text-sm text-durga">{error}</p>
+        <div className="rounded-xl bg-durga/8 border border-durga/20 px-4 py-3 flex items-start gap-2.5">
+          <svg className="w-4 h-4 text-durga shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.74-3l-6.93-12a2 2 0 00-3.48 0l-6.93 12a2 2 0 001.74 3z" /></svg>
+          <div>
+            <p className="font-ui text-sm font-semibold text-durga">Payment not completed</p>
+            <p className="font-ui text-sm text-durga/90 mt-0.5">{error}</p>
+            <p className="font-mono text-[10px] text-durga/70 mt-1.5">No charge was made and no tickets were issued. Update your payment details above and try again.</p>
+          </div>
         </div>
       )}
 
@@ -313,6 +324,7 @@ export default function CheckoutPage() {
       purchaseIp: clientIp,
       termsVersion: TERMS_VERSION,
       termsAcceptedIp: clientIp,
+      stripePaymentIntentId: paymentIntentId ?? null,
     });
 
     // One-payer group model: this single order covers everyone, so mark the

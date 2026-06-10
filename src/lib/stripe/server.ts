@@ -24,6 +24,11 @@ export const STRIPE_TEST_MODE = SECRET_KEY.startsWith("sk_test_");
 
 export const stripeConfigured = SECRET_KEY.length > 0;
 
+// Signing secret for the Stripe webhook endpoint (Dashboard → Developers →
+// Webhooks → your endpoint → "Signing secret", starts with `whsec_`). Put the
+// TEST endpoint's secret in `.env.local`, the LIVE endpoint's in Vercel.
+export const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET ?? "";
+
 // Instantiated lazily so a missing key doesn't crash unrelated routes at import.
 let _stripe: Stripe | null = null;
 export function getStripe(): Stripe {

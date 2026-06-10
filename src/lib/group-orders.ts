@@ -372,6 +372,7 @@ export async function saveOrder(params: {
   purchaseIp?: string | null;
   termsVersion?: string | null;
   termsAcceptedIp?: string | null;
+  stripePaymentIntentId?: string | null;
 }): Promise<{ orderId: string | null; error: string | null }> {
   const supabase = createClient();
 
@@ -405,6 +406,7 @@ export async function saveOrder(params: {
       grand_total: params.grandTotal,
       is_test: params.isTest ?? false,
       status: "confirmed",
+      stripe_payment_intent_id: params.stripePaymentIntentId ?? null,
       // Dispute-evidence: IP + terms acceptance captured at checkout
       purchase_ip: params.purchaseIp ?? null,
       terms_version: params.termsVersion ?? null,
