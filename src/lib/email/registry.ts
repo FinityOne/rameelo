@@ -92,6 +92,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     fires: "Automatically on a confirmed order · Manual resend from an order's detail page",
   },
   {
+    key: "order-team-notification",
+    name: "New order — team alert",
+    description: "Notifies an event's organizing team (org owners/admins + the event creator) on every new order, with the buyer's first name, ticket count, tier, event summary, and a small event banner.",
+    audience: "Organizers",
+    category: "Organizer",
+    status: "live",
+    trigger: "automatic",
+    fires: "Automatically on every confirmed, non-test order for the team's event",
+  },
+  {
     key: "event-reminder",
     name: "Event reminder",
     description: "A nudge a few days before an event the member holds tickets to.",

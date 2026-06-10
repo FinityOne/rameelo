@@ -9,7 +9,17 @@ import type { Notification } from "@/hooks/useNotifications";
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 const AVATAR_COLORS = ["#7C1F2C","#0E8C7A","#2E1B30","#D4891B","#5a1e7a","#892240","#1a4a5e"];
 
-type Tab = "profile" | "notifications";
+type Tab = "profile" | "payments" | "notifications";
+
+type PaymentMethod = {
+  id: string;
+  type: string;          // 'card' | 'us_bank_account'
+  brand: string | null;  // card brand or bank name
+  last4: string | null;
+  exp_month: number | null;
+  exp_year: number | null;
+  created_at: string;
+};
 
 type NotifPrefKey =
   | "event_reminders"
@@ -139,6 +149,37 @@ export default function ProfilePage() {
   const [prefs, setPrefs] = useState<Partial<Record<NotifPrefKey, boolean>>>({});
   const [prefSaving, setPrefSaving] = useState(false);
   const [prefSaved, setPrefSaved]   = useState(false);
+
+  // Saved payment methods
+  const [methods, setMethods] = useState<PaymentMethod[]>([]);
+  const [methodsLoading, setMethodsLoading] = useState(true);
+  const [removingId, setRemovingId] = useState<string | null>(null);
+
+  const loadMethods = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("payment_methods")
+      .select("id, type, brand, last4, exp_month, exp_year, created_at")
+      .order("created_at", { ascending: false });
+    setMethods((data ?? []) as PaymentMethod[]);
+    setMethodsLoading(false);
+  }, []);
+
+  useEffect(() => { loadMethods(); }, [loadMethods]);
+
+  async function removeMethod(id: string) {
+    setRemovingId(id);
+    try {
+      const res = await fetch("/api/payment-methods/remove", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      if (res.ok) setMethods(prev => prev.filter(m => m.id !== id));
+    } finally {
+      setRemovingId(null);
+    }
+  }
 
   const { notifications, loading: notifsLoading, unreadCount, markRead, markAllRead } =
     useNotifications({ audience: "user", limit: 50 });
@@ -279,7 +320,7 @@ export default function ProfilePage() {
 
       {/* Tabs */}
       <div className="flex rounded-2xl bg-ivory-200 p-1 gap-1">
-        {([["profile", "Profile"], ["notifications", "Notifications"]] as [Tab, string][]).map(([t, label]) => (
+        {([["profile", "Profile"], ["payments", "Payments"], ["notifications", "Notifications"]] as [Tab, string][]).map(([t, label]) => (
           <button key={t} onClick={() => setTab(t)}
             className={`flex-1 py-2.5 rounded-xl font-ui font-semibold text-sm transition-all relative ${tab === t ? "bg-white text-ink shadow-sm" : "text-ink/50 hover:text-ink"}`}>
             {label}
@@ -356,6 +397,70 @@ export default function ProfilePage() {
             : "Save Changes"}
           </button>
         </form>
+      )}
+
+      {/* ── Payments tab ── */}
+      {tab === "payments" && (
+        <div className="rounded-2xl bg-white border border-ivory-200 overflow-hidden">
+          <div className="px-6 py-5 border-b border-ivory-200">
+            <h2 className="font-display font-bold text-ink text-lg">Payment methods</h2>
+            <p className="font-ui text-xs text-ink-muted mt-0.5">Cards and bank accounts saved from your purchases. We only ever store the last 4 digits.</p>
+          </div>
+
+          {methodsLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="w-6 h-6 rounded-full border-2 border-ivory-200 border-t-marigold animate-spin" />
+            </div>
+          ) : methods.length === 0 ? (
+            <div className="py-12 text-center px-6">
+              <div className="w-12 h-12 rounded-2xl bg-ivory-200 flex items-center justify-center mx-auto mb-3">
+                <svg className="w-6 h-6 text-ink/25" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 10h18M7 15h.01M11 15h2M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+              </div>
+              <p className="font-display font-bold text-ink text-sm">No saved payment methods</p>
+              <p className="font-ui text-xs text-ink-muted mt-1">Your card or bank will appear here automatically after your next purchase.</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-ivory-200">
+              {methods.map(m => {
+                const isCard = m.type === "card";
+                const label = (m.brand || (isCard ? "Card" : "Bank account")).replace(/\b\w/g, c => c.toUpperCase());
+                return (
+                  <div key={m.id} className="flex items-center gap-4 px-6 py-4">
+                    <div className={`w-11 h-8 rounded-md flex items-center justify-center shrink-0 ${isCard ? "bg-aubergine/8 text-aubergine" : "bg-peacock/10 text-peacock"}`}>
+                      {isCard ? (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                      ) : (
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11m16-11v11M8 14v3m4-3v3m4-3v3" /></svg>
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-ui text-sm font-semibold text-ink">
+                        {label} <span className="font-mono text-ink-muted">•••• {m.last4 || "0000"}</span>
+                      </p>
+                      <p className="font-mono text-[10px] text-ink-muted uppercase tracking-widest mt-0.5">
+                        {isCard
+                          ? `Card${m.exp_month && m.exp_year ? ` · Exp ${String(m.exp_month).padStart(2, "0")}/${String(m.exp_year).slice(-2)}` : ""}`
+                          : "Bank account · ACH"}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => removeMethod(m.id)}
+                      disabled={removingId === m.id}
+                      className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-ink-muted hover:text-durga transition-colors disabled:opacity-50"
+                    >
+                      {removingId === m.id ? "Removing…" : "Remove"}
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          <div className="px-6 py-3 bg-ivory/50 border-t border-ivory-200 flex items-center gap-2">
+            <svg className="w-3.5 h-3.5 text-peacock shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            <p className="font-ui text-[11px] text-ink-muted">Securely stored by Stripe. Rameelo never sees or keeps your full card or bank numbers.</p>
+          </div>
+        </div>
       )}
 
       {/* ── Notifications tab ── */}

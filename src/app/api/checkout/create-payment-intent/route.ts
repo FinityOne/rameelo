@@ -29,11 +29,28 @@ export async function POST(request: Request) {
 
   try {
     const stripe = getStripe();
+
+    // Resolve a Stripe Customer keyed by the buyer's email so the payment method
+    // is saved to their account (reused across orders, attaches to a guest's
+    // account once they sign up). Only when we have a real email to key on.
+    let customerId: string | undefined;
+    if (email) {
+      const existing = await stripe.customers.list({ email, limit: 1 });
+      customerId = existing.data[0]?.id ?? (await stripe.customers.create({ email })).id;
+    }
+
     const intent = await stripe.paymentIntents.create({
       amount,
       currency: "usd",
       payment_method_types: [method],
       receipt_email: email,
+      ...(customerId
+        ? {
+            customer: customerId,
+            // Tells Stripe to save the method to the customer for future use.
+            setup_future_usage: "off_session" as const,
+          }
+        : {}),
       // Lightweight context for reconciliation in the Stripe dashboard.
       metadata: {
         event_id: typeof body.eventId === "string" ? body.eventId : "",

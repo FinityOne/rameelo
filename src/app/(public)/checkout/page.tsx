@@ -80,7 +80,7 @@ function StripePaymentSection({
   billingName: string;
   email: string;
   disabled: boolean;
-  onPaid: () => Promise<void>;
+  onPaid: (paymentIntentId?: string) => Promise<void>;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -115,7 +115,7 @@ function StripePaymentSection({
     // succeeded = card cleared; processing = ACH initiated (settles in days, but
     // the ticket is reserved now — matching the existing ACH copy).
     if (paymentIntent && (paymentIntent.status === "succeeded" || paymentIntent.status === "processing")) {
-      await onPaid();
+      await onPaid(paymentIntent.id);
       return;
     }
     setError("Payment didn't complete. Please try again.");
@@ -286,7 +286,7 @@ export default function CheckoutPage() {
   // Records the order after a successful (or processing, for ACH) Stripe payment —
   // or immediately for free tickets. Everything downstream (group allocation,
   // confirmation email, redirect) is unchanged from the prior flow.
-  async function finalizeOrder() {
+  async function finalizeOrder(paymentIntentId?: string) {
     if (!payload) return;
     setLoading(true);
 
@@ -337,6 +337,23 @@ export default function CheckoutPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId }),
       }).catch(() => { /* non-blocking — receipt email shouldn't block confirmation */ });
+
+      // Notify the event's organizing team about the new order (non-blocking).
+      fetch("/api/order-team-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId }),
+      }).catch(() => { /* non-blocking — team alert shouldn't block confirmation */ });
+
+      // Persist the payment method (last-4 / brand) to the order + the buyer's
+      // saved methods. Stripe-side details are read server-side (non-blocking).
+      if (paymentIntentId) {
+        fetch("/api/checkout/save-payment-method", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderId, paymentIntentId }),
+        }).catch(() => { /* non-blocking — saving the method shouldn't block confirmation */ });
+      }
     }
 
     if (error) console.error("Order save error:", error);

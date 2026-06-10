@@ -141,6 +141,11 @@ function isEventPast(ev: { start_date: string; end_date: string | null }): boole
   return lastDay < new Date().toISOString().slice(0, 10);
 }
 
+// Don't surface the real "X people secured their spot" count until it's high
+// enough to be persuasive — a low number discourages buyers. Below this we use
+// encouraging early-buyer wording with no number instead.
+const SOCIAL_PROOF_MIN_SOLD = 50;
+
 /** Pick urgency state based on lowest fill-% across visible tiers */
 function getUrgencyState(tiers: Tier[]): "early" | "momentum" | "urgent" | "critical" | "soldout" {
   if (!tiers.length) return "early";
@@ -364,8 +369,10 @@ function UrgencyBanner({
           <p className="font-mono text-[10px] text-peacock font-bold">{viewingNow} people viewing this event right now</p>
         </div>
 
-        {/* Early buyer positioning — reframes low sales as exclusivity */}
-        {totalSold > 0 && (
+        {/* Social proof — only show the real count once it's high enough to
+            persuade. Below the threshold a low number hurts conversion, so we
+            lean on encouraging early-buyer framing with no number instead. */}
+        {totalSold >= SOCIAL_PROOF_MIN_SOLD ? (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-aubergine/5 border border-aubergine/10">
             <span className="text-base">🎟️</span>
             <p className="font-ui text-xs text-ink-muted">
@@ -375,14 +382,12 @@ function UrgencyBanner({
               )}
             </p>
           </div>
-        )}
-
-        {totalSold === 0 && (
+        ) : (
           <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-marigold/8 border border-marigold/20">
             <span className="text-base">🌟</span>
             <p className="font-ui text-xs text-ink-muted">
-              <strong className="text-ink">Be the first to grab tickets.</strong>{" "}
-              Early buyers always get the best seats and more time to plan.
+              <strong className="text-ink">{totalSold === 0 ? "Be the first to grab tickets." : "Get in early."}</strong>{" "}
+              Early buyers always get the best seats and more time to plan their night.
             </p>
           </div>
         )}

@@ -23,6 +23,8 @@ type OrderFull = {
   grand_total: number;
   status: string;
   payment_method: string;
+  payment_last4: string | null;
+  payment_brand: string | null;
   is_test: boolean;
   group_id: string | null;
   created_at: string;
@@ -54,6 +56,15 @@ function fmtEventDate(d: string, t: string | null) {
 }
 function money(n: number) { return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+// "CARD · Visa •••• 4242" / "ACH · Wells Fargo •••• 6789" — falls back to just the
+// method when no saved details exist (older orders, free tickets).
+function paymentDisplay(o: { payment_method: string; payment_brand: string | null; payment_last4: string | null }): string {
+  const method = (o.payment_method || "").toUpperCase();
+  const brand = (o.payment_brand || "").replace(/\b\w/g, c => c.toUpperCase());
+  const parts = [brand, o.payment_last4 ? `•••• ${o.payment_last4}` : ""].filter(Boolean).join(" ");
+  return parts ? `${method} · ${parts}` : method;
+}
+
 function Row({ label, value, mono }: { label: string; value: React.ReactNode; mono?: boolean }) {
   return (
     <div className="flex items-start justify-between gap-4 py-2 border-b border-ivory-200 last:border-0">
@@ -83,7 +94,7 @@ export default function AdminOrderDetailPage() {
           id, user_id, buyer_name, buyer_email, buyer_phone,
           qty, unit_price, discount_pct, discount_amount,
           rameelo_fee, processing_fee, service_fee, grand_total,
-          status, payment_method, is_test, group_id, created_at,
+          status, payment_method, payment_last4, payment_brand, is_test, group_id, created_at,
           cancellation_reason, cancelled_at,
           events (id, title, start_date, start_time, venue_name, city, state, status),
           ticket_tiers (id, name, price)
@@ -174,7 +185,7 @@ export default function AdminOrderDetailPage() {
               )}
             </div>
             <p className="font-display font-bold text-ink text-2xl" style={{ letterSpacing: "-0.02em" }}>{receiptNum(order.id)}</p>
-            <p className="font-ui text-sm text-ink-muted mt-0.5">Placed {fmtTS(order.created_at)} · {order.payment_method.toUpperCase()}</p>
+            <p className="font-ui text-sm text-ink-muted mt-0.5">Placed {fmtTS(order.created_at)} · {paymentDisplay(order)}</p>
           </div>
           <div className="text-right">
             <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Total</p>
@@ -281,7 +292,7 @@ export default function AdminOrderDetailPage() {
         </div>
         <div className="px-5 py-4">
           <Row label="Order ID" value={<span className="select-all">{order.id}</span>} mono />
-          <Row label="Payment" value={order.payment_method.toUpperCase()} />
+          <Row label="Payment" value={paymentDisplay(order)} />
           <Row label="Group order" value={
             order.group_id
               ? <Link href={`/group/${order.group_id}`} className="text-aubergine hover:underline">{order.group_id}</Link>

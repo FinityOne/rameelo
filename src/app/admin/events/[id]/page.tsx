@@ -318,6 +318,7 @@ export default function AdminEventReviewPage() {
   const maxPrice   = event.ticket_tiers.length ? Math.max(...event.ticket_tiers.map(t => t.price)) : 0;
   const isPending  = event.status === 'pending_review';
   const isPublished = event.status === 'published';
+  const isDraft    = event.status === 'draft';
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -392,27 +393,29 @@ export default function AdminEventReviewPage() {
         </div>
       </div>
 
-      {/* Decision panel — only for reviewable statuses */}
-      {(isPending || isPublished) && !done && (
-        <div className={`rounded-2xl border p-5 space-y-4 ${isPending ? 'bg-marigold/6 border-marigold/25' : 'bg-white border-ivory-200'}`}>
+      {/* Decision panel — review queue, draft publish, or published controls */}
+      {(isPending || isPublished || isDraft) && !done && (
+        <div className={`rounded-2xl border p-5 space-y-4 ${(isPending || isDraft) ? 'bg-marigold/6 border-marigold/25' : 'bg-white border-ivory-200'}`}>
           <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${isPending ? 'bg-marigold/20' : 'bg-peacock/10'}`}>
-              {isPending ? '🔍' : '✅'}
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${(isPending || isDraft) ? 'bg-marigold/20' : 'bg-peacock/10'}`}>
+              {isPublished ? '✅' : isPending ? '🔍' : '📝'}
             </div>
             <div>
               <p className="font-display font-bold text-ink text-base" style={{ letterSpacing: '-0.015em' }}>
-                {isPending ? 'Review this event' : 'Event is published'}
+                {isPublished ? 'Event is published' : isPending ? 'Review this event' : 'Publish this event'}
               </p>
               <p className="font-ui text-xs text-ink-muted">
-                {isPending
-                  ? 'Approve to make it live, or reject with feedback for the organizer.'
-                  : 'You can unpublish this event if needed.'}
+                {isPublished
+                  ? 'You can unpublish this event if needed.'
+                  : isPending
+                    ? 'Approve to make it live, or reject with feedback for the organizer.'
+                    : 'This event is a draft. Publish it to make it live and visible to the public.'}
               </p>
             </div>
           </div>
 
           <div className="flex gap-3">
-            {isPending && (
+            {(isPending || isDraft) && (
               <button onClick={approve} disabled={acting}
                 className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl bg-peacock text-white font-display font-bold text-sm hover:bg-peacock/90 active:scale-[0.98] transition-all disabled:opacity-60 shadow-sm">
                 {acting ? <div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : (
