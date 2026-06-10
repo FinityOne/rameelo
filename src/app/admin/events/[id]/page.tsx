@@ -82,6 +82,7 @@ type EventFull = {
   capacity: number | null;
   status: string;
   selling_on_rameelo: boolean;
+  kids_5_under_free: boolean;
   review_note: string | null;
   reviewed_at: string | null;
   created_at: string;
@@ -147,6 +148,7 @@ export default function AdminEventReviewPage() {
   const [modal, setModal]     = useState<DecisionModal | null>(null);
   const [done, setDone]       = useState<'approved' | 'rejected' | null>(null);
   const [togglingRameelo, setTogglingRameelo] = useState(false);
+  const [togglingKidsFree, setTogglingKidsFree] = useState(false);
   const [interests, setInterests] = useState<InterestSubmission[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [togglingOrderId, setTogglingOrderId] = useState<string | null>(null);
@@ -166,7 +168,7 @@ export default function AdminEventReviewPage() {
             parking, parking_notes, website_url,
             cover_image_url, cover_gradient,
             dress_code, dress_code_details, dandiya_sticks, age_restriction,
-            capacity, status, selling_on_rameelo, review_note, reviewed_at, created_at,
+            capacity, status, selling_on_rameelo, kids_5_under_free, review_note, reviewed_at, created_at,
             ticket_tiers (id, name, price, quantity, description, sale_start_date, sale_end_date, group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value, group_discount_tiers),
             organizer:profiles!events_organizer_id_fkey (first_name, last_name, email, phone, city, state)
           `)
@@ -246,6 +248,16 @@ export default function AdminEventReviewPage() {
     await supabase.from('events').update({ selling_on_rameelo: next }).eq('id', id);
     setEvent(prev => prev ? { ...prev, selling_on_rameelo: next } : prev);
     setTogglingRameelo(false);
+  }
+
+  async function toggleKidsFree() {
+    if (!event) return;
+    setTogglingKidsFree(true);
+    const supabase = createClient();
+    const next = !event.kids_5_under_free;
+    await supabase.from('events').update({ kids_5_under_free: next }).eq('id', id);
+    setEvent(prev => prev ? { ...prev, kids_5_under_free: next } : prev);
+    setTogglingKidsFree(false);
   }
 
   async function toggleOrderTest(order: OrderRow) {
@@ -466,6 +478,36 @@ export default function AdminEventReviewPage() {
               className={`relative shrink-0 w-12 h-6 rounded-full transition-all duration-200 ${event.selling_on_rameelo ? 'bg-peacock' : 'bg-ivory-200'} ${togglingRameelo ? 'opacity-50' : ''}`}
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200 ${event.selling_on_rameelo ? 'translate-x-6' : 'translate-x-0'}`} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Kids 5 & under free admission toggle */}
+      {!done && (
+        <div className="rounded-2xl border border-ivory-200 bg-white p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${event.kids_5_under_free ? 'bg-peacock/10' : 'bg-ivory'}`}>
+                🧒
+              </div>
+              <div>
+                <p className="font-display font-bold text-ink text-sm" style={{ letterSpacing: '-0.01em' }}>
+                  Kids 5 &amp; under free
+                </p>
+                <p className="font-ui text-xs text-ink-muted mt-0.5">
+                  {event.kids_5_under_free
+                    ? 'Children 5 and under get FREE admission — shown on the event page.'
+                    : 'Turn on to show that children 5 and under get in free on the event page.'}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={toggleKidsFree}
+              disabled={togglingKidsFree}
+              className={`relative shrink-0 w-12 h-6 rounded-full transition-all duration-200 ${event.kids_5_under_free ? 'bg-peacock' : 'bg-ivory-200'} ${togglingKidsFree ? 'opacity-50' : ''}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200 ${event.kids_5_under_free ? 'translate-x-6' : 'translate-x-0'}`} />
             </button>
           </div>
         </div>
