@@ -24,11 +24,12 @@ const MEMBER_ROLES = [
   { value: "scanner", label: "Scanner", desc: "Door check-in / team member" },
 ];
 
-type TabKey = "basic" | "contract" | "organizers";
+type TabKey = "basic" | "contract" | "organizers" | "payouts";
 const SUBNAV: { key: TabKey; label: string }[] = [
   { key: "basic",      label: "Basic info" },
   { key: "contract",   label: "Contract & Agreement" },
   { key: "organizers", label: "Organizers & Team" },
+  { key: "payouts",    label: "Payouts" },
 ];
 
 type OrgData = {
@@ -369,9 +370,13 @@ export default function AdminOrgDetailPage() {
               {saveMsg && <p className={`font-ui text-sm ${saveMsg.startsWith("Error") ? "text-durga" : "text-peacock"}`}>{saveMsg}</p>}
             </div>
           </form>
+        </div>
+      )}
 
-          {/* ── Payout account (organizer's bank — reveal gated by a password) ── */}
-          <div className="mt-5 bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+      {/* ── Payouts (organizer's bank — reveal gated by a password) ── */}
+      {tab === "payouts" && (
+        <div className="max-w-2xl">
+          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
             <div className="px-5 pt-5 pb-4 border-b border-ivory-200 flex items-center justify-between gap-3">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Payout account</p>
