@@ -36,15 +36,16 @@ const MEMBER_ROLES = [
   { value: "member", label: "Member", desc: "Can view org profile" },
 ];
 
-type PayoutSchedule = "weekly" | "monthly";
 type AccountType = "checking" | "savings";
 
-type BankAccountDraft = {
-  bankName: string;
-  routingNumber: string;
-  accountNumber: string;
-  accountType: AccountType;
-  accountHolder: string;
+// What we store for a payout account — last-4 only, never the full account number.
+type PayoutAccount = {
+  account_holder_name: string;
+  bank_name: string;
+  account_type: string;
+  routing_number: string;
+  account_last4: string;
+  confirmed_at: string;
 };
 
 const inputCls = "w-full rounded-xl border border-ivory-200 bg-white px-4 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all";
@@ -73,19 +74,15 @@ export default function OrganizerOrganizationPage() {
   const [removingId, setRemovingId]       = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Payout settings (stored locally until Stripe Connect is wired)
-  const [payoutSchedule, setPayoutSchedule] = useState<PayoutSchedule>("monthly");
-  const [scheduleMsg, setScheduleMsg]       = useState("");
-  const [bankDraft, setBankDraft]           = useState<BankAccountDraft>({
-    bankName: "Chase Business Checking",
-    routingNumber: "021000021",
-    accountNumber: "000123456789",
-    accountType: "checking",
-    accountHolder: "",
+  // Payout account — entered once, confirmed, then locked (manual payouts; no schedule).
+  const [payoutAccount, setPayoutAccount] = useState<PayoutAccount | null>(null);
+  const [bankDraft, setBankDraft] = useState({
+    bankName: "", accountHolder: "", routingNumber: "",
+    accountNumber: "", accountNumberConfirm: "", accountType: "checking" as AccountType,
   });
-  const [bankSaving, setBankSaving]   = useState(false);
-  const [bankMsg, setBankMsg]         = useState("");
-  const [showAccount, setShowAccount] = useState(false);
+  const [bankConfirmStep, setBankConfirmStep] = useState(false);
+  const [bankSaving, setBankSaving] = useState(false);
+  const [bankErr, setBankErr] = useState("");
 
   useEffect(() => {
     if (!activeOrg) { setNotFound(true); setLoading(false); return; }
@@ -98,16 +95,20 @@ export default function OrganizerOrganizationPage() {
       const targetOrgId = activeOrg.id;
       setOrgId(targetOrgId);
 
-      const [{ data: membershipData }, { data: orgData }, { data: membersData }] = await Promise.all([
+      const [{ data: membershipData }, { data: orgData }, { data: membersData }, { data: payoutData }] = await Promise.all([
         supabase.from("organization_members").select("role").eq("org_id", targetOrgId).eq("user_id", user.id).single(),
         supabase.from("organizations").select("*").eq("id", targetOrgId).single(),
         supabase.from("organization_members")
           .select("id, user_id, role, profiles (first_name, last_name, email)")
           .eq("org_id", targetOrgId)
           .order("joined_at"),
+        supabase.from("organizer_payout_accounts")
+          .select("account_holder_name, bank_name, account_type, routing_number, account_last4, confirmed_at")
+          .eq("org_id", targetOrgId).maybeSingle(),
       ]);
 
       if (!orgData) { setNotFound(true); setLoading(false); return; }
+      setPayoutAccount((payoutData as PayoutAccount | null) ?? null);
 
       setMyRole(membershipData?.role ?? "member");
       const o = orgData as OrgData;
@@ -210,20 +211,54 @@ export default function OrganizerOrganizationPage() {
     setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m));
   }
 
-  function handleScheduleSave() {
-    setScheduleMsg("Schedule saved!");
-    setTimeout(() => setScheduleMsg(""), 3000);
+  // Bank entry validation (full account entered twice to catch typos before locking).
+  const routingValid = bankDraft.routingNumber.length === 9;
+  const accountValid = bankDraft.accountNumber.length >= 4;
+  const accountsMatch = bankDraft.accountNumber === bankDraft.accountNumberConfirm;
+  const bankFormValid = !!bankDraft.bankName.trim() && !!bankDraft.accountHolder.trim() && routingValid && accountValid && accountsMatch;
+
+  function reviewBank(e: React.FormEvent) {
+    e.preventDefault();
+    setBankErr("");
+    if (!bankFormValid) {
+      setBankErr(!accountsMatch ? "The account numbers don't match." : "Please complete all fields (routing must be 9 digits).");
+      return;
+    }
+    setBankConfirmStep(true); // ask for final confirmation before locking it in
   }
 
-  async function handleBankSave(e: React.FormEvent) {
-    e.preventDefault();
+  async function confirmBank() {
+    if (!orgId) return;
     setBankSaving(true);
-    setBankMsg("");
-    // Full persistence requires Stripe Connect — saving locally for now
-    await new Promise(r => setTimeout(r, 600));
+    setBankErr("");
+    // The full account number is sent over HTTPS to our server, which encrypts it
+    // (AES-256-GCM) before storing — it's never persisted in plaintext.
+    const res = await fetch("/api/organizer/payout-account", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        orgId,
+        holder: bankDraft.accountHolder.trim(),
+        bank: bankDraft.bankName.trim(),
+        type: bankDraft.accountType,
+        routing: bankDraft.routingNumber,
+        accountNumber: bankDraft.accountNumber,
+      }),
+    });
+    if (!res.ok) {
+      const j = await res.json().catch(() => ({}));
+      setBankSaving(false);
+      setBankErr(j.error ?? "Couldn't save your account. Please try again.");
+      return;
+    }
+    const supabase = createClient();
+    const { data } = await supabase.from("organizer_payout_accounts")
+      .select("account_holder_name, bank_name, account_type, routing_number, account_last4, confirmed_at")
+      .eq("org_id", orgId).maybeSingle();
+    setPayoutAccount((data as PayoutAccount | null) ?? null);
+    setBankConfirmStep(false);
     setBankSaving(false);
-    setBankMsg("Bank account updated!");
-    setTimeout(() => setBankMsg(""), 3000);
+    setBankDraft({ bankName: "", accountHolder: "", routingNumber: "", accountNumber: "", accountNumberConfirm: "", accountType: "checking" });
   }
 
   if (loading) {
@@ -577,157 +612,133 @@ export default function OrganizerOrganizationPage() {
             )}
           </div>
 
-          {/* ── Payout Schedule ── */}
+          {/* ── Payout account (manual payouts — set once, then locked) ── */}
           <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
-            <div className="px-5 pt-5 pb-4 border-b border-ivory-200">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Payout schedule</p>
-              <p className="font-display font-bold text-ink text-base mt-0.5" style={{ letterSpacing: "-0.015em" }}>When do you get paid?</p>
-            </div>
-            <div className="p-4 space-y-2.5">
-              {(["weekly", "monthly"] as const).map(opt => (
-                <label
-                  key={opt}
-                  className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all ${payoutSchedule === opt ? "border-peacock/30 bg-peacock/5" : "border-ivory-200 hover:border-aubergine/20"}`}
-                >
-                  <input
-                    type="radio"
-                    name="payout_schedule"
-                    value={opt}
-                    checked={payoutSchedule === opt}
-                    onChange={() => setPayoutSchedule(opt)}
-                    className="accent-peacock shrink-0"
-                  />
-                  <div className="flex-1">
-                    <p className="font-ui font-semibold text-ink text-sm capitalize">{opt}</p>
-                    <p className="font-mono text-[10px] text-ink-muted mt-0.5">
-                      {opt === "weekly" ? "Every Friday · Mon–Thu sales included" : "1st of month · prior month sales"}
-                    </p>
-                  </div>
-                </label>
-              ))}
-            </div>
-            <div className="px-4 pb-4 pt-1 flex items-center gap-3">
-              <button
-                onClick={handleScheduleSave}
-                className="px-4 py-2 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:bg-aubergine/90 transition-all"
-              >
-                Save schedule
-              </button>
-              {scheduleMsg && <p className="font-ui text-xs text-peacock">{scheduleMsg}</p>}
-            </div>
-          </div>
-
-          {/* ── Bank Account for Payouts ── */}
-          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
-            <div className="px-5 pt-5 pb-4 border-b border-ivory-200 flex items-center justify-between">
+            <div className="px-5 pt-5 pb-4 border-b border-ivory-200 flex items-center justify-between gap-3">
               <div>
                 <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Payout account</p>
-                <p className="font-display font-bold text-ink text-base mt-0.5" style={{ letterSpacing: "-0.015em" }}>Bank Account</p>
+                <p className="font-display font-bold text-ink text-base mt-0.5" style={{ letterSpacing: "-0.015em" }}>Bank account</p>
               </div>
-              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-peacock/10 text-peacock font-mono text-[9px] font-bold uppercase tracking-widest">
-                <span className="w-1.5 h-1.5 rounded-full bg-peacock" />
-                Test
-              </span>
+              {payoutAccount && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-peacock/10 text-peacock font-mono text-[9px] font-bold uppercase tracking-widest">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                  Locked
+                </span>
+              )}
             </div>
 
-            <form onSubmit={handleBankSave} className="p-4 space-y-3">
-              <div>
-                <label className={labelCls}>Bank name</label>
-                <input
-                  type="text"
-                  value={bankDraft.bankName}
-                  onChange={e => setBankDraft(d => ({ ...d, bankName: e.target.value }))}
-                  placeholder="e.g. Chase Business Checking"
-                  className={inputCls}
-                  disabled={!canEdit}
-                />
-              </div>
-              <div>
-                <label className={labelCls}>Account holder name</label>
-                <input
-                  type="text"
-                  value={bankDraft.accountHolder}
-                  onChange={e => setBankDraft(d => ({ ...d, accountHolder: e.target.value }))}
-                  placeholder="Legal name on account"
-                  className={inputCls}
-                  disabled={!canEdit}
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className={labelCls}>Routing number</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    maxLength={9}
-                    value={showAccount ? bankDraft.routingNumber : bankDraft.routingNumber.replace(/\d(?=\d{4})/g, "•")}
-                    onChange={e => setBankDraft(d => ({ ...d, routingNumber: e.target.value.replace(/\D/g, "") }))}
-                    placeholder="9 digits"
-                    className={`${inputCls} font-mono`}
-                    disabled={!canEdit}
-                  />
-                </div>
-                <div>
-                  <label className={labelCls}>Account number</label>
-                  <input
-                    type="text"
-                    inputMode="numeric"
-                    value={showAccount ? bankDraft.accountNumber : bankDraft.accountNumber.replace(/\d(?=\d{4})/g, "•")}
-                    onChange={e => setBankDraft(d => ({ ...d, accountNumber: e.target.value.replace(/\D/g, "") }))}
-                    placeholder="Account number"
-                    className={`${inputCls} font-mono`}
-                    disabled={!canEdit}
-                  />
-                </div>
-              </div>
-              <div>
-                <label className={labelCls}>Account type</label>
-                <div className="flex gap-2">
-                  {(["checking", "savings"] as const).map(t => (
-                    <label
-                      key={t}
-                      className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border cursor-pointer transition-all text-sm font-ui font-medium capitalize ${bankDraft.accountType === t ? "border-aubergine/30 bg-aubergine/8 text-ink" : "border-ivory-200 text-ink-muted hover:border-aubergine/20"}`}
-                    >
-                      <input
-                        type="radio"
-                        name="account_type"
-                        value={t}
-                        checked={bankDraft.accountType === t}
-                        onChange={() => setBankDraft(d => ({ ...d, accountType: t }))}
-                        className="accent-aubergine"
-                        disabled={!canEdit}
-                      />
-                      {t}
-                    </label>
+            {payoutAccount ? (
+              /* Locked masked view — cannot be changed */
+              <div className="p-5 space-y-4">
+                <div className="rounded-xl border border-ivory-200 bg-ivory/40 divide-y divide-ivory-200">
+                  {([
+                    ["Account holder", payoutAccount.account_holder_name],
+                    ["Bank", payoutAccount.bank_name],
+                    ["Type", payoutAccount.account_type],
+                    ["Routing", `•••••${payoutAccount.routing_number.slice(-4)}`],
+                    ["Account", `••••••${payoutAccount.account_last4}`],
+                  ] as [string, string][]).map(([label, value]) => (
+                    <div key={label} className="flex items-center justify-between gap-4 px-4 py-2.5">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">{label}</span>
+                      <span className="font-ui text-sm text-ink font-semibold capitalize">{value}</span>
+                    </div>
                   ))}
                 </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => setShowAccount(s => !s)}
-                className="font-mono text-[10px] text-ink-muted hover:text-ink transition-colors"
-              >
-                {showAccount ? "Hide" : "Show"} account details
-              </button>
-
-              {canEdit && (
-                <div className="pt-1 flex items-center gap-3">
-                  <button
-                    type="submit"
-                    disabled={bankSaving}
-                    className="px-4 py-2 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:bg-aubergine/90 transition-all disabled:opacity-50"
-                  >
-                    {bankSaving ? "Saving…" : "Update account"}
-                  </button>
-                  {bankMsg && <p className="font-ui text-xs text-peacock">{bankMsg}</p>}
+                <div className="flex items-start gap-2 rounded-xl bg-peacock/8 border border-peacock/20 px-3.5 py-3">
+                  <svg className="w-4 h-4 text-peacock shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                  <p className="font-ui text-xs text-ink-muted leading-relaxed">
+                    Your payout account is set and <strong className="text-ink">locked</strong> for security. To change it, contact <a href="mailto:support@rameelo.com" className="text-peacock font-semibold">support@rameelo.com</a>. Payouts are processed manually on request.
+                  </p>
                 </div>
-              )}
-            </form>
+              </div>
+            ) : !canEdit ? (
+              <div className="px-5 py-6 text-center">
+                <p className="font-ui text-sm text-ink-muted">No payout account on file yet. Only owners and admins can set it up.</p>
+              </div>
+            ) : bankConfirmStep ? (
+              /* Final confirmation before locking it in */
+              <div className="p-5 space-y-4">
+                <div className="flex items-start gap-2 rounded-xl bg-marigold/10 border border-marigold/30 px-3.5 py-3">
+                  <svg className="w-4 h-4 text-marigold-dark shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.74-3l-6.93-12a2 2 0 00-3.48 0l-6.93 12a2 2 0 001.74 3z" /></svg>
+                  <p className="font-ui text-xs text-ink leading-relaxed">
+                    <strong>Please double-check.</strong> Once confirmed, this account is <strong>locked and can&rsquo;t be changed</strong> here. Your details are encrypted and used only to pay you out.
+                  </p>
+                </div>
+                <div className="rounded-xl border border-ivory-200 bg-ivory/40 divide-y divide-ivory-200">
+                  {([
+                    ["Account holder", bankDraft.accountHolder],
+                    ["Bank", bankDraft.bankName],
+                    ["Type", bankDraft.accountType],
+                    ["Routing", bankDraft.routingNumber],
+                    ["Account", `••••••${bankDraft.accountNumber.slice(-4)}`],
+                  ] as [string, string][]).map(([label, value]) => (
+                    <div key={label} className="flex items-center justify-between gap-4 px-4 py-2.5">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">{label}</span>
+                      <span className="font-ui text-sm text-ink font-semibold capitalize">{value}</span>
+                    </div>
+                  ))}
+                </div>
+                {bankErr && <p className="font-ui text-xs text-durga">{bankErr}</p>}
+                <div className="flex gap-2.5">
+                  <button type="button" onClick={() => { setBankConfirmStep(false); setBankErr(""); }} disabled={bankSaving}
+                    className="flex-1 py-2.5 rounded-xl border border-ivory-200 text-ink-muted font-ui font-semibold text-sm hover:bg-ivory transition-all disabled:opacity-50">
+                    Back &amp; edit
+                  </button>
+                  <button type="button" onClick={confirmBank} disabled={bankSaving}
+                    className="flex-1 py-2.5 rounded-xl bg-peacock text-white font-display font-bold text-sm hover:bg-peacock/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                    {bankSaving ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Saving…</> : "Confirm & lock in"}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              /* Entry form */
+              <form onSubmit={reviewBank} className="p-4 space-y-3">
+                <div>
+                  <label className={labelCls}>Account holder name</label>
+                  <input type="text" value={bankDraft.accountHolder} onChange={e => setBankDraft(d => ({ ...d, accountHolder: e.target.value }))} placeholder="Legal name on the account" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Bank name</label>
+                  <input type="text" value={bankDraft.bankName} onChange={e => setBankDraft(d => ({ ...d, bankName: e.target.value }))} placeholder="e.g. Chase" className={inputCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Routing number</label>
+                  <input type="text" inputMode="numeric" maxLength={9} value={bankDraft.routingNumber} onChange={e => setBankDraft(d => ({ ...d, routingNumber: e.target.value.replace(/\D/g, "").slice(0, 9) }))} placeholder="9 digits" className={`${inputCls} font-mono`} />
+                  {bankDraft.routingNumber.length > 0 && !routingValid && <p className="font-mono text-[9px] text-marigold-dark mt-1">{9 - bankDraft.routingNumber.length} more digit(s)</p>}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelCls}>Account number</label>
+                    <input type="text" inputMode="numeric" value={bankDraft.accountNumber} onChange={e => setBankDraft(d => ({ ...d, accountNumber: e.target.value.replace(/\D/g, "") }))} placeholder="Account number" className={`${inputCls} font-mono`} />
+                  </div>
+                  <div>
+                    <label className={labelCls}>Confirm account #</label>
+                    <input type="text" inputMode="numeric" value={bankDraft.accountNumberConfirm} onChange={e => setBankDraft(d => ({ ...d, accountNumberConfirm: e.target.value.replace(/\D/g, "") }))} placeholder="Re-enter" className={`${inputCls} font-mono`} />
+                  </div>
+                </div>
+                {bankDraft.accountNumberConfirm.length > 0 && !accountsMatch && <p className="font-mono text-[9px] text-durga">Account numbers don&rsquo;t match.</p>}
+                <div>
+                  <label className={labelCls}>Account type</label>
+                  <div className="flex gap-2">
+                    {(["checking", "savings"] as const).map(t => (
+                      <label key={t} className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl border cursor-pointer transition-all text-sm font-ui font-medium capitalize ${bankDraft.accountType === t ? "border-aubergine/30 bg-aubergine/8 text-ink" : "border-ivory-200 text-ink-muted hover:border-aubergine/20"}`}>
+                        <input type="radio" name="account_type" value={t} checked={bankDraft.accountType === t} onChange={() => setBankDraft(d => ({ ...d, accountType: t }))} className="accent-aubergine" />
+                        {t}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+                {bankErr && <p className="font-ui text-xs text-durga">{bankErr}</p>}
+                <button type="submit" disabled={!bankFormValid}
+                  className={`w-full py-3 rounded-xl font-display font-bold text-sm transition-all ${bankFormValid ? "bg-aubergine text-white hover:bg-aubergine-light" : "bg-ivory-200 text-ink-muted cursor-not-allowed"}`}>
+                  Review &amp; confirm →
+                </button>
+              </form>
+            )}
 
             <div className="px-4 py-3 bg-ivory border-t border-ivory-200">
               <p className="font-mono text-[10px] text-ink-muted/60">
-                Stored securely · Full encryption via Stripe Connect · Only owners can update
+                Encrypted &amp; stored securely · used only to pay you out · set once, then locked
               </p>
             </div>
           </div>

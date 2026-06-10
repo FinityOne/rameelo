@@ -47,6 +47,15 @@ type Member = {
 
 type UserResult = { id: string; first_name: string; last_name: string; email: string; role: string };
 
+type PayoutSummary = {
+  account_holder_name: string; bank_name: string; account_type: string;
+  routing_number: string; account_last4: string;
+};
+type RevealedPayout = {
+  accountHolderName: string; bankName: string; accountType: string;
+  routingNumber: string; accountNumber: string;
+};
+
 const inputCls = "w-full rounded-xl border border-ivory-200 bg-white px-4 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all";
 const labelCls = "font-mono text-[10px] uppercase tracking-widest text-ink-muted block mb-1.5";
 const ROLE_BADGE: Record<string, string> = { owner: "bg-aubergine/10 text-aubergine", admin: "bg-peacock/10 text-peacock", member: "bg-ivory-200 text-ink-muted", scanner: "bg-marigold/15 text-marigold-dark" };
@@ -75,19 +84,31 @@ export default function AdminOrgDetailPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Payout account (masked summary) + password-gated reveal
+  const [payout, setPayout] = useState<PayoutSummary | null>(null);
+  const [revealOpen, setRevealOpen] = useState(false);
+  const [revealPw, setRevealPw] = useState("");
+  const [revealing, setRevealing] = useState(false);
+  const [revealErr, setRevealErr] = useState("");
+  const [revealed, setRevealed] = useState<RevealedPayout | null>(null);
+
   useEffect(() => { fetchAll(); }, [id]);
 
   async function fetchAll() {
     const supabase = createClient();
-    const [{ data: orgData }, { data: membersData }] = await Promise.all([
+    const [{ data: orgData }, { data: membersData }, { data: payoutData }] = await Promise.all([
       supabase.from("organizations").select("*").eq("id", id).single(),
       supabase.from("organization_members")
         .select("id, org_id, user_id, role, joined_at, profiles (first_name, last_name, email, city, state)")
         .eq("org_id", id)
         .order("joined_at"),
+      supabase.from("organizer_payout_accounts")
+        .select("account_holder_name, bank_name, account_type, routing_number, account_last4")
+        .eq("org_id", id).maybeSingle(),
     ]);
 
     if (!orgData) { router.push("/admin/organizations"); return; }
+    setPayout((payoutData as PayoutSummary | null) ?? null);
     const o = orgData as OrgData;
     setOrg(o);
     setForm(o);
@@ -173,6 +194,32 @@ export default function AdminOrgDetailPage() {
     const supabase = createClient();
     await supabase.from("organization_members").update({ role: newRole }).eq("id", memberId);
     setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m));
+  }
+
+  async function revealPayout(e: React.FormEvent) {
+    e.preventDefault();
+    setRevealing(true);
+    setRevealErr("");
+    try {
+      const res = await fetch("/api/admin/payout-account/reveal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orgId: id, password: revealPw }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) { setRevealErr(j.error ?? "Couldn't reveal details."); return; }
+      setRevealed(j as RevealedPayout);
+      setRevealPw("");
+    } finally {
+      setRevealing(false);
+    }
+  }
+
+  function closeReveal() {
+    setRevealOpen(false);
+    setRevealPw("");
+    setRevealErr("");
+    setRevealed(null);
   }
 
   if (loading) {
@@ -322,6 +369,50 @@ export default function AdminOrgDetailPage() {
               {saveMsg && <p className={`font-ui text-sm ${saveMsg.startsWith("Error") ? "text-durga" : "text-peacock"}`}>{saveMsg}</p>}
             </div>
           </form>
+
+          {/* ── Payout account (organizer's bank — reveal gated by a password) ── */}
+          <div className="mt-5 bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+            <div className="px-5 pt-5 pb-4 border-b border-ivory-200 flex items-center justify-between gap-3">
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Payout account</p>
+                <p className="font-display font-bold text-ink text-base mt-0.5" style={{ letterSpacing: "-0.015em" }}>Bank details</p>
+              </div>
+              {payout && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-peacock/10 text-peacock font-mono text-[9px] font-bold uppercase tracking-widest">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                  On file
+                </span>
+              )}
+            </div>
+            {payout ? (
+              <div className="p-5 space-y-4">
+                <div className="rounded-xl border border-ivory-200 bg-ivory/40 divide-y divide-ivory-200">
+                  {([
+                    ["Account holder", payout.account_holder_name],
+                    ["Bank", payout.bank_name],
+                    ["Type", payout.account_type],
+                    ["Routing", `•••••${payout.routing_number.slice(-4)}`],
+                    ["Account", `••••••${payout.account_last4}`],
+                  ] as [string, string][]).map(([label, value]) => (
+                    <div key={label} className="flex items-center justify-between gap-4 px-4 py-2.5">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">{label}</span>
+                      <span className="font-ui text-sm text-ink font-semibold capitalize">{value}</span>
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={() => setRevealOpen(true)}
+                  className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:bg-aubergine-light transition-all">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                  Reveal full details
+                </button>
+                <p className="font-mono text-[10px] text-ink-muted/60">For manual payouts via your bank or Stripe. Requires your reveal password.</p>
+              </div>
+            ) : (
+              <div className="px-5 py-6 text-center">
+                <p className="font-ui text-sm text-ink-muted">No payout account on file yet — the organizer hasn&rsquo;t added one.</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -458,6 +549,63 @@ export default function AdminOrgDetailPage() {
 
       {/* ── Contract & Agreement (onboarding questionnaire + signed agreement) ── */}
       {tab === "contract" && <OnboardingPanel orgId={id} />}
+
+      {/* ── Reveal bank details (password-gated) ── */}
+      {revealOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={closeReveal}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-aubergine/10 flex items-center justify-center text-xl shrink-0">🔒</div>
+              <div>
+                <p className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.015em" }}>Reveal bank details</p>
+                <p className="font-ui text-xs text-ink-muted">Enter your payout reveal password to view full details.</p>
+              </div>
+            </div>
+
+            {revealed ? (
+              <>
+                <div className="rounded-xl border border-ivory-200 bg-ivory/40 divide-y divide-ivory-200">
+                  {([
+                    ["Account holder", revealed.accountHolderName],
+                    ["Bank", revealed.bankName],
+                    ["Type", revealed.accountType],
+                    ["Routing", revealed.routingNumber],
+                    ["Account", revealed.accountNumber],
+                  ] as [string, string][]).map(([label, value]) => (
+                    <div key={label} className="flex items-center justify-between gap-4 px-4 py-2.5">
+                      <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted shrink-0">{label}</span>
+                      <span className="font-mono text-sm text-ink font-semibold text-right break-all capitalize">{value}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex items-start gap-2 rounded-xl bg-durga/8 border border-durga/20 px-3.5 py-2.5">
+                  <svg className="w-4 h-4 text-durga shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.74-3l-6.93-12a2 2 0 00-3.48 0l-6.93 12a2 2 0 001.74 3z" /></svg>
+                  <p className="font-ui text-[11px] text-ink-muted">Sensitive — don&rsquo;t share or leave on screen. Use only to process this payout.</p>
+                </div>
+                <button onClick={closeReveal} className="w-full py-2.5 rounded-xl bg-aubergine text-white font-display font-bold text-sm hover:bg-aubergine-light transition-all">Done</button>
+              </>
+            ) : (
+              <form onSubmit={revealPayout} className="space-y-3">
+                <input
+                  type="password"
+                  autoFocus
+                  value={revealPw}
+                  onChange={e => setRevealPw(e.target.value)}
+                  placeholder="Reveal password"
+                  className={inputCls}
+                />
+                {revealErr && <p className="font-ui text-xs text-durga">{revealErr}</p>}
+                <div className="flex gap-2.5">
+                  <button type="button" onClick={closeReveal} className="flex-1 py-2.5 rounded-xl border border-ivory-200 text-ink-muted font-ui font-semibold text-sm hover:bg-ivory transition-all">Cancel</button>
+                  <button type="submit" disabled={revealing || !revealPw} className="flex-1 py-2.5 rounded-xl bg-aubergine text-white font-display font-bold text-sm hover:bg-aubergine-light transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                    {revealing ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Verifying…</> : "Reveal"}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
