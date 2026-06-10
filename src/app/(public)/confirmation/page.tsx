@@ -26,6 +26,8 @@ interface StoredOrder {
   grandTotal: number;
   qty: number;
   purchasedAt: string;
+  paymentMethod?: string;     // 'card' | 'ach'
+  paymentPending?: boolean;   // ACH order awaiting bank-transfer clearance
 }
 
 function formatTime(iso: string) {
@@ -107,36 +109,68 @@ export default function ConfirmationPage() {
         )}
 
         <div className="relative max-w-2xl mx-auto px-4 sm:px-6 py-12 text-center">
-          {/* Success checkmark */}
-          <div className="w-20 h-20 rounded-full mx-auto flex items-center justify-center mb-6" style={{ backgroundColor: "#0E8C7A" }}>
-            <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-            </svg>
+          {/* Icon — checkmark for confirmed, hourglass-style for pending ACH */}
+          <div className="w-20 h-20 rounded-full mx-auto flex items-center justify-center mb-6" style={{ backgroundColor: order.paymentPending ? "#B8780F" : "#0E8C7A" }}>
+            {order.paymentPending ? (
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            ) : (
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
           </div>
 
           <p className="font-mono text-marigold text-xs font-bold uppercase tracking-widest mb-2">
-            Order Confirmed
+            {order.paymentPending ? "Tickets Reserved" : "Order Confirmed"}
           </p>
           <h1 className="font-display text-3xl md:text-4xl font-bold text-white mb-3">
-            You&rsquo;re going to Garba,<br />
-            <span className="text-marigold">{order.firstName}!</span>
+            {order.paymentPending ? (
+              <>Your spot is reserved,<br /><span className="text-marigold">{order.firstName}!</span></>
+            ) : (
+              <>You&rsquo;re going to Garba,<br /><span className="text-marigold">{order.firstName}!</span></>
+            )}
           </h1>
           <p className="font-ui text-white/60 text-sm">
-            Your tickets are saved to your Rameelo account
+            {order.paymentPending
+              ? "We’re waiting on your bank transfer to clear"
+              : "Your tickets are saved to your Rameelo account"}
           </p>
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-5">
 
+        {/* Pending (ACH) — explain the reserved state + when QR codes arrive */}
+        {order.paymentPending && (
+          <div className="rounded-2xl border-2 border-marigold/40 bg-marigold/[0.08] p-5 sm:p-6">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-marigold/20 flex items-center justify-center shrink-0 text-xl">⏳</div>
+              <div>
+                <p className="font-display font-bold text-ink text-base">Payment is clearing</p>
+                <p className="font-ui text-sm text-ink-muted mt-1 leading-relaxed">
+                  Bank transfers take <strong className="text-ink">2–5 business days</strong> to settle. Your spot is held the whole time. As soon as your payment clears, your tickets are confirmed and your <strong className="text-ink">QR codes appear in your account</strong> — we&rsquo;ll email you the moment they&rsquo;re ready.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Where the tickets live — no QR here; drive to the account */}
         <div className="rounded-2xl border-2 border-marigold/30 bg-marigold/[0.06] p-5 sm:p-6 text-center">
           <div className="w-12 h-12 rounded-2xl bg-marigold/20 flex items-center justify-center mx-auto mb-3 text-2xl">🎟️</div>
-          <p className="font-display font-bold text-ink text-lg">Your tickets are in your account</p>
+          <p className="font-display font-bold text-ink text-lg">
+            {order.paymentPending ? "Your tickets live in your account" : "Your tickets are in your account"}
+          </p>
           <p className="font-ui text-sm text-ink-muted mt-1 mb-4">
-            {isSignedIn === false
-              ? "We've reserved your tickets and QR codes. Create your free account to open your wallet — use the email below so they're waiting for you."
-              : "Your tickets and QR codes are ready in your Rameelo wallet."}
+            {order.paymentPending
+              ? (isSignedIn === false
+                  ? "Create your free account with the email below — your reserved tickets (and their QR codes, once payment clears) will be waiting for you."
+                  : "Your reserved tickets are here. The QR codes unlock automatically once your bank transfer clears.")
+              : isSignedIn === false
+                ? "We've reserved your tickets and QR codes. Create your free account to open your wallet — use the email below so they're waiting for you."
+                : "Your tickets and QR codes are ready in your Rameelo wallet."}
           </p>
 
           {/* Showcase the account email */}

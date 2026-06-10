@@ -81,7 +81,7 @@ function StripePaymentSection({
   billingName: string;
   email: string;
   disabled: boolean;
-  onPaid: (paymentIntentId?: string) => Promise<void>;
+  onPaid: (paymentIntentId?: string, paymentPending?: boolean) => Promise<void>;
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -125,7 +125,8 @@ function StripePaymentSection({
       return;
     }
 
-    await onPaid(paymentIntent.id);
+    // `processing` = ACH initiated but not cleared → the order is held pending.
+    await onPaid(paymentIntent.id, paymentIntent.status === "processing");
   }
 
   return (
@@ -297,7 +298,7 @@ export default function CheckoutPage() {
   // Records the order after a successful (or processing, for ACH) Stripe payment —
   // or immediately for free tickets. Everything downstream (group allocation,
   // confirmation email, redirect) is unchanged from the prior flow.
-  async function finalizeOrder(paymentIntentId?: string) {
+  async function finalizeOrder(paymentIntentId?: string, paymentPending?: boolean) {
     if (!payload) return;
     setLoading(true);
 
@@ -325,6 +326,7 @@ export default function CheckoutPage() {
       termsVersion: TERMS_VERSION,
       termsAcceptedIp: clientIp,
       stripePaymentIntentId: paymentIntentId ?? null,
+      paymentPending: paymentPending ?? false,
     });
 
     // One-payer group model: this single order covers everyone, so mark the
@@ -342,9 +344,10 @@ export default function CheckoutPage() {
       }
     }
 
-    // Send the buyer their order confirmation / receipt (non-blocking).
+    // Send the buyer their email. Pending (ACH) gets a "tickets reserved" notice;
+    // the full confirmation + QR follows once the bank transfer clears (webhook).
     if (orderId) {
-      fetch("/api/order-confirmation", {
+      fetch(paymentPending ? "/api/order-pending" : "/api/order-confirmation", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ orderId }),
@@ -385,6 +388,8 @@ export default function CheckoutPage() {
       tierName: payload.tierName,
       groupId: payload.groupId,
       isGroupPay: payload.isGroupPay ?? false,
+      paymentMethod,
+      paymentPending: paymentPending ?? false,
       purchasedAt: new Date().toISOString(),
     };
     localStorage.setItem("rameelo_order", JSON.stringify(orderSnapshot));

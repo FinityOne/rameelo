@@ -373,6 +373,7 @@ export async function saveOrder(params: {
   termsVersion?: string | null;
   termsAcceptedIp?: string | null;
   stripePaymentIntentId?: string | null;
+  paymentPending?: boolean;
 }): Promise<{ orderId: string | null; error: string | null }> {
   const supabase = createClient();
 
@@ -405,14 +406,17 @@ export async function saveOrder(params: {
       payment_method: params.paymentMethod,
       grand_total: params.grandTotal,
       is_test: params.isTest ?? false,
-      status: "confirmed",
+      // ACH starts 'pending' (payment initiated, not yet cleared) — no valid QR
+      // until the Stripe webhook flips it to 'confirmed'. Cards are confirmed now.
+      status: params.paymentPending ? "pending" : "confirmed",
       stripe_payment_intent_id: params.stripePaymentIntentId ?? null,
       // Dispute-evidence: IP + terms acceptance captured at checkout
       purchase_ip: params.purchaseIp ?? null,
       terms_version: params.termsVersion ?? null,
       terms_accepted_at: params.termsVersion ? nowIso : null,
       terms_accepted_ip: params.termsAcceptedIp ?? params.purchaseIp ?? null,
-      confirmation_email_sent_at: nowIso,
+      // The full confirmation (with QR) is only sent once payment clears.
+      confirmation_email_sent_at: params.paymentPending ? null : nowIso,
     });
 
   if (error) return { orderId: null, error: error.message };
@@ -427,7 +431,7 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
     .select(`
       id, group_id, qty, unit_price, discount_pct,
       discount_amount, service_fee, grand_total, is_test,
-      status, created_at, buyer_name, buyer_email, buyer_phone,
+      status, payment_method, created_at, buyer_name, buyer_email, buyer_phone,
       events (
         id, title, start_date, start_time,
         city, state, venue_name, category, cover_gradient, cover_image_url,
@@ -436,7 +440,9 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
       ticket_tiers (id, name, price)
     `)
     .eq("user_id", userId)
-    .eq("status", "confirmed")
+    // Include 'pending' (ACH awaiting clearance) so the buyer sees their reserved
+    // order; the UI gates the QR until it's 'confirmed'.
+    .in("status", ["confirmed", "pending"])
     .order("created_at", { ascending: false });
 
   if (error || !data) return [];
@@ -496,6 +502,9 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
         grandTotal: o.grand_total,
         isTest: o.is_test ?? false,
         purchasedAt: o.created_at,
+        status: o.status,
+        paymentMethod: o.payment_method,
+        paymentPending: o.status === "pending",
         groupMembers,
         transfers: (transfersByOrder.get(o.id) ?? []).map(t => ({
           id: t.id, token: t.token, status: t.status as "pending" | "accepted",
@@ -666,6 +675,7 @@ interface RawOrderRow {
   grand_total: number;
   is_test: boolean;
   status: string;
+  payment_method: string;
   created_at: string;
   buyer_name: string;
   buyer_email: string;
@@ -706,6 +716,9 @@ export interface PortalOrderRow {
   grandTotal: number;
   isTest: boolean;
   purchasedAt: string;
+  status: string;            // 'confirmed' | 'pending'
+  paymentMethod: string;     // 'card' | 'ach'
+  paymentPending: boolean;   // true while an ACH order awaits clearance (no QR yet)
   groupMembers?: GroupMember[];
   transfers?: {
     id: string;

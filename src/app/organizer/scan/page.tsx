@@ -50,6 +50,7 @@ export default function ScannerPage() {
   const [events, setEvents] = useState<EventOpt[]>([]);
   const [eventId, setEventId] = useState("");
   const [orders, setOrders] = useState<ScanOrder[]>([]);
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set()); // ACH orders awaiting clearance
   const [loading, setLoading] = useState(true);
 
   const [cameraOn, setCameraOn] = useState(false);
@@ -95,6 +96,15 @@ export default function ScannerPage() {
       .eq("event_id", evId)
       .eq("status", "confirmed");
     setOrders((data ?? []) as unknown as ScanOrder[]);
+
+    // Pending (ACH not yet cleared) orders — recognized so we can reject them with
+    // a clear reason instead of a generic "not a valid ticket".
+    const { data: pend } = await supabase
+      .from("orders")
+      .select("id")
+      .eq("event_id", evId)
+      .eq("status", "pending");
+    setPendingIds(new Set((pend ?? []).map(o => o.id as string)));
   }, []);
 
   useEffect(() => { loadOrders(eventId); setResult(null); }, [eventId, loadOrders]);
@@ -107,13 +117,17 @@ export default function ScannerPage() {
       const code = text.trim().toUpperCase();
       if (code.startsWith("RM-")) order = orders.find(o => receiptNum(o.id) === code);
     }
+    if (oid && !order && pendingIds.has(oid)) {
+      // Real ticket, but the bank/ACH payment hasn't cleared yet — not valid.
+      return { kind: "error", message: "Payment pending — this ticket isn't valid until the bank transfer clears." };
+    }
     if (oid && !order) {
       // Valid order code but not in this event's confirmed orders
       return { kind: "error", message: "Not a valid ticket for this event." };
     }
     if (!order) return { kind: "error", message: "Unrecognized code. Try the QR or the RM- number." };
     return { kind: "ok", order };
-  }, [ordersById, orders]);
+  }, [ordersById, orders, pendingIds]);
 
   function handleCode(text: string) {
     const now = Date.now();

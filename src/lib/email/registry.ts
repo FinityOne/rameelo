@@ -92,6 +92,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     fires: "Automatically on a confirmed order · Manual resend from an order's detail page",
   },
   {
+    key: "tickets-pending",
+    name: "Tickets reserved (payment pending)",
+    description: "Sent after an ACH/bank checkout while the transfer clears: tickets are reserved but not yet valid, and QR codes appear once payment settles (2–5 business days).",
+    audience: "Buyers",
+    category: "Orders & Tickets",
+    status: "live",
+    trigger: "automatic",
+    fires: "On a bank/ACH checkout, before the transfer clears",
+  },
+  {
     key: "payment-failed",
     name: "Payment failed",
     description: "Tells a buyer their payment didn't go through (most often a returned bank/ACH transfer caught after checkout) — their order was canceled, tickets aren't valid, and how to retry.",

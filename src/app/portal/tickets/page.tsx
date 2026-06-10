@@ -612,6 +612,7 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
 }) {
   const { order, seat, transfer, globalIndex } = slide;
   const ticketId = `${order.orderId}-T${seat}`;
+  const paymentPending = order.paymentPending; // ACH order awaiting clearance — no valid QR yet
   const isPending = transfer?.status === "pending";
   const isTransferred = transfer?.status === "accepted";
   const isGroup = !!order.groupId; // group allocations use "claim" wording
@@ -626,11 +627,13 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
     onCancelTransfer();
   }
 
-  const statusBadge = isTransferred
-    ? { label: isGroup ? "Claimed" : "Sent", cls: "text-ink-muted" }
-    : isPending
-      ? { label: isGroup ? "To claim" : "Pending", cls: "text-marigold-dark" }
-      : { label: "Valid", cls: "text-peacock" };
+  const statusBadge = paymentPending
+    ? { label: "Pending payment", cls: "text-marigold-dark" }
+    : isTransferred
+      ? { label: isGroup ? "Claimed" : "Sent", cls: "text-ink-muted" }
+      : isPending
+        ? { label: isGroup ? "To claim" : "Pending", cls: "text-marigold-dark" }
+        : { label: "Valid", cls: "text-peacock" };
 
   return (
     <div className="relative">
@@ -690,7 +693,15 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
       <div className="flex-1 flex flex-col lg:flex-row items-stretch">
         {/* QR / status block */}
         <div className="flex flex-col items-center justify-center gap-2.5 p-6 sm:p-7 lg:border-r border-dashed border-ivory-200">
-          {isPending || isTransferred ? (
+          {paymentPending ? (
+            <div className="flex flex-col items-center justify-center text-center gap-3 py-6 max-w-[220px]">
+              <div className="w-14 h-14 rounded-2xl bg-marigold/15 flex items-center justify-center text-2xl">⏳</div>
+              <p className="font-display font-bold text-ink text-sm">Payment pending</p>
+              <p className="font-ui text-xs text-ink-muted leading-snug">
+                Your bank transfer is clearing. Your QR code appears here as soon as payment settles — usually 2–5 business days.
+              </p>
+            </div>
+          ) : isPending || isTransferred ? (
             <div className="flex flex-col items-center justify-center text-center gap-3 py-6 max-w-[220px]">
               <div className={`w-14 h-14 rounded-2xl flex items-center justify-center text-2xl ${isPending ? "bg-marigold/15" : "bg-ivory-200"}`}>
                 {isPending ? "✈️" : "✓"}
@@ -734,7 +745,7 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
           <div className="flex items-center gap-2 mb-1.5">
             <span className="font-mono text-[11px] uppercase tracking-widest text-marigold-dark font-bold">{order.tierName}</span>
             <span className="inline-flex items-center gap-1.5">
-              <span className={`w-1.5 h-1.5 rounded-full ${isTransferred ? "bg-ink-muted/40" : isPending ? "bg-marigold" : "bg-peacock"}`} />
+              <span className={`w-1.5 h-1.5 rounded-full ${paymentPending ? "bg-marigold" : isTransferred ? "bg-ink-muted/40" : isPending ? "bg-marigold" : "bg-peacock"}`} />
               <span className={`font-mono text-[10px] uppercase tracking-widest font-bold ${statusBadge.cls}`}>{statusBadge.label}</span>
             </span>
           </div>
@@ -744,7 +755,7 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
           </h4>
           <p className="font-mono text-[11px] text-ink-muted mb-5">{ticketRef(order.orderId, seat)}</p>
 
-          {!isPending && !isTransferred && (
+          {!paymentPending && !isPending && !isTransferred && (
             <div className="space-y-2.5">
               <button
                 onClick={() => onEnlarge(ticketId, order.eventTitle, order.tierName)}
