@@ -40,6 +40,7 @@ export interface ReceivedTicket {
   seatNumbers: number[];
   fromName: string;
   acceptedAt: string;
+  eventId: string;
   eventTitle: string;
   eventDate: string;
   eventTime: string;
@@ -48,6 +49,11 @@ export interface ReceivedTicket {
   state: string;
   tierName: string;
   orderId: string;
+  groupId: string | null;          // set when the ticket came from a group order
+  coverImageUrl: string | null;
+  coverGradient: string;
+  artistName: string;
+  isTest: boolean;
 }
 
 export interface UserLookup {
@@ -222,8 +228,8 @@ export async function loadReceivedTickets(userId: string): Promise<ReceivedTicke
     .select(`
       id, token, qty, seat_numbers, accepted_at,
       orders (
-        id, buyer_name,
-        events (title, start_date, start_time, venue_name, city, state),
+        id, buyer_name, group_id, is_test,
+        events (id, title, start_date, start_time, venue_name, city, state, cover_image_url, cover_gradient, artists (name)),
         ticket_tiers (name)
       )
     `)
@@ -236,25 +242,35 @@ export async function loadReceivedTickets(userId: string): Promise<ReceivedTicke
   return (data as unknown as {
     id: string; token: string; qty: number; seat_numbers: number[]; accepted_at: string;
     orders: {
-      id: string; buyer_name: string;
-      events: { title: string; start_date: string; start_time: string; venue_name: string; city: string; state: string } | null;
+      id: string; buyer_name: string; group_id: string | null; is_test: boolean;
+      events: { id: string; title: string; start_date: string; start_time: string; venue_name: string; city: string; state: string; cover_image_url: string | null; cover_gradient: string | null; artists: { name: string } | { name: string }[] | null } | null;
       ticket_tiers: { name: string } | null;
     } | null;
-  }[]).map(r => ({
-    transferId: r.id,
-    token: r.token,
-    seatNumbers: r.seat_numbers ?? [],
-    fromName: r.orders?.buyer_name ?? "",
-    acceptedAt: r.accepted_at,
-    eventTitle: r.orders?.events?.title ?? "",
-    eventDate: r.orders?.events?.start_date ?? "",
-    eventTime: r.orders?.events?.start_time ?? "",
-    venue: r.orders?.events?.venue_name ?? "",
-    city: r.orders?.events?.city ?? "",
-    state: r.orders?.events?.state ?? "",
-    tierName: r.orders?.ticket_tiers?.name ?? "",
-    orderId: r.orders?.id ?? "",
-  }));
+  }[]).map(r => {
+    const ev = r.orders?.events ?? null;
+    const artist = Array.isArray(ev?.artists) ? ev?.artists[0] : ev?.artists;
+    return {
+      transferId: r.id,
+      token: r.token,
+      seatNumbers: r.seat_numbers ?? [],
+      fromName: r.orders?.buyer_name ?? "",
+      acceptedAt: r.accepted_at,
+      eventId: ev?.id ?? "",
+      eventTitle: ev?.title ?? "",
+      eventDate: ev?.start_date ?? "",
+      eventTime: ev?.start_time ?? "",
+      venue: ev?.venue_name ?? "",
+      city: ev?.city ?? "",
+      state: ev?.state ?? "",
+      tierName: r.orders?.ticket_tiers?.name ?? "",
+      orderId: r.orders?.id ?? "",
+      groupId: r.orders?.group_id ?? null,
+      coverImageUrl: ev?.cover_image_url ?? null,
+      coverGradient: ev?.cover_gradient ?? "",
+      artistName: artist?.name ?? "",
+      isTest: r.orders?.is_test ?? false,
+    };
+  });
 }
 
 // Claim page: load by token

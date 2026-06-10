@@ -28,9 +28,6 @@ function ticketQrValue(orderId: string) {
 function fmtDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
-function fmtDateTime(iso: string) {
-  return new Date(iso).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit", hour12: true });
-}
 
 const AVATAR_COLORS = ["#2E1B30", "#0E8C7A", "#7C1F2C", "#D4891B", "#5a1e7a", "#892240", "#1a4a5e"];
 
@@ -428,82 +425,6 @@ function IncomingTransferCard({ transfer, onAccepted, onDeclined }: {
   );
 }
 
-// ── Received Ticket Card (accepted transfer — recipient view) ──────────────────
-function ReceivedTicketCard({ ticket }: { ticket: ReceivedTicket }) {
-  const [expanded, setExpanded] = useState(ticket.eventDate >= new Date().toISOString().slice(0, 10));
-  const isUpcoming = ticket.eventDate >= new Date().toISOString().slice(0, 10);
-  const seatLabel = ticket.seatNumbers.length > 0 ? ticket.seatNumbers.map(s => `T${s}`).join(", ") : `${ticket.seatNumbers.length} ticket(s)`;
-
-  return (
-    <div className={`rounded-2xl overflow-hidden border transition-all ${expanded ? "border-peacock/30 shadow-md" : "border-ivory-200"} bg-white`}>
-      <button onClick={() => setExpanded(!expanded)} className="w-full text-left">
-        <div className="flex items-stretch">
-          <div className="w-1.5 shrink-0 rounded-l-2xl bg-peacock" />
-          <div className="flex-1 px-5 py-4">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold bg-peacock/10 text-peacock">Received</span>
-                  {isUpcoming && <span className="font-mono text-[9px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold bg-ivory-200 text-ink-muted">Upcoming</span>}
-                </div>
-                <h3 className="font-display font-bold text-ink leading-snug mb-0.5">{ticket.eventTitle}</h3>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-2">
-                  <span className="font-ui text-xs text-ink-muted">📅 {fmtDate(ticket.eventDate)}</span>
-                  {ticket.venue && <span className="font-ui text-xs text-ink-muted">📍 {ticket.venue}, {ticket.city}</span>}
-                  <span className="font-ui text-xs text-ink-muted">🎟️ {seatLabel} · {ticket.tierName}</span>
-                </div>
-                <p className="font-mono text-[9px] text-ink-muted/60 mt-1">From {ticket.fromName} · Accepted {fmtDateTime(ticket.acceptedAt)}</p>
-              </div>
-              <svg className={`w-4 h-4 text-ink-muted mt-1 transition-transform duration-200 shrink-0 ${expanded ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            </div>
-          </div>
-        </div>
-      </button>
-      {expanded && (
-        <>
-          <div className="border-t-2 border-dashed border-ivory-200 mx-5" />
-          <div className="px-5 py-4 space-y-2">
-            {(ticket.seatNumbers.length > 0 ? ticket.seatNumbers : [1]).map((seat, i) => {
-              const ticketId = `${ticket.orderId}-T${seat}`;
-              return (
-                <div key={i} className="rounded-2xl border border-ivory-200 overflow-hidden">
-                  <div className="px-4 py-3 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-xl bg-peacock flex items-center justify-center text-white text-[10px] font-bold shrink-0">T{seat}</div>
-                    <div className="flex-1">
-                      <p className="font-display font-bold text-ink text-sm">{ticketId}</p>
-                      <p className="font-ui text-xs text-ink-muted">{ticket.tierName}</p>
-                    </div>
-                    <span className="font-mono text-[9px] uppercase px-2 py-0.5 rounded-full bg-peacock/10 text-peacock border border-peacock/20 font-bold">In Wallet</span>
-                  </div>
-                  <div className="border-t-2 border-dashed border-ivory-200 mx-4" />
-                  <div className="px-4 pb-4 pt-3 flex flex-col sm:flex-row gap-4 items-start">
-                    <div className="flex flex-col items-center gap-2">
-                      <div className="p-3 rounded-2xl border-2 border-peacock/20 bg-white shadow-sm"><QRCode value={ticketQrValue(ticket.orderId)} size={140} /></div>
-                      <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-peacock/10 border border-peacock/20">
-                        <div className="w-1.5 h-1.5 bg-peacock rounded-full animate-pulse" />
-                        <p className="font-mono text-[10px] text-peacock font-bold uppercase tracking-wide">Valid</p>
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2">Ticket Details</p>
-                      {[{ label: "Event", value: ticket.eventTitle }, { label: "Type", value: ticket.tierName }, { label: "Ticket ID", value: ticketId }].map(row => (
-                        <div key={row.label} className="flex gap-2 py-1.5 border-b border-ivory-200 last:border-0">
-                          <span className="font-ui text-xs text-ink-muted w-16 shrink-0">{row.label}</span>
-                          <span className="font-ui text-xs font-semibold text-ink">{row.value}</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </div>
-  );
-}
-
 // ── Group Members Panel ────────────────────────────────────────────────────────
 function GroupMembersPanel({ members, groupId }: { members: GroupMember[]; groupId: string }) {
   const paid = members.filter(m => m.paid).length;
@@ -753,7 +674,17 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
           <h4 className="font-display font-bold text-ink leading-none mb-1" style={{ fontSize: "clamp(1.5rem, 3vw, 2rem)", letterSpacing: "-0.025em" }}>
             Ticket {globalIndex + 1} <span className="text-ink-muted/50 font-normal">of {total}</span>
           </h4>
-          <p className="font-mono text-[11px] text-ink-muted mb-5">{ticketRef(order.orderId, seat)}</p>
+          <p className={`font-mono text-[11px] text-ink-muted ${order.receivedFrom ? "mb-2" : "mb-5"}`}>{ticketRef(order.orderId, seat)}</p>
+
+          {/* Provenance — small note when this ticket was received from someone */}
+          {order.receivedFrom && (
+            <div className="mb-5 inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-peacock/8 border border-peacock/20 self-start">
+              <svg className="w-3.5 h-3.5 text-peacock shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2zm0 0V5.5A2.5 2.5 0 109.5 8H12zm-7 4h14M5 12a2 2 0 110-4h14a2 2 0 110 4M5 12v7a2 2 0 002 2h10a2 2 0 002-2v-7" /></svg>
+              <span className="font-ui text-[11px] text-peacock font-semibold">
+                {order.receivedFromGroup ? `Group order · from ${order.receivedFrom}` : `Received from ${order.receivedFrom}`}
+              </span>
+            </div>
+          )}
 
           {!paymentPending && !isPending && !isTransferred && (
             <div className="space-y-2.5">
@@ -765,18 +696,23 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7V5a2 2 0 012-2h2M4 17v2a2 2 0 002 2h2m8-18h2a2 2 0 012 2v2m-4 14h2a2 2 0 002-2v-2M9 12h6" /></svg>
                 Show at entry
               </button>
-              <div className="grid grid-cols-2 gap-2.5">
+              {order.receivedFrom ? (
+                /* Received tickets can be shown/added to wallet, but not re-transferred here. */
                 <AppleWalletButton orderId={order.orderId} seat={seat} />
-                <button
-                  onClick={() => onTransfer(order, seat)}
-                  disabled={!isUpcoming}
-                  className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-ink/12 text-ink font-ui font-semibold text-[13px] hover:bg-ivory active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-                  style={{ minHeight: 44 }}
-                >
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
-                  Transfer
-                </button>
-              </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-2.5">
+                  <AppleWalletButton orderId={order.orderId} seat={seat} />
+                  <button
+                    onClick={() => onTransfer(order, seat)}
+                    disabled={!isUpcoming}
+                    className="flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-ink/12 text-ink font-ui font-semibold text-[13px] hover:bg-ivory active:scale-[0.97] transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{ minHeight: 44 }}
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
+                    Transfer
+                  </button>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -1013,6 +949,40 @@ function groupOrdersByEvent(orders: PortalOrderRow[]): EventGroup[] {
   return Array.from(map.values()).sort((a, b) => a.eventDate.localeCompare(b.eventDate));
 }
 
+// Render a received ticket (transfer / group allocation) through the same large
+// ticket carousel as owned tickets — its QR lives there, tagged with where it
+// came from. groupId is intentionally left undefined so the group-members panel
+// doesn't trigger; provenance is carried on receivedFrom/receivedFromGroup.
+function receivedToOrder(t: ReceivedTicket): PortalOrderRow {
+  return {
+    orderId: t.orderId,
+    groupId: undefined,
+    eventId: t.eventId,
+    eventTitle: t.eventTitle,
+    eventDate: t.eventDate,
+    eventTime: t.eventTime,
+    city: t.city,
+    state: t.state,
+    venue: t.venue,
+    category: "",
+    coverGradient: t.coverGradient,
+    coverImageUrl: t.coverImageUrl,
+    artistName: t.artistName,
+    tierName: t.tierName,
+    qty: t.seatNumbers.length || 1,
+    unitPrice: 0,
+    grandTotal: 0,
+    isTest: t.isTest,
+    purchasedAt: t.acceptedAt,
+    status: "confirmed",
+    paymentMethod: "",
+    paymentPending: false,
+    receivedFrom: t.fromName,
+    receivedFromGroup: !!t.groupId,
+    transfers: [],
+  };
+}
+
 function EventSelector({ groups, selectedId, onSelect }: {
   groups: EventGroup[]; selectedId: string; onSelect: (id: string) => void;
 }) {
@@ -1058,7 +1028,8 @@ export default function TicketsPage() {
   const [incomingTransfers, setIncomingTransfers] = useState<IncomingTransfer[]>([]);
   const [receivedTickets, setReceivedTickets] = useState<ReceivedTicket[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "upcoming" | "past">("upcoming");
+  const [filter, setFilter] = useState<"all" | "upcoming" | "past" | "test">("upcoming");
+  const [isAdmin, setIsAdmin] = useState(false); // test orders are only visible to admins
   const [userId, setUserId] = useState("");
   const [userEmail, setUserEmail] = useState("");
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
@@ -1096,6 +1067,9 @@ export default function TicketsPage() {
       if (!user) { setLoading(false); return; }
       setUserId(user.id);
       setUserEmail(user.email ?? "");
+      // Only admins see test orders (and the Test tab); everyone else has them hidden.
+      const { data: prof } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+      setIsAdmin(prof?.role === "admin");
       await loadAll(user.id, user.email ?? "");
       setLoading(false);
     });
@@ -1110,28 +1084,37 @@ export default function TicketsPage() {
     setIncomingTransfers(prev => prev.filter(t => t.id !== transferId));
   }
 
-  const filtered = orders.filter(o => {
+  // Received tickets (accepted transfers / group allocations) flow through the
+  // same carousel as owned tickets, tagged with where they came from.
+  const allOrders = [...orders, ...receivedTickets.map(receivedToOrder)];
+
+  // Test orders are hidden from all normal views; admins get a dedicated Test tab.
+  const realOrders = orders.filter(o => !o.isTest); // owned purchases — drives counts/featured
+  const testOrders = allOrders.filter(o => o.isTest);
+  const liveTicketCount = allOrders.filter(o => !o.isTest).length;
+
+  const filtered = allOrders.filter(o => {
+    if (filter === "test")     return o.isTest;       // admin-only tab
+    if (o.isTest)              return false;          // never in upcoming/past/all
     if (filter === "upcoming") return o.eventDate >= today;
     if (filter === "past")     return o.eventDate < today;
     return true;
   });
 
-  const totalTransferredSeats = orders.reduce((sum, o) => {
+  const totalTransferredSeats = realOrders.reduce((sum, o) => {
     const transfers = o.transfers ?? [];
     const accepted = transfers.filter(t => t.status === "accepted");
     return sum + accepted.reduce((s, t) => s + (t.seatNumbers.length || o.qty), 0);
   }, 0);
-  const totalPendingSeats = orders.reduce((sum, o) => {
+  const totalPendingSeats = realOrders.reduce((sum, o) => {
     const transfers = o.transfers ?? [];
     const pending = transfers.filter(t => t.status === "pending");
     return sum + pending.reduce((s, t) => s + (t.seatNumbers.length || o.qty), 0);
   }, 0);
 
-  const nextUpcoming = orders
+  const nextUpcoming = realOrders
     .filter(o => o.eventDate >= today)
     .sort((a, b) => a.eventDate.localeCompare(b.eventDate))[0] ?? null;
-  const filteredReceived = receivedTickets.filter(t => filter === "all" || (filter === "upcoming" ? t.eventDate >= today : t.eventDate < today));
-
   // Group the member's tickets by event so they can pick which event to view.
   const eventGroups = groupOrdersByEvent(filtered);
   const activeGroup = eventGroups.find(g => g.eventId === selectedEventId) ?? eventGroups[0] ?? null;
@@ -1145,7 +1128,7 @@ export default function TicketsPage() {
           <h1 className="font-display font-bold text-ink" style={{ fontSize: "clamp(1.8rem, 4vw, 2.4rem)", letterSpacing: "-0.03em" }}>Your tickets</h1>
           {!loading && (
             <p className="font-ui text-ink-muted text-sm mt-1">
-              {orders.length} order{orders.length !== 1 ? "s" : ""}
+              {realOrders.length} order{realOrders.length !== 1 ? "s" : ""}
               {totalTransferredSeats > 0 && <span className="text-ink-muted/60"> · {totalTransferredSeats} transferred</span>}
               {totalPendingSeats > 0 && <span className="text-marigold-dark"> · {totalPendingSeats} pending</span>}
             </p>
@@ -1155,6 +1138,12 @@ export default function TicketsPage() {
           {(["upcoming", "past", "all"] as const).map(f => (
             <button key={f} onClick={() => setFilter(f)} className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold capitalize transition-all ${filter === f ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"}`}>{f}</button>
           ))}
+          {/* Test orders are admin-only and tucked away in their own tab. */}
+          {isAdmin && testOrders.length > 0 && (
+            <button onClick={() => setFilter("test")} className={`px-3.5 py-1.5 rounded-lg text-xs font-semibold transition-all ${filter === "test" ? "bg-white text-marigold-dark shadow-sm" : "text-ink-muted/70 hover:text-marigold-dark"}`}>
+              Test <span className="font-mono">({testOrders.length})</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1164,11 +1153,19 @@ export default function TicketsPage() {
         </div>
       ) : (
         <>
+          {/* Admin-only test orders notice */}
+          {filter === "test" && (
+            <div className="rounded-xl bg-marigold/8 border border-marigold/25 px-4 py-3 flex items-start gap-2">
+              <svg className="w-4 h-4 text-marigold-dark shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <p className="font-ui text-xs text-ink-muted"><strong className="text-ink">Admin view.</strong> Test orders are hidden from members and don&rsquo;t count toward real sales or revenue.</p>
+            </div>
+          )}
+
           {/* Featured upcoming order */}
-          {nextUpcoming && <SummaryCard order={nextUpcoming} />}
+          {filter !== "test" && nextUpcoming && <SummaryCard order={nextUpcoming} />}
 
           {/* Incoming pending transfers */}
-          {incomingTransfers.length > 0 && (
+          {filter !== "test" && incomingTransfers.length > 0 && (
             <div className="space-y-3">
               <div className="flex items-center gap-2">
                 <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Tickets Sent to You</p>
@@ -1178,19 +1175,14 @@ export default function TicketsPage() {
             </div>
           )}
 
-          {/* Received tickets (accepted transfers) */}
-          {filteredReceived.length > 0 && (
-            <div className="space-y-3">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Received Tickets</p>
-              {filteredReceived.map(t => <ReceivedTicketCard key={t.transferId} ticket={t} />)}
-            </div>
-          )}
+          {/* Received tickets now flow into the per-event carousel below, tagged
+              with where they came from — no separate QR cards. */}
 
-          {/* My purchased tickets — grouped by event */}
+          {/* My tickets — grouped by event */}
           {filtered.length === 0 || !activeGroup ? (
             <div className="text-center py-16">
-              <p className="font-display text-xl font-bold text-ink mb-2">{orders.length === 0 ? "No tickets yet" : `No ${filter} tickets`}</p>
-              <p className="font-ui text-ink-muted text-sm mb-6">{orders.length === 0 ? "Your tickets will appear here after purchase." : "Adjust the filter to see other tickets."}</p>
+              <p className="font-display text-xl font-bold text-ink mb-2">{liveTicketCount === 0 ? "No tickets yet" : `No ${filter} tickets`}</p>
+              <p className="font-ui text-ink-muted text-sm mb-6">{liveTicketCount === 0 ? "Your tickets will appear here after purchase." : "Adjust the filter to see other tickets."}</p>
               <Link href="/events" className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-marigold text-aubergine font-semibold text-sm hover:bg-marigold-dark transition-all">Browse events →</Link>
             </div>
           ) : (

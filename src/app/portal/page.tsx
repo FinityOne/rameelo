@@ -318,7 +318,7 @@ export default function PortalDashboard() {
       if (!authUser) return;
       const today = new Date().toISOString().slice(0, 10);
       const email = authUser.email ?? "";
-      const [myOrders, myPending, incoming, { data: eventsRaw }] = await Promise.all([
+      const [myOrders, myPending, incoming, { data: eventsRaw }, { data: prof }] = await Promise.all([
         loadMyOrders(authUser.id),
         loadMyPendingGroups(authUser.id),
         email ? loadIncomingTransfers(email) : Promise.resolve([]),
@@ -329,8 +329,11 @@ export default function PortalDashboard() {
           .gte("start_date", today)
           .order("start_date")
           .limit(6),
+        supabase.from("profiles").select("role").eq("id", authUser.id).maybeSingle(),
       ]);
-      setOrders(myOrders);
+      // Test orders are only shown to admins; everyone else sees live tickets only.
+      const isAdmin = (prof as { role?: string } | null)?.role === "admin";
+      setOrders(isAdmin ? myOrders : myOrders.filter(o => !o.isTest));
       setPendingGroups(myPending);
       setIncomingTransfers(incoming);
       const myEventIds = new Set(myOrders.map(o => o.eventId));

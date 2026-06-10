@@ -719,6 +719,10 @@ export interface PortalOrderRow {
   status: string;            // 'confirmed' | 'pending'
   paymentMethod: string;     // 'card' | 'ach'
   paymentPending: boolean;   // true while an ACH order awaits clearance (no QR yet)
+  // Set when this "order" is actually a ticket received from someone else (a
+  // transfer or group-order allocation) rather than the member's own purchase.
+  receivedFrom?: string;        // name of the person it was received from
+  receivedFromGroup?: boolean;  // it came via a group order
   groupMembers?: GroupMember[];
   transfers?: {
     id: string;

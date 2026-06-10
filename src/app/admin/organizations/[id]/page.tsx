@@ -18,9 +18,17 @@ const ORG_TYPES = [
 ];
 
 const MEMBER_ROLES = [
-  { value: "owner",  label: "Owner", desc: "Full control, primary contact" },
-  { value: "admin",  label: "Admin", desc: "Can edit org profile" },
-  { value: "member", label: "Member", desc: "Can view org profile" },
+  { value: "owner",   label: "Owner",   desc: "Full control, primary contact" },
+  { value: "admin",   label: "Admin",   desc: "Can edit org profile" },
+  { value: "member",  label: "Member",  desc: "Can view org profile" },
+  { value: "scanner", label: "Scanner", desc: "Door check-in / team member" },
+];
+
+type TabKey = "basic" | "contract" | "organizers";
+const SUBNAV: { key: TabKey; label: string }[] = [
+  { key: "basic",      label: "Basic info" },
+  { key: "contract",   label: "Contract & Agreement" },
+  { key: "organizers", label: "Organizers & Team" },
 ];
 
 type OrgData = {
@@ -41,7 +49,7 @@ type UserResult = { id: string; first_name: string; last_name: string; email: st
 
 const inputCls = "w-full rounded-xl border border-ivory-200 bg-white px-4 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all";
 const labelCls = "font-mono text-[10px] uppercase tracking-widest text-ink-muted block mb-1.5";
-const ROLE_BADGE: Record<string, string> = { owner: "bg-aubergine/10 text-aubergine", admin: "bg-peacock/10 text-peacock", member: "bg-ivory-200 text-ink-muted" };
+const ROLE_BADGE: Record<string, string> = { owner: "bg-aubergine/10 text-aubergine", admin: "bg-peacock/10 text-peacock", member: "bg-ivory-200 text-ink-muted", scanner: "bg-marigold/15 text-marigold-dark" };
 
 function fmtDate(d: string) { return new Date(d).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); }
 
@@ -51,6 +59,7 @@ export default function AdminOrgDetailPage() {
 
   const [org, setOrg] = useState<OrgData | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
+  const [tab, setTab] = useState<TabKey>("basic");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
@@ -197,9 +206,25 @@ export default function AdminOrgDetailPage() {
         </div>
       </div>
 
-      <div className="grid lg:grid-cols-5 gap-6">
-        {/* ── Left: Edit form ── */}
-        <div className="lg:col-span-3 space-y-5">
+      {/* Sub-navigation — split the page into easy-to-scan sections */}
+      <div className="flex items-center gap-1 border-b border-ivory-200 overflow-x-auto">
+        {SUBNAV.map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={`shrink-0 px-4 py-2.5 font-ui font-semibold text-sm border-b-2 -mb-px transition-colors ${tab === t.key ? "border-aubergine text-ink" : "border-transparent text-ink-muted hover:text-ink"}`}
+          >
+            {t.label}
+            {t.key === "organizers" && (
+              <span className="ml-1.5 font-mono text-[10px] text-ink-muted">{members.length}</span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* ── Basic info ── */}
+      {tab === "basic" && (
+        <div className="max-w-2xl">
           <form onSubmit={handleSave} className="space-y-5">
             {/* Identity */}
             <div className="bg-white rounded-2xl border border-ivory-200 p-5 space-y-4">
@@ -298,15 +323,18 @@ export default function AdminOrgDetailPage() {
             </div>
           </form>
         </div>
+      )}
 
-        {/* ── Right: Members ── */}
-        <div className="lg:col-span-2 space-y-4">
+      {/* ── Organizers & Team ── */}
+      {tab === "organizers" && (
+        <div className="max-w-2xl space-y-4">
           <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
             <div className="px-5 pt-5 pb-4 border-b border-ivory-200">
-              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Members</p>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Organizers &amp; Team</p>
               <p className="font-display font-bold text-ink text-lg mt-0.5" style={{ letterSpacing: "-0.015em" }}>
-                {members.length} organizer{members.length !== 1 ? "s" : ""}
+                {members.length} {members.length !== 1 ? "people" : "person"}
               </p>
+              <p className="font-ui text-xs text-ink-muted mt-0.5">Owners, admins, members &amp; door scanners on this organization.</p>
             </div>
 
             {/* Add member */}
@@ -426,10 +454,10 @@ export default function AdminOrgDetailPage() {
             )}
           </div>
         </div>
-      </div>
+      )}
 
-      {/* ── Onboarding questionnaire ── */}
-      <OnboardingPanel orgId={id} />
+      {/* ── Contract & Agreement (onboarding questionnaire + signed agreement) ── */}
+      {tab === "contract" && <OnboardingPanel orgId={id} />}
     </div>
   );
 }
