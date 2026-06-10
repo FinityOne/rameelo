@@ -823,6 +823,7 @@ export default function EventDetailClient({ id }: { id: string }) {
       tierName: selectedTier.name,
       eventTitle: event.title,
       eventDate: fmtDate(event.start_date),
+      eventStartDate: event.start_date,
       eventVenue: event.venue_name,
       eventCity: event.city,
       eventState: event.state,

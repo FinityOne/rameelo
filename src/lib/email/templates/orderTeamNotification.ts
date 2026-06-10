@@ -18,11 +18,14 @@ export function orderTeamNotificationEmail(p: {
   eventWhere: string;
   bannerUrl?: string | null;
   ordersUrl: string;
+  paymentMethod: string; // 'card' | 'ach'
 }): { subject: string; html: string; text: string } {
   const greet = (p.recipientFirstName ?? "").trim().split(" ")[0] || "there";
   const buyer = (p.buyerFirstName ?? "").trim() || "Someone";
   const artist = (p.artistName ?? "").trim();
   const ticketWord = p.qty === 1 ? "ticket" : "tickets";
+  const isAch = (p.paymentMethod ?? "").toLowerCase() === "ach";
+  const payLabel = isAch ? "Bank transfer (ACH)" : "Credit / Debit card";
   const subject = `🎟️ New order · ${p.qty} ${ticketWord} — ${p.eventTitle}`;
 
   // Small event banner (image when the event has a cover, otherwise a branded strip).
@@ -48,10 +51,22 @@ export function orderTeamNotificationEmail(p: {
         ${row("Buyer", buyer)}
         ${row("Tickets", `${p.qty} ${ticketWord}`)}
         ${row("Tier", p.tierName || "Ticket")}
+        ${row("Payment", payLabel)}
         <tr><td colspan="2" style="border-top:1px solid ${C.ivory200};padding-top:2px;"></td></tr>
         ${row("Order total", `$${money(p.grandTotal)}`, { strong: true })}
       </table>
     </td></tr></table>`;
+
+  // ACH orders settle over a few days — make clear the tickets aren't valid yet.
+  const achNote = isAch
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px;background:${C.marigold}14;border:1px solid ${C.marigold}40;border-radius:14px;">
+        <tr><td style="padding:14px 18px;">
+          <p style="margin:0 0 5px;font-family:${FONT_BODY};font-size:13px;font-weight:700;color:${C.ink};">⏳ Paid by bank transfer (ACH) — payment clearing</p>
+          <p style="margin:0;font-family:${FONT_BODY};font-size:13px;line-height:1.6;color:${C.inkMuted};">
+            Bank transfers take <strong>2&ndash;5 business days</strong> to clear. <strong>QR codes are not issued until the payment settles</strong> &mdash; this order&rsquo;s tickets stay reserved and won&rsquo;t scan at the door until the funds clear. We&rsquo;ll confirm automatically once they do.
+          </p>
+        </td></tr></table>`
+    : "";
 
   // Event summary panel.
   const eventPanel = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px;background:${C.ivory};border:1px solid ${C.ivory200};border-radius:14px;">
@@ -69,6 +84,7 @@ export function orderTeamNotificationEmail(p: {
     banner,
     sectionTitle("Order details"),
     orderPanel,
+    achNote,
     sectionTitle("Event"),
     eventPanel,
     button(p.ordersUrl, "View all orders"),
@@ -87,8 +103,12 @@ export function orderTeamNotificationEmail(p: {
     `  Buyer: ${buyer}`,
     `  Tickets: ${p.qty} ${ticketWord}`,
     `  Tier: ${p.tierName || "Ticket"}`,
+    `  Payment: ${payLabel}`,
     `  Order total: $${money(p.grandTotal)}`,
     "",
+    isAch
+      ? "NOTE: Paid by bank transfer (ACH). Payments take 2-5 business days to clear, and QR codes are NOT issued until the payment settles — the tickets stay reserved and won't scan at the door until the funds clear.\n"
+      : "",
     "Event:",
     `  ${p.eventTitle}`,
     artist ? `  Artist: ${artist}` : "",

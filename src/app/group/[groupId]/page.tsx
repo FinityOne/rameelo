@@ -170,6 +170,7 @@ export default function GroupLandingPage() {
       tierName: tier.name,
       eventTitle: ev.title,
       eventDate: fmtDate(ev.start_date),
+      eventStartDate: ev.start_date,
       eventVenue: ev.venue_name,
       eventCity: ev.city,
       eventState: ev.state,

@@ -19,7 +19,6 @@ function fmtTime(t: string | null) {
 
 type Recipient = { email: string; first_name: string | null };
 type TeamPayload = {
-  is_test: boolean;
   buyer_name: string | null;
   qty: number;
   tier_name: string | null;
@@ -37,31 +36,34 @@ type TeamPayload = {
   recipients: Recipient[];
 };
 
-// Notifies an event's organizing team (org owners/admins + the event creator) when
-// an order is placed. Data + recipient list come from a SECURITY DEFINER RPC keyed
-// by order id (recency-guarded), so it works for guest checkouts without RLS leaks.
+// Admin-triggered resend of the new-order notification to an event's organizing
+// team. The get_order_team_notification RPC bypasses its recency guard for admins,
+// so it works for any order; admins resolve recipients securely inside it.
 export async function POST(request: Request) {
+  const supabase = await createClient();
+
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
+  if (me?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const body = await request.json().catch(() => ({}));
   const orderId = typeof body.orderId === "string" ? body.orderId : "";
   if (!orderId) return NextResponse.json({ error: "Missing orderId" }, { status: 400 });
 
-  const supabase = await createClient();
   const { data, error } = await supabase.rpc("get_order_team_notification", { p_order_id: orderId });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   const o = data as TeamPayload | null;
-  if (!o) return NextResponse.json({ ok: true, skipped: "not-found" });
-  // Never notify the team for sandbox/test orders.
-  if (o.is_test) return NextResponse.json({ ok: true, skipped: "test-order" });
+  if (!o) return NextResponse.json({ error: "Order not found" }, { status: 404 });
   const recipients = (o.recipients ?? []).filter(r => r.email);
-  if (recipients.length === 0) return NextResponse.json({ ok: true, skipped: "no-recipients" });
+  if (recipients.length === 0) return NextResponse.json({ error: "This event has no team members to notify." }, { status: 422 });
 
   const eventWhen = `${fmtDate(o.event_start_date)}${fmtTime(o.event_start_time) ? ` · ${fmtTime(o.event_start_time)}` : ""}`;
   const eventWhere = [o.venue_name, o.city, o.state].filter(Boolean).join(", ");
   const buyerFirstName = (o.buyer_name ?? "").trim().split(" ")[0] || "Someone";
   const ordersUrl = `${EMAIL.site}/organizer/events/${o.event_id}/orders`;
 
-  // Send each team member their own personalized copy.
   const results = await Promise.all(recipients.map(async (r) => {
     const { subject, html, text } = orderTeamNotificationEmail({
       recipientFirstName: r.first_name,
@@ -84,12 +86,14 @@ export async function POST(request: Request) {
       type: "order_team_notification",
       subject,
       status: sendError ? "failed" : "sent",
-      trigger: "automatic",
+      trigger: "manual",
       providerId,
       error: sendError,
     });
     return !sendError;
   }));
 
-  return NextResponse.json({ ok: true, sent: results.filter(Boolean).length, total: recipients.length });
+  const sent = results.filter(Boolean).length;
+  if (sent === 0) return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
+  return NextResponse.json({ ok: true, sent, total: recipients.length });
 }

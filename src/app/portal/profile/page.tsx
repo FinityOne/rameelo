@@ -150,10 +150,9 @@ export default function ProfilePage() {
   const [prefSaving, setPrefSaving] = useState(false);
   const [prefSaved, setPrefSaved]   = useState(false);
 
-  // Saved payment methods
+  // Saved payment methods (read-only — kept on the account for record purposes)
   const [methods, setMethods] = useState<PaymentMethod[]>([]);
   const [methodsLoading, setMethodsLoading] = useState(true);
-  const [removingId, setRemovingId] = useState<string | null>(null);
 
   const loadMethods = useCallback(async () => {
     const supabase = createClient();
@@ -166,20 +165,6 @@ export default function ProfilePage() {
   }, []);
 
   useEffect(() => { loadMethods(); }, [loadMethods]);
-
-  async function removeMethod(id: string) {
-    setRemovingId(id);
-    try {
-      const res = await fetch("/api/payment-methods/remove", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id }),
-      });
-      if (res.ok) setMethods(prev => prev.filter(m => m.id !== id));
-    } finally {
-      setRemovingId(null);
-    }
-  }
 
   const { notifications, loading: notifsLoading, unreadCount, markRead, markAllRead } =
     useNotifications({ audience: "user", limit: 50 });
@@ -443,13 +428,6 @@ export default function ProfilePage() {
                           : "Bank account · ACH"}
                       </p>
                     </div>
-                    <button
-                      onClick={() => removeMethod(m.id)}
-                      disabled={removingId === m.id}
-                      className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-ink-muted hover:text-durga transition-colors disabled:opacity-50"
-                    >
-                      {removingId === m.id ? "Removing…" : "Remove"}
-                    </button>
                   </div>
                 );
               })}

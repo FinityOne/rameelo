@@ -32,6 +32,7 @@ interface CheckoutPayload {
   tierName: string;
   eventTitle: string;
   eventDate: string;
+  eventStartDate?: string; // raw YYYY-MM-DD — drives the ACH cutoff
   eventVenue: string;
   eventCity: string;
   eventState: string;
@@ -55,6 +56,16 @@ type PaymentMethod = "card" | "ach";
 
 // Fee math is centralized in src/lib/fees.ts — 3% Rameelo fee always on FACE value.
 const CARD_FEE_PCT = 0.05; // kept for the "+5% processing fee" toggle label
+
+// Bank/ACH transfers take 2–5 business days to settle, so we cut them off this many
+// days before the event — close to the date it's card-only, keeping check-in clean.
+const ACH_CUTOFF_DAYS = 14;
+function achAvailable(eventStartDate?: string): boolean {
+  if (!eventStartDate) return true; // unknown date → don't block
+  const start = new Date(`${eventStartDate}T00:00:00`).getTime();
+  if (Number.isNaN(start)) return true;
+  return Date.now() < start - ACH_CUTOFF_DAYS * 86_400_000;
+}
 
 function formatPhone(digits: string): string {
   const d = digits.replace(/\D/g, "").slice(0, 10);
@@ -245,6 +256,12 @@ export default function CheckoutPage() {
   const faceSubtotal = subtotal + (payload?.discountAmount ?? 0);
   const { rameeloFee, processingFee, grandTotal } = computeFees(faceSubtotal, subtotal, paymentMethod);
   const isFree = grandTotal <= 0; // free tickets skip Stripe entirely
+  // Bank transfers are cut off close to the event (card-only within the window).
+  const achAllowed = achAvailable(payload?.eventStartDate);
+  // Never leave ACH selected once it's unavailable.
+  useEffect(() => {
+    if (!achAllowed && paymentMethod === "ach") setPaymentMethod("card");
+  }, [achAllowed, paymentMethod]);
 
   // Paying as a group member who has an account: lock + mask their contact details
   // (the purchaser may not be them). Doesn't apply when the buyer is signed in.
@@ -605,8 +622,8 @@ export default function CheckoutPage() {
                 {!isFree && (
                 <div>
                   <label className={labelCls}>How would you like to pay?</label>
-                  <div className="grid grid-cols-2 gap-3">
-                    {(["card", "ach"] as PaymentMethod[]).map(method => {
+                  <div className={`grid ${achAllowed ? "grid-cols-2" : "grid-cols-1"} gap-3`}>
+                    {((achAllowed ? ["card", "ach"] : ["card"]) as PaymentMethod[]).map(method => {
                       const isCard = method === "card";
                       const active = paymentMethod === method;
                       return (
@@ -632,6 +649,15 @@ export default function CheckoutPage() {
                       );
                     })}
                   </div>
+
+                  {!achAllowed && (
+                    <div className="mt-3 rounded-xl bg-ivory border border-ivory-200 px-4 py-3 flex items-start gap-2">
+                      <svg className="w-4 h-4 text-ink-muted shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      <p className="font-ui text-xs text-ink-muted leading-relaxed">
+                        Bank transfer (ACH) isn&rsquo;t available within {ACH_CUTOFF_DAYS} days of the event &mdash; it takes a few business days to clear. Please pay by card so your tickets are ready right away.
+                      </p>
+                    </div>
+                  )}
 
                   {paymentMethod === "ach" && (
                     <div className="mt-3 rounded-xl bg-peacock/8 border border-peacock/20 px-4 py-3 flex items-start gap-2">
