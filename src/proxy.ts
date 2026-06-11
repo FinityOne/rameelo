@@ -125,5 +125,8 @@ export async function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  // Exclude `/api/*` so middleware never runs on route handlers (webhooks, etc.).
+  // API routes do their own auth (RLS / service-role / signature verification) and
+  // must never be touched by session refresh or auth redirects.
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
 }

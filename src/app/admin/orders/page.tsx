@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -51,13 +51,22 @@ function money(n: number) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+type Stats = { count: number; testCount: number; tickets: number; revenue: number; fees: number };
+const EMPTY_STATS: Stats = { count: 0, testCount: 0, tickets: 0, revenue: 0, fees: 0 };
+
 export default function AdminOrdersPage() {
   const router = useRouter();
-  const [orders, setOrders]   = useState<OrderRow[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [rows, setRows]           = useState<OrderRow[]>([]);
+  const [total, setTotal]         = useState(0);
+  const [stats, setStats]         = useState<Stats>(EMPTY_STATS);
+  const [eventOptions, setEventOptions] = useState<{ id: string; title: string }[]>([]);
+  const [loading, setLoading]     = useState(true);   // first load only (spinner)
+  const [fetching, setFetching]   = useState(false);  // subsequent fetches (dim table)
+  const [exporting, setExporting] = useState(false);
 
   // Filters
   const [search, setSearch]       = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [status, setStatus]       = useState("all");
   const [payment, setPayment]     = useState("all");
   const [eventFilter, setEvent]   = useState("all");
@@ -65,90 +74,88 @@ export default function AdminOrdersPage() {
   const [sort, setSort]           = useState<Sort>("newest");
   const [page, setPage]           = useState(1);
 
-  async function load() {
-    const supabase = createClient();
-    const { data } = await supabase
-      .from("orders")
-      .select(`
-        id, buyer_name, buyer_email, qty, unit_price, discount_amount,
-        rameelo_fee, processing_fee, grand_total, status, payment_method,
-        is_test, group_id, created_at, event_id,
-        events (id, title, start_date, city, state),
-        ticket_tiers (name)
-      `)
-      .order("created_at", { ascending: false });
-    setOrders((data ?? []) as unknown as OrderRow[]);
-    setLoading(false);
-  }
+  // Debounce the search box so we hit the DB once the user pauses, not per keystroke.
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 300);
+    return () => clearTimeout(t);
+  }, [search]);
 
-  useEffect(() => { load(); }, []);
-  useEffect(() => { setPage(1); }, [search, status, payment, eventFilter, typeFilter, sort]);
+  // Reset to page 1 whenever a filter narrows the set.
+  useEffect(() => { setPage(1); }, [debouncedSearch, status, payment, eventFilter, typeFilter, sort]);
 
-  // Distinct events present in orders (for the event filter)
-  const eventOptions = useMemo(() => {
-    const map = new Map<string, string>();
-    for (const o of orders) if (o.events) map.set(o.events.id, o.events.title);
-    return Array.from(map, ([id, title]) => ({ id, title })).sort((a, b) => a.title.localeCompare(b.title));
-  }, [orders]);
+  // Build the RPC args for the current filter state. pageSize <= 0 = "all rows" (used for CSV export).
+  const rpcArgs = (pageNum: number, pageSize: number) => ({
+    p_search:    debouncedSearch.trim(),
+    p_status:    status,
+    p_payment:   payment,
+    p_event:     eventFilter === "all" ? null : eventFilter,
+    p_type:      typeFilter,
+    p_sort:      sort,
+    p_page:      pageNum,
+    p_page_size: pageSize,
+  });
 
-  const filtered = useMemo(() => {
-    let result = [...orders];
-    if (typeFilter === "live") result = result.filter(o => !o.is_test);
-    if (typeFilter === "test") result = result.filter(o => o.is_test);
-    if (status !== "all")  result = result.filter(o => o.status === status);
-    if (payment !== "all") result = result.filter(o => o.payment_method === payment);
-    if (eventFilter !== "all") result = result.filter(o => o.event_id === eventFilter);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(o =>
-        o.buyer_name.toLowerCase().includes(q) ||
-        o.buyer_email.toLowerCase().includes(q) ||
-        (o.events?.title ?? "").toLowerCase().includes(q) ||
-        receiptNum(o.id).toLowerCase().includes(q) ||
-        (o.group_id ?? "").toLowerCase().includes(q)
-      );
+  // Server-side fetch: one page of rows + aggregate stats + total + event options, in a single round trip.
+  useEffect(() => {
+    let cancelled = false;
+    setFetching(true);
+    (async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("admin_orders_page", rpcArgs(page, PAGE_SIZE));
+      if (cancelled) return;
+      if (error || !data) {
+        setRows([]); setTotal(0); setStats(EMPTY_STATS);
+      } else {
+        const d = data as {
+          rows: OrderRow[]; total: number;
+          stats: { count: number; test_count: number; tickets: number; revenue: number; fees: number };
+          events: { id: string; title: string }[];
+        };
+        setRows(d.rows ?? []);
+        setTotal(d.total ?? 0);
+        setStats({
+          count:    d.stats?.count ?? 0,
+          testCount: d.stats?.test_count ?? 0,
+          tickets:  d.stats?.tickets ?? 0,
+          revenue:  d.stats?.revenue ?? 0,
+          fees:     d.stats?.fees ?? 0,
+        });
+        setEventOptions(d.events ?? []);
+      }
+      setLoading(false);
+      setFetching(false);
+    })();
+    return () => { cancelled = true; };
+  }, [debouncedSearch, status, payment, eventFilter, typeFilter, sort, page]);
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const hasFilters = !!search || status !== "all" || payment !== "all" || eventFilter !== "all" || typeFilter !== "all";
+
+  // CSV export pulls every matching row on demand (not just the visible page).
+  async function exportCsv() {
+    setExporting(true);
+    try {
+      const supabase = createClient();
+      const { data } = await supabase.rpc("admin_orders_page", rpcArgs(1, 0));
+      const all = ((data as { rows?: OrderRow[] } | null)?.rows ?? []) as OrderRow[];
+      const headers = ["Order", "Placed", "Buyer", "Email", "Event", "Tier", "Qty", "Unit Price", "Discount", "Rameelo Fee", "Processing Fee", "Total", "Payment", "Status", "Type"];
+      const csvRows = all.map(o => [
+        receiptNum(o.id), new Date(o.created_at).toISOString(), o.buyer_name, o.buyer_email,
+        o.events?.title ?? "", o.ticket_tiers?.name ?? "", o.qty, o.unit_price, o.discount_amount,
+        o.rameelo_fee, o.processing_fee, o.grand_total, o.payment_method, o.status, o.is_test ? "test" : "live",
+      ]);
+      const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+      const csv = [headers, ...csvRows].map(r => r.map(esc).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement("a");
+      a.href = url;
+      a.download = `rameelo-orders-${new Date().toISOString().slice(0, 10)}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    } finally {
+      setExporting(false);
     }
-    result.sort((a, b) => {
-      if (sort === "amount_high") return b.grand_total - a.grand_total;
-      if (sort === "amount_low")  return a.grand_total - b.grand_total;
-      const diff = a.created_at.localeCompare(b.created_at);
-      return sort === "oldest" ? diff : -diff;
-    });
-    return result;
-  }, [orders, search, status, payment, eventFilter, typeFilter, sort]);
-
-  // Stats reflect the current filter (excluding test orders from money)
-  const stats = useMemo(() => {
-    const live = filtered.filter(o => !o.is_test);
-    return {
-      count:    filtered.length,
-      testCount: filtered.length - live.length,
-      tickets:  live.reduce((s, o) => s + o.qty, 0),
-      revenue:  live.reduce((s, o) => s + o.grand_total, 0),
-      fees:     live.reduce((s, o) => s + o.rameelo_fee, 0),
-    };
-  }, [filtered]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
-  const hasFilters = search || status !== "all" || payment !== "all" || eventFilter !== "all" || typeFilter !== "all";
-
-  function exportCsv() {
-    const headers = ["Order", "Placed", "Buyer", "Email", "Event", "Tier", "Qty", "Unit Price", "Discount", "Rameelo Fee", "Processing Fee", "Total", "Payment", "Status", "Type"];
-    const rows = filtered.map(o => [
-      receiptNum(o.id), new Date(o.created_at).toISOString(), o.buyer_name, o.buyer_email,
-      o.events?.title ?? "", o.ticket_tiers?.name ?? "", o.qty, o.unit_price, o.discount_amount,
-      o.rameelo_fee, o.processing_fee, o.grand_total, o.payment_method, o.status, o.is_test ? "test" : "live",
-    ]);
-    const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
-    const csv = [headers, ...rows].map(r => r.map(esc).join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href = url;
-    a.download = `rameelo-orders-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
   }
 
   const selectCls = (active: boolean) =>
@@ -161,18 +168,22 @@ export default function AdminOrdersPage() {
         <div>
           <h2 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: "-0.02em" }}>Orders</h2>
           <p className="font-ui text-ink-muted text-sm mt-0.5">
-            {loading ? "—" : `${orders.length} order${orders.length !== 1 ? "s" : ""} across the platform`}
+            {loading ? "—" : `${total.toLocaleString()} order${total !== 1 ? "s" : ""} match${total === 1 ? "es" : ""} the current view`}
           </p>
         </div>
         <button
           onClick={exportCsv}
-          disabled={loading || filtered.length === 0}
+          disabled={loading || exporting || total === 0}
           className="shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl border border-ivory-200 bg-white text-ink-muted font-ui font-semibold text-sm hover:text-aubergine hover:border-aubergine/30 active:scale-[0.98] transition-all disabled:opacity-50"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Export CSV
+          {exporting ? (
+            <span className="w-4 h-4 rounded-full border-2 border-ivory-200 border-t-aubergine animate-spin" />
+          ) : (
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+          )}
+          {exporting ? "Exporting…" : "Export CSV"}
         </button>
       </div>
 
@@ -256,7 +267,7 @@ export default function AdminOrdersPage() {
 
         {!loading && (
           <span className="ml-auto font-mono text-[10px] text-ink-muted">
-            {filtered.length} result{filtered.length !== 1 ? "s" : ""}
+            {total.toLocaleString()} result{total !== 1 ? "s" : ""}
           </span>
         )}
       </div>
@@ -266,13 +277,13 @@ export default function AdminOrdersPage() {
         <div className="flex items-center justify-center py-20">
           <div className="w-8 h-8 rounded-full border-4 border-ivory-200 border-t-marigold animate-spin" />
         </div>
-      ) : filtered.length === 0 ? (
+      ) : total === 0 ? (
         <div className="bg-white rounded-2xl border border-ivory-200 p-16 text-center">
           <p className="text-3xl mb-3">{hasFilters ? "🔍" : "🧾"}</p>
           <p className="font-ui text-ink-muted text-sm">{hasFilters ? "No orders match your filters." : "No orders yet."}</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+        <div className={`bg-white rounded-2xl border border-ivory-200 overflow-hidden transition-opacity ${fetching ? "opacity-60" : ""}`}>
           <div className="grid items-center px-4 py-2 border-b border-ivory-200 bg-ivory/60"
             style={{ gridTemplateColumns: "minmax(0,1.6fr) minmax(0,1.8fr) 64px 100px 90px 110px 100px" }}>
             {["Order", "Event", "Qty", "Total", "Payment", "Status", "Placed"].map((h, i) => (
@@ -281,7 +292,7 @@ export default function AdminOrdersPage() {
           </div>
 
           <div className="divide-y divide-ivory-200">
-            {paginated.map(o => {
+            {rows.map(o => {
               const pill = STATUS_PILL[o.status] ?? { label: o.status, cls: "bg-ivory-200 text-ink-muted" };
               return (
                 <div
@@ -335,7 +346,7 @@ export default function AdminOrdersPage() {
       {/* Pagination */}
       {!loading && totalPages > 1 && (
         <div className="flex items-center justify-between">
-          <p className="font-mono text-[10px] text-ink-muted">Page {page} of {totalPages} · {filtered.length} orders</p>
+          <p className="font-mono text-[10px] text-ink-muted">Page {page} of {totalPages} · {total.toLocaleString()} orders</p>
           <div className="flex items-center gap-1">
             <button
               onClick={() => setPage(p => Math.max(1, p - 1))}
