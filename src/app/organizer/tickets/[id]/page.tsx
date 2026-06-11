@@ -139,9 +139,9 @@ export default function OrganizerOrderDetailPage() {
 
   const meta      = STATUS_META[order.status] ?? { label: order.status, cls: "bg-ivory-200 text-ink-muted", icon: "•" };
   const subtotal  = order.qty * Number(order.unit_price);
-  const rameeloFee = Number(order.rameelo_fee) || 0;
-  const procFee   = Number(order.processing_fee) || 0;
-  const feeTotal  = rameeloFee + procFee || Number(order.service_fee) || 0;
+  // Organizer-facing amount is ticket face value only (subtotal − discount).
+  // Platform (3%) and card (5%) fees are paid by the buyer and not shown here.
+  const faceValue = subtotal - (Number(order.discount_amount) || 0);
   const checkedIn = order.checked_in_count ?? 0;
   const seats     = Array.from({ length: order.qty }, (_, i) => i + 1);
 
@@ -175,7 +175,7 @@ export default function OrganizerOrderDetailPage() {
           </div>
           <div className="text-right shrink-0">
             <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Amount</p>
-            <p className="font-display font-bold text-ink text-2xl" style={{ letterSpacing: "-0.02em" }}>${money(order.grand_total)}</p>
+            <p className="font-display font-bold text-ink text-2xl" style={{ letterSpacing: "-0.02em" }}>${money(faceValue)}</p>
             <p className="font-mono text-[10px] text-ink-muted">{order.qty} ticket{order.qty !== 1 ? "s" : ""}</p>
           </div>
         </div>
@@ -242,13 +242,9 @@ export default function OrganizerOrderDetailPage() {
                 <span className="font-mono text-peacock">−${money(order.discount_amount)}</span>
               </div>
             )}
-            <div className="flex justify-between text-sm">
-              <span className="font-ui text-ink-muted">Fees</span>
-              <span className="font-mono text-ink-muted">${money(feeTotal)}</span>
-            </div>
             <div className="flex justify-between border-t border-ivory-200 pt-2 mt-1">
               <span className="font-display font-bold text-ink">Total</span>
-              <span className="font-display font-bold text-ink">${money(order.grand_total)}</span>
+              <span className="font-display font-bold text-ink">${money(faceValue)}</span>
             </div>
           </div>
           <div className="mt-3 pt-3 border-t border-ivory-200">

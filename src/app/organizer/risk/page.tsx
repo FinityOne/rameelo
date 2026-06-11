@@ -52,6 +52,7 @@ export default function RiskDisputesPage() {
         .select("id, user_id, buyer_name, buyer_email, qty, grand_total, status, created_at, event_id, purchase_ip, first_viewed_at, wallet_generated_at, checked_in_count, failed_payment_attempts, dispute_status")
         .in("event_id", events.map(e => e.id))
         .eq("is_test", false)
+        .neq("status", "pending")   // disputes apply to paid orders only — never pending ones
         .order("created_at", { ascending: false });
       const orders = (ordersData ?? []) as Record<string, unknown>[];
 

@@ -15,7 +15,8 @@ type OrderRow = {
   buyer_phone: string | null;
   user_id: string | null;
   qty: number;
-  grand_total: number;
+  unit_price: number;
+  discount_amount: number;
   status: string;
   created_at: string;
   events: { id: string; title: string; start_date: string } | null;
@@ -31,6 +32,9 @@ const STATUS_PILL: Record<string, string> = {
 };
 
 function money(n: number) { return Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+// Ticket FACE VALUE only (qty * unit_price - discount) — buyer-paid platform/card
+// fees are never counted in organizer-facing customer spend.
+function faceValue(o: OrderRow) { return Number(o.qty) * Number(o.unit_price) - Number(o.discount_amount); }
 function receiptNum(id: string) { return "RM-" + id.replace(/-/g, "").slice(0, 10).toUpperCase(); }
 function fmtDate(iso: string) { return new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); }
 function fmtEventDay(d: string) { return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }); }
@@ -71,9 +75,10 @@ export default function CustomerDetailPage() {
 
       const { data } = await supabase
         .from("orders")
-        .select("id, buyer_name, buyer_email, buyer_phone, user_id, qty, grand_total, status, created_at, event_id, events (id, title, start_date), ticket_tiers (name)")
+        .select("id, buyer_name, buyer_email, buyer_phone, user_id, qty, unit_price, discount_amount, status, created_at, event_id, events (id, title, start_date), ticket_tiers (name)")
         .in("event_id", eventIds)
         .eq("is_test", false)
+        .neq("status", "pending")   // organizers only see paid orders, never pending ones
         .ilike("buyer_email", email)
         .order("created_at", { ascending: false });
 
@@ -98,7 +103,7 @@ export default function CustomerDetailPage() {
   const isMember = orders.some(o => o.user_id);
   const confirmed = orders.filter(o => !REFUND_STATES.has(o.status));
   const tickets = confirmed.reduce((s, o) => s + o.qty, 0);
-  const spend   = confirmed.reduce((s, o) => s + Number(o.grand_total), 0);
+  const spend   = confirmed.reduce((s, o) => s + faceValue(o), 0);
   const firstSeen = orders.reduce((min, o) => o.created_at < min ? o.created_at : min, orders[0].created_at);
   const eventsCount = new Set(orders.map(o => o.events?.id).filter(Boolean)).size;
 
@@ -178,7 +183,7 @@ export default function CustomerDetailPage() {
                 </p>
               </div>
               <div className="text-right shrink-0">
-                <p className="font-display font-bold text-ink text-sm">${money(o.grand_total)}</p>
+                <p className="font-display font-bold text-ink text-sm">${money(faceValue(o))}</p>
               </div>
               <svg className="w-4 h-4 text-ink-muted shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
             </Link>

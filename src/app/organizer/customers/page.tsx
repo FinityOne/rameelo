@@ -13,10 +13,17 @@ type RawOrder = {
   buyer_email: string;
   buyer_phone: string | null;
   qty: number;
-  grand_total: number;
+  unit_price: number;
+  discount_amount: number;
   status: string;
   created_at: string;
 };
+
+// Customer spend = ticket FACE VALUE only (qty * unit_price - discount). The 3%
+// Rameelo fee and 5% card fee are paid by the buyer and never counted here.
+function faceValue(o: RawOrder) {
+  return Number(o.qty) * Number(o.unit_price) - Number(o.discount_amount);
+}
 
 type Customer = {
   email: string;
@@ -64,9 +71,10 @@ export default function CustomersPage() {
 
       const { data: rawOrders } = await supabase
         .from("orders")
-        .select("buyer_name, buyer_email, buyer_phone, qty, grand_total, status, created_at")
+        .select("buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_amount, status, created_at")
         .in("event_id", eventIds)
         .eq("is_test", false)
+        .neq("status", "pending")   // organizers only see paid orders, never pending ones
         .order("created_at", { ascending: false });
 
       // Aggregate orders into customers keyed by lowercased email
@@ -83,12 +91,12 @@ export default function CustomersPage() {
             phone: o.buyer_phone,
             orders: 1,
             tickets: confirmed ? o.qty : 0,
-            spend: confirmed ? Number(o.grand_total) : 0,
+            spend: confirmed ? faceValue(o) : 0,
             lastOrder: o.created_at,
           });
         } else {
           existing.orders += 1;
-          if (confirmed) { existing.tickets += o.qty; existing.spend += Number(o.grand_total); }
+          if (confirmed) { existing.tickets += o.qty; existing.spend += faceValue(o); }
           // orders are pre-sorted desc — keep the newest name/phone seen
           if (!existing.phone && o.buyer_phone) existing.phone = o.buyer_phone;
           if (o.created_at > existing.lastOrder) existing.lastOrder = o.created_at;

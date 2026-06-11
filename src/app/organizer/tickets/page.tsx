@@ -15,7 +15,10 @@ type OrderRow = {
   qty: number;
   discount_pct: number;
   discount_amount: number;
-  grand_total: number;
+  // Organizer-facing amount is the ticket FACE VALUE only (qty * unit_price -
+  // discount). The 3% Rameelo fee and 5% card fee are paid by the buyer and
+  // never shown to organizers, so grand_total is intentionally not surfaced here.
+  faceValue: number;
   status: string;
   created_at: string;
   group_id: string | null;
@@ -97,18 +100,19 @@ export default function OrganizerOrdersPage() {
       const { data: rawOrders } = await supabase
         .from("orders")
         .select(`
-          id, buyer_name, buyer_email, qty, discount_pct, discount_amount, grand_total,
+          id, buyer_name, buyer_email, qty, unit_price, discount_pct, discount_amount,
           status, created_at, group_id, event_id,
           events (id, title, start_date),
           ticket_tiers (name)
         `)
         .in("event_id", eventIds)
         .eq("is_test", false)
+        .neq("status", "pending")   // organizers only see paid orders, never pending ones
         .order("created_at", { ascending: false });
 
       const rows: OrderRow[] = ((rawOrders ?? []) as unknown as {
         id: string; buyer_name: string; buyer_email: string;
-        qty: number; discount_pct: number; discount_amount: number; grand_total: number;
+        qty: number; unit_price: number; discount_pct: number; discount_amount: number;
         status: string; created_at: string; group_id: string | null; event_id: string;
         events: { id: string; title: string; start_date: string };
         ticket_tiers: { name: string };
@@ -119,7 +123,7 @@ export default function OrganizerOrdersPage() {
         qty: o.qty,
         discount_pct: o.discount_pct,
         discount_amount: o.discount_amount,
-        grand_total: o.grand_total,
+        faceValue: Number(o.qty) * Number(o.unit_price) - Number(o.discount_amount),
         status: o.status,
         created_at: o.created_at,
         group_id: o.group_id,
@@ -151,7 +155,7 @@ export default function OrganizerOrdersPage() {
     list.sort((a, b) => {
       if (sortBy === "date_desc") return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       if (sortBy === "date_asc") return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
-      if (sortBy === "total_desc") return Number(b.grand_total) - Number(a.grand_total);
+      if (sortBy === "total_desc") return Number(b.faceValue) - Number(a.faceValue);
       if (sortBy === "name_asc") return a.buyer_name.localeCompare(b.buyer_name);
       return 0;
     });
@@ -159,7 +163,7 @@ export default function OrganizerOrdersPage() {
   }, [orders, search, eventFilter, statusFilter, sortBy]);
 
   // ── Summary (reflects current filter) ──
-  const revenue   = filtered.filter(o => !REFUND_STATES.has(o.status)).reduce((s, o) => s + Number(o.grand_total), 0);
+  const revenue   = filtered.filter(o => !REFUND_STATES.has(o.status)).reduce((s, o) => s + Number(o.faceValue), 0);
   const refunded  = filtered.filter(o => REFUND_STATES.has(o.status)).length;
   const hasFilters = search || eventFilter !== "all" || statusFilter !== "all";
 
@@ -310,7 +314,7 @@ export default function OrganizerOrdersPage() {
                           <p className="font-mono text-[10px] text-ink-muted">{o.tierName} · {o.qty} tkt</p>
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap text-right">
-                          <p className="font-display font-bold text-ink text-sm">${money(o.grand_total)}</p>
+                          <p className="font-display font-bold text-ink text-sm">${money(o.faceValue)}</p>
                           {Number(o.discount_amount) > 0 && <p className="font-mono text-[9px] text-peacock">{o.discount_pct}% off</p>}
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap"><StatusPill status={o.status} /></td>
@@ -346,7 +350,7 @@ export default function OrganizerOrdersPage() {
                         <p className="font-mono text-[10px] text-ink-muted/80">{o.tierName} · {o.qty} ticket{o.qty !== 1 ? "s" : ""}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className="font-display font-bold text-ink text-base">${money(o.grand_total)}</p>
+                        <p className="font-display font-bold text-ink text-base">${money(o.faceValue)}</p>
                         {o.group_id && <span className="font-mono text-[8px] uppercase tracking-widest text-marigold-dark">Group</span>}
                       </div>
                     </div>

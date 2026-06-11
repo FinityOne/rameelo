@@ -16,6 +16,11 @@ type RawTier = {
   sort_order: number;
 };
 
+// A tier augmented with PAID-only figures derived from real confirmed orders
+// (never the reserved quantity_sold, which also counts pending holds & is not
+// fee/face-value aware). paidSold = qty of paid tickets; paidEarned = face value.
+type Tier = RawTier & { paidSold: number; paidEarned: number };
+
 type RawEvent = {
   id: string;
   title: string;
@@ -31,7 +36,7 @@ type EventStat = {
   title: string;
   start_date: string;
   status: string;
-  tiers: RawTier[];
+  tiers: Tier[];
   totalSold: number;
   totalCapacity: number;
   fillPct: number;
@@ -262,10 +267,10 @@ function TierLeaderboard({ events }: { events: EventStat[] }) {
         eventTitle: ev.title,
         tierName: t.name,
         price: t.price,
-        sold: t.quantity_sold,
+        sold: t.paidSold,
         capacity: t.quantity,
-        earned: t.quantity_sold * t.price,
-        fillPct: (t.quantity_sold / t.quantity) * 100,
+        earned: t.paidEarned,
+        fillPct: (t.paidSold / t.quantity) * 100,
       });
     }
   }
@@ -493,12 +498,45 @@ export default function OrganizerSalesPage() {
         : evQuery.eq("organizer_id", user.id));
 
       const raw = (eventsRaw ?? []) as RawEvent[];
+      const eventIds = raw.map(e => e.id);
+
+      // Paid orders only — confirmed, non-test, not a lost/open chargeback, and
+      // never pending. Sold counts & revenue come from these real orders, not the
+      // reserved quantity_sold (which also counts pending holds).
+      type PaidOrder = { tier_id: string | null; qty: number; unit_price: number; discount_amount: number; dispute_status: string | null };
+      let paidOrders: PaidOrder[] = [];
+      if (eventIds.length > 0) {
+        const { data: ordersRaw } = await supabase
+          .from("orders")
+          .select("tier_id, qty, unit_price, discount_amount, dispute_status")
+          .in("event_id", eventIds)
+          .eq("is_test", false)
+          .eq("status", "confirmed");
+        paidOrders = ((ordersRaw ?? []) as PaidOrder[]).filter(
+          o => o.dispute_status !== "open" && o.dispute_status !== "lost"
+        );
+      }
+
+      // Aggregate paid tickets + face-value revenue (qty * unit_price - discount) by tier.
+      const soldByTier = new Map<string, number>();
+      const earnedByTier = new Map<string, number>();
+      for (const o of paidOrders) {
+        if (!o.tier_id) continue;
+        soldByTier.set(o.tier_id, (soldByTier.get(o.tier_id) ?? 0) + Number(o.qty));
+        const face = Number(o.qty) * Number(o.unit_price) - Number(o.discount_amount);
+        earnedByTier.set(o.tier_id, (earnedByTier.get(o.tier_id) ?? 0) + face);
+      }
+
       const computed: EventStat[] = raw.map(ev => {
-        const tiers = ev.ticket_tiers ?? [];
-        const totalSold = tiers.reduce((s, t) => s + t.quantity_sold, 0);
+        const tiers: Tier[] = (ev.ticket_tiers ?? []).map(t => ({
+          ...t,
+          paidSold: soldByTier.get(t.id) ?? 0,
+          paidEarned: earnedByTier.get(t.id) ?? 0,
+        }));
+        const totalSold = tiers.reduce((s, t) => s + t.paidSold, 0);
         const totalCapacity = tiers.reduce((s, t) => s + t.quantity, 0);
-        const maxRevenue = tiers.reduce((s, t) => s + t.quantity * t.price, 0);
-        const earnedRevenue = tiers.reduce((s, t) => s + t.quantity_sold * t.price, 0);
+        const maxRevenue = tiers.reduce((s, t) => s + t.quantity * t.price, 0);   // sellout potential (list price)
+        const earnedRevenue = tiers.reduce((s, t) => s + t.paidEarned, 0);        // actual paid face value
         const fillPct = totalCapacity > 0 ? (totalSold / totalCapacity) * 100 : 0;
         return {
           id: ev.id, title: ev.title, start_date: ev.start_date, status: ev.status,

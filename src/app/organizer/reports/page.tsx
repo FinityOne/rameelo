@@ -125,6 +125,7 @@ export default function ReportsPage() {
         .select("id, buyer_email, buyer_name, qty, unit_price, discount_amount, grand_total, status, created_at, event_id, tier_id")
         .in("event_id", events.map(e => e.id))
         .eq("is_test", false)
+        .neq("status", "pending")   // organizers only see paid orders, never pending ones
         .order("created_at", { ascending: true });
 
       const rows: Order[] = ((rawOrders ?? []) as Omit<Order, "eventTitle" | "eventState" | "tierName">[]).map(o => ({

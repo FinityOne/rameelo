@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { orderRevenue } from "@/lib/payouts";
 import { useOrg } from "./org-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -23,7 +24,9 @@ type RawEvent = {
   ticket_tiers: RawTier[];
 };
 
-type OrderRow = { event_id: string; qty: number; unit_price: number; grand_total: number; created_at: string; status: string };
+// Face value only — unit_price & discount_amount drive organizer revenue; the
+// 3% Rameelo fee and 5% card fee are charged to the buyer and never shown here.
+type OrderRow = { event_id: string; qty: number; unit_price: number; discount_amount: number; created_at: string; status: string; dispute_status: string };
 
 type EventCard = {
   id: string;
@@ -134,16 +137,20 @@ export default function OrganizerHubPage() {
 
       const eventIds = (rawEvents ?? []).map((e: { id: string }) => e.id);
       const { data: orders } = eventIds.length > 0
-        ? await supabase.from("orders").select("event_id, qty, unit_price, grand_total, created_at, status").in("event_id", eventIds).eq("status", "confirmed").eq("is_test", false).order("created_at", { ascending: false })
+        ? await supabase.from("orders").select("event_id, qty, unit_price, discount_amount, created_at, status, dispute_status").in("event_id", eventIds).eq("status", "confirmed").eq("is_test", false).order("created_at", { ascending: false })
         : { data: [] };
 
-      const allOrders: OrderRow[] = (orders ?? []) as OrderRow[];
+      // Paid orders only: confirmed + non-test (already filtered above) and not a
+      // lost/open chargeback. Disputed-but-won orders still count as paid.
+      const allOrders: OrderRow[] = ((orders ?? []) as OrderRow[]).filter(
+        (o) => o.dispute_status !== "open" && o.dispute_status !== "lost"
+      );
 
       const cards: EventCard[] = ((rawEvents ?? []) as RawEvent[]).map((ev) => {
         const evOrders = allOrders.filter((o) => o.event_id === ev.id);
         const totalSold = evOrders.reduce((s, o) => s + o.qty, 0);
         const totalCapacity = ev.ticket_tiers.reduce((s, t) => s + (t.quantity ?? 0), 0);
-        const grossRevenue = evOrders.reduce((s, o) => s + o.grand_total, 0);
+        const grossRevenue = evOrders.reduce((s, o) => s + orderRevenue(o), 0);
         const d = daysUntil(ev.start_date);
         const isPast = d < -1;
         return {
@@ -156,7 +163,7 @@ export default function OrganizerHubPage() {
         };
       });
 
-      const revenue = allOrders.reduce((s, o) => s + o.grand_total, 0);
+      const revenue = allOrders.reduce((s, o) => s + orderRevenue(o), 0);
       setTotalRevenue(revenue);
 
       // Enrich recent orders with event titles
@@ -343,7 +350,7 @@ export default function OrganizerHubPage() {
                       <p className="font-mono text-[10px] text-ink/30">{o.qty} ticket{o.qty !== 1 ? "s" : ""} · {timeAgo(o.created_at)}</p>
                     </div>
                     <span className="font-display font-bold text-ink/65 text-[13px] shrink-0" style={{ letterSpacing: "-0.02em" }}>
-                      {fmtMoney(o.grand_total)}
+                      {fmtMoney(orderRevenue(o))}
                     </span>
                   </div>
                 ))}

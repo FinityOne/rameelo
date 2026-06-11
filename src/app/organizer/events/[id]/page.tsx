@@ -195,6 +195,7 @@ export default function EventDashboardPage() {
           .select("id, buyer_name, buyer_email, qty, grand_total, status, created_at, ticket_tiers(name)", { count: "exact" })
           .eq("event_id", id)
           .eq("is_test", false)
+          .neq("status", "pending")   // organizers only see paid orders, never pending ones
           .order("created_at", { ascending: false })
           .limit(5),
 

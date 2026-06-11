@@ -339,10 +339,9 @@ export default function EventOrdersPage() {
 
         {/* Summary tiles */}
         {orders.length > 0 && (
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="grid grid-cols-3 gap-3">
             {[
               { label: "Confirmed", count: orders.filter(o => o.status === "confirmed").length, cls: "text-peacock" },
-              { label: "Pending",   count: orders.filter(o => o.status === "pending").length,   cls: "text-[#a06b00]" },
               { label: "Refunded",  count: orders.filter(o => o.status === "refunded").length,  cls: "text-durga" },
               { label: "Cancelled", count: cancelledCount,                                       cls: "text-ink-muted" },
             ].map(tile => (
@@ -363,7 +362,7 @@ export default function EventOrdersPage() {
         {/* Filter bar */}
         {orders.length > 0 && (
           <div className="flex items-center gap-1 bg-ivory-200 rounded-xl p-1 w-fit">
-            {["all", "confirmed", "pending", "refunded", "cancelled"].map(f => (
+            {["all", "confirmed", "refunded", "cancelled"].map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 className={`px-3 py-1.5 rounded-lg font-ui text-xs font-semibold capitalize transition-all ${
                   filter === f ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
