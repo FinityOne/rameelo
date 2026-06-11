@@ -43,6 +43,7 @@ export default function ConfirmationPage() {
   const [confettiActive, setConfettiActive] = useState(false);
   const [copied, setCopied] = useState(false);
   const [isSignedIn, setIsSignedIn] = useState<boolean | null>(null); // null = unknown
+  const [phase, setPhase] = useState<"checking" | "pending" | "confirmed" | "cancelled" | "timeout">("checking");
 
   useEffect(() => { document.title = "Order Confirmed | Rameelo"; }, []);
 
@@ -54,14 +55,38 @@ export default function ConfirmationPage() {
   useEffect(() => {
     try {
       const raw = localStorage.getItem("rameelo_order");
-      if (raw) {
-        const parsed = JSON.parse(raw) as StoredOrder;
-        setOrder(parsed);
-        setConfettiActive(true);
-        setTimeout(() => setConfettiActive(false), 3000);
-      }
+      if (raw) setOrder(JSON.parse(raw) as StoredOrder);
     } catch {}
   }, []);
+
+  // Poll the order status until the payment webhook marks it paid — up to ~1
+  // minute, then settle on "still pending" so the buyer isn't stuck on a spinner.
+  useEffect(() => {
+    const fromUrl = typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("order") : null;
+    const orderId = fromUrl || order?.orderId || "";
+    if (!/^[0-9a-fA-F-]{36}$/.test(orderId)) { setPhase("pending"); return; }
+    const supabase = createClient();
+    let active = true;
+    const startedAt = Date.now();
+    async function poll() {
+      if (!active) return;
+      const { data } = await supabase.rpc("get_order_status", { p_order_id: orderId });
+      if (!active) return;
+      const st = (data as { status?: string } | null)?.status;
+      if (st === "confirmed") {
+        setPhase("confirmed");
+        setConfettiActive(true);
+        setTimeout(() => setConfettiActive(false), 3000);
+        return;
+      }
+      if (st === "cancelled") { setPhase("cancelled"); return; }
+      if (Date.now() - startedAt > 60000) { setPhase("timeout"); return; } // ~1 min cap
+      setPhase("pending");
+      setTimeout(poll, 3000);
+    }
+    poll();
+    return () => { active = false; };
+  }, [order?.orderId]);
 
   function copyOrderId() {
     if (order) {
@@ -82,6 +107,11 @@ export default function ConfirmationPage() {
       </div>
     );
   }
+
+  const paid = phase === "confirmed";
+  const failed = phase === "cancelled";
+  const stillPending = phase === "timeout";
+  const processing = phase === "checking" || phase === "pending";
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FCF9F2" }}>
@@ -109,98 +139,117 @@ export default function ConfirmationPage() {
         )}
 
         <div className="relative max-w-2xl mx-auto px-4 sm:px-6 py-12 text-center">
-          {/* Icon — checkmark for confirmed, hourglass-style for pending ACH */}
-          <div className="w-20 h-20 rounded-full mx-auto flex items-center justify-center mb-6" style={{ backgroundColor: order.paymentPending ? "#B8780F" : "#0E8C7A" }}>
-            {order.paymentPending ? (
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+          {/* Icon reflects the live payment state */}
+          <div className="w-20 h-20 rounded-full mx-auto flex items-center justify-center mb-6" style={{ backgroundColor: paid ? "#0E8C7A" : failed ? "#7C1F2C" : "#B8780F" }}>
+            {paid ? (
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+            ) : failed ? (
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+            ) : processing ? (
+              <div className="w-9 h-9 rounded-full border-4 border-white/30 border-t-white animate-spin" />
             ) : (
-              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
-              </svg>
+              <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             )}
           </div>
 
           <p className="font-mono text-marigold text-xs font-bold uppercase tracking-widest mb-2">
-            {order.paymentPending ? "Tickets Reserved" : "Order Confirmed"}
+            {paid ? "Order Confirmed" : failed ? "Payment Issue" : processing ? "Confirming Payment" : "Payment Pending"}
           </p>
           <h1 className="font-display text-3xl md:text-4xl font-bold text-white mb-3">
-            {order.paymentPending ? (
-              <>Your spot is reserved,<br /><span className="text-marigold">{order.firstName}!</span></>
-            ) : (
-              <>You&rsquo;re going to Garba,<br /><span className="text-marigold">{order.firstName}!</span></>
-            )}
+            {paid ? <>You&rsquo;re going to Garba,<br /><span className="text-marigold">{order.firstName}!</span></>
+              : failed ? <>Hold on,<br /><span className="text-marigold">{order.firstName}.</span></>
+              : <>Almost there,<br /><span className="text-marigold">{order.firstName}!</span></>}
           </h1>
           <p className="font-ui text-white/60 text-sm">
-            {order.paymentPending
-              ? "We’re waiting on your bank transfer to clear"
-              : "Your tickets are saved to your Rameelo account"}
+            {paid ? "Your tickets are saved to your Rameelo account"
+              : failed ? "Your payment didn’t go through — no charge was made"
+              : processing ? "We’re confirming your payment…"
+              : "We’re still waiting for your payment to clear"}
           </p>
         </div>
       </div>
 
       <div className="max-w-2xl mx-auto px-4 sm:px-6 py-8 space-y-5">
 
-        {/* Pending (ACH) — explain the reserved state + when QR codes arrive */}
-        {order.paymentPending && (
+        {/* Confirming — webhook hasn't landed yet (first ~minute) */}
+        {processing && (
+          <div className="rounded-2xl border-2 border-marigold/40 bg-marigold/[0.08] p-5 sm:p-6 text-center">
+            <div className="w-10 h-10 rounded-full border-4 border-marigold/30 border-t-marigold animate-spin mx-auto mb-3" />
+            <p className="font-display font-bold text-ink text-base">Confirming your payment…</p>
+            <p className="font-ui text-sm text-ink-muted mt-1 leading-relaxed">This usually takes just a few seconds — please keep this page open.</p>
+          </div>
+        )}
+
+        {/* Still pending after ~1 minute */}
+        {stillPending && (
           <div className="rounded-2xl border-2 border-marigold/40 bg-marigold/[0.08] p-5 sm:p-6">
             <div className="flex items-start gap-3">
               <div className="w-10 h-10 rounded-xl bg-marigold/20 flex items-center justify-center shrink-0 text-xl">⏳</div>
               <div>
-                <p className="font-display font-bold text-ink text-base">Payment is clearing</p>
+                <p className="font-display font-bold text-ink text-base">We&rsquo;re still pending your payment to clear</p>
                 <p className="font-ui text-sm text-ink-muted mt-1 leading-relaxed">
-                  Bank transfers take <strong className="text-ink">2–5 business days</strong> to settle. Your spot is held the whole time. As soon as your payment clears, your tickets are confirmed and your <strong className="text-ink">QR codes appear in your account</strong> — we&rsquo;ll email you the moment they&rsquo;re ready.
+                  We haven&rsquo;t received final confirmation yet. {order.paymentMethod === "ach" ? "Bank transfers can take 2–5 business days to settle." : "This occasionally takes a little longer than usual."} Your spot is held — <strong className="text-ink">we&rsquo;ll email you the moment it&rsquo;s confirmed</strong>, and your tickets unlock in your account.
                 </p>
               </div>
             </div>
           </div>
         )}
 
-        {/* Where the tickets live — no QR here; drive to the account */}
-        <div className="rounded-2xl border-2 border-marigold/30 bg-marigold/[0.06] p-5 sm:p-6 text-center">
-          <div className="w-12 h-12 rounded-2xl bg-marigold/20 flex items-center justify-center mx-auto mb-3 text-2xl">🎟️</div>
-          <p className="font-display font-bold text-ink text-lg">
-            {order.paymentPending ? "Your tickets live in your account" : "Your tickets are in your account"}
-          </p>
-          <p className="font-ui text-sm text-ink-muted mt-1 mb-4">
-            {order.paymentPending
-              ? (isSignedIn === false
-                  ? "Create your free account with the email below — your reserved tickets (and their QR codes, once payment clears) will be waiting for you."
-                  : "Your reserved tickets are here. The QR codes unlock automatically once your bank transfer clears.")
-              : isSignedIn === false
-                ? "We've reserved your tickets and QR codes. Create your free account to open your wallet — use the email below so they're waiting for you."
-                : "Your tickets and QR codes are ready in your Rameelo wallet."}
-          </p>
-
-          {/* Showcase the account email */}
-          <div className="inline-flex flex-col items-center gap-0.5 px-5 py-3 rounded-xl bg-white border border-ivory-200 mb-4">
-            <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Account email</span>
-            <span className="font-display font-bold text-ink text-base break-all">{order.email}</span>
+        {/* Payment failed */}
+        {failed && (
+          <div className="rounded-2xl border-2 border-durga/30 bg-durga/[0.06] p-5 sm:p-6 text-center">
+            <p className="font-display font-bold text-ink text-lg">Your payment didn&rsquo;t go through</p>
+            <p className="font-ui text-sm text-ink-muted mt-1 mb-4">No charge was made. You can try again with a different payment method.</p>
+            <Link href="/events" className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark transition-all">Browse events →</Link>
           </div>
+        )}
 
-          {isSignedIn === false ? (
-            <>
+        {/* Where the tickets live — once paid (or set up your account ready for when it clears) */}
+        {(paid || stillPending) && (
+          <div className="rounded-2xl border-2 border-marigold/30 bg-marigold/[0.06] p-5 sm:p-6 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-marigold/20 flex items-center justify-center mx-auto mb-3 text-2xl">🎟️</div>
+            <p className="font-display font-bold text-ink text-lg">
+              {paid ? "Your tickets are in your account" : "Your tickets live in your account"}
+            </p>
+            <p className="font-ui text-sm text-ink-muted mt-1 mb-4">
+              {paid
+                ? (isSignedIn === false
+                    ? "Create your free account with the email below to open your wallet — your tickets and QR codes are waiting."
+                    : "Your tickets and QR codes are ready in your Rameelo wallet.")
+                : (isSignedIn === false
+                    ? "Create your free account with the email below — your tickets and QR codes unlock here as soon as your payment clears."
+                    : "Your tickets and QR codes unlock here automatically once your payment clears.")}
+            </p>
+
+            {/* Showcase the account email */}
+            <div className="inline-flex flex-col items-center gap-0.5 px-5 py-3 rounded-xl bg-white border border-ivory-200 mb-4">
+              <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Account email</span>
+              <span className="font-display font-bold text-ink text-base break-all">{order.email}</span>
+            </div>
+
+            {isSignedIn === false ? (
+              <>
+                <Link
+                  href={`/auth/signup?email=${encodeURIComponent(order.email)}&next=${encodeURIComponent("/portal/tickets")}`}
+                  className="block w-full py-3.5 rounded-2xl bg-marigold text-aubergine font-display font-bold text-sm text-center hover:bg-marigold-dark active:scale-[0.98] shadow-sm transition-all"
+                >
+                  Create my account &amp; open my tickets →
+                </Link>
+                <p className="font-mono text-[10px] text-ink-muted mt-2">
+                  Already have one?{" "}
+                  <Link href={`/auth/signin?next=${encodeURIComponent("/portal/tickets")}`} className="text-marigold-dark font-bold hover:underline">Sign in</Link>
+                </p>
+              </>
+            ) : (
               <Link
-                href={`/auth/signup?email=${encodeURIComponent(order.email)}&next=${encodeURIComponent("/portal/tickets")}`}
+                href="/portal/tickets"
                 className="block w-full py-3.5 rounded-2xl bg-marigold text-aubergine font-display font-bold text-sm text-center hover:bg-marigold-dark active:scale-[0.98] shadow-sm transition-all"
               >
-                Create my account &amp; open my tickets →
+                Open my tickets →
               </Link>
-              <p className="font-mono text-[10px] text-ink-muted mt-2">
-                Already have one?{" "}
-                <Link href={`/auth/signin?next=${encodeURIComponent("/portal/tickets")}`} className="text-marigold-dark font-bold hover:underline">Sign in</Link>
-              </p>
-            </>
-          ) : (
-            <Link
-              href="/portal/tickets"
-              className="block w-full py-3.5 rounded-2xl bg-marigold text-aubergine font-display font-bold text-sm text-center hover:bg-marigold-dark active:scale-[0.98] shadow-sm transition-all"
-            >
-              Open my tickets →
-            </Link>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         {/* Order ID card */}
         <div className="rounded-2xl bg-white border border-ivory-200 overflow-hidden">

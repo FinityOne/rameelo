@@ -51,16 +51,21 @@ export async function POST(request: Request) {
             setup_future_usage: "off_session" as const,
           }
         : {}),
-      // Lightweight context for reconciliation in the Stripe dashboard.
+      // Rich context so the Stripe dashboard alone can tell you which event,
+      // tier, and how many tickets a payment is for — a full backup source of
+      // truth if an order ever needs to be reconstructed.
       metadata: {
         event_id: typeof body.eventId === "string" ? body.eventId : "",
+        event_title: typeof body.eventTitle === "string" ? body.eventTitle.slice(0, 480) : "",
         tier_id: typeof body.tierId === "string" ? body.tierId : "",
-        group_id: typeof body.groupId === "string" ? body.groupId : "",
+        tier_name: typeof body.tierName === "string" ? body.tierName.slice(0, 480) : "",
         qty: String(body.qty ?? ""),
+        group_id: typeof body.groupId === "string" ? body.groupId : "",
+        event_date: typeof body.eventStartDate === "string" ? body.eventStartDate : "",
       },
     });
 
-    return NextResponse.json({ clientSecret: intent.client_secret, isTest: STRIPE_TEST_MODE });
+    return NextResponse.json({ clientSecret: intent.client_secret, paymentIntentId: intent.id, isTest: STRIPE_TEST_MODE });
   } catch (e) {
     console.error("create-payment-intent error:", e);
     // In test mode surface the real Stripe message so it's debuggable; in live

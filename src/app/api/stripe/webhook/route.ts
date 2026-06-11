@@ -5,6 +5,9 @@ import { createAdminClient, serviceRoleConfigured } from "@/lib/supabase/admin";
 import { friendlyStripeError } from "@/lib/stripe/errors";
 import { paymentFailedEmail } from "@/lib/email/templates/paymentFailed";
 import { orderConfirmationEmail } from "@/lib/email/templates/orderConfirmation";
+import { orderTeamNotificationEmail } from "@/lib/email/templates/orderTeamNotification";
+import { ticketsPendingEmail } from "@/lib/email/templates/ticketsPending";
+import { groupTicketClaimEmail } from "@/lib/email/templates/groupTicketClaim";
 import { sendEmail } from "@/lib/email/send";
 import { recordEmailLog } from "@/lib/email/log";
 import { EMAIL } from "@/lib/email/theme";
@@ -29,19 +32,20 @@ function one<T>(v: T | T[] | null | undefined): T | null {
 // Stripe sends the raw body; we must read it verbatim to verify the signature.
 export const runtime = "nodejs";
 
-// Stripe webhook — the source of truth for async payment outcomes.
+// Stripe webhook — the SOURCE OF TRUTH for payment outcomes.
 //
-// Why it matters: a card decline is caught live at checkout, but a *bank/ACH*
-// transfer is only "processing" at checkout and can bounce days later. Stripe
-// reports that via `payment_intent.payment_failed`. This endpoint reconciles the
-// order: a failed/canceled payment flips the order out of `confirmed`, which the
-// quantity_sold trigger uses to release the seat — so a bounced payment never
-// keeps a valid ticket. The buyer is emailed so they know to fix it.
+// Orders are created `pending` at checkout (before payment) so none are ever
+// lost. This endpoint is what actually FULFILLS them:
+//   • payment_intent.succeeded  → confirm the order (releasing the QR/tickets),
+//       email the buyer their receipt, alert the organizing team, allocate group
+//       tickets + claim emails, and save the payment method.
+//   • payment_intent.processing → ACH initiated: email the buyer "tickets reserved".
+//   • payment_intent.payment_failed / canceled → cancel + release the seat + email
+//       (card declines during active checkout are left pending so a retry works).
 //
 // Runs with no user session (Stripe calls us), so it uses the service-role client.
 export async function POST(request: Request) {
   if (!stripeConfigured || !STRIPE_WEBHOOK_SECRET) {
-    // Misconfigured — tell Stripe so the dashboard surfaces it (and it retries).
     return NextResponse.json({ error: "Stripe webhook not configured" }, { status: 500 });
   }
 
@@ -53,13 +57,10 @@ export async function POST(request: Request) {
   try {
     event = getStripe().webhooks.constructEvent(raw, sig, STRIPE_WEBHOOK_SECRET);
   } catch (e) {
-    // Bad signature → reject so nobody can spoof payment outcomes.
     const msg = e instanceof Error ? e.message : "invalid signature";
     return NextResponse.json({ error: `Webhook signature verification failed: ${msg}` }, { status: 400 });
   }
 
-  // We can verify but can't write without the service role — ack so Stripe stops
-  // retrying, but make the gap obvious in logs.
   if (!serviceRoleConfigured) {
     console.error("Stripe webhook received but SUPABASE_SERVICE_ROLE_KEY is not set — cannot reconcile order.");
     return NextResponse.json({ received: true, skipped: "no-service-role" });
@@ -67,29 +68,28 @@ export async function POST(request: Request) {
 
   try {
     switch (event.type) {
-      case "payment_intent.payment_failed":
-      case "payment_intent.canceled": {
-        const pi = event.data.object as Stripe.PaymentIntent;
-        const reason =
-          event.type === "payment_intent.canceled"
-            ? "The payment was canceled before it completed."
-            : friendlyStripeError(pi.last_payment_error ?? undefined);
-        await failOrderForIntent(pi.id, reason);
+      case "payment_intent.succeeded": {
+        await fulfillPaidOrder(event.data.object as Stripe.PaymentIntent);
         break;
       }
-      // A bank/ACH transfer clearing lands here. Cards are already `confirmed`
-      // inline at checkout (no-op), but a `pending` ACH order is now confirmed —
-      // which releases the QR codes — and the buyer gets the full ticket email.
-      case "payment_intent.succeeded": {
+      case "payment_intent.processing": {
+        await notifyAchProcessing((event.data.object as Stripe.PaymentIntent).id);
+        break;
+      }
+      case "payment_intent.payment_failed": {
         const pi = event.data.object as Stripe.PaymentIntent;
-        await confirmOrderForIntent(pi.id);
+        await failOrderForIntent(pi, friendlyStripeError(pi.last_payment_error ?? undefined), false);
+        break;
+      }
+      case "payment_intent.canceled": {
+        const pi = event.data.object as Stripe.PaymentIntent;
+        await failOrderForIntent(pi, "The payment was canceled before it completed.", true);
         break;
       }
       default:
         break;
     }
   } catch (e) {
-    // Returning 500 makes Stripe retry, which is what we want on a transient error.
     const msg = e instanceof Error ? e.message : String(e);
     console.error("Stripe webhook handler error:", msg);
     return NextResponse.json({ error: msg }, { status: 500 });
@@ -98,119 +98,191 @@ export async function POST(request: Request) {
   return NextResponse.json({ received: true });
 }
 
-// Cancels the order tied to a failed PaymentIntent (releasing its seats via the
-// quantity_sold trigger) and emails the buyer. Idempotent: only acts on an order
-// that's still `confirmed`, so duplicate webhook deliveries don't double-send.
-async function failOrderForIntent(paymentIntentId: string, reason: string) {
+type FulfillEvent = { title: string; start_date: string; start_time: string | null; city: string | null; state: string | null; venue_name: string | null; cover_image_url: string | null; org_id: string | null; organizer_id: string | null; artists: { name: string } | { name: string }[] | null } | null;
+
+// Confirms a paid order and fully fulfills it. Idempotent — only acts on an order
+// that's still `pending`, so duplicate webhook deliveries don't double-fire.
+async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
   const admin = createAdminClient();
 
+  // Find the order for this PaymentIntent and decide if it should be fulfilled:
+  // a still-pending order, or one the cleanup cron expired while the webhook was
+  // delayed (reason "Expired…"). Never re-fulfill an already-confirmed order or a
+  // real payment failure ("Payment failed: …").
+  const { data: cand } = await admin
+    .from("orders")
+    .select("id, status, cancellation_reason")
+    .eq("stripe_payment_intent_id", pi.id)
+    .limit(1)
+    .maybeSingle();
+  if (!cand) return; // unknown intent
+  const eligible = cand.status === "pending" || (cand.status === "cancelled" && (cand.cancellation_reason ?? "").startsWith("Expired"));
+  if (!eligible) return; // already fulfilled, or a real failure
+
+  // Idempotent: gating on the exact current status means concurrent deliveries
+  // only fulfill once. The trigger re-reserves the seat if it was released.
   const { data: rows } = await admin
     .from("orders")
-    .update({
-      status: "cancelled",
-      cancellation_reason: `Payment failed: ${reason}`,
-      cancelled_at: new Date().toISOString(),
-    })
-    .eq("stripe_payment_intent_id", paymentIntentId)
-    // ACH orders are 'pending' until cleared; a bounce can hit either state.
-    .in("status", ["confirmed", "pending"])
-    .select("id, user_id, buyer_name, buyer_email, qty, event_id");
-
-  const order = rows?.[0];
-  if (!order) return; // unknown intent, or already handled
-
-  // Tell the buyer their payment didn't go through and how to fix it.
-  if (order.buyer_email) {
-    const { data: ev } = await admin
-      .from("events")
-      .select("title")
-      .eq("id", order.event_id)
-      .single();
-
-    const { subject, html, text } = paymentFailedEmail({
-      buyerName: order.buyer_name,
-      eventTitle: ev?.title ?? "your event",
-      qty: order.qty,
-      reason,
-      retryUrl: `${EMAIL.site}/events`,
-    });
-
-    const { id: providerId, error: sendError } = await sendEmail({ to: order.buyer_email, subject, html, text });
-    await recordEmailLog(admin, {
-      userId: order.user_id,
-      toEmail: order.buyer_email,
-      type: "payment_failed",
-      subject,
-      status: sendError ? "failed" : "sent",
-      trigger: "automatic",
-      providerId,
-      error: sendError,
-    });
-  }
-}
-
-// Confirms a pending order once its bank transfer clears: status pending →
-// confirmed (releasing the QR codes) and emails the buyer their full ticket
-// confirmation. Idempotent — only acts on a still-`pending` order.
-async function confirmOrderForIntent(paymentIntentId: string) {
-  const admin = createAdminClient();
-
-  const { data: rows } = await admin
-    .from("orders")
-    .update({ status: "confirmed", confirmation_email_sent_at: new Date().toISOString() })
-    .eq("stripe_payment_intent_id", paymentIntentId)
-    .eq("status", "pending")
+    .update({ status: "confirmed", confirmation_email_sent_at: new Date().toISOString(), cancellation_reason: null, cancelled_at: null })
+    .eq("id", cand.id)
+    .eq("status", cand.status)
     .select(`
-      id, user_id, buyer_name, buyer_email, qty, unit_price, discount_pct, discount_amount,
-      rameelo_fee, processing_fee, grand_total, payment_method,
-      events ( title, start_date, start_time, city, state, venue_name, artists ( name ) ),
+      id, user_id, group_id, buyer_name, buyer_email, qty, unit_price, discount_pct, discount_amount,
+      rameelo_fee, processing_fee, grand_total, payment_method, event_id,
+      events ( title, start_date, start_time, city, state, venue_name, cover_image_url, org_id, organizer_id, artists ( name ) ),
       ticket_tiers ( name )
     `);
 
   const order = rows?.[0] as {
-    id: string; user_id: string | null; buyer_name: string | null; buyer_email: string;
+    id: string; user_id: string | null; group_id: string | null; buyer_name: string | null; buyer_email: string;
     qty: number; unit_price: number; discount_pct: number; discount_amount: number;
-    rameelo_fee: number; processing_fee: number; grand_total: number; payment_method: string;
-    events: { title: string; start_date: string; start_time: string | null; city: string | null; state: string | null; venue_name: string | null; artists: { name: string } | { name: string }[] | null } | null;
-    ticket_tiers: { name: string } | null;
+    rameelo_fee: number; processing_fee: number; grand_total: number; payment_method: string; event_id: string;
+    events: FulfillEvent; ticket_tiers: { name: string } | null;
   } | undefined;
-  if (!order || !order.buyer_email) return; // unknown intent, already confirmed, or no email
+  if (!order || !order.buyer_email) return; // already fulfilled, or unknown intent
+
+  const ev = order.events;
+  const artist = one(ev?.artists)?.name ?? null;
+  const tierName = order.ticket_tiers?.name ?? "Ticket";
+  const eventWhen = ev ? `${fmtDate(ev.start_date)}${fmtTime(ev.start_time) ? ` · ${fmtTime(ev.start_time)}` : ""}` : "";
+  const where = [ev?.venue_name, ev?.city, ev?.state].filter(Boolean).join(", ");
+
+  // 1) Group order: mark paid, split into per-member allocations, email claim links.
+  if (order.group_id) {
+    try {
+      await admin.rpc("mark_group_paid", { p_group_id: order.group_id, p_order_id: order.id });
+      await admin.rpc("create_group_ticket_allocations", { p_order_id: order.id });
+      const { data: recips } = await admin.rpc("get_group_claim_recipients", { p_order_id: order.id });
+      for (const r of (recips ?? []) as { to_email: string; to_name: string | null; qty: number; token: string; buyer_name: string | null; event_title: string; event_start_date: string; event_start_time: string | null; city: string; state: string; venue_name: string | null }[]) {
+        const cl = groupTicketClaimEmail({
+          recipientName: r.to_name, buyerName: r.buyer_name ?? "", eventTitle: r.event_title,
+          eventWhen: `${fmtDate(r.event_start_date)}${fmtTime(r.event_start_time) ? ` · ${fmtTime(r.event_start_time)}` : ""}`,
+          eventWhere: [r.venue_name, r.city, r.state].filter(Boolean).join(", "),
+          qty: r.qty, claimUrl: `${EMAIL.site}/tickets/claim/${r.token}`,
+        });
+        const sent = await sendEmail({ to: r.to_email, subject: cl.subject, html: cl.html, text: cl.text });
+        await recordEmailLog(admin as SupabaseClient, { userId: null, toEmail: r.to_email, type: "group_ticket_claim", subject: cl.subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error });
+      }
+    } catch (e) { console.error("group fulfillment error:", e instanceof Error ? e.message : e); }
+  }
+
+  // 2) Buyer confirmation / receipt. (Best-effort: the order is already confirmed
+  //    above — never let an email hiccup throw, which would make Stripe retry and
+  //    then skip fulfillment since the order is no longer `pending`.)
+  try {
+    const conf = orderConfirmationEmail({
+      buyerName: order.buyer_name, receiptNum: receiptNum(order.id), qty: order.qty,
+      unitPrice: Number(order.unit_price) || 0, discountPct: Number(order.discount_pct) || 0, discountAmount: Number(order.discount_amount) || 0,
+      rameeloFee: Number(order.rameelo_fee) || 0, processingFee: Number(order.processing_fee) || 0, grandTotal: Number(order.grand_total) || 0,
+      tierName, eventTitle: ev?.title ?? "your event", artistName: artist,
+      eventWhen, eventWhere: where,
+      directionsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(where)}`,
+      ticketsUrl: `${EMAIL.site}/portal/tickets`, buyMoreUrl: `${EMAIL.site}/events`,
+    });
+    const r1 = await sendEmail({ to: order.buyer_email, subject: conf.subject, html: conf.html, text: conf.text });
+    await recordEmailLog(admin as SupabaseClient, { userId: order.user_id, toEmail: order.buyer_email, type: "order_confirmation", subject: conf.subject, status: r1.error ? "failed" : "sent", trigger: "automatic", providerId: r1.id, error: r1.error });
+  } catch (e) { console.error("buyer confirmation email error:", e instanceof Error ? e.message : e); }
+
+  // 3) Organizing team alert (org owners/admins + the event creator).
+  try {
+    const memberIds = ev?.org_id
+      ? ((await admin.from("organization_members").select("user_id").eq("org_id", ev.org_id).in("role", ["owner", "admin"])).data ?? []).map(m => m.user_id)
+      : [];
+    const ids = Array.from(new Set([...memberIds, ev?.organizer_id].filter(Boolean))) as string[];
+    const { data: profs } = ids.length ? await admin.from("profiles").select("email, first_name").in("id", ids) : { data: [] };
+    for (const p of ((profs ?? []) as { email: string | null; first_name: string | null }[]).filter(p => p.email)) {
+      const tn = orderTeamNotificationEmail({
+        recipientFirstName: p.first_name, buyerFirstName: (order.buyer_name || "").trim().split(" ")[0] || "Someone",
+        qty: order.qty, tierName, grandTotal: Number(order.grand_total) || 0,
+        eventTitle: ev?.title ?? "", artistName: artist, eventWhen, eventWhere: where,
+        bannerUrl: ev?.cover_image_url ?? null, ordersUrl: `${EMAIL.site}/organizer/events/${order.event_id}/orders`,
+        paymentMethod: order.payment_method,
+      });
+      const sent = await sendEmail({ to: p.email as string, subject: tn.subject, html: tn.html, text: tn.text });
+      await recordEmailLog(admin as SupabaseClient, { toEmail: p.email as string, type: "order_team_notification", subject: tn.subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error });
+    }
+  } catch (e) { console.error("team notify error:", e instanceof Error ? e.message : e); }
+
+  // 4) Save the payment method (last-4 / brand) to the order + buyer's account.
+  try {
+    const full = await getStripe().paymentIntents.retrieve(pi.id, { expand: ["payment_method"] });
+    const pm = full.payment_method as Stripe.PaymentMethod | null;
+    if (pm && typeof pm !== "string") {
+      let brand = "", last4 = "", expMonth: number | null = null, expYear: number | null = null;
+      if (pm.type === "card" && pm.card) { brand = pm.card.brand ?? ""; last4 = pm.card.last4 ?? ""; expMonth = pm.card.exp_month ?? null; expYear = pm.card.exp_year ?? null; }
+      else if (pm.type === "us_bank_account" && pm.us_bank_account) { brand = pm.us_bank_account.bank_name ?? ""; last4 = pm.us_bank_account.last4 ?? ""; }
+      const customerId = typeof full.customer === "string" ? full.customer : full.customer?.id ?? "";
+      await admin.rpc("save_order_payment_method", { p_order_id: order.id, p_pm_id: pm.id, p_customer_id: customerId, p_type: pm.type, p_brand: brand, p_last4: last4, p_exp_month: expMonth, p_exp_year: expYear });
+    }
+  } catch (e) { console.error("save payment method error:", e instanceof Error ? e.message : e); }
+}
+
+// ACH initiated (not yet cleared) — tell the buyer their tickets are reserved.
+async function notifyAchProcessing(paymentIntentId: string) {
+  const admin = createAdminClient();
+  const { data: o } = await admin
+    .from("orders")
+    .select(`id, user_id, buyer_name, buyer_email, qty, payment_method,
+      events ( title, start_date, start_time, city, state, venue_name, artists ( name ) ),
+      ticket_tiers ( name )`)
+    .eq("stripe_payment_intent_id", paymentIntentId)
+    .eq("status", "pending")
+    .maybeSingle();
+
+  const order = o as {
+    id: string; user_id: string | null; buyer_name: string | null; buyer_email: string; qty: number; payment_method: string;
+    events: FulfillEvent; ticket_tiers: { name: string } | null;
+  } | null;
+  if (!order || order.payment_method !== "ach" || !order.buyer_email) return;
 
   const ev = order.events;
   const artist = one(ev?.artists)?.name ?? null;
   const eventWhen = ev ? `${fmtDate(ev.start_date)}${fmtTime(ev.start_time) ? ` · ${fmtTime(ev.start_time)}` : ""}` : "";
   const where = [ev?.venue_name, ev?.city, ev?.state].filter(Boolean).join(", ");
-  const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(where)}`;
 
-  const { subject, html, text } = orderConfirmationEmail({
-    buyerName: order.buyer_name,
-    receiptNum: receiptNum(order.id),
-    qty: order.qty,
-    unitPrice: Number(order.unit_price) || 0,
-    discountPct: Number(order.discount_pct) || 0,
-    discountAmount: Number(order.discount_amount) || 0,
-    rameeloFee: Number(order.rameelo_fee) || 0,
-    processingFee: Number(order.processing_fee) || 0,
-    grandTotal: Number(order.grand_total) || 0,
-    tierName: order.ticket_tiers?.name ?? "Ticket",
-    eventTitle: ev?.title ?? "your event",
-    artistName: artist,
-    eventWhen,
-    eventWhere: where,
-    directionsUrl,
-    ticketsUrl: `${EMAIL.site}/portal/tickets`,
-    buyMoreUrl: `${EMAIL.site}/events`,
+  const { subject, html, text } = ticketsPendingEmail({
+    buyerName: order.buyer_name, receiptNum: receiptNum(order.id), qty: order.qty,
+    tierName: order.ticket_tiers?.name ?? "Ticket", eventTitle: ev?.title ?? "", artistName: artist,
+    eventWhen, eventWhere: where, ticketsUrl: `${EMAIL.site}/portal/tickets`,
   });
+  const sent = await sendEmail({ to: order.buyer_email, subject, html, text });
+  await recordEmailLog(admin as SupabaseClient, { userId: order.user_id, toEmail: order.buyer_email, type: "tickets_pending", subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error });
+}
 
-  const { id: providerId, error: sendError } = await sendEmail({ to: order.buyer_email, subject, html, text });
-  await recordEmailLog(admin as SupabaseClient, {
-    userId: order.user_id,
-    toEmail: order.buyer_email,
-    type: "order_confirmation",
-    subject,
-    status: sendError ? "failed" : "sent",
-    trigger: "automatic",
-    providerId,
-    error: sendError,
+// Cancels the order tied to a failed/canceled PaymentIntent and releases its seat.
+// A *card* decline during active checkout is left pending (the buyer is retrying on
+// the page), so we only cancel when forced (PI canceled), or for ACH bounces, or a
+// confirmed order failing. Emails the buyer when it's a real cancellation.
+async function failOrderForIntent(pi: Stripe.PaymentIntent, reason: string, forceCancel: boolean) {
+  const admin = createAdminClient();
+
+  const { data: existing } = await admin
+    .from("orders")
+    .select("id, status, payment_method")
+    .eq("stripe_payment_intent_id", pi.id)
+    .in("status", ["confirmed", "pending"])
+    .maybeSingle();
+  if (!existing) return; // unknown or already handled
+
+  const isAch = existing.payment_method === "ach";
+  // Leave card checkout declines pending for a retry; cancel only when meaningful.
+  if (!forceCancel && existing.status === "pending" && !isAch) return;
+
+  const { data: rows } = await admin
+    .from("orders")
+    .update({ status: "cancelled", cancellation_reason: `Payment failed: ${reason}`, cancelled_at: new Date().toISOString() })
+    .eq("id", existing.id)
+    .in("status", ["confirmed", "pending"])
+    .select("id, user_id, buyer_name, buyer_email, qty, event_id");
+
+  const order = rows?.[0];
+  if (!order || !order.buyer_email) return;
+
+  const { data: ev } = await admin.from("events").select("title").eq("id", order.event_id).single();
+  const { subject, html, text } = paymentFailedEmail({
+    buyerName: order.buyer_name, eventTitle: ev?.title ?? "your event", qty: order.qty,
+    reason, retryUrl: `${EMAIL.site}/events`,
   });
+  const sent = await sendEmail({ to: order.buyer_email, subject, html, text });
+  await recordEmailLog(admin as SupabaseClient, { userId: order.user_id, toEmail: order.buyer_email, type: "payment_failed", subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error });
 }

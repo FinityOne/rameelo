@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Elements, PaymentElement, useStripe, useElements } from "@stripe/react-stripe-js";
@@ -82,17 +82,18 @@ function maskLastName(last: string): string {
 }
 
 // ── Stripe payment section (lives inside <Elements>) ──────────────────────────
-// Renders the Payment Element + the "Complete Purchase" button. Confirms the
-// payment with Stripe, then hands off to the parent's finalizeOrder() which
-// records the order exactly as before.
+// Renders the Payment Element + the "Complete Purchase" button. Creates the
+// PENDING order first (so it's never lost), then confirms payment with Stripe;
+// the webhook fulfills the order once paid.
 function StripePaymentSection({
-  grandTotalLabel, billingName, email, disabled, onPaid,
+  grandTotalLabel, billingName, email, disabled, onCreateOrder, onPaid,
 }: {
   grandTotalLabel: string;
   billingName: string;
   email: string;
   disabled: boolean;
-  onPaid: (paymentIntentId?: string, paymentPending?: boolean) => Promise<void>;
+  onCreateOrder: () => Promise<string | null>;       // create the pending order, return its id
+  onPaid: (orderId: string) => Promise<void>;          // go to confirmation
 }) {
   const stripe = useStripe();
   const elements = useElements();
@@ -105,13 +106,22 @@ function StripePaymentSection({
     setProcessing(true);
     setError("");
 
-    // Confirm the payment. `redirect: "if_required"` keeps the buyer on-page for
-    // cards (and instant bank verification); only redirects if truly necessary.
+    // 1) Create the order as PENDING first — so it's never lost, even if payment
+    //    fails or the buyer's browser dies. The webhook fulfills it once paid.
+    const orderId = await onCreateOrder();
+    if (!orderId) {
+      setError("We couldn't start your order. Please try again.");
+      setProcessing(false);
+      return;
+    }
+
+    // 2) Confirm the payment. `redirect: "if_required"` keeps the buyer on-page for
+    //    cards (and instant bank verification); only redirects if truly necessary.
     const { error: confirmError, paymentIntent } = await stripe.confirmPayment({
       elements,
       redirect: "if_required",
       confirmParams: {
-        return_url: `${window.location.origin}/confirmation`,
+        return_url: `${window.location.origin}/confirmation?order=${orderId}`,
         payment_method_data: {
           billing_details: { name: billingName, email },
         },
@@ -119,7 +129,9 @@ function StripePaymentSection({
     });
 
     // A returned error = the card was declined / details invalid / auth failed.
-    // Stripe didn't charge anything; show the specific reason and let them retry.
+    // Stripe didn't charge anything; show the specific reason and stay on this
+    // page so they can retry. The pending order remains for tracking; the webhook
+    // reconciles it (and a retry on this same intent reuses the same order).
     if (confirmError) {
       setError(friendlyStripeError(confirmError));
       setProcessing(false);
@@ -127,8 +139,7 @@ function StripePaymentSection({
     }
 
     // No error object — inspect the PaymentIntent. Only `succeeded` (card cleared)
-    // and `processing` (ACH initiated, ticket reserved) are good. Any other status
-    // is a failure: surface why and DO NOT finalize — no order, no tickets.
+    // and `processing` (ACH initiated) are good; anything else is a failure.
     const piError = paymentIntentError(paymentIntent);
     if (piError || !paymentIntent) {
       setError(piError ?? "We couldn't confirm your payment. No charge was made — please try again.");
@@ -136,8 +147,9 @@ function StripePaymentSection({
       return;
     }
 
-    // `processing` = ACH initiated but not cleared → the order is held pending.
-    await onPaid(paymentIntent.id, paymentIntent.status === "processing");
+    // Payment is in flight — head to the confirmation screen, which polls until
+    // the webhook marks the order paid (and tickets/emails are generated).
+    await onPaid(orderId);
   }
 
   return (
@@ -193,7 +205,10 @@ export default function CheckoutPage() {
 
   // Stripe: clientSecret for the current PaymentIntent (recreated per method/amount)
   const [clientSecret, setClientSecret] = useState<string | null>(null);
+  const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
   const [intentError, setIntentError]   = useState("");
+  // The pending order created for the current PaymentIntent (idempotent per PI).
+  const pendingOrderIdRef = useRef<string | null>(null);
 
   // Terms acceptance + IP (for dispute evidence)
   const [agreedTerms, setAgreedTerms] = useState(false);
@@ -287,6 +302,8 @@ export default function CheckoutPage() {
     if (!email || !email.includes("@")) return;
     let cancelled = false;
     setClientSecret(null);
+    setPaymentIntentId(null);
+    pendingOrderIdRef.current = null; // new PI → a fresh pending order
     setIntentError("");
     fetch("/api/checkout/create-payment-intent", {
       method: "POST",
@@ -296,7 +313,10 @@ export default function CheckoutPage() {
         paymentMethod,
         email,
         eventId: payload.eventId,
+        eventTitle: payload.eventTitle,
+        eventStartDate: payload.eventStartDate,
         tierId: payload.tierId,
+        tierName: payload.tierName,
         groupId: payload.groupId,
         qty: payload.qty,
       }),
@@ -304,7 +324,7 @@ export default function CheckoutPage() {
       .then(r => r.json())
       .then(d => {
         if (cancelled) return;
-        if (d.clientSecret) setClientSecret(d.clientSecret);
+        if (d.clientSecret) { setClientSecret(d.clientSecret); setPaymentIntentId(d.paymentIntentId ?? null); }
         else setIntentError(d.error ?? "Could not start payment.");
       })
       .catch(() => { if (!cancelled) setIntentError("Could not start payment."); });
@@ -312,21 +332,40 @@ export default function CheckoutPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [step, paymentMethod, grandTotal, isFree, payload?.eventId, email]);
 
-  // Records the order after a successful (or processing, for ACH) Stripe payment —
-  // or immediately for free tickets. Everything downstream (group allocation,
-  // confirmation email, redirect) is unchanged from the prior flow.
-  async function finalizeOrder(paymentIntentId?: string, paymentPending?: boolean) {
+  // Store the snapshot the confirmation screen reads while it polls for status.
+  function writeOrderSnapshot(orderId: string) {
     if (!payload) return;
-    setLoading(true);
+    localStorage.setItem("rameelo_order", JSON.stringify({
+      orderId,
+      firstName, lastName, email,
+      eventTitle: payload.eventTitle, eventDate: payload.eventDate,
+      eventVenue: payload.eventVenue, eventCity: payload.eventCity, eventState: payload.eventState,
+      grandTotal, qty: payload.qty, tierName: payload.tierName,
+      groupId: payload.groupId, isGroupPay: payload.isGroupPay ?? false,
+      paymentMethod, purchasedAt: new Date().toISOString(),
+    }));
+  }
 
-    const isTest = STRIPE_TEST_MODE;
+  // Paid flow: create the order as PENDING *before* confirming payment, so the
+  // order always exists even if payment fails or the buyer never finishes. The
+  // Stripe webhook flips it to confirmed and fulfills it (tickets + emails).
+  // Idempotent per PaymentIntent so retries reuse the same pending order.
+  async function createPendingOrder(): Promise<string | null> {
+    if (!payload) return null;
+    if (pendingOrderIdRef.current) return pendingOrderIdRef.current;
+
+    // The order MUST carry its PaymentIntent id so the webhook can reconcile it.
+    // Prefer the returned id; fall back to deriving it from the clientSecret
+    // (`pi_xxx_secret_yyy`). If neither exists, don't create an unlinked order.
+    const piId = paymentIntentId || (clientSecret ? clientSecret.split("_secret")[0] : null);
+    if (!piId) { console.error("createPendingOrder: no PaymentIntent id"); return null; }
 
     const { orderId, error } = await saveOrder({
       userId: authedUserId,
       eventId: payload.eventId,
       tierId: payload.tierId,
       groupId: payload.groupId,
-      buyerName: `${firstName} ${lastName}`,
+      buyerName: `${firstName} ${lastName}`.trim(),
       buyerEmail: email,
       buyerPhone: phoneDigits,
       qty: payload.qty,
@@ -338,81 +377,58 @@ export default function CheckoutPage() {
       processingFee,
       paymentMethod,
       grandTotal,
-      isTest,
+      isTest: STRIPE_TEST_MODE,
       purchaseIp: clientIp,
       termsVersion: TERMS_VERSION,
       termsAcceptedIp: clientIp,
-      stripePaymentIntentId: paymentIntentId ?? null,
-      paymentPending: paymentPending ?? false,
+      stripePaymentIntentId: piId,
+      paymentPending: true, // PENDING until the webhook confirms payment
     });
+    if (error || !orderId) { console.error("pending order save error:", error); return null; }
+    pendingOrderIdRef.current = orderId;
+    writeOrderSnapshot(orderId);
+    return orderId;
+  }
 
-    // One-payer group model: this single order covers everyone, so mark the
-    // whole group paid, split the tickets into per-member allocations the others
-    // claim, and email each of them a claim link.
-    if (orderId && payload.groupId) {
-      await markGroupPaid({ groupId: payload.groupId, orderId });
-      if (payload.isGroupPay) {
-        await createGroupAllocations(orderId);
-        fetch("/api/group-tickets-distributed", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderId }),
-        }).catch(() => { /* non-blocking — claim emails shouldn't block confirmation */ });
-      }
-    }
+  // After Stripe confirms (card succeeded / ACH processing), go to the
+  // confirmation screen, which polls until the webhook marks the order paid.
+  async function goToConfirmation(orderId: string) {
+    setLoading(true);
+    await new Promise(r => setTimeout(r, 400));
+    router.push(`/confirmation?order=${orderId}`);
+  }
 
-    // Send the buyer their email. Pending (ACH) gets a "tickets reserved" notice;
-    // the full confirmation + QR follows once the bank transfer clears (webhook).
+  // Free tickets skip Stripe entirely — there's no payment and no webhook, so we
+  // create the order CONFIRMED and run fulfillment (emails, group allocation) here.
+  async function finalizeFreeOrder() {
+    if (!payload) return;
+    setLoading(true);
+
+    const { orderId, error } = await saveOrder({
+      userId: authedUserId, eventId: payload.eventId, tierId: payload.tierId, groupId: payload.groupId,
+      buyerName: `${firstName} ${lastName}`.trim(), buyerEmail: email, buyerPhone: phoneDigits,
+      qty: payload.qty, unitPrice: payload.unitPrice, discountPct: payload.discount, discountAmount: payload.discountAmount,
+      serviceFee: rameeloFee + processingFee, rameeloFee, processingFee, paymentMethod, grandTotal,
+      isTest: STRIPE_TEST_MODE, purchaseIp: clientIp, termsVersion: TERMS_VERSION, termsAcceptedIp: clientIp,
+      stripePaymentIntentId: null, paymentPending: false, // free → confirmed immediately
+    });
+    if (error) console.error("free order save error:", error);
+
     if (orderId) {
-      fetch(paymentPending ? "/api/order-pending" : "/api/order-confirmation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId }),
-      }).catch(() => { /* non-blocking — receipt email shouldn't block confirmation */ });
-
-      // Notify the event's organizing team about the new order (non-blocking).
-      fetch("/api/order-team-notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderId }),
-      }).catch(() => { /* non-blocking — team alert shouldn't block confirmation */ });
-
-      // Persist the payment method (last-4 / brand) to the order + the buyer's
-      // saved methods. Stripe-side details are read server-side (non-blocking).
-      if (paymentIntentId) {
-        fetch("/api/checkout/save-payment-method", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderId, paymentIntentId }),
-        }).catch(() => { /* non-blocking — saving the method shouldn't block confirmation */ });
+      if (payload.groupId) {
+        await markGroupPaid({ groupId: payload.groupId, orderId });
+        if (payload.isGroupPay) {
+          await createGroupAllocations(orderId);
+          fetch("/api/group-tickets-distributed", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId }) }).catch(() => {});
+        }
       }
+      fetch("/api/order-confirmation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId }) }).catch(() => {});
+      fetch("/api/order-team-notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId }) }).catch(() => {});
+      writeOrderSnapshot(orderId);
     }
 
-    if (error) console.error("Order save error:", error);
-
-    const orderSnapshot = {
-      orderId: orderId ?? ("RM-" + Math.random().toString(36).slice(2, 8).toUpperCase()),
-      firstName,
-      lastName,
-      email,
-      eventTitle: payload.eventTitle,
-      eventDate: payload.eventDate,
-      eventVenue: payload.eventVenue,
-      eventCity: payload.eventCity,
-      eventState: payload.eventState,
-      grandTotal,
-      qty: payload.qty,
-      tierName: payload.tierName,
-      groupId: payload.groupId,
-      isGroupPay: payload.isGroupPay ?? false,
-      paymentMethod,
-      paymentPending: paymentPending ?? false,
-      purchasedAt: new Date().toISOString(),
-    };
-    localStorage.setItem("rameelo_order", JSON.stringify(orderSnapshot));
-
-    await new Promise(r => setTimeout(r, 1800));
-    router.push("/confirmation");
+    await new Promise(r => setTimeout(r, 800));
+    router.push(`/confirmation?order=${orderId ?? ""}`);
   }
 
   const inputCls  = "w-full rounded-xl border border-ivory-200 bg-white px-4 py-3 font-ui text-sm text-ink placeholder-ink-muted/50 focus:outline-none focus:ring-2 focus:ring-aubergine/25 focus:border-aubergine transition-all";
@@ -684,7 +700,7 @@ export default function CheckoutPage() {
                 {isFree ? (
                   <button
                     type="button"
-                    onClick={() => { if (agreedTerms) finalizeOrder(); }}
+                    onClick={() => { if (agreedTerms) finalizeFreeOrder(); }}
                     disabled={!agreedTerms}
                     className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all ${agreedTerms ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-sm" : "bg-ivory-200 text-ink-muted cursor-not-allowed"}`}
                   >
@@ -705,7 +721,8 @@ export default function CheckoutPage() {
                       billingName={`${firstName} ${lastName}`.trim()}
                       email={email}
                       disabled={!agreedTerms}
-                      onPaid={finalizeOrder}
+                      onCreateOrder={createPendingOrder}
+                      onPaid={goToConfirmation}
                     />
                   </Elements>
                 ) : (

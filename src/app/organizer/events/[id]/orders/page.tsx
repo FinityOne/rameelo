@@ -9,6 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 
 type Order = {
   id: string;
+  user_id: string | null;
   buyer_name: string;
   buyer_email: string;
   buyer_phone: string;
@@ -33,6 +34,25 @@ function fmtDate(d: string) {
 
 function fmtTime(d: string) {
   return new Date(d).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" });
+}
+
+// Whether the buyer has a Rameelo account: they were signed in at purchase
+// (user_id set) or a profile exists with their email (signed up later).
+function buyerHasAccount(order: Order, accountEmails: Set<string>): boolean {
+  return !!order.user_id || accountEmails.has((order.buyer_email ?? "").toLowerCase());
+}
+
+function AccountBadge({ has }: { has: boolean }) {
+  return has ? (
+    <span className="inline-flex items-center gap-1 font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-peacock/10 text-peacock">
+      <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+      Account
+    </span>
+  ) : (
+    <span className="inline-flex items-center gap-1 font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-ink/5 text-ink-muted">
+      Guest
+    </span>
+  );
 }
 
 const ORDER_STATUS: Record<string, { label: string; cls: string }> = {
@@ -181,6 +201,7 @@ export default function EventOrdersPage() {
   const router = useRouter();
 
   const [orders, setOrders]         = useState<Order[]>([]);
+  const [accountEmails, setAccountEmails] = useState<Set<string>>(new Set());
   const [eventTitle, setEventTitle] = useState("");
   const [loading, setLoading]       = useState(true);
   const [filter, setFilter]         = useState<string>("all");
@@ -195,9 +216,12 @@ export default function EventOrdersPage() {
     const [evRes, ordRes] = await Promise.all([
       supabase.from("events").select("title").eq("id", id).eq("organizer_id", user.id).single(),
       supabase.from("orders")
-        .select("id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_amount, service_fee, grand_total, status, created_at, group_id, cancellation_reason, cancelled_at, ticket_tiers(name)")
+        .select("id, user_id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_amount, service_fee, grand_total, status, created_at, group_id, cancellation_reason, cancelled_at, ticket_tiers(name)")
         .eq("event_id", id)
         .eq("is_test", false)
+        // Only paid orders — exclude `pending` (unpaid checkout attempts awaiting
+        // the payment webhook) so organizers aren't confused by unpaid orders.
+        .neq("status", "pending")
         .order("created_at", { ascending: false }),
     ]);
 
@@ -205,6 +229,10 @@ export default function EventOrdersPage() {
     setEventTitle(evRes.data.title);
     setOrders((ordRes.data ?? []) as unknown as Order[]);
     setLoading(false);
+
+    // Flag which buyers have a Rameelo account (incl. guests who signed up later).
+    const { data: acctEmails } = await supabase.rpc("get_event_buyer_account_emails", { p_event_id: id });
+    setAccountEmails(new Set(((acctEmails ?? []) as string[]).map(e => e.toLowerCase())));
   }, [id, router]);
 
   useEffect(() => { load(); }, [load]);
@@ -387,7 +415,10 @@ export default function EventOrdersPage() {
                             <p className="font-mono text-[9px] text-ink-muted">{fmtTime(order.created_at)}</p>
                           </td>
                           <td className="px-5 py-3.5">
-                            <p className={`font-ui text-sm font-semibold ${isCancelled ? "line-through text-ink-muted" : "text-ink"}`}>{order.buyer_name}</p>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className={`font-ui text-sm font-semibold ${isCancelled ? "line-through text-ink-muted" : "text-ink"}`}>{order.buyer_name}</p>
+                              <AccountBadge has={buyerHasAccount(order, accountEmails)} />
+                            </div>
                             <p className="font-mono text-[9px] text-ink-muted">{order.buyer_email}</p>
                           </td>
                           <td className="px-5 py-3.5">
@@ -462,7 +493,11 @@ export default function EventOrdersPage() {
                   <div key={order.id} className={`px-4 py-4 ${isCancelled ? "opacity-60" : ""}`}>
                     <div className="flex items-start justify-between gap-3 mb-1.5">
                       <div className="min-w-0">
-                        <p className={`font-ui text-sm font-semibold ${isCancelled ? "line-through text-ink-muted" : "text-ink"}`}>{order.buyer_name}</p>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className={`font-ui text-sm font-semibold ${isCancelled ? "line-through text-ink-muted" : "text-ink"}`}>{order.buyer_name}</p>
+                          <AccountBadge has={buyerHasAccount(order, accountEmails)} />
+                        </div>
+                        <p className="font-mono text-[9px] text-ink-muted truncate">{order.buyer_email}</p>
                         <p className="font-mono text-[9px] text-ink-muted">{order.ticket_tiers?.name ?? "—"} · {order.qty} ticket{order.qty !== 1 ? "s" : ""}</p>
                       </div>
                       <div className="text-right shrink-0">
