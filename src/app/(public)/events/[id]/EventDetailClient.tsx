@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -620,6 +620,24 @@ export default function EventDetailClient({ id }: { id: string }) {
 
   // Invite group — arrived via /events/[id]?groupId=RM-XXXXX
   const [inviteGroup, setInviteGroup] = useState<{ id: string; hostName: string; joined: number; discount: number } | null>(null);
+
+  // Mobile sticky "Buy Tickets" bar: hidden once the buy panel is reached (or
+  // scrolled past) so there's never a duplicate action on screen.
+  const buyPanelRef = useRef<HTMLDivElement>(null);
+  const [buyPanelReached, setBuyPanelReached] = useState(false);
+  useEffect(() => {
+    const el = buyPanelRef.current;
+    if (!el) return;
+    const obs = new IntersectionObserver(
+      ([entry]) => setBuyPanelReached(entry.isIntersecting || entry.boundingClientRect.top < 0),
+      { threshold: 0 },
+    );
+    obs.observe(el);
+    return () => obs.disconnect();
+  }, [event]);
+  function scrollToBuyPanel() {
+    buyPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
 
   // Interest form (for non-Rameelo events)
   const [interestName, setInterestName]           = useState("");
@@ -1307,7 +1325,7 @@ export default function EventDetailClient({ id }: { id: string }) {
           </div>
 
           {/* ── Right: Purchase widget or Interest form ── */}
-          <div className="w-full lg:w-96 shrink-0">
+          <div ref={buyPanelRef} className="w-full lg:w-96 shrink-0">
             <div className="lg:sticky lg:top-5 space-y-4">
 
               {/* Urgency / Interest banner — desktop only */}
@@ -1833,6 +1851,28 @@ export default function EventDetailClient({ id }: { id: string }) {
               </p>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── Sticky mobile "Buy Tickets" bar — hides once the buy panel is reached ── */}
+      {event.selling_on_rameelo && !salesClosed && !totalSoldOut && !inviteGroup && !buyPanelReached && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 px-4 pb-safe-bottom pb-3 pt-5"
+          style={{ background: "linear-gradient(to top, rgba(252,249,242,1) 62%, rgba(252,249,242,0))" }}>
+          <button
+            onClick={scrollToBuyPanel}
+            className="w-full py-4 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-xl shadow-marigold/30"
+          >
+            Buy Tickets →
+          </button>
+          <Link
+            href={`/group/create?eventId=${event.id}`}
+            className="mt-2 flex items-center justify-center gap-1.5 text-aubergine/70 active:opacity-70"
+          >
+            <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            <span className="font-ui text-[11px] font-medium underline underline-offset-2 decoration-aubergine/30">
+              Going with friends? Start a group to unlock discounts
+            </span>
+          </Link>
         </div>
       )}
 
