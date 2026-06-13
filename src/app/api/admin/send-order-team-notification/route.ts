@@ -22,6 +22,8 @@ type TeamPayload = {
   buyer_name: string | null;
   qty: number;
   tier_name: string | null;
+  unit_price: number;
+  discount_amount: number;
   grand_total: number;
   payment_method: string;
   event_id: string;
@@ -63,6 +65,9 @@ export async function POST(request: Request) {
   const eventWhere = [o.venue_name, o.city, o.state].filter(Boolean).join(", ");
   const buyerFirstName = (o.buyer_name ?? "").trim().split(" ")[0] || "Someone";
   const ordersUrl = `${EMAIL.site}/organizer/events/${o.event_id}/orders`;
+  const unitPrice = Number(o.unit_price) || 0;
+  const discountAmount = Number(o.discount_amount) || 0;
+  const faceValue = Math.max(0, o.qty * unitPrice - discountAmount);
 
   const results = await Promise.all(recipients.map(async (r) => {
     const { subject, html, text } = orderTeamNotificationEmail({
@@ -70,7 +75,9 @@ export async function POST(request: Request) {
       buyerFirstName,
       qty: o.qty,
       tierName: o.tier_name ?? "Ticket",
-      grandTotal: Number(o.grand_total) || 0,
+      unitPrice,
+      discountAmount,
+      faceValue,
       eventTitle: o.event_title,
       artistName: o.artist_name,
       eventWhen,

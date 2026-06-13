@@ -191,9 +191,12 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
     const ids = Array.from(new Set([...memberIds, ev?.organizer_id].filter(Boolean))) as string[];
     const { data: profs } = ids.length ? await admin.from("profiles").select("email, first_name").in("id", ids) : { data: [] };
     for (const p of ((profs ?? []) as { email: string | null; first_name: string | null }[]).filter(p => p.email)) {
+      const unitPrice = Number(order.unit_price) || 0;
+      const discountAmount = Number(order.discount_amount) || 0;
       const tn = orderTeamNotificationEmail({
         recipientFirstName: p.first_name, buyerFirstName: (order.buyer_name || "").trim().split(" ")[0] || "Someone",
-        qty: order.qty, tierName, grandTotal: Number(order.grand_total) || 0,
+        qty: order.qty, tierName, unitPrice, discountAmount,
+        faceValue: Math.max(0, order.qty * unitPrice - discountAmount),
         eventTitle: ev?.title ?? "", artistName: artist, eventWhen, eventWhere: where,
         bannerUrl: ev?.cover_image_url ?? null, ordersUrl: `${EMAIL.site}/organizer/events/${order.event_id}/orders`,
         paymentMethod: order.payment_method,

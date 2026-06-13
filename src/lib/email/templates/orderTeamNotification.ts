@@ -6,12 +6,19 @@ import { money } from "../../money";
 // creator) every time an order is placed for one of their events. Keeps it light:
 // who bought, how many, which tier, the event summary, and a small event banner —
 // with a CTA into the event's orders dashboard.
+//
+// IMPORTANT — all money shown here is TICKET FACE VALUE only (qty × unit_price −
+// discount), which is the organizer's revenue. The Rameelo platform fee and card
+// processing fee are charged to the buyer and never deducted from the organizer, so
+// they're deliberately left out — this email is the organizer's order summary.
 export function orderTeamNotificationEmail(p: {
   recipientFirstName?: string | null;
   buyerFirstName: string;
   qty: number;
   tierName: string;
-  grandTotal: number;
+  unitPrice: number;       // per-ticket face price
+  discountAmount?: number; // total discount applied (subtracted from face value)
+  faceValue: number;       // qty × unitPrice − discountAmount — organizer revenue
   eventTitle: string;
   artistName?: string | null;
   eventWhen: string;
@@ -26,7 +33,9 @@ export function orderTeamNotificationEmail(p: {
   const ticketWord = p.qty === 1 ? "ticket" : "tickets";
   const isAch = (p.paymentMethod ?? "").toLowerCase() === "ach";
   const payLabel = isAch ? "Bank transfer (ACH)" : "Credit / Debit card";
-  const subject = `🎟️ New order · ${p.qty} ${ticketWord} — ${p.eventTitle}`;
+  const discount = Math.max(0, Number(p.discountAmount) || 0);
+  // Consistent, scannable subject: who · how many · which event.
+  const subject = `🎟️ ${buyer} ordered ${p.qty} ${ticketWord} — ${p.eventTitle}`;
 
   // Small event banner (image when the event has a cover, otherwise a branded strip).
   const banner = p.bannerUrl
@@ -49,12 +58,14 @@ export function orderTeamNotificationEmail(p: {
     <tr><td style="padding:14px 18px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
         ${row("Buyer", buyer)}
-        ${row("Tickets", `${p.qty} ${ticketWord}`)}
         ${row("Tier", p.tierName || "Ticket")}
+        ${row("Tickets", `${p.qty} ${ticketWord} × $${money(p.unitPrice)}`)}
+        ${discount > 0 ? row("Discount", `−$${money(discount)}`) : ""}
         ${row("Payment", payLabel)}
         <tr><td colspan="2" style="border-top:1px solid ${C.ivory200};padding-top:2px;"></td></tr>
-        ${row("Order total", `$${money(p.grandTotal)}`, { strong: true })}
+        ${row("Ticket revenue", `$${money(p.faceValue)}`, { strong: true })}
       </table>
+      <p style="margin:8px 0 0;font-family:${FONT_BODY};font-size:11px;line-height:1.5;color:${C.inkMuted};">Ticket face value — your revenue. Rameelo &amp; card fees are paid by the buyer and aren&rsquo;t deducted from this.</p>
     </td></tr></table>`;
 
   // ACH orders settle over a few days — make clear the tickets aren't valid yet.
@@ -101,10 +112,12 @@ export function orderTeamNotificationEmail(p: {
     "",
     `New order for ${p.eventTitle}:`,
     `  Buyer: ${buyer}`,
-    `  Tickets: ${p.qty} ${ticketWord}`,
     `  Tier: ${p.tierName || "Ticket"}`,
+    `  Tickets: ${p.qty} ${ticketWord} x $${money(p.unitPrice)}`,
+    discount > 0 ? `  Discount: -$${money(discount)}` : "",
     `  Payment: ${payLabel}`,
-    `  Order total: $${money(p.grandTotal)}`,
+    `  Ticket revenue (face value): $${money(p.faceValue)}`,
+    "  (Rameelo & card fees are paid by the buyer — not deducted from your revenue.)",
     "",
     isAch
       ? "NOTE: Paid by bank transfer (ACH). Payments take 2-5 business days to clear, and QR codes are NOT issued until the payment settles — the tickets stay reserved and won't scan at the door until the funds clear.\n"
