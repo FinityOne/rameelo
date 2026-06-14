@@ -393,6 +393,9 @@ export async function saveOrder(params: {
       event_id: params.eventId,
       tier_id: params.tierId,
       group_id: params.groupId ?? null,
+      // Real purchase-flow order (vs. organizer-issued 'comp' tickets, which are
+      // created server-side and never go through checkout).
+      order_type: "purchase",
       buyer_name: params.buyerName,
       buyer_email: params.buyerEmail,
       buyer_phone: params.buyerPhone,

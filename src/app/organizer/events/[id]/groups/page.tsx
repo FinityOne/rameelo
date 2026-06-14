@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import EventSubnav from "../EventSubnav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -120,6 +121,8 @@ export default function EventGroupsPage() {
           </Link>
         </div>
       </div>
+
+      <EventSubnav eventId={id} active="groups" />
 
       {/* Summary tiles */}
       {groups.length > 0 && (

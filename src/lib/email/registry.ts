@@ -132,6 +132,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     fires: "Automatically on every confirmed, non-test order — to each admin still subscribed for that event",
   },
   {
+    key: "comp-ticket",
+    name: "Complimentary tickets",
+    description: "Tells someone an organizer gifted them free tickets. Branches on whether they already have a Rameelo account — log in to find the tickets waiting, or create a free account with the same email and have the tickets attach automatically. No payment, no claim code.",
+    audience: "Buyers",
+    category: "Orders & Tickets",
+    status: "live",
+    trigger: "automatic",
+    fires: "When an organizer issues comp tickets from an event's Comp Tickets page",
+  },
+  {
     key: "event-reminder",
     name: "Event reminder",
     description: "A nudge a few days before an event the member holds tickets to.",

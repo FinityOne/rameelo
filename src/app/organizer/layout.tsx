@@ -120,6 +120,7 @@ const PAGE_TITLES: Array<{ test: (p: string) => boolean; title: string }> = [
   { test: (p) => /^\/organizer\/events\/[^/]+\/edit$/.test(p),    title: "Edit Event" },
   { test: (p) => /^\/organizer\/events\/[^/]+\/groups$/.test(p),  title: "Group Orders" },
   { test: (p) => /^\/organizer\/events\/[^/]+\/orders$/.test(p),  title: "Orders" },
+  { test: (p) => /^\/organizer\/events\/[^/]+\/comp$/.test(p),    title: "Comp Tickets" },
   { test: (p) => p === "/organizer/tickets",                       title: "Orders" },
   { test: (p) => /^\/organizer\/tickets\/[^/]+$/.test(p),         title: "Order Detail" },
   { test: (p) => p === "/organizer/reports",                       title: "Reports" },

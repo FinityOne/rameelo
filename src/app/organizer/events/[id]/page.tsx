@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "../create/types";
+import EventSubnav from "./EventSubnav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,7 @@ type Tier = {
   price: number;
   quantity: number;
   quantity_sold: number;
+  quantity_comped: number;
 };
 
 type EventData = {
@@ -50,6 +52,7 @@ type Order = {
   qty: number;
   grand_total: number;
   status: string;
+  order_type: string;
   created_at: string;
   ticket_tiers: { name: string } | null;
 };
@@ -185,14 +188,14 @@ export default function EventDashboardPage() {
       const [evRes, ordRes, grpRes] = await Promise.all([
         supabase
           .from("events")
-          .select("id, title, category, artist, description, start_date, end_date, start_time, end_time, doors_open_time, is_multi_day, venue_name, address_line1, address_line2, city, state, zip, status, selling_on_rameelo, review_note, cover_image_url, cover_gradient, capacity, ticket_tiers(id, name, price, quantity, quantity_sold)")
+          .select("id, title, category, artist, description, start_date, end_date, start_time, end_time, doors_open_time, is_multi_day, venue_name, address_line1, address_line2, city, state, zip, status, selling_on_rameelo, review_note, cover_image_url, cover_gradient, capacity, ticket_tiers(id, name, price, quantity, quantity_sold, quantity_comped)")
           .eq("id", id)
           .eq("organizer_id", user.id)
           .single(),
 
         supabase
           .from("orders")
-          .select("id, buyer_name, buyer_email, qty, grand_total, status, created_at, ticket_tiers(name)", { count: "exact" })
+          .select("id, buyer_name, buyer_email, qty, grand_total, status, order_type, created_at, ticket_tiers(name)", { count: "exact" })
           .eq("event_id", id)
           .eq("is_test", false)
           .neq("status", "pending")   // organizers only see paid orders, never pending ones
@@ -230,8 +233,11 @@ export default function EventDashboardPage() {
 
   const tiers        = ev.ticket_tiers ?? [];
   const totalSold    = tiers.reduce((s, t) => s + t.quantity_sold, 0);
+  const totalComped  = tiers.reduce((s, t) => s + (t.quantity_comped ?? 0), 0);
+  const paidSold     = Math.max(0, totalSold - totalComped); // comp tickets generate $0
   const totalCap     = tiers.reduce((s, t) => s + t.quantity, 0);
-  const grossRev     = tiers.reduce((s, t) => s + t.quantity_sold * t.price, 0);
+  // Revenue counts PAID tickets only — comps (free) contribute nothing.
+  const grossRev     = tiers.reduce((s, t) => s + Math.max(0, t.quantity_sold - (t.quantity_comped ?? 0)) * t.price, 0);
   const maxRev       = tiers.reduce((s, t) => s + t.quantity * t.price, 0);
   const fillPct      = totalCap > 0 ? (totalSold / totalCap) * 100 : 0;
   const revPct       = maxRev > 0 ? (grossRev / maxRev) * 100 : 0;
@@ -242,9 +248,9 @@ export default function EventDashboardPage() {
 
   const kpis = [
     { label: "Revenue", value: fmtCurrency(grossRev), sub: `of ${fmtCurrency(maxRev)} potential`, color: "#0E8C7A", icon: "💰" },
-    { label: "Tickets Sold", value: totalSold.toLocaleString(), sub: `of ${totalCap.toLocaleString()} total`, color: "#2E1B30", icon: "🎟️" },
+    { label: "Tickets Sold", value: totalSold.toLocaleString(), sub: totalComped > 0 ? `of ${totalCap.toLocaleString()} · ${totalComped} comp` : `of ${totalCap.toLocaleString()} total`, color: "#2E1B30", icon: "🎟️" },
     { label: "Fill Rate", value: `${Math.round(fillPct)}%`, sub: fillPct >= 80 ? "Almost sold out!" : fillPct >= 50 ? "Good momentum" : "Still growing", color: fillColor, icon: "📊" },
-    { label: "Total Orders", value: orderCount.toLocaleString(), sub: "individual purchases", color: "#2E1B30", icon: "🧾" },
+    { label: "Total Orders", value: orderCount.toLocaleString(), sub: totalComped > 0 ? "incl. comp tickets" : "individual orders", color: "#2E1B30", icon: "🧾" },
     { label: "Group Orders", value: groupCount.toLocaleString(), sub: "group links created", color: "#3D2543", icon: "👥" },
   ];
 
@@ -287,6 +293,9 @@ export default function EventDashboardPage() {
           </Link>
         </div>
       </div>
+
+      {/* ── In-event sub-navigation ── */}
+      <EventSubnav eventId={id} active="overview" />
 
       {/* ── Status banner (hide when published + no note) ── */}
       {(ev.status !== "published" || ev.review_note) && (
@@ -488,20 +497,29 @@ export default function EventDashboardPage() {
             <div className="divide-y divide-ivory-200">
               {recentOrders.map(order => {
                 const s = ORDER_STATUS[order.status] ?? ORDER_STATUS.confirmed;
+                const isComp = order.order_type === "comp";
                 return (
                   <div key={order.id} className="px-5 py-3.5 flex items-center gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-0.5">
                         <p className="font-ui text-sm font-semibold text-ink truncate">{order.buyer_name}</p>
-                        <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 ${s.cls}`}>{s.label}</span>
+                        {isComp ? (
+                          <span className="font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 bg-aubergine/12 text-aubergine">Comp</span>
+                        ) : (
+                          <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 ${s.cls}`}>{s.label}</span>
+                        )}
                       </div>
                       <p className="font-mono text-[10px] text-ink-muted truncate">
                         {order.ticket_tiers?.name ?? "—"} · {order.qty} ticket{order.qty !== 1 ? "s" : ""} · {timeAgo(order.created_at)}
                       </p>
                     </div>
-                    <p className="font-display font-bold text-peacock shrink-0" style={{ letterSpacing: "-0.02em" }}>
-                      ${order.grand_total.toFixed(2)}
-                    </p>
+                    {isComp ? (
+                      <p className="font-display font-bold text-aubergine shrink-0" style={{ letterSpacing: "-0.02em" }}>Free</p>
+                    ) : (
+                      <p className="font-display font-bold text-peacock shrink-0" style={{ letterSpacing: "-0.02em" }}>
+                        ${order.grand_total.toFixed(2)}
+                      </p>
+                    )}
                   </div>
                 );
               })}
@@ -611,10 +629,12 @@ export default function EventDashboardPage() {
 
           <div className="divide-y divide-ivory-200">
             {[...tiers]
-              .sort((a, b) => (b.quantity_sold * b.price) - (a.quantity_sold * a.price))
+              .map(t => ({ ...t, paidSold: Math.max(0, t.quantity_sold - (t.quantity_comped ?? 0)) }))
+              .sort((a, b) => (b.paidSold * b.price) - (a.paidSold * a.price))
               .map((tier, i) => {
                 const tf = tier.quantity > 0 ? (tier.quantity_sold / tier.quantity) * 100 : 0;
-                const tc = tier.quantity_sold * tier.price;
+                const tc = tier.paidSold * tier.price; // revenue from PAID tickets only (comps are free)
+                const comped = tier.quantity_comped ?? 0;
                 const tcolor = tf >= 80 ? "#7C1F2C" : tf >= 50 ? "#0E8C7A" : "#D4891B";
                 return (
                   <div key={tier.id} className="px-5 py-4">
@@ -629,7 +649,7 @@ export default function EventDashboardPage() {
                         <div className="min-w-0">
                           <p className="font-ui text-sm font-semibold text-ink truncate">{tier.name}</p>
                           <p className="font-mono text-[9px] text-ink-muted">
-                            ${tier.price.toFixed(2)}/ticket · {tier.quantity_sold} sold of {tier.quantity}
+                            ${tier.price.toFixed(2)}/ticket · {tier.quantity_sold} sold{comped > 0 ? ` (${comped} comp)` : ""} of {tier.quantity}
                           </p>
                         </div>
                       </div>

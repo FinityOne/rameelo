@@ -4,6 +4,7 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import EventSubnav from "../EventSubnav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,7 @@ type Order = {
   service_fee: number;
   grand_total: number;
   status: string;
+  order_type: string;
   created_at: string;
   group_id: string | null;
   cancellation_reason: string | null;
@@ -216,7 +218,7 @@ export default function EventOrdersPage() {
     const [evRes, ordRes] = await Promise.all([
       supabase.from("events").select("title").eq("id", id).eq("organizer_id", user.id).single(),
       supabase.from("orders")
-        .select("id, user_id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_amount, service_fee, grand_total, status, created_at, group_id, cancellation_reason, cancelled_at, ticket_tiers(name)")
+        .select("id, user_id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_amount, service_fee, grand_total, status, order_type, created_at, group_id, cancellation_reason, cancelled_at, ticket_tiers(name)")
         .eq("event_id", id)
         .eq("is_test", false)
         // Only paid orders — exclude `pending` (unpaid checkout attempts awaiting
@@ -318,6 +320,8 @@ export default function EventOrdersPage() {
             </Link>
           </div>
         </div>
+
+        <EventSubnav eventId={id} active="orders" />
 
         {/* Cancelled revenue banner */}
         {cancelledCount > 0 && (
@@ -428,18 +432,26 @@ export default function EventOrdersPage() {
                             <p className="font-display font-bold text-ink" style={{ letterSpacing: "-0.02em" }}>{order.qty}</p>
                           </td>
                           <td className="px-5 py-3.5 text-right">
-                            <p className={`font-display font-bold ${isCancelled ? "line-through text-ink-muted" : "text-peacock"}`} style={{ letterSpacing: "-0.02em" }}>
-                              ${order.grand_total.toFixed(2)}
-                            </p>
-                            {order.discount_amount > 0 && (
-                              <p className="font-mono text-[9px] text-ink-muted">−${order.discount_amount.toFixed(2)} disc.</p>
+                            {order.order_type === "comp" ? (
+                              <p className={`font-display font-bold ${isCancelled ? "line-through text-ink-muted" : "text-aubergine"}`} style={{ letterSpacing: "-0.02em" }}>Free</p>
+                            ) : (
+                              <>
+                                <p className={`font-display font-bold ${isCancelled ? "line-through text-ink-muted" : "text-peacock"}`} style={{ letterSpacing: "-0.02em" }}>
+                                  ${order.grand_total.toFixed(2)}
+                                </p>
+                                {order.discount_amount > 0 && (
+                                  <p className="font-mono text-[9px] text-ink-muted">−${order.discount_amount.toFixed(2)} disc.</p>
+                                )}
+                              </>
                             )}
                           </td>
                           <td className="px-5 py-3.5 text-center">
                             <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-2 py-1 rounded-full ${s.cls}`}>{s.label}</span>
                           </td>
                           <td className="px-5 py-3.5 text-center">
-                            {order.group_id ? (
+                            {order.order_type === "comp" ? (
+                              <span className="font-mono text-[9px] text-aubergine bg-aubergine/8 px-2 py-0.5 rounded-full">Comp</span>
+                            ) : order.group_id ? (
                               <span className="font-mono text-[9px] text-aubergine bg-aubergine/8 px-2 py-0.5 rounded-full">Group</span>
                             ) : (
                               <span className="font-mono text-[9px] text-ink-muted">—</span>
@@ -500,8 +512,8 @@ export default function EventOrdersPage() {
                         <p className="font-mono text-[9px] text-ink-muted">{order.ticket_tiers?.name ?? "—"} · {order.qty} ticket{order.qty !== 1 ? "s" : ""}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className={`font-display font-bold ${isCancelled ? "line-through text-ink-muted" : "text-peacock"}`} style={{ letterSpacing: "-0.02em" }}>${order.grand_total.toFixed(2)}</p>
-                        <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
+                        <p className={`font-display font-bold ${isCancelled ? "line-through text-ink-muted" : order.order_type === "comp" ? "text-aubergine" : "text-peacock"}`} style={{ letterSpacing: "-0.02em" }}>{order.order_type === "comp" ? "Free" : `$${order.grand_total.toFixed(2)}`}</p>
+                        <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${order.order_type === "comp" ? "bg-aubergine/12 text-aubergine" : s.cls}`}>{order.order_type === "comp" ? "Comp" : s.label}</span>
                       </div>
                     </div>
                     <p className="font-mono text-[9px] text-ink-muted">{fmtDate(order.created_at)} · {fmtTime(order.created_at)}</p>
