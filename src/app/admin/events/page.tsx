@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { GRADIENTS } from "@/app/organizer/events/create/types";
 
 type EventRow = {
   id: string;
@@ -17,10 +18,14 @@ type EventRow = {
   created_at: string;
   location_tba: boolean;
   selling_on_rameelo: boolean;
+  cover_image_url: string | null;
+  cover_gradient: string;
   organizer: { first_name: string | null; last_name: string | null; email: string } | null;
   organization: { name: string } | null;
-  ticket_tiers: { price: number; quantity: number }[];
+  ticket_tiers: { price: number; quantity: number; quantity_sold: number | null }[];
 };
+
+type Sales = { tickets_sold: number; net_revenue: number; paid_orders: number };
 
 type Tab = 'published' | 'draft' | 'cancelled' | 'all';
 
@@ -44,15 +49,85 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 const PAGE_SIZE = 12;
-const GRID_COLS = 'minmax(0,2.4fr) 100px 92px 130px 120px 64px 100px';
+// Desktop-first 7-column grid. Sales is the widest non-title column — it's the
+// reason an admin opens this page.
+const GRID_COLS = 'minmax(0,2.5fr) 150px 108px 188px 132px 132px 88px';
 
 function fmtDateShort(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function fmtUSD(n: number) {
+  return `$${Math.round(n).toLocaleString()}`;
+}
+function fmtUSDCompact(n: number) {
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1).replace(/\.0$/, '')}M`;
+  if (n >= 10_000)    return `$${Math.round(n / 1_000)}K`;
+  if (n >= 1_000)     return `$${(n / 1_000).toFixed(1).replace(/\.0$/, '')}K`;
+  return `$${Math.round(n).toLocaleString()}`;
+}
+// Compact relative time-to-event used as an at-a-glance chip.
+function relLabel(d: string, today: string): { text: string; tone: 'soon' | 'future' | 'past' } {
+  if (d < today) return { text: 'Past', tone: 'past' };
+  const ms = new Date(d + 'T00:00:00').getTime() - new Date(today + 'T00:00:00').getTime();
+  const days = Math.round(ms / 86_400_000);
+  if (days === 0) return { text: 'Today', tone: 'soon' };
+  if (days === 1) return { text: 'Tomorrow', tone: 'soon' };
+  if (days <= 14) return { text: `In ${days}d`, tone: 'soon' };
+  if (days <= 60) return { text: `In ${Math.round(days / 7)}w`, tone: 'future' };
+  return { text: `In ${Math.round(days / 30)}mo`, tone: 'future' };
+}
+
+// Cover swatch (image or regional gradient) — fast visual scanning down the list.
+function Cover({ ev, size }: { ev: EventRow; size: number }) {
+  const gradient = GRADIENTS.find(g => g.id === ev.cover_gradient) ?? GRADIENTS[0];
+  return (
+    <div
+      className="rounded-lg overflow-hidden shrink-0 border border-black/5 shadow-sm"
+      style={{ width: size, height: size, background: ev.cover_image_url ? undefined : gradient.css }}
+    >
+      {ev.cover_image_url && <img src={ev.cover_image_url} alt="" className="w-full h-full object-cover" />}
+    </div>
+  );
+}
+
+// Sell-through bar — colors by momentum so a strong/weak seller reads instantly.
+function SalesBar({ sold, capacity }: { sold: number; capacity: number }) {
+  const pct = capacity > 0 ? Math.min(100, Math.round((sold / capacity) * 100)) : 0;
+  const soldOut = capacity > 0 && sold >= capacity;
+  const color = soldOut ? 'bg-aubergine' : pct >= 65 ? 'bg-peacock' : pct >= 25 ? 'bg-marigold' : 'bg-marigold/50';
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-2 mb-1">
+        <span className="font-mono text-xs font-semibold text-ink">
+          {sold.toLocaleString()}
+          <span className="text-ink-muted/60 font-normal"> / {capacity > 0 ? capacity.toLocaleString() : '∞'}</span>
+        </span>
+        {soldOut ? (
+          <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-aubergine">Sold out</span>
+        ) : capacity > 0 ? (
+          <span className="font-mono text-[10px] text-ink-muted/70">{pct}%</span>
+        ) : null}
+      </div>
+      <div className="h-1.5 rounded-full bg-ivory-200 overflow-hidden">
+        <div className={`h-full rounded-full transition-all ${color}`} style={{ width: `${capacity > 0 ? Math.max(sold > 0 ? 4 : 0, pct) : 0}%` }} />
+      </div>
+    </div>
+  );
+}
+
+function ModeTag({ selling }: { selling: boolean }) {
+  return (
+    <span className={`inline-flex items-center gap-1.5 font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full ${selling ? 'bg-peacock/12 text-peacock' : 'bg-ivory-200 text-ink-muted'}`}>
+      <span className={`w-1.5 h-1.5 rounded-full ${selling ? 'bg-peacock' : 'bg-ink-muted/50'}`} />
+      {selling ? 'Selling' : 'Interest'}
+    </span>
+  );
 }
 
 export default function AdminEventsPage() {
   const router = useRouter();
   const [events, setEvents]   = useState<EventRow[]>([]);
+  const [salesMap, setSalesMap] = useState<Record<string, Sales>>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab]         = useState<Tab>('published');
 
@@ -68,17 +143,25 @@ export default function AdminEventsPage() {
 
   async function load() {
     const supabase = createClient();
-    const { data } = await supabase
-      .from('events')
-      .select(`
-        id, title, category, artist, city, state, start_date, status,
-        created_at, location_tba, selling_on_rameelo,
-        organizer:profiles!events_organizer_id_fkey (first_name, last_name, email),
-        organization:organizations (name),
-        ticket_tiers (price, quantity)
-      `)
-      .order('start_date', { ascending: true });
-    setEvents((data ?? []) as unknown as EventRow[]);
+    const [eventsRes, salesRes] = await Promise.all([
+      supabase
+        .from('events')
+        .select(`
+          id, title, category, artist, city, state, start_date, status,
+          created_at, location_tba, selling_on_rameelo, cover_image_url, cover_gradient,
+          organizer:profiles!events_organizer_id_fkey (first_name, last_name, email),
+          organization:organizations (name),
+          ticket_tiers (price, quantity, quantity_sold)
+        `)
+        .order('start_date', { ascending: true }),
+      supabase.rpc('admin_event_sales_summary'),
+    ]);
+    setEvents((eventsRes.data ?? []) as unknown as EventRow[]);
+    const map: Record<string, Sales> = {};
+    for (const r of (salesRes.data ?? []) as { event_id: string; tickets_sold: number; net_revenue: number; paid_orders: number }[]) {
+      map[r.event_id] = { tickets_sold: Number(r.tickets_sold) || 0, net_revenue: Number(r.net_revenue) || 0, paid_orders: Number(r.paid_orders) || 0 };
+    }
+    setSalesMap(map);
     setLoading(false);
   }
 
@@ -114,7 +197,10 @@ export default function AdminEventsPage() {
     if (filterState)  result = result.filter(e => e.state === filterState);
     if (filterArtist) result = result.filter(e => e.artist === filterArtist);
 
+    // Primary sort: events SELLING on Rameelo float to the top (that's where the
+    // money is). Secondary: event date in the chosen direction.
     result = [...result].sort((a, b) => {
+      if (a.selling_on_rameelo !== b.selling_on_rameelo) return a.selling_on_rameelo ? -1 : 1;
       const diff = a.start_date.localeCompare(b.start_date);
       return sortDir === 'asc' ? diff : -diff;
     });
@@ -122,11 +208,43 @@ export default function AdminEventsPage() {
     return result;
   }, [events, tab, search, filterCat, filterState, filterArtist, sortDir]);
 
+  // KPI roll-up reflects the CURRENT filtered view, not the whole platform.
+  const kpis = useMemo(() => {
+    const selling = filtered.filter(e => e.selling_on_rameelo).length;
+    let sold = 0, revenue = 0, orders = 0;
+    for (const e of filtered) {
+      const s = salesMap[e.id];
+      if (s) { sold += s.tickets_sold; revenue += s.net_revenue; orders += s.paid_orders; }
+    }
+    return { count: filtered.length, selling, sold, revenue, orders };
+  }, [filtered, salesMap]);
+
   const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
   const paginated  = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   const hasFilters = search || filterCat || filterState || filterArtist;
   const today = new Date().toISOString().slice(0, 10);
+
+  // One row's worth of computed display values, shared by the desktop grid + mobile card.
+  function derive(ev: EventRow) {
+    const pill     = STATUS_PILL[ev.status] ?? STATUS_PILL.draft;
+    const orgName  = [ev.organizer?.first_name, ev.organizer?.last_name].filter(Boolean).join(' ') || ev.organizer?.email || '—';
+    const location = ev.location_tba ? 'TBA' : [ev.city, ev.state].filter(Boolean).join(', ') || '—';
+    const capacity = ev.ticket_tiers.reduce((s, t) => s + t.quantity, 0);
+    const sales    = salesMap[ev.id];
+    const sold     = sales?.tickets_sold ?? ev.ticket_tiers.reduce((s, t) => s + (t.quantity_sold ?? 0), 0);
+    const revenue  = sales?.net_revenue ?? 0;
+    const orders   = sales?.paid_orders ?? 0;
+    const prices   = ev.ticket_tiers.map(t => t.price);
+    const minP     = prices.length ? Math.min(...prices) : 0;
+    const maxP     = prices.length ? Math.max(...prices) : 0;
+    const rel      = relLabel(ev.start_date, today);
+    const subline  = [CATEGORY_LABELS[ev.category] ?? ev.category, ev.artist, ev.organization?.name].filter(Boolean).join(' · ');
+    return { pill, orgName, location, capacity, sold, revenue, orders, minP, maxP, rel, subline };
+  }
+
+  const relChipCls = (tone: 'soon' | 'future' | 'past') =>
+    tone === 'soon' ? 'bg-marigold/15 text-[#a06b00]' : tone === 'future' ? 'bg-ivory-200 text-ink-muted' : 'bg-ivory-200 text-ink-muted/60';
 
   return (
     <div className="space-y-5">
@@ -166,6 +284,22 @@ export default function AdminEventsPage() {
           </span>
         </Link>
       )}
+
+      {/* KPI strip — reflects the current tab + filters (live, money-rule-correct) */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        {[
+          { label: 'Events in view', value: loading ? '—' : kpis.count.toLocaleString(), sub: hasFilters || tab !== 'all' ? 'filtered' : 'all events', accent: 'text-ink' },
+          { label: 'Selling on Rameelo', value: loading ? '—' : kpis.selling.toLocaleString(), sub: kpis.count ? `${Math.round((kpis.selling / kpis.count) * 100)}% of view` : '—', accent: 'text-peacock' },
+          { label: 'Tickets sold', value: loading ? '—' : kpis.sold.toLocaleString(), sub: `${kpis.orders.toLocaleString()} paid order${kpis.orders !== 1 ? 's' : ''}`, accent: 'text-aubergine' },
+          { label: 'Net ticket revenue', value: loading ? '—' : fmtUSDCompact(kpis.revenue), sub: 'face value · live orders', accent: 'text-ink' },
+        ].map(card => (
+          <div key={card.label} className="bg-white rounded-2xl border border-ivory-200 px-4 py-3.5">
+            <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">{card.label}</p>
+            <p className={`font-display font-bold text-2xl mt-1 ${card.accent}`} style={{ letterSpacing: '-0.02em' }}>{card.value}</p>
+            <p className="font-ui text-[11px] text-ink-muted/70 mt-0.5">{card.sub}</p>
+          </div>
+        ))}
+      </div>
 
       {/* Tabs */}
       <div className="flex gap-1 bg-ivory rounded-2xl p-1 w-fit border border-ivory-200">
@@ -236,10 +370,11 @@ export default function AdminEventsPage() {
           </select>
         )}
 
-        {/* Date sort */}
+        {/* Date sort (secondary to selling-first) */}
         <button
           type="button"
           onClick={() => setSortDir(d => d === 'asc' ? 'desc' : 'asc')}
+          title="Selling events always show first; this sets the date order within each group"
           className="flex items-center gap-1.5 px-3 py-2 rounded-xl border border-ivory-200 bg-white font-ui text-sm text-ink-muted hover:text-ink hover:border-aubergine/30 transition-all"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -267,7 +402,7 @@ export default function AdminEventsPage() {
         )}
       </div>
 
-      {/* Table */}
+      {/* Table / cards */}
       {loading ? (
         <div className="flex items-center justify-center py-20">
           <div className="w-8 h-8 rounded-full border-4 border-ivory-200 border-t-marigold animate-spin" />
@@ -280,104 +415,153 @@ export default function AdminEventsPage() {
           </p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
-          {/* Table header */}
-          <div className="grid items-center px-4 py-2 border-b border-ivory-200 bg-ivory/60"
-            style={{ gridTemplateColumns: GRID_COLS }}>
-            {['Event', 'Location', 'Date', 'Organizer', 'Capacity', 'Mode', ''].map((h, i) => (
-              <p key={i} className={`font-mono text-[9px] uppercase tracking-widest text-ink-muted ${i >= 4 && i <= 5 ? 'text-right' : ''}`}>{h}</p>
-            ))}
+        <>
+          {/* ── Desktop table (lg and up) ── */}
+          <div className="hidden lg:block bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+            {/* Header */}
+            <div className="grid items-center px-5 py-2.5 border-b border-ivory-200 bg-ivory/60"
+              style={{ gridTemplateColumns: GRID_COLS }}>
+              {['Event', 'When & where', 'Mode', 'Ticket sales', 'Revenue', 'Organizer', ''].map((h, i) => (
+                <p key={i} className={`font-mono text-[9px] uppercase tracking-widest text-ink-muted ${i === 4 ? 'text-right' : ''}`}>{h}</p>
+              ))}
+            </div>
+
+            {/* Rows */}
+            <div className="divide-y divide-ivory-200">
+              {paginated.map(ev => {
+                const d = derive(ev);
+                return (
+                  <div
+                    key={ev.id}
+                    onClick={() => router.push(`/admin/events/${ev.id}`)}
+                    className="grid items-center px-5 py-3 cursor-pointer transition-colors hover:bg-ivory/40 group"
+                    style={{ gridTemplateColumns: GRID_COLS }}
+                  >
+                    {/* Event */}
+                    <div className="flex items-center gap-3 min-w-0 pr-3">
+                      <Cover ev={ev} size={40} />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 ${d.pill.cls}`}>
+                            {d.pill.label}
+                          </span>
+                        </div>
+                        <p className="font-ui font-semibold text-ink text-sm truncate group-hover:text-aubergine transition-colors" style={{ letterSpacing: '-0.01em' }}>
+                          {ev.title}
+                        </p>
+                        <p className="font-ui text-[11px] text-ink-muted/80 truncate">{d.subline || '—'}</p>
+                      </div>
+                    </div>
+
+                    {/* When & where */}
+                    <div className="pr-3 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="font-mono text-xs text-ink">{fmtDateShort(ev.start_date)}</span>
+                        <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 ${relChipCls(d.rel.tone)}`}>
+                          {d.rel.text}
+                        </span>
+                      </div>
+                      <p className={`font-ui text-[11px] truncate ${ev.location_tba ? 'text-marigold-dark italic' : 'text-ink-muted'}`}>{d.location}</p>
+                    </div>
+
+                    {/* Mode */}
+                    <div><ModeTag selling={ev.selling_on_rameelo} /></div>
+
+                    {/* Ticket sales */}
+                    <div className="pr-4">
+                      {ev.selling_on_rameelo && ev.ticket_tiers.length > 0 ? (
+                        <SalesBar sold={d.sold} capacity={d.capacity} />
+                      ) : ev.ticket_tiers.length > 0 ? (
+                        <p className="font-mono text-[11px] text-ink-muted/60">{d.capacity.toLocaleString()} cap · not selling</p>
+                      ) : (
+                        <p className="font-mono text-[11px] text-ink-muted/40">No tiers</p>
+                      )}
+                    </div>
+
+                    {/* Revenue */}
+                    <div className="text-right pr-2">
+                      {d.revenue > 0 ? (
+                        <>
+                          <p className="font-mono text-sm font-semibold text-ink">{fmtUSD(d.revenue)}</p>
+                          <p className="font-mono text-[10px] text-ink-muted/70">{d.orders} order{d.orders !== 1 ? 's' : ''}</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="font-mono text-sm text-ink-muted/40">$0</p>
+                          {ev.ticket_tiers.length > 0 && <p className="font-mono text-[10px] text-ink-muted/50">${d.minP}{d.maxP > d.minP ? `–$${d.maxP}` : ''}</p>}
+                        </>
+                      )}
+                    </div>
+
+                    {/* Organizer */}
+                    <p className="font-ui text-xs text-ink-muted truncate pr-2">{d.orgName}</p>
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
+                      <Link
+                        href={`/admin/events/${ev.id}/edit`}
+                        className="w-7 h-7 rounded-lg border border-ivory-200 flex items-center justify-center text-ink-muted hover:text-aubergine hover:border-aubergine/30 transition-colors"
+                        title="Edit event"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                      </Link>
+                      <Link
+                        href={`/admin/events/${ev.id}`}
+                        className="w-7 h-7 rounded-lg border border-ivory-200 flex items-center justify-center text-ink-muted hover:text-aubergine hover:border-aubergine/30 transition-colors"
+                        title="View event"
+                      >
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                      </Link>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
 
-          {/* Rows */}
-          <div className="divide-y divide-ivory-200">
+          {/* ── Mobile / tablet cards (below lg) ── */}
+          <div className="lg:hidden space-y-2.5">
             {paginated.map(ev => {
-              const pill     = STATUS_PILL[ev.status] ?? STATUS_PILL.draft;
-              const orgName  = [ev.organizer?.first_name, ev.organizer?.last_name].filter(Boolean).join(' ') || ev.organizer?.email || '—';
-              const location = ev.location_tba ? 'TBA' : [ev.city, ev.state].filter(Boolean).join(', ') || '—';
-              const capacity = ev.ticket_tiers.reduce((s, t) => s + t.quantity, 0);
-              const prices   = ev.ticket_tiers.map(t => t.price);
-              const minP     = prices.length ? Math.min(...prices) : 0;
-              const maxP     = prices.length ? Math.max(...prices) : 0;
-              const isPast   = ev.start_date < today;
-              const subline  = [CATEGORY_LABELS[ev.category] ?? ev.category, ev.artist, ev.organization?.name].filter(Boolean).join(' · ');
-
+              const d = derive(ev);
               return (
                 <div
                   key={ev.id}
                   onClick={() => router.push(`/admin/events/${ev.id}`)}
-                  className="grid items-center px-4 py-2.5 cursor-pointer transition-colors hover:bg-ivory/50"
-                  style={{ gridTemplateColumns: GRID_COLS }}
+                  className="bg-white rounded-2xl border border-ivory-200 p-4 cursor-pointer active:scale-[0.99] transition-transform"
                 >
-                  {/* Event title + status + subline */}
-                  <div className="min-w-0 pr-3">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 ${pill.cls}`}>
-                        {pill.label}
-                      </span>
-                      {isPast && <span className="font-mono text-[8px] uppercase tracking-widest text-ink-muted/50">Past</span>}
+                  <div className="flex items-start gap-3">
+                    <Cover ev={ev} size={48} />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${d.pill.cls}`}>{d.pill.label}</span>
+                        <ModeTag selling={ev.selling_on_rameelo} />
+                      </div>
+                      <p className="font-ui font-semibold text-ink text-sm truncate" style={{ letterSpacing: '-0.01em' }}>{ev.title}</p>
+                      <p className="font-ui text-[11px] text-ink-muted/80 truncate">{d.subline || '—'}</p>
                     </div>
-                    <p className="font-ui font-semibold text-ink text-sm truncate" style={{ letterSpacing: '-0.01em' }}>
-                      {ev.title}
-                    </p>
-                    <p className="font-ui text-[11px] text-ink-muted/80 truncate">{subline || '—'}</p>
                   </div>
 
-                  {/* Location */}
-                  <p className={`font-ui text-xs truncate pr-2 ${ev.location_tba ? 'text-marigold-dark italic' : 'text-ink-muted'}`}>
-                    {location}
-                  </p>
-
-                  {/* Event date */}
-                  <p className={`font-mono text-xs ${isPast ? 'text-ink-muted/50' : 'text-ink-muted'}`}>
-                    {fmtDateShort(ev.start_date)}
-                  </p>
-
-                  {/* Organizer */}
-                  <p className="font-ui text-xs text-ink-muted truncate pr-2">{orgName}</p>
-
-                  {/* Capacity + price */}
-                  <div className="text-right pr-2">
-                    {ev.ticket_tiers.length > 0 ? (
-                      <>
-                        <p className="font-mono text-xs text-ink">{capacity.toLocaleString()}</p>
-                        <p className="font-mono text-[10px] text-ink-muted/70">${minP}{maxP > minP ? `–$${maxP}` : ''}</p>
-                      </>
-                    ) : (
-                      <span className="font-mono text-xs text-ink-muted/40">—</span>
-                    )}
+                  <div className="flex items-center gap-2 mt-2.5 font-ui text-[11px] text-ink-muted">
+                    <span className="font-mono text-ink">{fmtDateShort(ev.start_date)}</span>
+                    <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${relChipCls(d.rel.tone)}`}>{d.rel.text}</span>
+                    <span className="text-ink-muted/40">·</span>
+                    <span className={`truncate ${ev.location_tba ? 'text-marigold-dark italic' : ''}`}>{d.location}</span>
                   </div>
 
-                  {/* Mode */}
-                  <div className="flex justify-end pr-1">
-                    <span title={ev.selling_on_rameelo ? 'Selling tickets on Rameelo' : 'Interest collection only'}
-                      className={`font-mono text-[9px] font-bold px-1.5 py-0.5 rounded-full ${ev.selling_on_rameelo ? 'bg-peacock/12 text-peacock' : 'bg-ivory-200 text-ink-muted'}`}>
-                      {ev.selling_on_rameelo ? '🎟️' : '👀'}
-                    </span>
-                  </div>
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-end gap-1.5" onClick={e => e.stopPropagation()}>
-                    <Link
-                      href={`/admin/events/${ev.id}/edit`}
-                      className="w-7 h-7 rounded-lg border border-ivory-200 flex items-center justify-center text-ink-muted hover:text-aubergine hover:border-aubergine/30 transition-colors"
-                      title="Edit event"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                    </Link>
-                    <Link
-                      href={`/admin/events/${ev.id}`}
-                      className="px-2.5 py-1.5 rounded-lg border border-ivory-200 text-ink-muted font-ui text-xs hover:border-aubergine/30 hover:text-aubergine transition-colors"
-                      title="View event"
-                    >
-                      View
-                    </Link>
-                  </div>
+                  {ev.selling_on_rameelo && ev.ticket_tiers.length > 0 && (
+                    <div className="mt-3 grid grid-cols-[1fr_auto] items-end gap-4">
+                      <SalesBar sold={d.sold} capacity={d.capacity} />
+                      <div className="text-right">
+                        <p className="font-mono text-sm font-semibold text-ink">{d.revenue > 0 ? fmtUSD(d.revenue) : '$0'}</p>
+                        <p className="font-mono text-[10px] text-ink-muted/70">{d.orders} order{d.orders !== 1 ? 's' : ''}</p>
+                      </div>
+                    </div>
+                  )}
                 </div>
               );
             })}
           </div>
-        </div>
+        </>
       )}
 
       {/* Pagination */}
