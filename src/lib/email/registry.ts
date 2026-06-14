@@ -122,6 +122,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     fires: "Automatically on every confirmed, non-test order · Manual resend from an order's detail page",
   },
   {
+    key: "order-admin-notification",
+    name: "New order — admin alert",
+    description: "Detailed internal record sent to platform admins on every new order: full buyer contact (first/last name, email, phone), ticket count & tier, event/artist/date, the face-value price breakdown, buyer-paid Rameelo & card fees, and Rameelo's effective profit after Stripe's processing cost. Admins can opt out per event from the event's admin detail page.",
+    audience: "Admins",
+    category: "Platform",
+    status: "live",
+    trigger: "automatic",
+    fires: "Automatically on every confirmed, non-test order — to each admin still subscribed for that event",
+  },
+  {
     key: "event-reminder",
     name: "Event reminder",
     description: "A nudge a few days before an event the member holds tickets to.",

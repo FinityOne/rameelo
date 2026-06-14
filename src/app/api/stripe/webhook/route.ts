@@ -6,6 +6,7 @@ import { friendlyStripeError } from "@/lib/stripe/errors";
 import { paymentFailedEmail } from "@/lib/email/templates/paymentFailed";
 import { orderConfirmationEmail } from "@/lib/email/templates/orderConfirmation";
 import { orderTeamNotificationEmail } from "@/lib/email/templates/orderTeamNotification";
+import { orderAdminNotificationEmail } from "@/lib/email/templates/orderAdminNotification";
 import { ticketsPendingEmail } from "@/lib/email/templates/ticketsPending";
 import { groupTicketClaimEmail } from "@/lib/email/templates/groupTicketClaim";
 import { sendEmail } from "@/lib/email/send";
@@ -127,14 +128,14 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
     .eq("id", cand.id)
     .eq("status", cand.status)
     .select(`
-      id, user_id, group_id, buyer_name, buyer_email, qty, unit_price, discount_pct, discount_amount,
+      id, user_id, group_id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_pct, discount_amount,
       rameelo_fee, processing_fee, grand_total, payment_method, event_id,
       events ( title, start_date, start_time, city, state, venue_name, cover_image_url, org_id, organizer_id, artists ( name ) ),
       ticket_tiers ( name )
     `);
 
   const order = rows?.[0] as {
-    id: string; user_id: string | null; group_id: string | null; buyer_name: string | null; buyer_email: string;
+    id: string; user_id: string | null; group_id: string | null; buyer_name: string | null; buyer_email: string; buyer_phone: string | null;
     qty: number; unit_price: number; discount_pct: number; discount_amount: number;
     rameelo_fee: number; processing_fee: number; grand_total: number; payment_method: string; event_id: string;
     events: FulfillEvent; ticket_tiers: { name: string } | null;
@@ -205,6 +206,31 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
       await recordEmailLog(admin as SupabaseClient, { toEmail: p.email as string, type: "order_team_notification", subject: tn.subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error });
     }
   } catch (e) { console.error("team notify error:", e instanceof Error ? e.message : e); }
+
+  // 3.5) Platform-admin alert — detailed internal record (full buyer contact, price
+  //      breakdown, and Rameelo's effective profit after Stripe's cost). Goes to every
+  //      admin EXCEPT those who opted out of this event's order emails.
+  try {
+    const { data: optouts } = await admin.from("admin_event_email_optouts").select("user_id").eq("event_id", order.event_id);
+    const optedOut = new Set(((optouts ?? []) as { user_id: string }[]).map(r => r.user_id));
+    const { data: admins } = await admin.from("profiles").select("id, email").eq("role", "admin");
+    const recipients = ((admins ?? []) as { id: string; email: string | null }[])
+      .filter(a => a.email && !optedOut.has(a.id));
+    if (recipients.length) {
+      const an = orderAdminNotificationEmail({
+        buyerName: order.buyer_name, buyerEmail: order.buyer_email, buyerPhone: order.buyer_phone,
+        qty: order.qty, tierName, unitPrice: Number(order.unit_price) || 0, discountAmount: Number(order.discount_amount) || 0,
+        rameeloFee: Number(order.rameelo_fee) || 0, processingFee: Number(order.processing_fee) || 0, grandTotal: Number(order.grand_total) || 0,
+        paymentMethod: order.payment_method, eventTitle: ev?.title ?? "", artistName: artist, eventWhen, eventWhere: where,
+        receiptNum: receiptNum(order.id), orderUrl: `${EMAIL.site}/admin/events/${order.event_id}`,
+        placedAt: new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }),
+      });
+      for (const a of recipients) {
+        const sent = await sendEmail({ to: a.email as string, subject: an.subject, html: an.html, text: an.text });
+        await recordEmailLog(admin as SupabaseClient, { toEmail: a.email as string, type: "order_admin_notification", subject: an.subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error });
+      }
+    }
+  } catch (e) { console.error("admin notify error:", e instanceof Error ? e.message : e); }
 
   // 4) Save the payment method (last-4 / brand) to the order + buyer's account.
   try {

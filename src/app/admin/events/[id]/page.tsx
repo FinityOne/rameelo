@@ -149,6 +149,8 @@ export default function AdminEventReviewPage() {
   const [done, setDone]       = useState<'approved' | 'rejected' | null>(null);
   const [togglingRameelo, setTogglingRameelo] = useState(false);
   const [togglingKidsFree, setTogglingKidsFree] = useState(false);
+  const [orderEmailsOn, setOrderEmailsOn] = useState(true);
+  const [togglingOrderEmails, setTogglingOrderEmails] = useState(false);
   const [interests, setInterests] = useState<InterestSubmission[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [togglingOrderId, setTogglingOrderId] = useState<string | null>(null);
@@ -190,6 +192,9 @@ export default function AdminEventReviewPage() {
       setEvent(eventRes.data as unknown as EventFull);
       setInterests((interestRes.data ?? []) as InterestSubmission[]);
       setOrders((orderRes.data ?? []) as OrderRow[]);
+      // This admin's own order-email subscription for this event (default on).
+      const { data: emailPref } = await supabase.rpc('is_admin_order_email_enabled', { p_event_id: id });
+      setOrderEmailsOn(emailPref !== false);
       setLoading(false);
     }
     load();
@@ -258,6 +263,15 @@ export default function AdminEventReviewPage() {
     await supabase.from('events').update({ kids_5_under_free: next }).eq('id', id);
     setEvent(prev => prev ? { ...prev, kids_5_under_free: next } : prev);
     setTogglingKidsFree(false);
+  }
+
+  async function toggleOrderEmails() {
+    setTogglingOrderEmails(true);
+    const supabase = createClient();
+    const next = !orderEmailsOn;
+    const { error } = await supabase.rpc('set_admin_order_email_pref', { p_event_id: id, p_enabled: next });
+    if (!error) setOrderEmailsOn(next);
+    setTogglingOrderEmails(false);
   }
 
   async function toggleOrderTest(order: OrderRow) {
@@ -508,6 +522,36 @@ export default function AdminEventReviewPage() {
               className={`relative shrink-0 w-12 h-6 rounded-full transition-all duration-200 ${event.kids_5_under_free ? 'bg-peacock' : 'bg-ivory-200'} ${togglingKidsFree ? 'opacity-50' : ''}`}
             >
               <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200 ${event.kids_5_under_free ? 'translate-x-6' : 'translate-x-0'}`} />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Admin order-email subscription toggle (per admin, per event — default on) */}
+      {!done && (
+        <div className="rounded-2xl border border-ivory-200 bg-white p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg shrink-0 ${orderEmailsOn ? 'bg-peacock/10' : 'bg-ivory'}`}>
+                {orderEmailsOn ? '📧' : '🔕'}
+              </div>
+              <div>
+                <p className="font-display font-bold text-ink text-sm" style={{ letterSpacing: '-0.01em' }}>
+                  Order email notifications
+                </p>
+                <p className="font-ui text-xs text-ink-muted mt-0.5">
+                  {orderEmailsOn
+                    ? 'You get a detailed email on every new order for this event — buyer contact, price breakdown, and effective profit. Turn off to stop them.'
+                    : "You won't get order emails for this event. Turn on to start receiving a detailed email on every new order."}
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={toggleOrderEmails}
+              disabled={togglingOrderEmails}
+              className={`relative shrink-0 w-12 h-6 rounded-full transition-all duration-200 ${orderEmailsOn ? 'bg-peacock' : 'bg-ivory-200'} ${togglingOrderEmails ? 'opacity-50' : ''}`}
+            >
+              <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200 ${orderEmailsOn ? 'translate-x-6' : 'translate-x-0'}`} />
             </button>
           </div>
         </div>

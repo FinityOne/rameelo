@@ -424,6 +424,7 @@ export default function CheckoutPage() {
       }
       fetch("/api/order-confirmation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId }) }).catch(() => {});
       fetch("/api/order-team-notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId }) }).catch(() => {});
+      fetch("/api/order-admin-notify", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId }) }).catch(() => {});
       writeOrderSnapshot(orderId);
     }
 
