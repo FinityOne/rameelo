@@ -14,8 +14,11 @@ type ScanOrder = {
   is_test: boolean;
   checked_in_count: number;
   checked_in_at: string | null;
-  ticket_tiers: { name: string } | null;
+  tier_name: string | null;
+  is_combo: boolean;
 };
+
+type RecentAdmit = { id: string; name: string; tier: string; n: number; at: string; combo: boolean };
 
 type EventOpt = { id: string; title: string; start_date: string };
 
@@ -57,11 +60,36 @@ export default function ScannerPage() {
   const [cameraError, setCameraError] = useState("");
   const [manual, setManual] = useState("");
   const [result, setResult] = useState<Resolved | null>(null);
+  const [nameResults, setNameResults] = useState<ScanOrder[] | null>(null);
+  const [recentAdmits, setRecentAdmits] = useState<RecentAdmit[]>([]);
+  const [soundOn, setSoundOn] = useState(true);
   const [busy, setBusy] = useState(false);
 
   // html5-qrcode instance + scan debounce
   const scannerRef = useRef<{ stop: () => Promise<void>; clear: () => void } | null>(null);
   const lastScanRef = useRef<{ text: string; at: number }>({ text: "", at: 0 });
+
+  // Audible + haptic scan feedback — vital at a loud, fast-moving door. A short
+  // bright tone on a valid ticket, a low buzz on a rejection.
+  const audioRef = useRef<AudioContext | null>(null);
+  const feedback = useCallback((ok: boolean) => {
+    if (typeof navigator !== "undefined" && navigator.vibrate) navigator.vibrate(ok ? 40 : [60, 50, 60]);
+    if (!soundOn) return;
+    try {
+      const Ctx = window.AudioContext ?? (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+      const ctx = audioRef.current ?? (audioRef.current = new Ctx());
+      if (ctx.state === "suspended") void ctx.resume();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = ok ? "sine" : "square";
+      osc.frequency.value = ok ? 880 : 220;
+      gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.18, ctx.currentTime + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + (ok ? 0.16 : 0.3));
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(); osc.stop(ctx.currentTime + (ok ? 0.16 : 0.3));
+    } catch { /* audio unsupported — haptics/visual still fire */ }
+  }, [soundOn]);
 
   const ordersById = useMemo(() => new Map(orders.map(o => [o.id, o])), [orders]);
 
@@ -86,28 +114,21 @@ export default function ScannerPage() {
       });
   }, [activeOrg]);
 
-  // Load orders for the selected event
+  // Load orders valid at the selected event. The RPC includes combo orders linked to
+  // this event even when their anchor event_id is a different event in the org — so a
+  // combo ticket scans at every event it covers. Returns confirmed + pending.
   const loadOrders = useCallback(async (evId: string) => {
-    if (!evId) { setOrders([]); return; }
+    if (!evId) { setOrders([]); setPendingIds(new Set()); return; }
     const supabase = createClient();
-    const { data } = await supabase
-      .from("orders")
-      .select("id, buyer_name, qty, status, is_test, checked_in_count, checked_in_at, ticket_tiers(name)")
-      .eq("event_id", evId)
-      .eq("status", "confirmed");
-    setOrders((data ?? []) as unknown as ScanOrder[]);
-
-    // Pending (ACH not yet cleared) orders — recognized so we can reject them with
-    // a clear reason instead of a generic "not a valid ticket".
-    const { data: pend } = await supabase
-      .from("orders")
-      .select("id")
-      .eq("event_id", evId)
-      .eq("status", "pending");
-    setPendingIds(new Set((pend ?? []).map(o => o.id as string)));
+    const { data } = await supabase.rpc("get_event_scan_orders", { p_event_id: evId });
+    const rows = (data ?? []) as ScanOrder[];
+    setOrders(rows.filter(o => o.status === "confirmed"));
+    // Pending (ACH not yet cleared) orders — recognized so we can reject them with a
+    // clear reason instead of a generic "not a valid ticket".
+    setPendingIds(new Set(rows.filter(o => o.status === "pending").map(o => o.id)));
   }, []);
 
-  useEffect(() => { loadOrders(eventId); setResult(null); }, [eventId, loadOrders]);
+  useEffect(() => { loadOrders(eventId); setResult(null); setNameResults(null); setRecentAdmits([]); }, [eventId, loadOrders]);
 
   // Resolve a scanned/typed code against the loaded orders for this event
   const resolve = useCallback((text: string): Resolved => {
@@ -133,7 +154,21 @@ export default function ScannerPage() {
     const now = Date.now();
     if (text === lastScanRef.current.text && now - lastScanRef.current.at < 2500) return;
     lastScanRef.current = { text, at: now };
-    setResult(resolve(text));
+    const r = resolve(text);
+    setResult(r);
+    setNameResults(null);
+    feedback(r.kind === "ok");
+  }
+
+  // Manual box: resolve a code (QR / RM-) OR fall back to a name search across this
+  // event's confirmed orders — handy when a guest's phone is dead at the door.
+  function lookup(text: string) {
+    const t = text.trim();
+    if (!t) return;
+    if (parseOrderId(t) || t.toUpperCase().startsWith("RM-")) { handleCode(t); return; }
+    const q = t.toLowerCase();
+    setResult(null);
+    setNameResults(orders.filter(o => o.buyer_name.toLowerCase().includes(q)).slice(0, 8));
   }
 
   // Camera lifecycle
@@ -168,15 +203,23 @@ export default function ScannerPage() {
   async function admit(order: ScanOrder, n: number) {
     setBusy(true);
     const next = Math.min(order.qty, order.checked_in_count + n);
+    const added = next - order.checked_in_count;
     const supabase = createClient();
+    const at = new Date().toISOString();
     const { error } = await supabase
       .from("orders")
-      .update({ checked_in_count: next, checked_in_at: new Date().toISOString(), checked_in_by: userId || null })
+      .update({ checked_in_count: next, checked_in_at: at, checked_in_by: userId || null })
       .eq("id", order.id);
     if (!error) {
-      const updated = { ...order, checked_in_count: next, checked_in_at: new Date().toISOString() };
+      const updated = { ...order, checked_in_count: next, checked_in_at: at };
       setOrders(prev => prev.map(o => o.id === order.id ? updated : o));
       setResult({ kind: "ok", order: updated });
+      if (added > 0) {
+        setRecentAdmits(prev => [{ id: order.id + at, name: order.buyer_name, tier: order.tier_name ?? "Ticket", n: added, at, combo: order.is_combo }, ...prev].slice(0, 6));
+        feedback(true);
+      }
+    } else {
+      feedback(false);
     }
     setBusy(false);
   }
@@ -199,9 +242,19 @@ export default function ScannerPage() {
   return (
     <div className="max-w-lg mx-auto space-y-5">
       {/* Header */}
-      <div>
-        <h2 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: "-0.02em" }}>Door Scanner</h2>
-        <p className="font-ui text-ink-muted text-sm mt-0.5">Scan attendee QR codes to check them in.</p>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h2 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: "-0.02em" }}>Door Scanner</h2>
+          <p className="font-ui text-ink-muted text-sm mt-0.5">Scan attendee QR codes to check them in.</p>
+        </div>
+        <button
+          onClick={() => setSoundOn(s => !s)}
+          title={soundOn ? "Scan sound on" : "Scan sound off"}
+          className={`shrink-0 flex items-center gap-1.5 px-3 py-2 rounded-xl border font-ui font-semibold text-xs transition-colors ${soundOn ? "border-peacock/30 bg-peacock/8 text-peacock" : "border-ivory-200 bg-white text-ink-muted"}`}
+        >
+          <span>{soundOn ? "🔊" : "🔇"}</span>
+          {soundOn ? "Sound on" : "Sound off"}
+        </button>
       </div>
 
       {/* Event picker + stats */}
@@ -272,17 +325,17 @@ export default function ScannerPage() {
           )}
         </div>
 
-        {/* Manual entry */}
+        {/* Manual entry — code OR name */}
         <div className="p-4 border-t border-ivory-200">
-          <label className="font-mono text-[9px] uppercase tracking-widest text-ink-muted block mb-1.5">Or enter a code manually</label>
+          <label className="font-mono text-[9px] uppercase tracking-widest text-ink-muted block mb-1.5">Enter a code, or search by name</label>
           <form
-            onSubmit={e => { e.preventDefault(); if (manual.trim()) { handleCode(manual.trim()); setManual(""); } }}
+            onSubmit={e => { e.preventDefault(); if (manual.trim()) { lookup(manual.trim()); setManual(""); } }}
             className="flex gap-2"
           >
             <input
               value={manual}
               onChange={e => setManual(e.target.value)}
-              placeholder="RM-XXXXXXXXXX or order ID"
+              placeholder="RM-XXXXXXXXXX, order ID, or attendee name"
               className="flex-1 rounded-xl border border-ivory-200 px-3 py-2.5 font-mono text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/20"
             />
             <button type="submit" className="px-4 py-2.5 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:bg-aubergine-light transition-colors">
@@ -291,6 +344,37 @@ export default function ScannerPage() {
           </form>
         </div>
       </div>
+
+      {/* Name search results */}
+      {nameResults && (
+        <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+          <div className="px-4 py-2.5 border-b border-ivory-200 flex items-center justify-between">
+            <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">{nameResults.length} match{nameResults.length !== 1 ? "es" : ""}</p>
+            <button onClick={() => setNameResults(null)} className="font-ui text-xs text-ink-muted hover:text-ink">Clear</button>
+          </div>
+          {nameResults.length === 0 ? (
+            <p className="px-4 py-6 text-center font-ui text-sm text-ink-muted">No attendee found by that name.</p>
+          ) : (
+            <div className="divide-y divide-ivory-200">
+              {nameResults.map(o => {
+                const inFull = o.checked_in_count >= o.qty;
+                return (
+                  <button key={o.id} onClick={() => { setResult({ kind: "ok", order: o }); setNameResults(null); }}
+                    className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-ivory/50 transition-colors">
+                    <div className="min-w-0">
+                      <p className="font-ui text-sm font-semibold text-ink truncate">{o.buyer_name}</p>
+                      <p className="font-mono text-[10px] text-ink-muted truncate">{o.tier_name ?? "Ticket"} · {o.qty} · {receiptNum(o.id)}</p>
+                    </div>
+                    <span className={`shrink-0 font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${inFull ? "bg-peacock/15 text-peacock" : "bg-marigold/20 text-[#a06b00]"}`}>
+                      {inFull ? "✓ In" : `${o.checked_in_count}/${o.qty}`}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Result */}
       {result && (
@@ -314,10 +398,12 @@ export default function ScannerPage() {
                     <span className={`font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full ${fullyIn ? "bg-peacock/15 text-peacock" : "bg-marigold/20 text-[#a06b00]"}`}>
                       {fullyIn ? "✓ All checked in" : `${o.checked_in_count} of ${o.qty} in`}
                     </span>
+                    {o.is_combo && <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-aubergine/12 text-aubergine">✨ Combo</span>}
                     {o.is_test && <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full bg-marigold/20 text-marigold-dark">Test</span>}
                   </div>
                   <p className="font-display font-bold text-ink text-lg leading-tight">{o.buyer_name}</p>
-                  <p className="font-ui text-sm text-ink-muted">{o.ticket_tiers?.name ?? "Ticket"} · {o.qty} ticket{o.qty !== 1 ? "s" : ""} · {receiptNum(o.id)}</p>
+                  <p className="font-ui text-sm text-ink-muted">{o.tier_name ?? "Ticket"} · {o.qty} ticket{o.qty !== 1 ? "s" : ""} · {receiptNum(o.id)}</p>
+                  {o.is_combo && <p className="font-mono text-[10px] text-aubergine mt-0.5">Combo ticket — valid for this event</p>}
                   {o.checked_in_at && o.checked_in_count > 0 && (
                     <p className="font-mono text-[10px] text-ink-muted/70 mt-1">Last admitted {fmtTime(o.checked_in_at)}</p>
                   )}
@@ -351,6 +437,25 @@ export default function ScannerPage() {
             </div>
           );
         })()
+      )}
+
+      {/* Recent admits — quick situational awareness at the door */}
+      {recentAdmits.length > 0 && (
+        <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+          <p className="px-4 pt-3 pb-1 font-mono text-[9px] uppercase tracking-widest text-ink-muted">Just checked in</p>
+          <div className="divide-y divide-ivory-200">
+            {recentAdmits.map(r => (
+              <div key={r.id} className="px-4 py-2 flex items-center justify-between gap-3">
+                <div className="min-w-0 flex items-center gap-2">
+                  <span className="w-1.5 h-1.5 rounded-full bg-peacock shrink-0" />
+                  <p className="font-ui text-sm text-ink truncate">{r.name}</p>
+                  {r.combo && <span className="font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-aubergine/10 text-aubergine shrink-0">Combo</span>}
+                </div>
+                <span className="font-mono text-[10px] text-ink-muted shrink-0">+{r.n} · {fmtTime(r.at)}</span>
+              </div>
+            ))}
+          </div>
+        </div>
       )}
 
       <p className="font-mono text-[10px] text-ink-muted/70 text-center">
