@@ -26,6 +26,7 @@ type Order = {
   cancellation_reason: string | null;
   cancelled_at: string | null;
   ticket_tiers: { name: string } | null;
+  combo_tickets: { name: string } | null;
 };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -218,7 +219,7 @@ export default function EventOrdersPage() {
     const [evRes, ordRes] = await Promise.all([
       supabase.from("events").select("title").eq("id", id).eq("organizer_id", user.id).single(),
       supabase.from("orders")
-        .select("id, user_id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_amount, service_fee, grand_total, status, order_type, created_at, group_id, cancellation_reason, cancelled_at, ticket_tiers(name)")
+        .select("id, user_id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_amount, service_fee, grand_total, status, order_type, created_at, group_id, cancellation_reason, cancelled_at, ticket_tiers(name), combo_tickets(name)")
         .eq("event_id", id)
         .eq("is_test", false)
         // Only paid orders — exclude `pending` (unpaid checkout attempts awaiting
@@ -425,7 +426,7 @@ export default function EventOrdersPage() {
                             <p className="font-mono text-[9px] text-ink-muted">{order.buyer_email}</p>
                           </td>
                           <td className="px-5 py-3.5">
-                            <p className="font-ui text-sm text-ink">{order.ticket_tiers?.name ?? "—"}</p>
+                            <p className="font-ui text-sm text-ink">{order.ticket_tiers?.name ?? order.combo_tickets?.name ?? "—"}</p>
                             <p className="font-mono text-[9px] text-ink-muted">${order.unit_price}/ticket</p>
                           </td>
                           <td className="px-5 py-3.5 text-center">
@@ -451,6 +452,8 @@ export default function EventOrdersPage() {
                           <td className="px-5 py-3.5 text-center">
                             {order.order_type === "comp" ? (
                               <span className="font-mono text-[9px] text-aubergine bg-aubergine/8 px-2 py-0.5 rounded-full">Comp</span>
+                            ) : order.order_type === "combo" ? (
+                              <span className="font-mono text-[9px] text-[#a06b00] bg-marigold/15 px-2 py-0.5 rounded-full">✨ Combo</span>
                             ) : order.group_id ? (
                               <span className="font-mono text-[9px] text-aubergine bg-aubergine/8 px-2 py-0.5 rounded-full">Group</span>
                             ) : (
@@ -509,7 +512,7 @@ export default function EventOrdersPage() {
                           <AccountBadge has={buyerHasAccount(order, accountEmails)} />
                         </div>
                         <p className="font-mono text-[9px] text-ink-muted truncate">{order.buyer_email}</p>
-                        <p className="font-mono text-[9px] text-ink-muted">{order.ticket_tiers?.name ?? "—"} · {order.qty} ticket{order.qty !== 1 ? "s" : ""}</p>
+                        <p className="font-mono text-[9px] text-ink-muted">{order.ticket_tiers?.name ?? order.combo_tickets?.name ?? "—"} · {order.qty} ticket{order.qty !== 1 ? "s" : ""}</p>
                       </div>
                       <div className="text-right shrink-0">
                         <p className={`font-display font-bold ${isCancelled ? "line-through text-ink-muted" : order.order_type === "comp" ? "text-aubergine" : "text-peacock"}`} style={{ letterSpacing: "-0.02em" }}>{order.order_type === "comp" ? "Free" : `$${order.grand_total.toFixed(2)}`}</p>

@@ -500,31 +500,38 @@ export default function OrganizerSalesPage() {
       const raw = (eventsRaw ?? []) as RawEvent[];
       const eventIds = raw.map(e => e.id);
 
-      // Paid orders only — confirmed, non-test, real purchases (comps excluded),
-      // not a lost/open chargeback, and never pending. Sold counts & revenue come
-      // from these real orders, not the reserved quantity_sold.
-      type PaidOrder = { tier_id: string | null; qty: number; unit_price: number; discount_amount: number; dispute_status: string | null };
+      // Paid orders — confirmed, non-test, real purchases + combos (comps excluded),
+      // not a lost/open chargeback, never pending. Sold counts & revenue come from
+      // these real orders. Tier orders aggregate by tier; combos (untiered, anchored
+      // to an event) aggregate per event.
+      type PaidOrder = { event_id: string; tier_id: string | null; order_type: string; qty: number; unit_price: number; discount_amount: number; dispute_status: string | null };
       let paidOrders: PaidOrder[] = [];
       if (eventIds.length > 0) {
         const { data: ordersRaw } = await supabase
           .from("orders")
-          .select("tier_id, qty, unit_price, discount_amount, dispute_status")
+          .select("event_id, tier_id, order_type, qty, unit_price, discount_amount, dispute_status")
           .in("event_id", eventIds)
           .eq("is_test", false)
           .eq("status", "confirmed")
-          .eq("order_type", "purchase");
+          .in("order_type", ["purchase", "combo"]);
         paidOrders = ((ordersRaw ?? []) as PaidOrder[]).filter(
           o => o.dispute_status !== "open" && o.dispute_status !== "lost"
         );
       }
 
-      // Aggregate paid tickets + face-value revenue (qty * unit_price - discount) by tier.
+      // Aggregate paid tickets + face-value revenue (qty * unit_price - discount).
       const soldByTier = new Map<string, number>();
       const earnedByTier = new Map<string, number>();
+      const comboSoldByEvent = new Map<string, number>();
+      const comboEarnedByEvent = new Map<string, number>();
       for (const o of paidOrders) {
-        if (!o.tier_id) continue;
-        soldByTier.set(o.tier_id, (soldByTier.get(o.tier_id) ?? 0) + Number(o.qty));
         const face = Number(o.qty) * Number(o.unit_price) - Number(o.discount_amount);
+        if (o.order_type === "combo" || !o.tier_id) {
+          comboSoldByEvent.set(o.event_id, (comboSoldByEvent.get(o.event_id) ?? 0) + Number(o.qty));
+          comboEarnedByEvent.set(o.event_id, (comboEarnedByEvent.get(o.event_id) ?? 0) + face);
+          continue;
+        }
+        soldByTier.set(o.tier_id, (soldByTier.get(o.tier_id) ?? 0) + Number(o.qty));
         earnedByTier.set(o.tier_id, (earnedByTier.get(o.tier_id) ?? 0) + face);
       }
 
@@ -534,11 +541,14 @@ export default function OrganizerSalesPage() {
           paidSold: soldByTier.get(t.id) ?? 0,
           paidEarned: earnedByTier.get(t.id) ?? 0,
         }));
-        const totalSold = tiers.reduce((s, t) => s + t.paidSold, 0);
+        const comboSold = comboSoldByEvent.get(ev.id) ?? 0;
+        const comboEarned = comboEarnedByEvent.get(ev.id) ?? 0;
+        // Combos add to sold tickets + revenue, but not to tier capacity / fill rate.
+        const totalSold = tiers.reduce((s, t) => s + t.paidSold, 0) + comboSold;
         const totalCapacity = tiers.reduce((s, t) => s + t.quantity, 0);
         const maxRevenue = tiers.reduce((s, t) => s + t.quantity * t.price, 0);   // sellout potential (list price)
-        const earnedRevenue = tiers.reduce((s, t) => s + t.paidEarned, 0);        // actual paid face value
-        const fillPct = totalCapacity > 0 ? (totalSold / totalCapacity) * 100 : 0;
+        const earnedRevenue = tiers.reduce((s, t) => s + t.paidEarned, 0) + comboEarned; // actual paid face value (incl. combos)
+        const fillPct = totalCapacity > 0 ? (tiers.reduce((s, t) => s + t.paidSold, 0) / totalCapacity) * 100 : 0;
         return {
           id: ev.id, title: ev.title, start_date: ev.start_date, status: ev.status,
           tiers, totalSold, totalCapacity, fillPct, maxRevenue, earnedRevenue,

@@ -23,6 +23,7 @@ type OrderRow = {
   buyer_name: string;
   buyer_email: string;
   tier_id: string | null;
+  order_type: string;
   qty: number;
   unit_price: number | null;
   discount_amount: number | null;
@@ -239,7 +240,7 @@ export default function AdminEventReviewPage() {
           .order('created_at', { ascending: false }),
         supabase
           .from('orders')
-          .select('id, buyer_name, buyer_email, tier_id, qty, unit_price, discount_amount, rameelo_fee, processing_fee, grand_total, payment_method, status, is_test, dispute_status, created_at')
+          .select('id, buyer_name, buyer_email, tier_id, order_type, qty, unit_price, discount_amount, rameelo_fee, processing_fee, grand_total, payment_method, status, is_test, dispute_status, created_at')
           .eq('event_id', id)
           .order('created_at', { ascending: false }),
       ]);
@@ -821,6 +822,9 @@ export default function AdminEventReviewPage() {
                           <td className="px-5 py-3 font-ui text-sm text-ink font-medium">
                             <div className="flex items-center gap-2">
                               {o.buyer_name}
+                              {o.order_type === 'combo' && (
+                                <span className="font-mono text-[8px] uppercase tracking-widest bg-marigold/15 text-[#a06b00] px-1.5 py-0.5 rounded-full">✨ Combo</span>
+                              )}
                               {o.is_test && (
                                 <span className="font-mono text-[8px] uppercase tracking-widest bg-marigold/20 text-marigold-dark px-1.5 py-0.5 rounded-full">Test</span>
                               )}

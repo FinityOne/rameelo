@@ -55,6 +55,7 @@ type Order = {
   order_type: string;
   created_at: string;
   ticket_tiers: { name: string } | null;
+  combo_tickets: { name: string } | null;
 };
 
 type GroupOrder = {
@@ -177,6 +178,7 @@ export default function EventDashboardPage() {
   const [recentGroups, setRecentGroups] = useState<GroupOrder[]>([]);
   const [orderCount, setOrderCount]   = useState(0);
   const [groupCount, setGroupCount]   = useState(0);
+  const [comboStats, setComboStats]   = useState<{ tickets: number; revenue: number; orders: number }>({ tickets: 0, revenue: 0, orders: 0 });
   const [loading, setLoading]         = useState(true);
 
   useEffect(() => {
@@ -185,7 +187,7 @@ export default function EventDashboardPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [evRes, ordRes, grpRes] = await Promise.all([
+      const [evRes, ordRes, grpRes, comboRes] = await Promise.all([
         supabase
           .from("events")
           .select("id, title, category, artist, description, start_date, end_date, start_time, end_time, doors_open_time, is_multi_day, venue_name, address_line1, address_line2, city, state, zip, status, selling_on_rameelo, review_note, cover_image_url, cover_gradient, capacity, ticket_tiers(id, name, price, quantity, quantity_sold, quantity_comped)")
@@ -195,7 +197,7 @@ export default function EventDashboardPage() {
 
         supabase
           .from("orders")
-          .select("id, buyer_name, buyer_email, qty, grand_total, status, order_type, created_at, ticket_tiers(name)", { count: "exact" })
+          .select("id, buyer_name, buyer_email, qty, grand_total, status, order_type, created_at, ticket_tiers(name), combo_tickets(name)", { count: "exact" })
           .eq("event_id", id)
           .eq("is_test", false)
           .neq("status", "pending")   // organizers only see paid orders, never pending ones
@@ -208,6 +210,15 @@ export default function EventDashboardPage() {
           .eq("event_id", id)
           .order("created_at", { ascending: false })
           .limit(5),
+
+        // Combo-ticket sales anchored to this event (org-spanning bundles bought here).
+        supabase
+          .from("orders")
+          .select("qty, unit_price, discount_amount")
+          .eq("event_id", id)
+          .eq("order_type", "combo")
+          .eq("is_test", false)
+          .eq("status", "confirmed"),
       ]);
 
       if (!evRes.data) { router.replace("/organizer/events"); return; }
@@ -217,6 +228,12 @@ export default function EventDashboardPage() {
       setOrderCount(ordRes.count ?? 0);
       setRecentGroups((grpRes.data ?? []) as unknown as GroupOrder[]);
       setGroupCount(grpRes.count ?? 0);
+      const comboRows = (comboRes.data ?? []) as { qty: number; unit_price: number; discount_amount: number | null }[];
+      setComboStats({
+        tickets: comboRows.reduce((s, o) => s + o.qty, 0),
+        revenue: comboRows.reduce((s, o) => s + (o.qty * o.unit_price - (o.discount_amount ?? 0)), 0),
+        orders: comboRows.length,
+      });
       setLoading(false);
     }
     load();
@@ -246,9 +263,19 @@ export default function EventDashboardPage() {
   const statusMeta   = STATUS_META[ev.status] ?? STATUS_META.draft;
   const gradient     = GRADIENTS.find(g => g.id === ev.cover_gradient) ?? GRADIENTS[0];
 
+  // Combo tickets are an org product sold here (anchored to this event); their revenue
+  // counts toward this event's total but stays out of the tier sellout progress bar.
+  const revenueTotal = grossRev + comboStats.revenue;
+  const ticketsTotal = totalSold + comboStats.tickets;
+  const soldSub = [
+    `of ${totalCap.toLocaleString()} total`,
+    totalComped > 0 ? `${totalComped} comp` : null,
+    comboStats.tickets > 0 ? `${comboStats.tickets} combo` : null,
+  ].filter(Boolean).join(" · ");
+
   const kpis = [
-    { label: "Revenue", value: fmtCurrency(grossRev), sub: `of ${fmtCurrency(maxRev)} potential`, color: "#0E8C7A", icon: "💰" },
-    { label: "Tickets Sold", value: totalSold.toLocaleString(), sub: totalComped > 0 ? `of ${totalCap.toLocaleString()} · ${totalComped} comp` : `of ${totalCap.toLocaleString()} total`, color: "#2E1B30", icon: "🎟️" },
+    { label: "Revenue", value: fmtCurrency(revenueTotal), sub: comboStats.revenue > 0 ? `incl. ${fmtCurrency(comboStats.revenue)} combo` : `of ${fmtCurrency(maxRev)} potential`, color: "#0E8C7A", icon: "💰" },
+    { label: "Tickets Sold", value: ticketsTotal.toLocaleString(), sub: soldSub, color: "#2E1B30", icon: "🎟️" },
     { label: "Fill Rate", value: `${Math.round(fillPct)}%`, sub: fillPct >= 80 ? "Almost sold out!" : fillPct >= 50 ? "Good momentum" : "Still growing", color: fillColor, icon: "📊" },
     { label: "Total Orders", value: orderCount.toLocaleString(), sub: totalComped > 0 ? "incl. comp tickets" : "individual orders", color: "#2E1B30", icon: "🧾" },
     { label: "Group Orders", value: groupCount.toLocaleString(), sub: "group links created", color: "#3D2543", icon: "👥" },
@@ -498,6 +525,7 @@ export default function EventDashboardPage() {
               {recentOrders.map(order => {
                 const s = ORDER_STATUS[order.status] ?? ORDER_STATUS.confirmed;
                 const isComp = order.order_type === "comp";
+                const isCombo = order.order_type === "combo";
                 return (
                   <div key={order.id} className="px-5 py-3.5 flex items-center gap-3">
                     <div className="flex-1 min-w-0">
@@ -505,12 +533,14 @@ export default function EventDashboardPage() {
                         <p className="font-ui text-sm font-semibold text-ink truncate">{order.buyer_name}</p>
                         {isComp ? (
                           <span className="font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 bg-aubergine/12 text-aubergine">Comp</span>
+                        ) : isCombo ? (
+                          <span className="font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 bg-marigold/15 text-[#a06b00]">✨ Combo</span>
                         ) : (
                           <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 ${s.cls}`}>{s.label}</span>
                         )}
                       </div>
                       <p className="font-mono text-[10px] text-ink-muted truncate">
-                        {order.ticket_tiers?.name ?? "—"} · {order.qty} ticket{order.qty !== 1 ? "s" : ""} · {timeAgo(order.created_at)}
+                        {order.ticket_tiers?.name ?? order.combo_tickets?.name ?? "—"} · {order.qty} ticket{order.qty !== 1 ? "s" : ""} · {timeAgo(order.created_at)}
                       </p>
                     </div>
                     {isComp ? (

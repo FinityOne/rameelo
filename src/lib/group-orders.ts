@@ -471,6 +471,26 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
 
   const orders = data as unknown as RawOrderRow[];
 
+  // The events a combo covers, fetched separately so a hiccup here never blocks the
+  // core ticket load. Keyed by combo_ticket_id.
+  const comboEventsByCombo = new Map<string, { id: string; title: string; start_date: string }[]>();
+  const comboIds = Array.from(new Set(orders.map(o => o.combo_ticket_id).filter((x): x is string => !!x)));
+  if (comboIds.length > 0) {
+    const { data: links } = await supabase
+      .from("combo_ticket_events")
+      .select("combo_ticket_id, events (id, title, start_date)")
+      .in("combo_ticket_id", comboIds);
+    type EvRow = { id: string; title: string; start_date: string };
+    for (const l of (links ?? []) as unknown as { combo_ticket_id: string; events: EvRow | EvRow[] | null }[]) {
+      const ev = Array.isArray(l.events) ? l.events[0] : l.events;
+      if (!ev) continue;
+      const arr = comboEventsByCombo.get(l.combo_ticket_id) ?? [];
+      arr.push(ev);
+      comboEventsByCombo.set(l.combo_ticket_id, arr);
+    }
+    for (const arr of comboEventsByCombo.values()) arr.sort((a, b) => a.start_date.localeCompare(b.start_date));
+  }
+
   const result: PortalOrderRow[] = await Promise.all(
     orders.map(async (o) => {
       let groupMembers: GroupMember[] | undefined;
@@ -511,6 +531,7 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
         grandTotal: o.grand_total,
         isTest: o.is_test ?? false,
         isCombo: !!o.combo_ticket_id,
+        comboEvents: o.combo_ticket_id ? (comboEventsByCombo.get(o.combo_ticket_id) ?? []) : [],
         purchasedAt: o.created_at,
         status: o.status,
         paymentMethod: o.payment_method,
@@ -728,6 +749,7 @@ export interface PortalOrderRow {
   grandTotal: number;
   isTest: boolean;
   isCombo?: boolean;         // combo ticket — grants entry to multiple events
+  comboEvents?: { id: string; title: string; start_date: string }[]; // events the combo covers
   purchasedAt: string;
   status: string;            // 'confirmed' | 'pending'
   paymentMethod: string;     // 'card' | 'ach'

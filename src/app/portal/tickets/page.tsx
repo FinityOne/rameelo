@@ -592,9 +592,14 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
             <span className="inline-flex items-center font-mono text-[10px] uppercase tracking-[0.18em] text-white/90 bg-black/25 backdrop-blur-sm px-3 py-1.5 rounded-full">
               {seasonLabel(order)}
             </span>
-            {order.isTest && (
-              <span className="inline-flex items-center font-mono text-[9px] uppercase tracking-widest font-bold bg-white/20 text-white px-2 py-1 rounded-full">Test</span>
-            )}
+            <div className="flex items-center gap-1.5">
+              {order.isCombo && (
+                <span className="inline-flex items-center gap-1 font-mono text-[9px] uppercase tracking-widest font-bold bg-marigold text-aubergine px-2 py-1 rounded-full">✨ Combo</span>
+              )}
+              {order.isTest && (
+                <span className="inline-flex items-center font-mono text-[9px] uppercase tracking-widest font-bold bg-white/20 text-white px-2 py-1 rounded-full">Test</span>
+              )}
+            </div>
           </div>
 
           <div className="mt-auto pt-8">
@@ -693,6 +698,16 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
             Ticket {globalIndex + 1} <span className="text-ink-muted/50 font-normal">of {total}</span>
           </h4>
           <p className={`font-mono text-[11px] text-ink-muted ${order.receivedFrom ? "mb-2" : "mb-5"}`}>{ticketRef(order.orderId, seat)}</p>
+
+          {/* Combo — one ticket, multiple events */}
+          {order.isCombo && (order.comboEvents?.length ?? 0) > 0 && (
+            <div className="mb-5 inline-flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-marigold/10 border border-marigold/30 self-start">
+              <span className="text-sm leading-none mt-0.5">✨</span>
+              <span className="font-ui text-[11px] text-[#a06b00] font-semibold">
+                Combo ticket · valid for {order.comboEvents!.map(e => e.title).join(" · ")}
+              </span>
+            </div>
+          )}
 
           {/* Provenance — small note when this ticket was received from someone */}
           {order.receivedFrom && (
