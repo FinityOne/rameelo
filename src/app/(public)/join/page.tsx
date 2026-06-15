@@ -61,6 +61,15 @@ function JoinPageInner() {
         },
         body: JSON.stringify({ firstName, email }),
       }).catch(() => {});
+
+      // Notify platform admins of the new registration (non-blocking).
+      if (data.user?.id) {
+        fetch("/api/new-user-notify", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId: data.user.id }),
+        }).catch(() => {});
+      }
     }
 
     if (data.session) {

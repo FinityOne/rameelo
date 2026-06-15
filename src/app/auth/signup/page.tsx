@@ -121,6 +121,16 @@ export default function SignUpPage() {
       body: JSON.stringify({ firstName, email }),
     }).catch(() => { /* silent — welcome email failure shouldn't block onboarding */ });
 
+    // Notify platform admins of the new registration (non-blocking). The route
+    // resolves admin recipients + the member's details server-side from the user id.
+    if (data.user?.id) {
+      fetch("/api/new-user-notify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: data.user.id }),
+      }).catch(() => { /* silent — admin alert shouldn't block onboarding */ });
+    }
+
     if (data.session) {
       // Email confirmation disabled — claim any team invite + guest orders, then route.
       if (inviteToken) {

@@ -192,6 +192,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     fires: "On a refund or dispute event",
   },
   {
+    key: "new-user-signup",
+    name: "New user signup alert",
+    description: "Notifies all platform admins when someone registers a Rameelo account, with the new member's name, email, phone, and location so an admin can reach out directly.",
+    audience: "Admins",
+    category: "Platform",
+    status: "live",
+    trigger: "automatic",
+    fires: "Automatically when a user creates an account",
+  },
+  {
     key: "sponsorship-inquiry",
     name: "Sponsorship inquiry alert",
     description: "Notifies all platform admins, with the full form details, when someone submits the /sponsor advertising form.",
