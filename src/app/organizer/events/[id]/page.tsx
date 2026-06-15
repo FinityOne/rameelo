@@ -232,12 +232,12 @@ export default function EventDashboardPage() {
   if (!ev) return null;
 
   const tiers        = ev.ticket_tiers ?? [];
+  // quantity_sold is PAID purchases only; comps are tracked separately in
+  // quantity_comped and never consume for-sale inventory or count as revenue.
   const totalSold    = tiers.reduce((s, t) => s + t.quantity_sold, 0);
   const totalComped  = tiers.reduce((s, t) => s + (t.quantity_comped ?? 0), 0);
-  const paidSold     = Math.max(0, totalSold - totalComped); // comp tickets generate $0
   const totalCap     = tiers.reduce((s, t) => s + t.quantity, 0);
-  // Revenue counts PAID tickets only — comps (free) contribute nothing.
-  const grossRev     = tiers.reduce((s, t) => s + Math.max(0, t.quantity_sold - (t.quantity_comped ?? 0)) * t.price, 0);
+  const grossRev     = tiers.reduce((s, t) => s + t.quantity_sold * t.price, 0);
   const maxRev       = tiers.reduce((s, t) => s + t.quantity * t.price, 0);
   const fillPct      = totalCap > 0 ? (totalSold / totalCap) * 100 : 0;
   const revPct       = maxRev > 0 ? (grossRev / maxRev) * 100 : 0;
@@ -629,11 +629,10 @@ export default function EventDashboardPage() {
 
           <div className="divide-y divide-ivory-200">
             {[...tiers]
-              .map(t => ({ ...t, paidSold: Math.max(0, t.quantity_sold - (t.quantity_comped ?? 0)) }))
-              .sort((a, b) => (b.paidSold * b.price) - (a.paidSold * a.price))
+              .sort((a, b) => (b.quantity_sold * b.price) - (a.quantity_sold * a.price))
               .map((tier, i) => {
                 const tf = tier.quantity > 0 ? (tier.quantity_sold / tier.quantity) * 100 : 0;
-                const tc = tier.paidSold * tier.price; // revenue from PAID tickets only (comps are free)
+                const tc = tier.quantity_sold * tier.price; // PAID tickets only (comps are free + tracked separately)
                 const comped = tier.quantity_comped ?? 0;
                 const tcolor = tf >= 80 ? "#7C1F2C" : tf >= 50 ? "#0E8C7A" : "#D4891B";
                 return (

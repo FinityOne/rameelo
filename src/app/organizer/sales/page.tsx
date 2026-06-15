@@ -500,9 +500,9 @@ export default function OrganizerSalesPage() {
       const raw = (eventsRaw ?? []) as RawEvent[];
       const eventIds = raw.map(e => e.id);
 
-      // Paid orders only — confirmed, non-test, not a lost/open chargeback, and
-      // never pending. Sold counts & revenue come from these real orders, not the
-      // reserved quantity_sold (which also counts pending holds).
+      // Paid orders only — confirmed, non-test, real purchases (comps excluded),
+      // not a lost/open chargeback, and never pending. Sold counts & revenue come
+      // from these real orders, not the reserved quantity_sold.
       type PaidOrder = { tier_id: string | null; qty: number; unit_price: number; discount_amount: number; dispute_status: string | null };
       let paidOrders: PaidOrder[] = [];
       if (eventIds.length > 0) {
@@ -511,7 +511,8 @@ export default function OrganizerSalesPage() {
           .select("tier_id, qty, unit_price, discount_amount, dispute_status")
           .in("event_id", eventIds)
           .eq("is_test", false)
-          .eq("status", "confirmed");
+          .eq("status", "confirmed")
+          .eq("order_type", "purchase");
         paidOrders = ((ordersRaw ?? []) as PaidOrder[]).filter(
           o => o.dispute_status !== "open" && o.dispute_status !== "lost"
         );
