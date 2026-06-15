@@ -10,6 +10,7 @@ import { money } from "@/lib/money";
 import { groupDiscountPct, groupDiscountAmount, groupScalingLevels } from "@/lib/group-orders";
 import { computeFees } from "@/lib/fees";
 import EventInterestView from "./EventInterestView";
+import { ComboBanner, ComboTicketCard, comboBuyable, type ComboTicket } from "./ComboTickets";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -595,6 +596,7 @@ export default function EventDetailClient({ id }: { id: string }) {
   const router = useRouter();
 
   const [event, setEvent] = useState<Event | null>(null);
+  const [combos, setCombos] = useState<ComboTicket[]>([]);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [selectedTierId, setSelectedTierId] = useState<string | null>(null);
@@ -702,6 +704,10 @@ export default function EventDetailClient({ id }: { id: string }) {
             if (org && !cancelled) setEvent(prev => prev ? { ...prev, organization: org as Organization } : prev);
           });
         }
+        // Combo tickets that include this event (org-spanning bundles).
+        supabase.rpc("get_event_combo_tickets", { p_event_id: id }).then(({ data: comboRows }) => {
+          if (!cancelled) setCombos((comboRows ?? []) as ComboTicket[]);
+        });
       }
     }
 
@@ -860,6 +866,38 @@ export default function EventDetailClient({ id }: { id: string }) {
     router.push("/checkout");
   }, [event, selectedTier, qty, unitPrice, discountPct, discountAmount, serviceFee, grandTotal, router]);
 
+  // Combo tickets have a single flat price (no group discounts) and route straight
+  // to checkout with a combo payload. event_id anchors the order to this event.
+  const handleComboCheckout = useCallback((combo: ComboTicket, comboQty: number) => {
+    if (!event) return;
+    const subtotal = combo.price * comboQty;
+    const { rameeloFee, processingFee, grandTotal: comboGrand } = computeFees(subtotal, subtotal, "card");
+    const payload = {
+      eventId: event.id,
+      tierId: "",
+      tierName: combo.name,
+      comboTicketId: combo.id,
+      isCombo: true,
+      eventTitle: event.title,
+      eventDate: fmtDate(event.start_date),
+      eventStartDate: event.start_date,
+      eventVenue: event.venue_name,
+      eventCity: event.city,
+      eventState: event.state,
+      artistName: event.artist?.name ?? null,
+      qty: comboQty,
+      unitPrice: combo.price,
+      discount: 0,
+      discountAmount: 0,
+      subtotalAfterDiscount: subtotal,
+      rameeloFee,
+      serviceFee: rameeloFee + processingFee,
+      grandTotal: comboGrand,
+    };
+    localStorage.setItem("rameelo_checkout", JSON.stringify(payload));
+    router.push("/checkout");
+  }, [event, router]);
+
   const gradient = event ? (GRADIENTS.find(g => g.id === event.cover_gradient) ?? GRADIENTS[0]) : null;
 
   if (loading) {
@@ -890,6 +928,8 @@ export default function EventDetailClient({ id }: { id: string }) {
   const totalSoldOut = event.ticket_tiers.every(t => t.quantity_sold >= t.quantity);
   // Sales close once doors open in the event's local timezone.
   const salesClosed = salesClosedForEvent(event);
+  // Active, in-window combo tickets that include this event.
+  const buyableCombos = combos.filter(comboBuyable);
 
   // ── PAST EVENT ── rich, indexable recap — keeps artist/org/details for SEO &
   // context, but drops every CTA, form, and urgency mechanic. ───────────────────
@@ -1158,6 +1198,13 @@ export default function EventDetailClient({ id }: { id: string }) {
 
       {/* ── Content ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        {/* Combo ticket promo banner — clicks scroll to the combo card */}
+        {buyableCombos.length > 0 && (
+          <ComboBanner
+            combo={buyableCombos[0]}
+            onGet={() => document.getElementById("combo-tickets")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+          />
+        )}
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-10 items-start">
 
           {/* ── Left: Event details ── */}
@@ -1327,6 +1374,15 @@ export default function EventDetailClient({ id }: { id: string }) {
           {/* ── Right: Purchase widget or Interest form ── */}
           <div ref={buyPanelRef} className="w-full lg:w-96 shrink-0">
             <div className="lg:sticky lg:top-5 space-y-4">
+
+              {/* Combo tickets (org-spanning bundles) — shown above the regular tickets */}
+              {buyableCombos.length > 0 && (
+                <div id="combo-tickets" className="space-y-3 scroll-mt-5">
+                  {buyableCombos.map(combo => (
+                    <ComboTicketCard key={combo.id} combo={combo} currentEventId={event.id} onBuy={handleComboCheckout} />
+                  ))}
+                </div>
+              )}
 
               {/* Urgency / Interest banner — desktop only */}
               <div className="hidden lg:block">

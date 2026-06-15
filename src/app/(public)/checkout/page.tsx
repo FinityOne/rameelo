@@ -30,6 +30,8 @@ interface CheckoutPayload {
   eventId: string;
   tierId: string;
   tierName: string;
+  comboTicketId?: string;   // set for combo-ticket purchases (spans multiple events)
+  isCombo?: boolean;
   eventTitle: string;
   eventDate: string;
   eventStartDate?: string; // raw YYYY-MM-DD — drives the ACH cutoff
@@ -317,6 +319,7 @@ export default function CheckoutPage() {
         eventStartDate: payload.eventStartDate,
         tierId: payload.tierId,
         tierName: payload.tierName,
+        comboTicketId: payload.comboTicketId,
         groupId: payload.groupId,
         qty: payload.qty,
       }),
@@ -364,6 +367,7 @@ export default function CheckoutPage() {
       userId: authedUserId,
       eventId: payload.eventId,
       tierId: payload.tierId,
+      comboTicketId: payload.comboTicketId ?? null,
       groupId: payload.groupId,
       buyerName: `${firstName} ${lastName}`.trim(),
       buyerEmail: email,
@@ -405,7 +409,7 @@ export default function CheckoutPage() {
     setLoading(true);
 
     const { orderId, error } = await saveOrder({
-      userId: authedUserId, eventId: payload.eventId, tierId: payload.tierId, groupId: payload.groupId,
+      userId: authedUserId, eventId: payload.eventId, tierId: payload.tierId, comboTicketId: payload.comboTicketId ?? null, groupId: payload.groupId,
       buyerName: `${firstName} ${lastName}`.trim(), buyerEmail: email, buyerPhone: phoneDigits,
       qty: payload.qty, unitPrice: payload.unitPrice, discountPct: payload.discount, discountAmount: payload.discountAmount,
       serviceFee: rameeloFee + processingFee, rameeloFee, processingFee, paymentMethod, grandTotal,

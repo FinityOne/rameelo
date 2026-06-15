@@ -354,7 +354,8 @@ export async function createGroupAllocations(orderId: string): Promise<void> {
 export async function saveOrder(params: {
   userId: string | null;
   eventId: string;
-  tierId: string;
+  tierId?: string | null;
+  comboTicketId?: string | null;
   groupId?: string;
   buyerName: string;
   buyerEmail: string;
@@ -391,11 +392,14 @@ export async function saveOrder(params: {
       id,
       user_id: params.userId,
       event_id: params.eventId,
-      tier_id: params.tierId,
+      // A combo order spans multiple events: no single ticket_tier, so tier_id is
+      // null and combo_ticket_id carries the product. Otherwise a normal tier order.
+      tier_id: params.comboTicketId ? null : params.tierId,
+      combo_ticket_id: params.comboTicketId ?? null,
       group_id: params.groupId ?? null,
-      // Real purchase-flow order (vs. organizer-issued 'comp' tickets, which are
-      // created server-side and never go through checkout).
-      order_type: "purchase",
+      // 'combo' for org-spanning combo tickets, else a real purchase-flow order
+      // (vs. organizer-issued 'comp' tickets created server-side, not via checkout).
+      order_type: params.comboTicketId ? "combo" : "purchase",
       buyer_name: params.buyerName,
       buyer_email: params.buyerEmail,
       buyer_phone: params.buyerPhone,
@@ -440,7 +444,9 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
         city, state, venue_name, category, cover_gradient, cover_image_url,
         artists (name, profile_image_url)
       ),
-      ticket_tiers (id, name, price)
+      ticket_tiers (id, name, price),
+      combo_ticket_id,
+      combo_tickets (id, name, price)
     `)
     .eq("user_id", userId)
     // Include 'pending' (ACH awaiting clearance) so the buyer sees their reserved
@@ -499,11 +505,12 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
         coverGradient: o.events?.cover_gradient ?? "",
         coverImageUrl: o.events?.cover_image_url ?? null,
         artistName: o.events?.artists?.name ?? "",
-        tierName: o.ticket_tiers?.name ?? "",
+        tierName: o.ticket_tiers?.name ?? o.combo_tickets?.name ?? "",
         qty: o.qty,
         unitPrice: o.unit_price,
         grandTotal: o.grand_total,
         isTest: o.is_test ?? false,
+        isCombo: !!o.combo_ticket_id,
         purchasedAt: o.created_at,
         status: o.status,
         paymentMethod: o.payment_method,
@@ -697,6 +704,8 @@ interface RawOrderRow {
     artists: { name: string; profile_image_url: string | null } | null;
   } | null;
   ticket_tiers: { id: string; name: string; price: number } | null;
+  combo_ticket_id: string | null;
+  combo_tickets: { id: string; name: string; price: number } | null;
 }
 
 export interface PortalOrderRow {
@@ -718,6 +727,7 @@ export interface PortalOrderRow {
   unitPrice: number;
   grandTotal: number;
   isTest: boolean;
+  isCombo?: boolean;         // combo ticket — grants entry to multiple events
   purchasedAt: string;
   status: string;            // 'confirmed' | 'pending'
   paymentMethod: string;     // 'card' | 'ach'

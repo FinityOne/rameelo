@@ -59,6 +59,7 @@ export async function POST(request: Request) {
         event_title: typeof body.eventTitle === "string" ? body.eventTitle.slice(0, 480) : "",
         tier_id: typeof body.tierId === "string" ? body.tierId : "",
         tier_name: typeof body.tierName === "string" ? body.tierName.slice(0, 480) : "",
+        combo_ticket_id: typeof body.comboTicketId === "string" ? body.comboTicketId : "",
         qty: String(body.qty ?? ""),
         group_id: typeof body.groupId === "string" ? body.groupId : "",
         event_date: typeof body.eventStartDate === "string" ? body.eventStartDate : "",

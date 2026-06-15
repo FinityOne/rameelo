@@ -129,22 +129,23 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
     .eq("status", cand.status)
     .select(`
       id, user_id, group_id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_pct, discount_amount,
-      rameelo_fee, processing_fee, grand_total, payment_method, event_id,
+      rameelo_fee, processing_fee, grand_total, payment_method, event_id, combo_ticket_id,
       events ( title, start_date, start_time, city, state, venue_name, cover_image_url, org_id, organizer_id, artists ( name ) ),
-      ticket_tiers ( name )
+      ticket_tiers ( name ),
+      combo_tickets ( name )
     `);
 
   const order = rows?.[0] as {
     id: string; user_id: string | null; group_id: string | null; buyer_name: string | null; buyer_email: string; buyer_phone: string | null;
     qty: number; unit_price: number; discount_pct: number; discount_amount: number;
-    rameelo_fee: number; processing_fee: number; grand_total: number; payment_method: string; event_id: string;
-    events: FulfillEvent; ticket_tiers: { name: string } | null;
+    rameelo_fee: number; processing_fee: number; grand_total: number; payment_method: string; event_id: string; combo_ticket_id: string | null;
+    events: FulfillEvent; ticket_tiers: { name: string } | null; combo_tickets: { name: string } | null;
   } | undefined;
   if (!order || !order.buyer_email) return; // already fulfilled, or unknown intent
 
   const ev = order.events;
   const artist = one(ev?.artists)?.name ?? null;
-  const tierName = order.ticket_tiers?.name ?? "Ticket";
+  const tierName = order.ticket_tiers?.name ?? order.combo_tickets?.name ?? "Ticket";
   const eventWhen = ev ? `${fmtDate(ev.start_date)}${fmtTime(ev.start_time) ? ` · ${fmtTime(ev.start_time)}` : ""}` : "";
   const where = [ev?.venue_name, ev?.city, ev?.state].filter(Boolean).join(", ");
 
