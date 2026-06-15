@@ -161,7 +161,7 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
           eventWhere: [r.venue_name, r.city, r.state].filter(Boolean).join(", "),
           qty: r.qty, claimUrl: `${EMAIL.site}/tickets/claim/${r.token}`,
         });
-        const sent = await sendEmail({ to: r.to_email, subject: cl.subject, html: cl.html, text: cl.text });
+        const sent = await sendEmail({ to: r.to_email, subject: cl.subject, html: cl.html, text: cl.text, type: "group_ticket_claim" });
         await recordEmailLog(admin as SupabaseClient, { userId: null, toEmail: r.to_email, type: "group_ticket_claim", subject: cl.subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error });
       }
     } catch (e) { console.error("group fulfillment error:", e instanceof Error ? e.message : e); }
@@ -180,7 +180,7 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
       directionsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(where)}`,
       ticketsUrl: `${EMAIL.site}/portal/tickets`, buyMoreUrl: `${EMAIL.site}/events`,
     });
-    const r1 = await sendEmail({ to: order.buyer_email, subject: conf.subject, html: conf.html, text: conf.text });
+    const r1 = await sendEmail({ to: order.buyer_email, subject: conf.subject, html: conf.html, text: conf.text, type: "order_confirmation" });
     await recordEmailLog(admin as SupabaseClient, { userId: order.user_id, toEmail: order.buyer_email, type: "order_confirmation", subject: conf.subject, status: r1.error ? "failed" : "sent", trigger: "automatic", providerId: r1.id, error: r1.error });
   } catch (e) { console.error("buyer confirmation email error:", e instanceof Error ? e.message : e); }
 
@@ -202,7 +202,7 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
         bannerUrl: ev?.cover_image_url ?? null, ordersUrl: `${EMAIL.site}/organizer/events/${order.event_id}/orders`,
         paymentMethod: order.payment_method,
       });
-      const sent = await sendEmail({ to: p.email as string, subject: tn.subject, html: tn.html, text: tn.text });
+      const sent = await sendEmail({ to: p.email as string, subject: tn.subject, html: tn.html, text: tn.text, type: "order_team_notification" });
       await recordEmailLog(admin as SupabaseClient, { toEmail: p.email as string, type: "order_team_notification", subject: tn.subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error });
     }
   } catch (e) { console.error("team notify error:", e instanceof Error ? e.message : e); }
@@ -226,7 +226,7 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
         placedAt: new Date().toLocaleString("en-US", { dateStyle: "medium", timeStyle: "short" }),
       });
       for (const a of recipients) {
-        const sent = await sendEmail({ to: a.email as string, subject: an.subject, html: an.html, text: an.text });
+        const sent = await sendEmail({ to: a.email as string, subject: an.subject, html: an.html, text: an.text, type: "order_admin_notification" });
         await recordEmailLog(admin as SupabaseClient, { toEmail: a.email as string, type: "order_admin_notification", subject: an.subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error });
       }
     }
@@ -274,7 +274,7 @@ async function notifyAchProcessing(paymentIntentId: string) {
     tierName: order.ticket_tiers?.name ?? "Ticket", eventTitle: ev?.title ?? "", artistName: artist,
     eventWhen, eventWhere: where, ticketsUrl: `${EMAIL.site}/portal/tickets`,
   });
-  const sent = await sendEmail({ to: order.buyer_email, subject, html, text });
+  const sent = await sendEmail({ to: order.buyer_email, subject, html, text, type: "tickets_pending" });
   await recordEmailLog(admin as SupabaseClient, { userId: order.user_id, toEmail: order.buyer_email, type: "tickets_pending", subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error });
 }
 
@@ -312,6 +312,6 @@ async function failOrderForIntent(pi: Stripe.PaymentIntent, reason: string, forc
     buyerName: order.buyer_name, eventTitle: ev?.title ?? "your event", qty: order.qty,
     reason, retryUrl: `${EMAIL.site}/events`,
   });
-  const sent = await sendEmail({ to: order.buyer_email, subject, html, text });
+  const sent = await sendEmail({ to: order.buyer_email, subject, html, text, type: "payment_failed" });
   await recordEmailLog(admin as SupabaseClient, { userId: order.user_id, toEmail: order.buyer_email, type: "payment_failed", subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error });
 }

@@ -93,7 +93,7 @@ export async function POST(request: Request) {
   });
 
   const results = await Promise.all(recipients.map(async (r) => {
-    const { id: providerId, error: sendError } = await sendEmail({ to: r.email, subject, html, text });
+    const { id: providerId, error: sendError } = await sendEmail({ to: r.email, subject, html, text, type: "order_admin_notification" });
     await recordEmailLog(supabase, {
       toEmail: r.email,
       type: "order_admin_notification",

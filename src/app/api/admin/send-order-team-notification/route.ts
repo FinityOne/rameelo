@@ -87,7 +87,7 @@ export async function POST(request: Request) {
       paymentMethod: o.payment_method,
     });
 
-    const { id: providerId, error: sendError } = await sendEmail({ to: r.email, subject, html, text });
+    const { id: providerId, error: sendError } = await sendEmail({ to: r.email, subject, html, text, type: "order_team_notification" });
     await recordEmailLog(supabase, {
       toEmail: r.email,
       type: "order_team_notification",

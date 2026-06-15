@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     groupUrl: `${EMAIL.site}/group/${groupId}`,
   });
 
-  const { id: providerId, error: sendError } = await sendEmail({ to: group.organizer_email, subject, html, text });
+  const { id: providerId, error: sendError } = await sendEmail({ to: group.organizer_email, subject, html, text, type: "group_joined" });
 
   await recordEmailLog(supabase, {
     userId: group.organizer_user_id,

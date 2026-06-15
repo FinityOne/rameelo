@@ -50,7 +50,7 @@ export async function POST(request: Request) {
       claimUrl: `${EMAIL.site}/tickets/claim/${r.token}`,
     });
 
-    const { id: providerId, error: sendError } = await sendEmail({ to: r.to_email, subject, html, text });
+    const { id: providerId, error: sendError } = await sendEmail({ to: r.to_email, subject, html, text, type: "group_ticket_claim" });
     await recordEmailLog(supabase, {
       userId: null,
       toEmail: r.to_email,

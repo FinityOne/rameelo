@@ -74,7 +74,7 @@ export async function POST(request: Request) {
     discount,
   });
 
-  const { id: providerId, error: sendError } = await sendEmail({ to: g.organizer_email, subject, html, text });
+  const { id: providerId, error: sendError } = await sendEmail({ to: g.organizer_email, subject, html, text, type: "group_created" });
 
   await recordEmailLog(supabase, {
     userId: g.organizer_user_id,

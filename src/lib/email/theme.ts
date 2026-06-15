@@ -5,8 +5,14 @@
 
 export const EMAIL = {
   site: "https://rameelo.com",
-  // Sent from the verified Resend subdomain; replies route to support.
+  // Sent from the verified Resend subdomain (mail.rameelo.com) so SPF/DKIM/DMARC
+  // pass; replies route to support. Two From identities on the SAME verified domain:
+  //  • from        — general/account mail (welcome, invites, password reset, …)
+  //  • fromTickets — ticketing/order/purchase mail (receipts, comps, order alerts).
+  // Splitting the identity makes order mail read as official and lets it build a
+  // focused sending reputation. Both inherit the domain's existing DNS auth.
   from: "Rameelo <hello@mail.rameelo.com>",
+  fromTickets: "Rameelo Tickets <tickets@mail.rameelo.com>",
   replyTo: "support@rameelo.com",
   support: "support@rameelo.com",
   // Absolute, production-hosted assets (email clients can't use relative paths).

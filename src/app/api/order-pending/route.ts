@@ -59,7 +59,7 @@ export async function POST(request: Request) {
     ticketsUrl: `${EMAIL.site}/portal/tickets`,
   });
 
-  const { id: providerId, error: sendError } = await sendEmail({ to: o.buyer_email, subject, html, text });
+  const { id: providerId, error: sendError } = await sendEmail({ to: o.buyer_email, subject, html, text, type: "tickets_pending" });
 
   await recordEmailLog(supabase, {
     userId: o.user_id,

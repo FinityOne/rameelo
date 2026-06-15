@@ -70,7 +70,7 @@ export async function POST(request: Request) {
     signUpUrl: `${EMAIL.site}/auth/signup?email=${encodeURIComponent(o.buyer_email)}&next=/portal/tickets`,
   });
 
-  const { id: providerId, error: sendError } = await sendEmail({ to: o.buyer_email, subject, html, text });
+  const { id: providerId, error: sendError } = await sendEmail({ to: o.buyer_email, subject, html, text, type: "comp_ticket" });
   await recordEmailLog(supabase, {
     toEmail: o.buyer_email,
     type: "comp_ticket",

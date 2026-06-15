@@ -76,7 +76,7 @@ export async function POST(request: Request) {
     buyMoreUrl: `${EMAIL.site}/events`,
   });
 
-  const { id: providerId, error: sendError } = await sendEmail({ to: order.buyer_email, subject, html, text });
+  const { id: providerId, error: sendError } = await sendEmail({ to: order.buyer_email, subject, html, text, type: "order_confirmation" });
 
   await recordEmailLog(supabase, {
     userId: order.user_id,
