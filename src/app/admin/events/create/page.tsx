@@ -199,6 +199,18 @@ export default function AdminCreateEventPage() {
               : 'has been saved. Publish it from the event review page when ready.'}
           </p>
         </div>
+        {form.orgId && (
+          <div className="rounded-2xl border border-aubergine/20 bg-aubergine/[0.04] px-5 py-4 max-w-sm mx-auto text-left flex items-start gap-3">
+            <span className="text-lg shrink-0">🎟️✨</span>
+            <div className="min-w-0">
+              <p className="font-ui font-semibold text-ink text-sm">Want a combo ticket?</p>
+              <p className="font-ui text-xs text-ink-muted mt-0.5">
+                Bundle this event with others from the same organization. Set it up in the event&rsquo;s Tickets tab —{" "}
+                <Link href={`/admin/events/${createdId}/edit?tab=tickets`} className="text-aubergine font-semibold hover:underline">add a combo ticket →</Link>
+              </p>
+            </div>
+          </div>
+        )}
         <div className="flex gap-3 justify-center flex-wrap">
           {publishStatus === 'published' && (
             <Link href={`/admin/events/${createdId}`}

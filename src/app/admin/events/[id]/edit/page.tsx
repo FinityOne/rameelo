@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
+import ComboTicketsManager from "./ComboTicketsManager";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -331,9 +332,12 @@ function ToggleRow({ title, desc, checked, onChange }: {
 
 type ActiveTab = "details" | "schedule" | "venue" | "cover" | "tickets";
 
+const VALID_TABS: ActiveTab[] = ["details", "schedule", "venue", "cover", "tickets"];
+
 export default function AdminEventEditPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   const [ev, setEv]             = useState<EventData | null>(null);
@@ -348,7 +352,8 @@ export default function AdminEventEditPage() {
   const [error, setError]       = useState("");
   const [uploading, setUploading] = useState(false);
   const [evDirty, setEvDirty]   = useState(false);
-  const [activeTab, setActiveTab] = useState<ActiveTab>("details");
+  const tabParam = searchParams.get("tab") as ActiveTab | null;
+  const [activeTab, setActiveTab] = useState<ActiveTab>(tabParam && VALID_TABS.includes(tabParam) ? tabParam : "details");
 
   useEffect(() => {
     async function load() {
@@ -1248,6 +1253,9 @@ export default function AdminEventEditPage() {
               {saving ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Saving…</> : "Save ticket changes"}
             </button>
           )}
+
+          {/* Combo tickets — org-spanning bundles (saved independently of the tiers above) */}
+          <ComboTicketsManager eventId={id} orgId={ev.org_id} />
         </div>
       )}
 
