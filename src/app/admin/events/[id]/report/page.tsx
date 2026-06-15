@@ -12,7 +12,7 @@ type Tier = {
   sale_start_date: string | null; sale_end_date: string | null;
 };
 type Order = {
-  tier_id: string | null; qty: number; unit_price: number | null; discount_amount: number | null;
+  tier_id: string | null; order_type: string; qty: number; unit_price: number | null; discount_amount: number | null;
   rameelo_fee: number | null; processing_fee: number | null; grand_total: number;
   status: string; is_test: boolean; dispute_status: string | null;
 };
@@ -44,7 +44,7 @@ export default function SalesReportPrintPage() {
           .single(),
         supabase
           .from("orders")
-          .select("tier_id, qty, unit_price, discount_amount, rameelo_fee, processing_fee, grand_total, status, is_test, dispute_status")
+          .select("tier_id, order_type, qty, unit_price, discount_amount, rameelo_fee, processing_fee, grand_total, status, is_test, dispute_status")
           .eq("event_id", id),
       ]);
       if (!evRes.data) { router.replace(`/admin/events/${id}`); return; }

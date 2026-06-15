@@ -25,6 +25,7 @@ export interface SalesReportTier {
 
 export interface SalesReportOrder {
   tier_id: string | null;
+  order_type?: string | null; // 'combo' rolls up into its own line, not a tier
   qty: number;
   unit_price: number | null;
   discount_amount: number | null;
@@ -85,9 +86,17 @@ export function buildSalesReport(
 ): SalesReport {
   const revenueOrders = orders.filter(isRevenueOrder);
 
-  // Aggregate revenue orders by tier.
+  // Aggregate revenue orders by tier. Combo tickets aren't a tier — they're an
+  // org-spanning bundle anchored to this event — so they roll up into their own line.
   const byTier = new Map<string, { sold: number; grossFace: number; discounts: number }>();
+  const comboAgg = { sold: 0, grossFace: 0, discounts: 0 };
   for (const o of revenueOrders) {
+    if (o.order_type === "combo") {
+      comboAgg.sold += o.qty;
+      comboAgg.grossFace += o.qty * (o.unit_price ?? 0);
+      comboAgg.discounts += o.discount_amount ?? 0;
+      continue;
+    }
     const key = o.tier_id ?? "__unassigned__";
     const acc = byTier.get(key) ?? { sold: 0, grossFace: 0, discounts: 0 };
     acc.sold += o.qty;
@@ -112,6 +121,21 @@ export function buildSalesReport(
       netRevenue: grossFace - discounts,
     };
   });
+
+  // Combo tickets line — bundles spanning multiple events, sold against this event.
+  if (comboAgg.sold > 0) {
+    lines.push({
+      name: "Combo tickets",
+      price: 0,
+      capacity: 0,
+      sold: comboAgg.sold,
+      remaining: 0,
+      pctSold: 0,
+      grossFace: comboAgg.grossFace,
+      discounts: comboAgg.discounts,
+      netRevenue: comboAgg.grossFace - comboAgg.discounts,
+    });
+  }
 
   // Orders against a tier that no longer exists (deleted tier) — keep them visible
   // so revenue always reconciles to the dollar.

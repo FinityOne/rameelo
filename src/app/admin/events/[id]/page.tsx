@@ -389,7 +389,7 @@ export default function AdminEventReviewPage() {
         sale_start_date: t.sale_start_date, sale_end_date: t.sale_end_date,
       })),
       orders.map(o => ({
-        tier_id: o.tier_id, qty: o.qty, unit_price: o.unit_price,
+        tier_id: o.tier_id, order_type: o.order_type, qty: o.qty, unit_price: o.unit_price,
         discount_amount: o.discount_amount, rameelo_fee: o.rameelo_fee,
         processing_fee: o.processing_fee, grand_total: o.grand_total,
         status: o.status, is_test: o.is_test, dispute_status: o.dispute_status,
