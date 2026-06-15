@@ -102,7 +102,8 @@ export default function CompTicketsPage() {
   const selectedTier = tiers.find(t => t.id === tierId) ?? null;
   const remaining = selectedTier ? Math.max(0, selectedTier.quantity - selectedTier.quantity_sold) : 0;
   const emailValid = EMAIL_RE.test(email.trim());
-  const canSubmit = !!tierId && firstName.trim() && emailValid && qty >= 1 && qty <= remaining && !submitting;
+  const overCapacity = !!selectedTier && qty > remaining; // comps may exceed capacity
+  const canSubmit = !!tierId && firstName.trim() && emailValid && qty >= 1 && !submitting;
 
   const totalComped = comps.reduce((s, c) => s + c.qty, 0);
   const claimedCount = comps.filter(c => c.user_id).length;
@@ -218,18 +219,20 @@ export default function CompTicketsPage() {
               <select value={tierId} onChange={e => { setTierId(e.target.value); setQty(1); }} className={inputCls}>
                 {tiers.map(t => {
                   const rem = Math.max(0, t.quantity - t.quantity_sold);
-                  return <option key={t.id} value={t.id} disabled={rem === 0}>{t.name} · {rem} left{rem === 0 ? " (sold out)" : ""}</option>;
+                  return <option key={t.id} value={t.id}>{t.name} · {rem} left{rem === 0 ? " (sold out)" : ""}</option>;
                 })}
               </select>
             </div>
             <div>
               <label className={labelCls}>Quantity</label>
               <input
-                type="number" min={1} max={Math.max(1, remaining)} value={qty}
-                onChange={e => setQty(Math.max(1, Math.min(remaining || 1, parseInt(e.target.value || "1", 10))))}
+                type="number" min={1} value={qty}
+                onChange={e => setQty(Math.max(1, parseInt(e.target.value || "1", 10)))}
                 className={inputCls}
               />
-              <p className="font-mono text-[9px] text-ink-muted mt-1">{remaining} available</p>
+              <p className={`font-mono text-[9px] mt-1 ${overCapacity ? "text-marigold-dark" : "text-ink-muted"}`}>
+                {overCapacity ? `${remaining} for sale · over capacity OK` : `${remaining} available`}
+              </p>
             </div>
           </div>
 
@@ -282,6 +285,12 @@ export default function CompTicketsPage() {
               <input type="text" value={note} onChange={e => setNote(e.target.value)} placeholder="e.g. Artist guest list" className={inputCls} />
             </div>
           </div>
+
+          {overCapacity && (
+            <p className="font-ui text-xs text-[#a06b00] bg-marigold/8 border border-marigold/25 rounded-xl px-3.5 py-2.5">
+              Heads up: {qty} exceeds the {remaining} ticket{remaining !== 1 ? "s" : ""} left for sale in this tier. Comps are allowed to go over capacity — just make sure your venue can accommodate the extra {qty - remaining} guest{qty - remaining !== 1 ? "s" : ""}.
+            </p>
+          )}
 
           {errorMsg && (
             <p className="font-ui text-sm text-durga bg-durga/8 border border-durga/20 rounded-xl px-3.5 py-2.5">{errorMsg}</p>
