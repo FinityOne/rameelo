@@ -164,12 +164,12 @@ export const EMAIL_REGISTRY: EmailDef[] = [
   {
     key: "tickets-live",
     name: "Tickets-now-live alert",
-    description: "Tells interested fans when a “coming soon” event's tickets go on sale.",
+    description: "A conversion email to an event's interest list when tickets go on sale: a warm thank-you for their interest, the event at a glance, gentle urgency, and one CTA into the event page to buy. Personalized per recipient (first name + the quantity they wanted), and anyone who already purchased is skipped.",
     audience: "Interested fans",
     category: "Orders & Tickets",
-    status: "planned",
+    status: "live",
     trigger: "manual",
-    fires: "When an admin flips an event to selling and notifies its interest list",
+    fires: "When an admin clicks “Notify interested people” in an event's Interest tab",
   },
   {
     key: "payout-status",

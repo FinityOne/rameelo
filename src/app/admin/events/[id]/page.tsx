@@ -177,6 +177,8 @@ function CardHead({ label, sub, right }: { label: string; sub?: string; right?: 
 
 type DecisionModal = { type: 'reject' | 'unpublish'; note: string };
 
+type Blast = { id: string; recipient_count: number; success_count: number; created_at: string; sent_by_name: string | null };
+
 type TabKey = 'overview' | 'tickets' | 'orders' | 'interest' | 'settings';
 
 // Inline icons for the in-event sub-nav (kept SVG, no emoji, per house style).
@@ -205,6 +207,9 @@ export default function AdminEventReviewPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [togglingOrderId, setTogglingOrderId] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>('overview');
+  const [blasts, setBlasts] = useState<Blast[]>([]);
+  const [blasting, setBlasting] = useState(false);
+  const [blastMsg, setBlastMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -246,6 +251,9 @@ export default function AdminEventReviewPage() {
       // This admin's own order-email subscription for this event (default on).
       const { data: emailPref } = await supabase.rpc('is_admin_order_email_enabled', { p_event_id: id });
       setOrderEmailsOn(emailPref !== false);
+      // History of "tickets are live" blasts sent to this event's interest list.
+      const { data: blastRows } = await supabase.rpc('get_interest_blasts', { p_event_id: id });
+      setBlasts((blastRows ?? []) as Blast[]);
       setLoading(false);
     }
     load();
@@ -323,6 +331,30 @@ export default function AdminEventReviewPage() {
     const { error } = await supabase.rpc('set_admin_order_email_pref', { p_event_id: id, p_enabled: next });
     if (!error) setOrderEmailsOn(next);
     setTogglingOrderEmails(false);
+  }
+
+  async function notifyInterest() {
+    setBlasting(true);
+    setBlastMsg(null);
+    try {
+      const res = await fetch('/api/admin/notify-interest', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ eventId: id }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setBlastMsg({ ok: false, text: data.error || 'Could not send the emails. Please try again.' });
+      } else {
+        setBlastMsg({ ok: true, text: `Sent to ${data.sent} of ${data.total} interested ${data.total === 1 ? 'person' : 'people'}.` });
+        const supabase = createClient();
+        const { data: blastRows } = await supabase.rpc('get_interest_blasts', { p_event_id: id });
+        setBlasts((blastRows ?? []) as Blast[]);
+      }
+    } catch {
+      setBlastMsg({ ok: false, text: 'Could not send the emails. Please try again.' });
+    }
+    setBlasting(false);
   }
 
   async function toggleOrderTest(order: OrderRow) {
@@ -831,6 +863,70 @@ export default function AdminEventReviewPage() {
       {/* ════════ INTEREST ════════ */}
       {tab === 'interest' && (
         <div className="space-y-5">
+          {/* Notify campaign — email the interest list that tickets are live */}
+          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+            <CardHead label="Notify interested people" sub="Email everyone on this list that tickets are now on sale — with a link to buy" />
+            <div className="px-5 py-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="font-ui text-sm text-ink-muted max-w-md">
+                  Sends a personalized “tickets are live” email to each interested person (anyone who already purchased is skipped). Every send is logged below.
+                </p>
+                <button
+                  onClick={notifyInterest}
+                  disabled={blasting || interests.length === 0 || !event.selling_on_rameelo}
+                  className={`shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-display font-bold text-sm transition-all ${
+                    blasting || interests.length === 0 || !event.selling_on_rameelo
+                      ? 'bg-black/[0.06] text-ink-muted cursor-not-allowed'
+                      : 'bg-aubergine text-white hover:bg-aubergine/90 active:scale-[0.98] shadow-sm'
+                  }`}
+                >
+                  {blasting ? (
+                    <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Sending…</>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                      Send “tickets are live” email
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {!event.selling_on_rameelo && (
+                <p className="font-ui text-xs text-[#a06b00] bg-marigold/8 border border-marigold/25 rounded-xl px-3.5 py-2.5">
+                  Turn on <strong>ticket sales</strong> in the Settings tab first — the email links people to buy, so sales need to be live.
+                </p>
+              )}
+              {event.selling_on_rameelo && interests.length === 0 && (
+                <p className="font-ui text-xs text-ink-muted">No interest submissions yet — there&rsquo;s no one to notify.</p>
+              )}
+              {blastMsg && (
+                <p className={`font-ui text-sm rounded-xl px-3.5 py-2.5 border ${blastMsg.ok ? 'text-peacock bg-peacock/8 border-peacock/25' : 'text-durga bg-durga/8 border-durga/20'}`}>
+                  {blastMsg.ok ? '✅ ' : ''}{blastMsg.text}
+                </p>
+              )}
+            </div>
+
+            {/* Blast log */}
+            {blasts.length > 0 && (
+              <div className="border-t border-ivory-200">
+                <p className="px-5 pt-3 pb-1 font-mono text-[9px] uppercase tracking-widest text-ink-muted">Send history</p>
+                <div className="divide-y divide-ivory-200">
+                  {blasts.map(b => (
+                    <div key={b.id} className="px-5 py-2.5 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-ui text-sm text-ink">{fmtTS(b.created_at)}</p>
+                        {b.sent_by_name && <p className="font-mono text-[10px] text-ink-muted">by {b.sent_by_name}</p>}
+                      </div>
+                      <span className="font-mono text-[10px] font-bold shrink-0 text-peacock">
+                        {b.success_count}/{b.recipient_count} delivered
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
             <CardHead label="Interest Form Submissions" right={
               interests.length > 0 ? (
