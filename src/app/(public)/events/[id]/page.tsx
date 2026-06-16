@@ -38,8 +38,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     ? event.description.slice(0, 155)
     : `${category} event${artistName ? ` with ${artistName}` : ""}${event.venue_name ? ` at ${event.venue_name}` : ""}${locationLabel ? `, ${locationLabel}` : ""} on ${date}. Buy tickets on Rameelo.`;
 
+  // Uploaded banners are arbitrary sizes — don't declare 1200×630 dimensions for
+  // them (lying to scrapers makes platforms like Facebook/LinkedIn render a broken
+  // or letterboxed preview); let them read the real image. Only the default OG asset
+  // is genuinely 1200×630.
   const ogImages = event.cover_image_url
-    ? [{ url: event.cover_image_url, width: 1200, height: 630, alt: event.title }]
+    ? [{ url: event.cover_image_url, alt: event.title }]
     : [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: `${event.title} — Rameelo` }];
 
   return {
