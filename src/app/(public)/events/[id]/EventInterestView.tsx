@@ -4,6 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
+import MetroSticker from "./MetroSticker";
+import MoreFromOrganizer from "./MoreFromOrganizer";
 
 // ── Props (structural subset of the full Event) ──────────────────────────────
 type IVArtist = {
@@ -15,10 +17,11 @@ type IVEvent = {
   id: string; title: string; category: string; description: string | null;
   start_date: string; end_date: string | null; start_time: string; end_time: string | null;
   doors_open_time: string | null;
-  venue_name: string; address_line1: string; city: string; state: string; zip: string | null;
+  venue_name: string; address_line1: string; city: string; state: string; zip: string | null; metro_city: string | null;
   parking: string; age_restriction: string; dress_code: string; dandiya_sticks: string;
   cover_image_url: string | null; cover_gradient: string;
   artist: IVArtist | null;
+  org_id: string | null; organization?: { name: string } | null;
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -199,6 +202,7 @@ export default function EventInterestView({ event }: { event: IVEvent }) {
               <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-white bg-aubergine/60 border border-white/15 px-2.5 py-1 rounded-full">{categoryLabel}</span>
               <span className="font-mono text-[10px] font-bold uppercase tracking-widest text-marigold bg-marigold/15 border border-marigold/40 px-2.5 py-1 rounded-full">Tickets Coming Soon</span>
             </div>
+            <MetroSticker metro={event.metro_city} category={event.category} />
             <h1 className="font-display font-bold text-white leading-[0.98]" style={{ fontSize: "clamp(2.25rem, 6vw, 4rem)", letterSpacing: "-0.035em" }}>{event.title}</h1>
             {/* Subtitle hidden on mobile for a more scannable header */}
             <p className="hidden sm:block font-ui text-white/75 text-base sm:text-lg mt-3 max-w-2xl leading-relaxed">{subtitle}</p>
@@ -408,6 +412,9 @@ export default function EventInterestView({ event }: { event: IVEvent }) {
           </div>
         </aside>
       </div>
+
+      {/* More from this organizer (only other upcoming org events) */}
+      <MoreFromOrganizer orgId={event.org_id} currentEventId={event.id} orgName={event.organization?.name} />
     </div>
   );
 }

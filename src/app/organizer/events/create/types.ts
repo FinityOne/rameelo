@@ -45,6 +45,7 @@ export type EventFormData = {
   city: string;
   state: string;
   zip: string;
+  metroCity: string; // nearest major metro (e.g. "Los Angeles")
   parking: ParkingOption;
   parkingNotes: string;
   websiteUrl: string;
@@ -81,7 +82,7 @@ export const EMPTY_TIER = (): TicketTier => ({
 export const DEFAULT_FORM: EventFormData = {
   title: '', category: 'garba', orgId: '', artist: '', artistId: '', description: '', navratriNights: [],
   isMultiDay: false, startDate: '', endDate: '', startTime: '', endTime: '', doorsOpenTime: '',
-  venueName: '', addressLine1: '', addressLine2: '', city: '', state: '', zip: '',
+  venueName: '', addressLine1: '', addressLine2: '', city: '', state: '', zip: '', metroCity: '',
   parking: 'none', parkingNotes: '', websiteUrl: '',
   coverImageUrl: '', coverGradient: 'aubergine',
   dressCode: 'none', dressCodeDetails: '', dandiyaSticks: 'not_applicable', ageRestriction: 'all',

@@ -177,6 +177,13 @@ export default function Step3Venue({ data, onChange }: Props) {
         </div>
       </div>
 
+      {/* Major metro — featured on the event page so buyers recognize the region */}
+      <div>
+        <label className={labelCls}>Major Metro Area <span className="normal-case text-ink-muted/50">(optional)</span></label>
+        <input type="text" value={data.metroCity} onChange={e => onChange({ metroCity: e.target.value })} className={inputCls} placeholder="Los Angeles" />
+        <p className="font-ui text-xs text-ink-muted/70 mt-1.5">The nearest big-city metro (e.g. enter <span className="font-semibold text-ink-muted">Los Angeles</span> for an Irvine venue). Featured prominently on the event page.</p>
+      </div>
+
       {/* Parking */}
       <div>
         <label className={labelCls}>Parking</label>

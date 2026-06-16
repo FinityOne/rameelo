@@ -122,6 +122,7 @@ export default function AdminCreateEventPage() {
           city:               locationTba ? null : (form.city || null),
           state:              locationTba ? null : (form.state || null),
           zip:                locationTba ? null : (form.zip || null),
+          metro_city:         locationTba ? null : (form.metroCity.trim() || null),
           parking:            locationTba ? null : (form.parking || null),
           parking_notes:      locationTba ? null : (form.parkingNotes || null),
           location_tba:       locationTba,

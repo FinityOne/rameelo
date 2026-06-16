@@ -11,6 +11,8 @@ import { groupDiscountPct, groupDiscountAmount, groupScalingLevels } from "@/lib
 import { computeFees } from "@/lib/fees";
 import EventInterestView from "./EventInterestView";
 import { ComboBanner, ComboTicketCard, comboBuyable, type ComboTicket } from "./ComboTickets";
+import MetroSticker from "./MetroSticker";
+import MoreFromOrganizer from "./MoreFromOrganizer";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -74,6 +76,7 @@ type Event = {
   city: string;
   state: string;
   zip: string | null;
+  metro_city: string | null;
   parking: string;
   parking_notes: string | null;
   website_url: string | null;
@@ -665,7 +668,7 @@ export default function EventDetailClient({ id }: { id: string }) {
         .select(`
           id, title, category, description, navratri_nights, org_id,
           start_date, end_date, start_time, end_time, doors_open_time,
-          venue_name, address_line1, city, state, zip,
+          venue_name, address_line1, city, state, zip, metro_city,
           parking, parking_notes, website_url,
           cover_image_url, cover_gradient,
           dress_code, dress_code_details, dandiya_sticks, age_restriction, capacity, selling_on_rameelo, kids_5_under_free,
@@ -979,6 +982,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                   Event Ended
                 </span>
               </div>
+              <MetroSticker metro={event.metro_city} category={event.category} />
               <h1 className="font-display text-xl sm:text-3xl md:text-4xl font-bold text-white leading-tight mb-2">
                 {event.title}
               </h1>
@@ -1089,6 +1093,9 @@ export default function EventDetailClient({ id }: { id: string }) {
             </Link>
           </div>
         </div>
+
+        {/* More from this organizer (only other upcoming org events) */}
+        <MoreFromOrganizer orgId={event.org_id} currentEventId={event.id} orgName={event.organization?.name} />
       </div>
     );
   }
@@ -1155,6 +1162,10 @@ export default function EventDetailClient({ id }: { id: string }) {
                 </span>
               )}
             </div>
+
+            {/* Major-metro destination sticker — the standout regional cue */}
+            <MetroSticker metro={event.metro_city} category={event.category} />
+
             <h1 className="font-display text-xl sm:text-3xl md:text-4xl font-bold text-white leading-tight mb-2">
               {event.title}
             </h1>
@@ -1796,6 +1807,9 @@ export default function EventDetailClient({ id }: { id: string }) {
           </div>
         </div>
       </div>
+
+      {/* ── More from this organizer (only other upcoming org events) ── */}
+      <MoreFromOrganizer orgId={event.org_id} currentEventId={event.id} orgName={event.organization?.name} />
 
       {/* ── Leave confirmation modal ── */}
       {showLeaveModal && (

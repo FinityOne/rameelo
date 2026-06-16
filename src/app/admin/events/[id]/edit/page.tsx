@@ -46,6 +46,7 @@ type EventData = {
   city: string;
   state: string;
   zip: string;
+  metro_city: string;
   parking: string;
   parking_notes: string;
   website_url: string;
@@ -364,7 +365,7 @@ export default function AdminEventEditPage() {
           .select(`
             id, title, category, artist, description, navratri_nights,
             is_multi_day, start_date, end_date, start_time, end_time, doors_open_time,
-            venue_name, address_line1, address_line2, city, state, zip,
+            venue_name, address_line1, address_line2, city, state, zip, metro_city,
             parking, parking_notes, website_url, cover_image_url, cover_gradient,
             dress_code, dress_code_details, dandiya_sticks, age_restriction,
             capacity, status, selling_on_rameelo, featured_on_tour, featured_on_events, featured_on_artist, organizer_id, org_id
@@ -401,6 +402,7 @@ export default function AdminEventEditPage() {
         city:               raw.city ?? "",
         state:              raw.state ?? "",
         zip:                raw.zip ?? "",
+        metro_city:         raw.metro_city ?? "",
         parking:            raw.parking ?? "none",
         parking_notes:      raw.parking_notes ?? "",
         website_url:        raw.website_url ?? "",
@@ -511,6 +513,7 @@ export default function AdminEventEditPage() {
             city:               ev.city || null,
             state:              ev.state || null,
             zip:                ev.zip || null,
+            metro_city:         ev.metro_city.trim() || null,
             parking:            ev.parking || null,
             parking_notes:      ev.parking_notes || null,
             website_url:        ev.website_url || null,
@@ -1050,6 +1053,14 @@ export default function AdminEventEditPage() {
                   <input type="text" placeholder="30313" maxLength={10} value={ev.zip}
                     onChange={e => patchEv({ zip: e.target.value })} className={inputCls} />
                 </div>
+              </div>
+
+              {/* Major metro — featured prominently on the event page */}
+              <div>
+                <label className={labelCls}>Major Metro Area</label>
+                <input type="text" placeholder="Los Angeles" value={ev.metro_city}
+                  onChange={e => patchEv({ metro_city: e.target.value })} className={inputCls} />
+                <p className="font-ui text-xs text-ink-muted/70 mt-1.5">The nearest big-city metro (e.g. <span className="font-semibold text-ink-muted">Los Angeles</span> for an Irvine venue). Shown as a standout sticker on the event page.</p>
               </div>
 
               <div>

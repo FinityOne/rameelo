@@ -14,7 +14,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const supabase = await createClient();
   const { data: event } = await supabase
     .from("events")
-    .select("title, description, category, start_date, city, state, venue_name, cover_image_url, cover_gradient, artist:artists!events_artist_id_fkey(name)")
+    .select("title, description, category, start_date, city, state, metro_city, venue_name, cover_image_url, cover_gradient, artist:artists!events_artist_id_fkey(name)")
     .eq("id", id)
     .eq("status", "published")
     .single();
@@ -31,8 +31,11 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const category = event.category.charAt(0).toUpperCase() + event.category.slice(1);
 
   const locationLabel = [event.city, event.state].filter(Boolean).join(", ");
-  const title = locationLabel
-    ? `${event.title} — ${locationLabel} | Rameelo`
+  // Lead the share title with the major metro when set — it's the cue people
+  // recognize ("Boston" rather than "Wilmington, MA").
+  const titleLocation = event.metro_city?.trim() || locationLabel;
+  const title = titleLocation
+    ? `${event.title} — ${titleLocation} | Rameelo`
     : `${event.title} | Rameelo`;
   const description = event.description
     ? event.description.slice(0, 155)
@@ -56,6 +59,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ...(event.city ? [`garba ${event.city}`, `navratri ${event.city}`, `${event.category} ${event.city}`] : []),
       ...(event.state ? [`garba ${event.state}`, `navratri ${event.state}`] : []),
       ...(artistName ? [artistName, `${artistName} tickets`, `${artistName} garba`] : []),
+      ...(event.metro_city ? [`garba ${event.metro_city}`, `navratri ${event.metro_city}`, `${event.category} ${event.metro_city}`, `garba near ${event.metro_city}`] : []),
       "garba tickets", "navratri tickets", "raas garba usa",
     ],
     alternates: { canonical: `https://rameelo.com/events/${id}` },
