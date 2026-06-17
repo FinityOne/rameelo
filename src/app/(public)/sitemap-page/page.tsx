@@ -37,7 +37,6 @@ const SECTIONS = [
     links: [
       { label: "Sign In", href: "/auth/signin" },
       { label: "Create Account", href: "/auth/signup" },
-      { label: "Forgot Password", href: "/auth/forgot-password" },
     ],
   },
 ];

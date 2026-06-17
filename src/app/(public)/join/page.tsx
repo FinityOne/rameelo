@@ -3,8 +3,8 @@
 import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
-import { createUser, saveUser } from "@/lib/auth";
+import { createUser, saveUser, type UserRole } from "@/lib/auth";
+import OtpVerify, { type VerifyResult } from "@/app/auth/OtpVerify";
 
 function JoinPageInner() {
   const router       = useRouter();
@@ -14,89 +14,54 @@ function JoinPageInner() {
   const [firstName, setFirstName] = useState("");
   const [lastName,  setLastName]  = useState("");
   const [email,     setEmail]     = useState("");
-  const [password,  setPassword]  = useState("");
+  const [step,      setStep]      = useState<"form" | "code">("form");
   const [loading,   setLoading]   = useState(false);
   const [error,     setError]     = useState("");
-  const [done,      setDone]      = useState(false);
+  const [accountExists, setAccountExists] = useState(false);
 
   useEffect(() => { document.title = "Join Rameelo"; }, []);
 
+  // Submit info → email a 6-digit code (passwordless account created server-side).
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (password.length < 8) { setError("Password must be at least 8 characters."); return; }
     setLoading(true);
     setError("");
-
-    const supabase = createClient();
-    const { data, error: authErr } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { firstName, lastName, referredBy: ref || undefined },
-        emailRedirectTo: `${location.origin}/auth/callback`,
-      },
-    });
-
-    if (authErr) {
-      const msg = authErr.message.toLowerCase();
-      if (msg.includes("already registered") || msg.includes("already exists")) {
-        setError("An account with this email already exists.");
-      } else {
-        setError(authErr.message);
+    setAccountExists(false);
+    try {
+      const res = await fetch("/api/auth/request-otp", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), purpose: "signup", firstName, lastName }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Could not send a code. Please try again.");
+        if (data.code === "account_exists") setAccountExists(true);
+        return;
       }
+      setStep("code");
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
       setLoading(false);
-      return;
     }
-
-    if (data.user) {
-      const user = createUser({ firstName, lastName, email, phone: "", city: "", state: "" });
-      saveUser(user);
-      // Welcome email — pass the new user's token so the API verifies them.
-      const accessToken = data.session?.access_token;
-      fetch("/api/send-welcome", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-        },
-        body: JSON.stringify({ firstName, email }),
-      }).catch(() => {});
-
-      // Notify platform admins of the new registration (non-blocking).
-      if (data.user?.id) {
-        fetch("/api/new-user-notify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ userId: data.user.id }),
-        }).catch(() => {});
-      }
-    }
-
-    if (data.session) {
-      router.push("/portal");
-      router.refresh();
-    } else {
-      setDone(true);
-    }
-    setLoading(false);
   }
 
-  if (done) return (
-    <div className="min-h-screen flex items-center justify-center px-6" style={{ backgroundColor: "#2E1B30" }}>
-      <div className="text-center space-y-5 max-w-xs">
-        <div className="text-4xl">📬</div>
-        <div>
-          <h2 className="font-display font-bold text-white text-2xl mb-2">Check your email</h2>
-          <p className="font-ui text-white/50 text-sm">
-            Confirmation sent to <span className="text-marigold">{email}</span>. Click the link to activate your account.
-          </p>
-        </div>
-        <Link href="/auth/signin" className="block font-ui text-sm text-white/40 hover:text-white/60 transition-colors">
-          Sign in →
-        </Link>
-      </div>
-    </div>
-  );
+  // Code verified → session set server-side. Fire welcome + admin alert, then route.
+  function onVerified(data: VerifyResult) {
+    saveUser(createUser({ firstName, lastName, email, phone: "", city: "", state: "", role: (data.role ?? "user") as UserRole }));
+    fetch("/api/send-welcome", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ firstName, email }),
+    }).catch(() => {});
+    if (data.userId) {
+      fetch("/api/new-user-notify", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: data.userId }),
+      }).catch(() => {});
+    }
+    router.push("/portal");
+    router.refresh();
+  }
 
   return (
     <div className="min-h-screen flex flex-col px-6 py-10" style={{ backgroundColor: "#2E1B30" }}>
@@ -124,53 +89,57 @@ function JoinPageInner() {
           <Link href="/auth/signin" className="text-marigold font-semibold hover:text-marigold-dark">Sign in →</Link>
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-3">
-          <div className="grid grid-cols-2 gap-3">
+        {step === "form" ? (
+          <form onSubmit={handleSubmit} className="space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-white/35 mb-1.5 block">First name</label>
+                <input type="text" autoComplete="given-name" value={firstName}
+                  onChange={e => setFirstName(e.target.value)} placeholder="Priya" required
+                  className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3.5 font-ui text-sm text-white placeholder-white/25 focus:outline-none focus:ring-2 focus:ring-marigold/50 focus:border-marigold/50 transition-all" />
+              </div>
+              <div>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-white/35 mb-1.5 block">Last name</label>
+                <input type="text" autoComplete="family-name" value={lastName}
+                  onChange={e => setLastName(e.target.value)} placeholder="Patel" required
+                  className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3.5 font-ui text-sm text-white placeholder-white/25 focus:outline-none focus:ring-2 focus:ring-marigold/50 focus:border-marigold/50 transition-all" />
+              </div>
+            </div>
+
             <div>
-              <label className="font-mono text-[10px] uppercase tracking-widest text-white/35 mb-1.5 block">First name</label>
-              <input type="text" autoComplete="given-name" value={firstName}
-                onChange={e => setFirstName(e.target.value)} placeholder="Priya" required
+              <label className="font-mono text-[10px] uppercase tracking-widest text-white/35 mb-1.5 block">Email</label>
+              <input type="email" autoComplete="email" value={email}
+                onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required
                 className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3.5 font-ui text-sm text-white placeholder-white/25 focus:outline-none focus:ring-2 focus:ring-marigold/50 focus:border-marigold/50 transition-all" />
+              <p className="font-ui text-xs text-white/30 mt-2">No password — we&rsquo;ll email you a 6-digit code to confirm your account.</p>
             </div>
-            <div>
-              <label className="font-mono text-[10px] uppercase tracking-widest text-white/35 mb-1.5 block">Last name</label>
-              <input type="text" autoComplete="family-name" value={lastName}
-                onChange={e => setLastName(e.target.value)} placeholder="Patel" required
-                className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3.5 font-ui text-sm text-white placeholder-white/25 focus:outline-none focus:ring-2 focus:ring-marigold/50 focus:border-marigold/50 transition-all" />
-            </div>
-          </div>
 
-          <div>
-            <label className="font-mono text-[10px] uppercase tracking-widest text-white/35 mb-1.5 block">Email</label>
-            <input type="email" autoComplete="email" value={email}
-              onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required
-              className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3.5 font-ui text-sm text-white placeholder-white/25 focus:outline-none focus:ring-2 focus:ring-marigold/50 focus:border-marigold/50 transition-all" />
-          </div>
+            {error && (
+              <div className="rounded-xl bg-durga/20 border border-durga/30 px-4 py-3 space-y-1">
+                <p className="font-ui text-sm text-white/80">{error}</p>
+                {accountExists && (
+                  <Link href={`/auth/signin?email=${encodeURIComponent(email)}`}
+                    className="inline-block font-ui text-xs text-marigold font-semibold hover:text-marigold-dark">
+                    Sign in instead →
+                  </Link>
+                )}
+              </div>
+            )}
 
-          <div>
-            <label className="font-mono text-[10px] uppercase tracking-widest text-white/35 mb-1.5 block">Password</label>
-            <input type="password" autoComplete="new-password" value={password}
-              onChange={e => setPassword(e.target.value)} placeholder="8+ characters" required
-              className="w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3.5 font-ui text-sm text-white placeholder-white/25 focus:outline-none focus:ring-2 focus:ring-marigold/50 focus:border-marigold/50 transition-all" />
-          </div>
-
-          {error && (
-            <div className="rounded-xl bg-durga/20 border border-durga/30 px-4 py-3 space-y-1">
-              <p className="font-ui text-sm text-white/80">{error}</p>
-              {error.includes("already exists") && (
-                <Link href={`/auth/signin?email=${encodeURIComponent(email)}`}
-                  className="inline-block font-ui text-xs text-marigold font-semibold hover:text-marigold-dark">
-                  Sign in instead →
-                </Link>
-              )}
-            </div>
-          )}
-
-          <button type="submit" disabled={loading || !firstName || !lastName || !email || !password}
-            className="w-full py-4 rounded-2xl font-display font-bold text-base transition-all mt-1 bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-lg disabled:opacity-40 disabled:cursor-not-allowed">
-            {loading ? "Creating account…" : "Create My Account →"}
-          </button>
-        </form>
+            <button type="submit" disabled={loading || !firstName || !lastName || !email}
+              className="w-full py-4 rounded-2xl font-display font-bold text-base transition-all mt-1 bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-lg disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+              {loading ? <><div className="w-4 h-4 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" />Sending code…</> : "Send me a code →"}
+            </button>
+          </form>
+        ) : (
+          <OtpVerify
+            email={email.trim()}
+            purpose="signup"
+            requestPayload={{ email: email.trim(), purpose: "signup", firstName, lastName }}
+            onVerified={onVerified}
+            onBack={() => { setStep("form"); setError(""); }}
+          />
+        )}
 
         <p className="mt-6 text-center font-mono text-[9px] text-white/20">
           By joining you agree to our Terms &amp; Privacy Policy

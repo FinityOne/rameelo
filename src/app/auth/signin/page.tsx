@@ -4,8 +4,8 @@ import { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Logo from "@/components/Logo";
-import { createClient } from "@/lib/supabase/client";
-import { createUser, saveUser } from "@/lib/auth";
+import { createUser, saveUser, type UserRole } from "@/lib/auth";
+import OtpVerify, { type VerifyResult } from "../OtpVerify";
 
 function SignInInner() {
   const router = useRouter();
@@ -14,53 +14,46 @@ function SignInInner() {
   const rawNext = searchParams.get("next") ?? "";
   const nextDest = rawNext.startsWith("/") && !rawNext.startsWith("//") ? rawNext : "";
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [step, setStep] = useState<"email" | "code">("email");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [noAccount, setNoAccount] = useState(false);
 
   useEffect(() => { document.title = "Sign In | Rameelo"; }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
+  // Email-only → send a 6-digit code.
+  async function handleRequest(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
     setError("");
-
-    const supabase = createClient();
-    const { data, error: authError } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (authError) {
-      setError(authError.message);
+    setNoAccount(false);
+    try {
+      const res = await fetch("/api/auth/request-otp", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), purpose: "login" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Could not send a code. Please try again.");
+        if (data.code === "no_account") setNoAccount(true);
+        return;
+      }
+      setStep("code");
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
       setLoading(false);
-      return;
     }
+  }
 
-    // Populate localStorage so portal pages can read display data
-    const meta = data.user?.user_metadata ?? {};
-    const firstName = meta.firstName ?? email.split("@")[0];
-    const lastName = meta.lastName ?? "Member";
-
-    // Fetch role to decide which portal to land on
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("role, first_name, last_name")
-      .eq("id", data.user!.id)
-      .single();
-
-    const role = profile?.role ?? "user";
-    const rameeloUser = createUser({
-      firstName: profile?.first_name || firstName,
-      lastName:  profile?.last_name  || lastName,
-      email: data.user?.email ?? email,
-      phone: meta.phone ?? "",
-      city: meta.city ?? "",
-      state: meta.state ?? "",
-      role,
-    });
-    saveUser(rameeloUser);
-
-    // Attach any guest orders bought with this email to the account (best-effort).
-    try { await supabase.rpc("claim_my_guest_orders"); } catch { /* non-blocking */ }
-
+  // Session cookies are already set server-side; mirror display data + route.
+  function onVerified(data: VerifyResult) {
+    const role = (data.role ?? "user") as UserRole;
+    saveUser(createUser({
+      firstName: data.firstName || email.split("@")[0],
+      lastName: data.lastName || "Member",
+      email: data.email || email, phone: "", city: "", state: "", role,
+    }));
     const destination = nextDest || (role === "admin" ? "/admin" : role === "organizer" ? "/organizer" : "/portal");
     router.push(destination);
     router.refresh();
@@ -127,56 +120,50 @@ function SignInInner() {
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="font-mono text-[10px] uppercase tracking-widest text-white/40 mb-1.5 block">Email</label>
-              <input
-                type="email"
-                autoComplete="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="priya@example.com"
-                className={inputCls}
-                required
-              />
-            </div>
-            <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="font-mono text-[10px] uppercase tracking-widest text-white/40">Password</label>
-                <Link href="/auth/forgot-password" className="font-ui text-xs text-marigold hover:text-marigold-dark transition-colors">Forgot?</Link>
+          {step === "email" ? (
+            <form onSubmit={handleRequest} className="space-y-4">
+              <div>
+                <label className="font-mono text-[10px] uppercase tracking-widest text-white/40 mb-1.5 block">Email</label>
+                <input
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="priya@example.com"
+                  className={inputCls}
+                  required
+                />
+                <p className="font-ui text-xs text-white/35 mt-2">No password needed — we&rsquo;ll email you a 6-digit code to sign in.</p>
               </div>
-              <input
-                type="password"
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className={inputCls}
-                required
-              />
-            </div>
 
-            {error && (
-              <div className="rounded-xl bg-durga/20 border border-durga/30 px-4 py-3">
-                <p className="font-ui text-sm text-white/80">{error}</p>
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-lg mt-2 flex items-center justify-center gap-2"
-            >
-              {loading ? (
-                <>
-                  <div className="w-4 h-4 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" />
-                  Signing in…
-                </>
-              ) : (
-                "Sign In →"
+              {error && (
+                <div className="rounded-xl bg-durga/20 border border-durga/30 px-4 py-3">
+                  <p className="font-ui text-sm text-white/80">{error}</p>
+                  {noAccount && (
+                    <Link href={nextDest ? `/auth/signup?next=${encodeURIComponent(nextDest)}` : "/auth/signup"} className="font-ui text-sm text-marigold hover:text-marigold-dark font-semibold">
+                      Create an account →
+                    </Link>
+                  )}
+                </div>
               )}
-            </button>
-          </form>
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-4 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-lg mt-2 flex items-center justify-center gap-2"
+              >
+                {loading ? <><div className="w-4 h-4 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" />Sending code…</> : "Email me a code →"}
+              </button>
+            </form>
+          ) : (
+            <OtpVerify
+              email={email.trim()}
+              purpose="login"
+              requestPayload={{ email: email.trim(), purpose: "login" }}
+              onVerified={onVerified}
+              onBack={() => { setStep("email"); setError(""); }}
+            />
+          )}
 
           <div className="mt-6 flex items-center gap-3">
             <div className="h-px flex-1 bg-white/10" />

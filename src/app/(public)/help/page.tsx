@@ -102,7 +102,7 @@ const CATEGORIES = [
   {
     id: "account",
     title: "Account & Profile",
-    description: "Password resets, profile settings, organization linking, and privacy.",
+    description: "Signing in, profile settings, organization linking, and privacy.",
     count: 3,
     iconBg: "#3B4A6B",
     iconFg: "#ffffff",
@@ -252,9 +252,9 @@ const ARTICLES = [
   {
     cat: "Account & Profile",
     catId: "account",
-    q: "How do I reset my password?",
-    a: "Go to rameelo.com/auth/forgot-password and enter the email address associated with your account. You'll receive a secure reset link within a few minutes. The link expires after 1 hour. If you don't see it, check your spam folder. After resetting, you can log back in with your new password.",
-    cta: { label: "Reset password", href: "/auth/forgot-password" },
+    q: "How do I sign in to my account?",
+    a: "Rameelo is passwordless — there's no password to set or remember. Go to rameelo.com/auth/signin, enter the email associated with your account, and we'll send you a 6-digit code. Type it in to sign in. The code expires in 30 minutes; if you don't see it within a minute, check your spam folder. You can also continue with Google.",
+    cta: { label: "Sign in", href: "/auth/signin" },
     min: 1,
   },
   {

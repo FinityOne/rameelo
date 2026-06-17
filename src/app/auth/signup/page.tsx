@@ -4,8 +4,8 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Logo from "@/components/Logo";
-import { createClient } from "@/lib/supabase/client";
-import { createUser, saveUser } from "@/lib/auth";
+import { createUser, saveUser, type UserRole } from "@/lib/auth";
+import OtpVerify, { type VerifyResult } from "../OtpVerify";
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
@@ -35,10 +35,9 @@ export default function SignUpPage() {
   const [state, setState] = useState("NJ");
   const stateEditedByUser = useRef(false);
   const cityEditedByUser = useRef(false);
-  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [emailSent, setEmailSent] = useState(false);
+  const [accountExists, setAccountExists] = useState(false);
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [nextDest, setNextDest] = useState<string>("");
 
@@ -81,94 +80,53 @@ export default function SignUpPage() {
   }
 
   const step1Valid = firstName && lastName && email.includes("@") && phone.length === 10;
-  const step2Valid = password.length >= 8;
 
+  // Step 1 → request a 6-digit code (creates the passwordless account; confirmed on verify).
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (step === 1) { setStep(2); return; }
+    if (step !== 1 || !step1Valid) return;
     setLoading(true);
     setError("");
-
-    const supabase = createClient();
-    const { data, error: authError } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { firstName, lastName, phone, city, state },
-        emailRedirectTo: `${location.origin}/auth/callback`,
-      },
-    });
-
-    if (authError) {
-      setError(authError.message);
-      setLoading(false);
-      return;
-    }
-
-    // Build and save local user for portal pages
-    const user = createUser({ firstName, lastName, email, phone, city, state });
-    saveUser(user);
-
-    // Fire welcome email (non-blocking — don't delay registration on failure).
-    // Pass the new user's access token so the API can verify them immediately.
-    const accessToken = data.session?.access_token;
-    fetch("/api/send-welcome", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
-      },
-      body: JSON.stringify({ firstName, email }),
-    }).catch(() => { /* silent — welcome email failure shouldn't block onboarding */ });
-
-    // Notify platform admins of the new registration (non-blocking). The route
-    // resolves admin recipients + the member's details server-side from the user id.
-    if (data.user?.id) {
-      fetch("/api/new-user-notify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: data.user.id }),
-      }).catch(() => { /* silent — admin alert shouldn't block onboarding */ });
-    }
-
-    if (data.session) {
-      // Email confirmation disabled — claim any team invite + guest orders, then route.
-      if (inviteToken) {
-        try { await supabase.rpc("claim_org_invitations"); } catch { /* organizer layout will retry */ }
+    setAccountExists(false);
+    try {
+      const res = await fetch("/api/auth/request-otp", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), purpose: "signup", firstName, lastName, phone, city, state }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error || "Could not send a code. Please try again.");
+        if (data.code === "account_exists") setAccountExists(true);
+        return;
       }
-      try { await supabase.rpc("claim_my_guest_orders"); } catch { /* non-blocking */ }
-      router.push(nextDest || (inviteToken ? "/organizer" : "/portal"));
-      router.refresh();
-    } else {
-      // Email confirmation enabled — show check-email screen
-      setEmailSent(true);
+      setStep(2);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
       setLoading(false);
     }
+  }
+
+  // Code verified → session is set server-side (guest orders + invites claimed there).
+  // Fire the welcome + admin-alert emails (cookie-authed, best-effort), then route.
+  function onSignupVerified(data: VerifyResult) {
+    saveUser(createUser({ firstName, lastName, email, phone, city, state, role: (data.role ?? "user") as UserRole }));
+    fetch("/api/send-welcome", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ firstName, email }),
+    }).catch(() => {});
+    if (data.userId) {
+      fetch("/api/new-user-notify", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: data.userId }),
+      }).catch(() => {});
+    }
+    router.push(nextDest || (inviteToken ? "/organizer" : "/portal"));
+    router.refresh();
   }
 
   const inputCls = "w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3.5 font-ui text-sm text-white placeholder-white/30 focus:outline-none focus:ring-2 focus:ring-marigold/50 focus:border-marigold/50 transition-all";
   const labelCls = "font-mono text-[10px] uppercase tracking-widest text-white/40 mb-1.5 block";
-
-  if (emailSent) {
-    return (
-      <div className="min-h-screen flex items-center justify-center px-6" style={{ backgroundColor: "#2E1B30" }}>
-        <div className="w-full max-w-sm text-center space-y-6">
-          <div className="w-16 h-16 rounded-2xl bg-marigold/15 border border-marigold/30 flex items-center justify-center mx-auto text-3xl">
-            📬
-          </div>
-          <div>
-            <h1 className="font-display font-bold text-white text-2xl mb-2">Check your email</h1>
-            <p className="font-ui text-white/50 text-sm">
-              We sent a confirmation link to <span className="text-marigold font-medium">{email}</span>. Click it to activate your account.
-            </p>
-          </div>
-          <Link href="/auth/signin" className="block font-ui text-sm text-white/40 hover:text-white/60 transition-colors">
-            ← Back to sign in
-          </Link>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen flex" style={{ backgroundColor: "#2E1B30" }}>
@@ -218,7 +176,7 @@ export default function SignUpPage() {
                   {step > s ? "✓" : s}
                 </div>
                 <span className={`font-mono text-[10px] uppercase tracking-wide ${step === s ? "text-white/60" : "text-white/25"}`}>
-                  {s === 1 ? "Your info" : "Secure it"}
+                  {s === 1 ? "Your info" : "Verify"}
                 </span>
               </div>
             ))}
@@ -232,14 +190,13 @@ export default function SignUpPage() {
               {step === 1 ? (
                 <>Already a member? <Link href="/auth/signin" className="text-marigold font-semibold hover:text-marigold-dark">Sign in →</Link></>
               ) : (
-                "Choose a password to secure your account."
+                "Enter the 6-digit code we emailed to confirm your account."
               )}
             </p>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            {step === 1 ? (
-              <>
+          {step === 1 ? (
+            <form onSubmit={handleSubmit} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className={labelCls}>First name</label>
@@ -290,47 +247,28 @@ export default function SignUpPage() {
                     </select>
                   </div>
                 </div>
-                <button type="submit" disabled={!step1Valid} className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all mt-2 ${step1Valid ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-lg" : "bg-white/10 text-white/30 cursor-not-allowed"}`}>
-                  Continue →
-                </button>
-              </>
-            ) : (
-              <>
-                <div>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className={labelCls}>Password</label>
-                    {password.length > 0 && (
-                      <span className={`font-mono text-[10px] ${password.length >= 8 ? "text-peacock" : "text-marigold"}`}>
-                        {password.length >= 8 ? "Strong ✓" : `${8 - password.length} more chars`}
-                      </span>
-                    )}
-                  </div>
-                  <input type="password" autoComplete="new-password" value={password} onChange={(e) => setPassword(e.target.value)} placeholder="At least 8 characters" className={inputCls} required />
-                </div>
-
-                {/* Summary */}
-                <div className="rounded-xl bg-white/5 border border-white/10 p-4 space-y-1.5">
-                  <p className="font-mono text-[10px] uppercase tracking-widest text-white/30 mb-2">Account summary</p>
-                  <p className="font-ui text-sm text-white font-medium">{firstName} {lastName}</p>
-                  <p className="font-ui text-xs text-white/50">{email}</p>
-                  {city && <p className="font-ui text-xs text-white/50">{city}, {state}</p>}
-                </div>
-
                 {error && (
                   <div className="rounded-xl bg-durga/20 border border-durga/30 px-4 py-3">
                     <p className="font-ui text-sm text-white/80">{error}</p>
+                    {accountExists && (
+                      <Link href={nextDest ? `/auth/signin?next=${encodeURIComponent(nextDest)}` : "/auth/signin"} className="font-ui text-sm text-marigold hover:text-marigold-dark font-semibold">Sign in instead →</Link>
+                    )}
                   </div>
                 )}
 
-                <button type="submit" disabled={loading || !step2Valid} className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all flex items-center justify-center gap-2 ${step2Valid && !loading ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-lg" : "bg-white/10 text-white/30 cursor-not-allowed"}`}>
-                  {loading ? (<><div className="w-4 h-4 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" />Creating account…</>) : "Create My Account →"}
+                <button type="submit" disabled={!step1Valid || loading} className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all mt-2 flex items-center justify-center gap-2 ${step1Valid && !loading ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-lg" : "bg-white/10 text-white/30 cursor-not-allowed"}`}>
+                  {loading ? <><div className="w-4 h-4 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" />Sending code…</> : "Send me a code →"}
                 </button>
-                <button type="button" onClick={() => setStep(1)} className="w-full py-2.5 text-white/40 font-ui text-sm hover:text-white/60 transition-colors">
-                  ← Back
-                </button>
-              </>
-            )}
-          </form>
+            </form>
+          ) : (
+            <OtpVerify
+              email={email.trim()}
+              purpose="signup"
+              requestPayload={{ email: email.trim(), purpose: "signup", firstName, lastName, phone, city, state }}
+              onVerified={onSignupVerified}
+              onBack={() => { setStep(1); setError(""); }}
+            />
+          )}
           <p className="mt-6 text-center font-mono text-[10px] text-white/25">By creating an account you agree to our Terms & Privacy Policy</p>
         </div>
       </div>
