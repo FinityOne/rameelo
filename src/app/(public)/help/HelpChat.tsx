@@ -35,9 +35,9 @@ const QA = [
     answer: "Rameelo accepts all major credit and debit cards — Visa, Mastercard, Amex, and Discover — processed securely via Stripe. We currently don't support cash, checks, or crypto.",
   },
   {
-    question: "How do I reset my password?",
-    answer: "Visit the forgot password page, enter your email address, and you'll receive a secure reset link within a few minutes. The link expires after 1 hour. Check your spam folder if it doesn't arrive.",
-    cta: { label: "Reset password →", href: "/auth/forgot-password" },
+    question: "How do I sign in?",
+    answer: "Rameelo is passwordless — there's no password to remember. Enter your email and we'll send you a 6-digit code; type it in to sign in. The code expires in 30 minutes. Check your spam folder if it doesn't arrive within a minute.",
+    cta: { label: "Sign in →", href: "/auth/signin" },
   },
   {
     question: "Can I transfer my ticket?",
