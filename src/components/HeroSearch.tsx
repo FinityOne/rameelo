@@ -5,6 +5,7 @@ import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useNearestMetro } from "@/hooks/useNearestMetro";
 import { METROS } from "@/lib/metros";
+import type { QuickCity } from "@/lib/home-search";
 
 const VIBES = [
   { value: "All",      label: "All",      icon: "✨" },
@@ -14,37 +15,35 @@ const VIBES = [
   { value: "Workshop", label: "Workshop", icon: "📚" },
 ];
 
-// Cities shown as quick-chips — ordered by community density
-const QUICK_CITIES = [
-  { city: "Edison",       state: "NJ" },
-  { city: "Houston",      state: "TX" },
-  { city: "Atlanta",      state: "GA" },
-  { city: "Chicago",      state: "IL" },
-  { city: "San Jose",     state: "CA" },
-  { city: "Boston",       state: "MA" },
-  { city: "Dallas",       state: "TX" },
-  { city: "Seattle",      state: "WA" },
-  { city: "New York",     state: "NY" },
-  { city: "Los Angeles",  state: "CA" },
-  { city: "Philadelphia", state: "PA" },
-  { city: "Denver",       state: "CO" },
+// Static fallbacks — only used if the live data hasn't loaded (e.g. SSR hiccup or
+// a brand-new platform with no upcoming events). Normally everything is data-driven.
+const FALLBACK_QUICK_CITIES: QuickCity[] = [
+  { city: "Edison", state: "NJ" }, { city: "Houston", state: "TX" },
+  { city: "Atlanta", state: "GA" }, { city: "Chicago", state: "IL" },
+  { city: "San Jose", state: "CA" }, { city: "Boston", state: "MA" },
 ];
-
-const CITY_LIST = ["All Cities", ...METROS.map(m => m.city)];
+const FALLBACK_CITIES = METROS.map(m => m.city);
 
 type Drop = "city" | "vibe" | null;
 
-export default function HeroSearch() {
+export default function HeroSearch({ cities, quickCities }: { cities?: string[]; quickCities?: QuickCity[] }) {
   const router = useRouter();
   const locationState = useNearestMetro();
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Dropdown = only cities/metros with upcoming events (falls back to static metros).
+  const cityOptions = cities && cities.length ? cities : FALLBACK_CITIES;
+  const CITY_LIST = ["All Cities", ...cityOptions];
+  // Quick chips = featured / major-metro selling areas (falls back to static).
+  const quickChips = quickCities && quickCities.length ? quickCities : FALLBACK_QUICK_CITIES;
 
   const [city, setCity] = useState("All Cities");
   const [vibe, setVibe] = useState("All");
   const [open, setOpen] = useState<Drop>(null);
 
   useEffect(() => {
-    if (locationState.status === "resolved" && city === "All Cities") {
+    // Default to the nearest metro only when it's a place we actually have events for.
+    if (locationState.status === "resolved" && city === "All Cities" && cityOptions.includes(locationState.metro.city)) {
       setCity(locationState.metro.city);
     }
   }, [locationState.status]); // eslint-disable-line
@@ -243,7 +242,7 @@ export default function HeroSearch() {
             </Link>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            {QUICK_CITIES.map(({ city: c, state: s }) => (
+            {quickChips.slice(0, 6).map(({ city: c, state: s }) => (
               <Link
                 key={c}
                 href={eventsUrl(c)}
@@ -251,7 +250,7 @@ export default function HeroSearch() {
                 style={{ minHeight: 56 }}
               >
                 <span className="font-ui text-sm font-semibold text-white leading-tight">{c}</span>
-                <span className="font-mono text-[9px] text-white/40 mt-0.5">{s}</span>
+                {s && <span className="font-mono text-[9px] text-white/40 mt-0.5">{s}</span>}
               </Link>
             ))}
           </div>
@@ -272,32 +271,22 @@ export default function HeroSearch() {
         </button>
       </div>
 
-      {/* ── Popular quick-links (both breakpoints, desktop only) ── */}
-      <div className="hidden sm:flex flex-wrap items-center gap-2">
-        <span className="font-mono text-[10px] text-white/30 uppercase tracking-widest mr-1 shrink-0">Popular:</span>
-        {[
-          { label: "Falguni Pathak · NJ",    city: "Edison",     vibe: "All"     },
-          { label: "Atul Purohit · Houston",  city: "Houston",    vibe: "Garba"   },
-          { label: "Garba · Atlanta",         city: "Atlanta",    vibe: "Garba"   },
-          { label: "Dandiya · Chicago",       city: "Chicago",    vibe: "Dandiya" },
-          { label: "UGA Raas Royalty",        city: "All Cities", vibe: "Raas"    },
-          { label: "Bay Area Navratri",       city: "San Jose",   vibe: "All"     },
-        ].map((tag) => {
-          const params = new URLSearchParams();
-          if (tag.city !== "All Cities") params.set("city", tag.city);
-          if (tag.vibe !== "All")        params.set("vibe", tag.vibe);
-          const qs = params.toString();
-          return (
+      {/* ── Popular quick-links — featured / major-metro selling areas (desktop) ── */}
+      {quickChips.length > 0 && (
+        <div className="hidden sm:flex flex-wrap items-center gap-2">
+          <span className="font-mono text-[10px] text-white/30 uppercase tracking-widest mr-1 shrink-0">Popular:</span>
+          {quickChips.map(({ city: c, state: s }) => (
             <Link
-              key={tag.label}
-              href={`/events${qs ? `?${qs}` : ""}`}
-              className="inline-flex items-center px-3.5 py-1.5 rounded-full border border-white/12 bg-white/5 font-ui text-xs text-white/60 hover:text-white hover:border-white/25 hover:bg-white/10 transition-all"
+              key={c}
+              href={eventsUrl(c)}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full border border-white/12 bg-white/5 font-ui text-xs text-white/60 hover:text-white hover:border-white/25 hover:bg-white/10 transition-all"
             >
-              {tag.label}
+              <svg className="w-3 h-3 text-marigold/70 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              {c}{s ? ` · ${s}` : ""}
             </Link>
-          );
-        })}
-      </div>
+          ))}
+        </div>
+      )}
     </>
   );
 }

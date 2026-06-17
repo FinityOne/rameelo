@@ -17,6 +17,7 @@ type DBEvent = {
   is_multi_day: boolean;
   city: string | null;
   state: string | null;
+  metro_city: string | null;
   venue_name: string | null;
   start_time: string;
   cover_image_url: string | null;
@@ -45,6 +46,7 @@ type EventVM = {
   isMultiDay: boolean;
   city: string | null;
   state: string | null;
+  metroCity: string | null;
   venue: string | null;
   time: string;
   coverImageUrl: string | null;
@@ -248,7 +250,7 @@ export default function EventsPage() {
         .from('events')
         .select(`
           id, title, category, artist, artist_id, description,
-          start_date, end_date, is_multi_day, city, state, venue_name, start_time,
+          start_date, end_date, is_multi_day, city, state, metro_city, venue_name, start_time,
           cover_image_url, cover_gradient, dress_code, dandiya_sticks,
           age_restriction, navratri_nights, capacity, selling_on_rameelo, featured_on_events,
           ticket_tiers (price, quantity),
@@ -274,6 +276,7 @@ export default function EventsPage() {
           isMultiDay: ev.is_multi_day,
           city: ev.city,
           state: ev.state,
+          metroCity: ev.metro_city,
           venue: ev.venue_name,
           time: ev.start_time,
           coverImageUrl: ev.cover_image_url,
@@ -292,10 +295,11 @@ export default function EventsPage() {
       setEvents(vms);
       setLoading(false);
 
-      // After events load, match geo city to an actual event city
+      // After events load, match geo city to an actual event city (or its metro)
       if (geoCity) {
-        const matched = vms.find(e => e.city?.toLowerCase() === geoCity.toLowerCase());
-        if (matched?.city) setActiveCity(matched.city);
+        const g = geoCity.toLowerCase();
+        const matched = vms.find(e => e.city?.toLowerCase() === g || e.metroCity?.toLowerCase() === g);
+        if (matched) setActiveCity(matched.metroCity?.toLowerCase() === g ? matched.metroCity! : matched.city!);
       }
     }
     load();
@@ -332,11 +336,12 @@ export default function EventsPage() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Once geo city is known and events are loaded, auto-select nearest city
+  // Once geo city is known and events are loaded, auto-select nearest city (or metro)
   useEffect(() => {
-    if (!geoCity || events.length === 0) return;
-    const matched = events.find(e => e.city?.toLowerCase() === geoCity.toLowerCase());
-    if (matched?.city && activeCity === 'All Cities') setActiveCity(matched.city);
+    if (!geoCity || events.length === 0 || activeCity !== 'All Cities') return;
+    const g = geoCity.toLowerCase();
+    const matched = events.find(e => e.city?.toLowerCase() === g || e.metroCity?.toLowerCase() === g);
+    if (matched) setActiveCity(matched.metroCity?.toLowerCase() === g ? matched.metroCity! : matched.city!);
   }, [geoCity, events]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Split into upcoming vs past using the 2-day grace rule
@@ -353,18 +358,23 @@ export default function EventsPage() {
 
   // Filter options derive from all events so the picker stays stable across views
   const categories = ['All', ...Array.from(new Set(events.map(e => CATEGORY_LABELS[e.category] ?? e.category))).sort()];
-  const cities = ['All Cities', ...Array.from(new Set(events.map(e => e.city).filter((c): c is string => !!c))).sort()];
+  // City picker includes both the event's city AND its major-metro label, so a
+  // metro selection (e.g. "Los Angeles") surfaces its city-level events (e.g. Irvine).
+  const cities = ['All Cities', ...Array.from(new Set(
+    events.flatMap(e => [e.city, e.metroCity]).filter((c): c is string => !!c)
+  )).sort()];
 
   const filtered = useMemo(() => {
     let result = [...base];
     if (activeCategory !== 'All') result = result.filter(e => (CATEGORY_LABELS[e.category] ?? e.category) === activeCategory);
-    if (activeCity !== 'All Cities') result = result.filter(e => e.city === activeCity);
+    if (activeCity !== 'All Cities') result = result.filter(e => e.city === activeCity || e.metroCity === activeCity);
     if (search.trim()) {
       const q = search.toLowerCase();
       result = result.filter(e =>
         e.title.toLowerCase().includes(q) ||
         (e.artist ?? '').toLowerCase().includes(q) ||
         (e.city ?? '').toLowerCase().includes(q) ||
+        (e.metroCity ?? '').toLowerCase().includes(q) ||
         (e.venue ?? '').toLowerCase().includes(q)
       );
     }

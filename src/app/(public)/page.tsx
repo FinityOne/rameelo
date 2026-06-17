@@ -4,6 +4,7 @@ import { testimonials, communityGroups } from "@/lib/data";
 import { Eyebrow, Button, Badge, EventCard, Avatar } from "@/components/ui";
 import HeroSearch from "@/components/HeroSearch";
 import { createClient } from "@/lib/supabase/server";
+import { getHomeSearchOptions } from "@/lib/home-search";
 import { getPlatformStats, headlineStats, compactNumber } from "@/lib/platform-stats";
 import { breadcrumbSchema, faqSchema, itemListSchema, ld } from "@/lib/jsonld";
 
@@ -90,8 +91,9 @@ export default async function HomePage() {
   const supabase = await createClient();
   const today = new Date().toISOString().split("T")[0];
 
-  const [platformStats, { data: rawEvents }] = await Promise.all([
+  const [platformStats, searchOptions, { data: rawEvents }] = await Promise.all([
     getPlatformStats(),
+    getHomeSearchOptions(),
     supabase.from("events")
       .select("id, title, category, city, state, start_date, start_time, venue_name, selling_on_rameelo, featured_on_tour, cover_image_url, artists(name), ticket_tiers(price, quantity, quantity_sold)")
       .eq("status", "published")
@@ -181,7 +183,7 @@ export default async function HomePage() {
           </p>
 
           {/* ── Search widget + popular (client — reads geolocation) ── */}
-          <HeroSearch />
+          <HeroSearch cities={searchOptions.cities} quickCities={searchOptions.quickCities} />
 
           {/* Trust strip */}
           <div className="mt-12 flex flex-wrap items-center gap-x-6 gap-y-3">
