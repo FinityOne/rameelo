@@ -49,6 +49,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     trigger: "manual",
     fires: "Triggered by an admin from a user's detail page",
   },
+  {
+    key: "login-code",
+    name: "Sign-in / sign-up code",
+    description: "A 6-digit one-time code for passwordless sign-in and sign-up. Expires in 30 minutes; the member enters it to authenticate — no password to remember.",
+    audience: "Members",
+    category: "Member",
+    status: "live",
+    trigger: "automatic",
+    fires: "When a member requests a sign-in or sign-up code (enters their email)",
+  },
 
   // ── Planned (not yet built) ──
   {
