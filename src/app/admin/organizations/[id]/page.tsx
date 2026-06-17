@@ -74,6 +74,8 @@ export default function AdminOrgDetailPage() {
   const [saving, setSaving] = useState(false);
   const [saveMsg, setSaveMsg] = useState("");
   const [form, setForm] = useState<Partial<OrgData>>({});
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const logoInputRef = useRef<HTMLInputElement>(null);
 
   // Member search
   const [memberSearch, setMemberSearch] = useState("");
@@ -134,6 +136,7 @@ export default function AdminOrgDetailPage() {
     const supabase = createClient();
     const { error } = await supabase.from("organizations").update({
       name: form.name, slug: form.slug, description: form.description || null,
+      logo_url: form.logo_url || null,
       email: form.email || null, phone: form.phone || null, website: form.website || null,
       city: form.city || null, state: form.state || null, org_type: form.org_type || null,
       status: form.status, founded_year: form.founded_year || null,
@@ -145,6 +148,39 @@ export default function AdminOrgDetailPage() {
     setSaveMsg("Saved!");
     setTimeout(() => setSaveMsg(""), 3000);
     fetchAll();
+  }
+
+  // Logo lives in the public event-images bucket (org-logos/ prefix). Persist the URL
+  // immediately so it's saved even if the admin doesn't click "Save changes", and it
+  // appears right away on the org's public pages + event detail "Presented by" card.
+  async function handleLogoUpload(file: File) {
+    if (!file.type.startsWith("image/") || file.size > 5 * 1024 * 1024) {
+      setSaveMsg("Error: pick an image under 5MB."); return;
+    }
+    setUploadingLogo(true);
+    setSaveMsg("");
+    const supabase = createClient();
+    const ext = file.name.split(".").pop();
+    const path = `org-logos/${id}/${Date.now()}.${ext}`;
+    const { error: upErr } = await supabase.storage.from("event-images").upload(path, file, { upsert: true });
+    if (upErr) { setUploadingLogo(false); setSaveMsg("Error: " + upErr.message); return; }
+    const { data } = supabase.storage.from("event-images").getPublicUrl(path);
+    const url = data.publicUrl;
+    const { error } = await supabase.from("organizations").update({ logo_url: url, updated_at: new Date().toISOString() }).eq("id", id);
+    setUploadingLogo(false);
+    if (error) { setSaveMsg("Error: " + error.message); return; }
+    setForm(f => ({ ...f, logo_url: url }));
+    setOrg(o => o ? { ...o, logo_url: url } : o);
+    setSaveMsg("Logo updated!");
+    setTimeout(() => setSaveMsg(""), 3000);
+  }
+
+  async function removeLogo() {
+    const supabase = createClient();
+    const { error } = await supabase.from("organizations").update({ logo_url: null, updated_at: new Date().toISOString() }).eq("id", id);
+    if (error) { setSaveMsg("Error: " + error.message); return; }
+    setForm(f => ({ ...f, logo_url: null }));
+    setOrg(o => o ? { ...o, logo_url: null } : o);
   }
 
   // Debounced user search
@@ -277,6 +313,34 @@ export default function AdminOrgDetailPage() {
             {/* Identity */}
             <div className="bg-white rounded-2xl border border-ivory-200 p-5 space-y-4">
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Identity</p>
+
+              {/* Logo / profile picture */}
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 rounded-2xl overflow-hidden border border-ivory-200 bg-aubergine/8 flex items-center justify-center text-aubergine font-display font-bold text-2xl shrink-0">
+                  {form.logo_url
+                    ? <img src={form.logo_url} alt={form.name ?? "Logo"} className="w-full h-full object-cover" />
+                    : (form.name?.charAt(0)?.toUpperCase() ?? "?")}
+                </div>
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1.5">Logo</p>
+                  <div className="flex items-center gap-2">
+                    <button type="button" onClick={() => logoInputRef.current?.click()} disabled={uploadingLogo}
+                      className="inline-flex items-center gap-1.5 font-ui font-semibold text-xs px-3 py-2 rounded-xl border border-ivory-200 bg-white text-ink hover:border-aubergine/30 hover:text-aubergine transition-all disabled:opacity-60">
+                      {uploadingLogo
+                        ? <><div className="w-3.5 h-3.5 rounded-full border-2 border-ivory-200 border-t-aubergine animate-spin" />Uploading…</>
+                        : <><svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>{form.logo_url ? "Replace" : "Upload logo"}</>}
+                    </button>
+                    {form.logo_url && !uploadingLogo && (
+                      <button type="button" onClick={removeLogo}
+                        className="font-ui font-semibold text-xs px-3 py-2 rounded-xl text-ink-muted hover:text-durga transition-colors">Remove</button>
+                    )}
+                  </div>
+                  <input ref={logoInputRef} type="file" accept="image/*" className="hidden"
+                    onChange={e => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f); e.target.value = ""; }} />
+                  <p className="font-mono text-[10px] text-ink-muted/60 mt-1.5">Shown on the org&rsquo;s public page and the &ldquo;Presented by&rdquo; card on event pages. Square works best · max 5MB.</p>
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2">
                   <label className={labelCls}>Organization name *</label>
