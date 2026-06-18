@@ -28,6 +28,30 @@ export function fromAddressForType(type?: string): string {
   return type && TICKETING_EMAIL_TYPES.has(type) ? EMAIL.fromTickets : EMAIL.from;
 }
 
+// ── Process-wide send pacing ──────────────────────────────────────────────────
+// Resend rate-limits to 5 requests/second. Bulk tools (group / marketing /
+// interest blasts) fan out many sends at once, so without pacing the surplus
+// gets 429'd and silently dropped. We serialize slot acquisition so each send
+// starts at least MIN_INTERVAL_MS after the previous one — capping throughput
+// just under the limit. (Serverless runs one blast per invocation, so a
+// module-level limiter throttles the whole blast.)
+const MIN_INTERVAL_MS = 220; // ~4.5 sends/sec, a hair under Resend's 5/sec
+let pacingChain: Promise<void> = Promise.resolve();
+let lastSlotAt = 0;
+function acquireSendSlot(): Promise<void> {
+  const next = pacingChain.then(async () => {
+    const wait = Math.max(0, lastSlotAt + MIN_INTERVAL_MS - Date.now());
+    if (wait) await new Promise((r) => setTimeout(r, wait));
+    lastSlotAt = Date.now();
+  });
+  pacingChain = next.catch(() => {});
+  return next;
+}
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+function isRateLimit(error: { message?: string; statusCode?: number | null; name?: string }): boolean {
+  return error.statusCode === 429 || /too many requests|rate limit/i.test(error.message ?? "") || error.name === "rate_limit_exceeded";
+}
+
 export async function sendEmail({
   to, subject, html, text, type, from, headers,
 }: {
@@ -46,7 +70,7 @@ export async function sendEmail({
     return { id: null, error: "Email is not configured (RESEND_API_KEY is missing in this environment)." };
   }
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const { data, error } = await resend.emails.send({
+  const payload = {
     from: from ?? fromAddressForType(type),
     to,
     subject,
@@ -54,7 +78,20 @@ export async function sendEmail({
     text,
     replyTo: EMAIL.replyTo,
     ...(headers ? { headers } : {}),
-  });
-  if (error) return { id: null, error: error.message ?? "send failed" };
-  return { id: data?.id ?? null, error: null };
+  };
+
+  // Paced + retried so bulk blasts stay under Resend's 5/sec limit and a
+  // momentary 429 doesn't drop a recipient.
+  const MAX_ATTEMPTS = 4;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    await acquireSendSlot();
+    const { data, error } = await resend.emails.send(payload);
+    if (!error) return { id: data?.id ?? null, error: null };
+    if (isRateLimit(error) && attempt < MAX_ATTEMPTS) {
+      await sleep(500 * attempt); // back off, then re-acquire a slot
+      continue;
+    }
+    return { id: null, error: error.message ?? "send failed" };
+  }
+  return { id: null, error: "send failed after retries" };
 }
