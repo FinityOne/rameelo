@@ -212,6 +212,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     fires: "Automatically when a user creates an account",
   },
   {
+    key: "marketing-blast",
+    name: "Marketing blast",
+    description: "An admin-composed marketing email to a targeted group (by tag, upload batch, location, or past-event attendance) inviting them to an upcoming event with a 'Get tickets' CTA. Honors per-user marketing opt-out and includes one-click unsubscribe. Sent from hello@.",
+    audience: "Members",
+    category: "Platform",
+    status: "live",
+    trigger: "manual",
+    fires: "When an admin sends a blast from the Email Blast tool",
+  },
+  {
     key: "sponsorship-inquiry",
     name: "Sponsorship inquiry alert",
     description: "Notifies all platform admins, with the full form details, when someone submits the /sponsor advertising form.",

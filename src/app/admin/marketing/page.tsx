@@ -1,0 +1,300 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+type Batch = { id: string; label: string; created_count: number };
+type EventOpt = { id: string; title: string; start_date: string };
+type Blast = { id: string; subject: string; event_id: string | null; recipient_count: number; sent_count: number; failed_count: number; created_at: string };
+
+const labelCls = "font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1.5 block";
+const inputCls = "w-full rounded-xl border border-ivory-200 bg-white px-3.5 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/25 focus:border-aubergine transition-all";
+const fmtTS = (d: string) => new Date(d).toLocaleString("en-US", { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+const fmtDay = (d: string) => new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+
+// Searchable multi-select checklist.
+function MultiPick({ title, options, selected, onChange, labelOf, searchable = true }: {
+  title: string; options: { value: string; label: string; sub?: string }[]; selected: string[];
+  onChange: (v: string[]) => void; labelOf?: (v: string) => string; searchable?: boolean;
+}) {
+  const [q, setQ] = useState("");
+  const filtered = q ? options.filter(o => o.label.toLowerCase().includes(q.toLowerCase())) : options;
+  const toggle = (v: string) => onChange(selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v]);
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1.5">
+        <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">{title}</span>
+        {selected.length > 0 && <button onClick={() => onChange([])} className="font-mono text-[9px] text-ink-muted hover:text-durga">clear ({selected.length})</button>}
+      </div>
+      {options.length === 0 ? (
+        <p className="font-ui text-xs text-ink-muted/60 px-1 py-2">None yet.</p>
+      ) : (
+        <>
+          {searchable && options.length > 8 && <input value={q} onChange={e => setQ(e.target.value)} placeholder={`Search ${title.toLowerCase()}…`} className={`${inputCls} mb-1.5 py-2`} />}
+          <div className="max-h-44 overflow-auto rounded-xl border border-ivory-200 divide-y divide-ivory-200">
+            {filtered.map(o => {
+              const on = selected.includes(o.value);
+              return (
+                <button key={o.value} onClick={() => toggle(o.value)} className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${on ? "bg-aubergine/[0.04]" : "hover:bg-ivory/50"}`}>
+                  <span className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 ${on ? "bg-aubergine border-aubergine" : "border-ivory-200 bg-white"}`}>
+                    {on && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                  </span>
+                  <span className="flex-1 min-w-0"><span className="font-ui text-sm text-ink truncate block">{o.label}</span>{o.sub && <span className="font-mono text-[10px] text-ink-muted">{o.sub}</span>}</span>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+      {labelOf && selected.length > 0 && <p className="font-mono text-[10px] text-aubergine mt-1.5">{selected.map(labelOf).join(", ")}</p>}
+    </div>
+  );
+}
+
+export default function MarketingBlastPage() {
+  // Facets + data
+  const [tags, setTags] = useState<string[]>([]);
+  const [cities, setCities] = useState<string[]>([]);
+  const [states, setStates] = useState<string[]>([]);
+  const [batches, setBatches] = useState<Batch[]>([]);
+  const [upcoming, setUpcoming] = useState<EventOpt[]>([]);
+  const [allEvents, setAllEvents] = useState<EventOpt[]>([]);
+  const [blasts, setBlasts] = useState<Blast[]>([]);
+
+  // Filters
+  const [selTags, setSelTags] = useState<string[]>([]);
+  const [selBatches, setSelBatches] = useState<string[]>([]);
+  const [selCities, setSelCities] = useState<string[]>([]);
+  const [selStates, setSelStates] = useState<string[]>([]);
+  const [selAttended, setSelAttended] = useState<string[]>([]);
+  const [source, setSource] = useState("");
+  const [matchAny, setMatchAny] = useState(false);
+
+  // Compose
+  const [eventId, setEventId] = useState("");
+  const [subject, setSubject] = useState("");
+  const [headline, setHeadline] = useState("");
+  const [body, setBody] = useState("");
+
+  // Audience count
+  const [count, setCount] = useState<number | null>(null);
+  const [sample, setSample] = useState<string[]>([]);
+  const [counting, setCounting] = useState(false);
+
+  // Send
+  const [confirming, setConfirming] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [result, setResult] = useState<{ sent: number; failed: number; recipients: number } | null>(null);
+  const [sendErr, setSendErr] = useState("");
+
+  useEffect(() => { document.title = "Email Blast | Rameelo Admin"; load(); }, []);
+
+  async function load() {
+    const supabase = createClient();
+    const today = new Date().toISOString().slice(0, 10);
+    const [{ data: facets }, { data: bs }, { data: evs }, { data: bl }] = await Promise.all([
+      supabase.rpc("get_marketing_filter_facets"),
+      supabase.from("user_import_batches").select("id, label, created_count").order("created_at", { ascending: false }),
+      supabase.from("events").select("id, title, start_date").order("start_date", { ascending: false }).limit(200),
+      supabase.from("marketing_blasts").select("id, subject, event_id, recipient_count, sent_count, failed_count, created_at").order("created_at", { ascending: false }).limit(8),
+    ]);
+    const f = (facets ?? {}) as { tags?: string[]; cities?: string[]; states?: string[] };
+    setTags(f.tags ?? []); setCities(f.cities ?? []); setStates(f.states ?? []);
+    setBatches((bs ?? []) as Batch[]);
+    const events = (evs ?? []) as EventOpt[];
+    setAllEvents(events);
+    setUpcoming(events.filter(e => e.start_date >= today).sort((a, b) => a.start_date.localeCompare(b.start_date)));
+    setBlasts((bl ?? []) as Blast[]);
+  }
+
+  const filters = useMemo(() => ({
+    tags: selTags, batchIds: selBatches, cities: selCities, states: selStates,
+    attendedEventIds: selAttended, source: source || null, matchAny,
+  }), [selTags, selBatches, selCities, selStates, selAttended, source, matchAny]);
+
+  const hasFilters = selTags.length || selBatches.length || selCities.length || selStates.length || selAttended.length || source;
+
+  // Debounced live recipient count.
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    setCounting(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const res = await fetch("/api/admin/marketing/audience", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(filters) });
+        const d = await res.json().catch(() => ({}));
+        setCount(res.ok ? d.count : null); setSample(d.sample ?? []);
+      } catch { setCount(null); }
+      setCounting(false);
+    }, 400);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [filters]);
+
+  const canSend = !!subject.trim() && (!!body.trim() || !!eventId) && (count ?? 0) > 0;
+
+  async function send() {
+    setSending(true); setSendErr("");
+    try {
+      const res = await fetch("/api/admin/marketing/send", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...filters, subject: subject.trim(), headline: headline.trim(), body: body.trim(), eventId: eventId || null }),
+      });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) { setSendErr(d.error || "Send failed."); setSending(false); setConfirming(false); return; }
+      setResult({ sent: d.sent, failed: d.failed, recipients: d.recipients });
+      setConfirming(false);
+      load();
+    } catch { setSendErr("Send failed."); }
+    setSending(false);
+  }
+
+  function resetAfterSend() {
+    setResult(null); setSubject(""); setHeadline(""); setBody(""); setEventId("");
+    setSelTags([]); setSelBatches([]); setSelCities([]); setSelStates([]); setSelAttended([]); setSource("");
+  }
+
+  const eventTitleOf = (id: string) => allEvents.find(e => e.id === id)?.title ?? "event";
+
+  if (result) {
+    return (
+      <div className="max-w-2xl mx-auto">
+        <div className="bg-white rounded-2xl border border-ivory-200 p-6 text-center space-y-4">
+          <div className="w-14 h-14 rounded-2xl bg-peacock/10 flex items-center justify-center mx-auto text-2xl">📣</div>
+          <div>
+            <p className="font-display font-bold text-ink text-xl">Blast sent</p>
+            <p className="font-ui text-sm text-ink-muted mt-1">
+              <strong className="text-peacock">{result.sent} delivered</strong> of {result.recipients}{result.failed > 0 && <> · <span className="text-durga">{result.failed} failed</span></>}.
+            </p>
+          </div>
+          <button onClick={resetAfterSend} className="px-5 py-2.5 rounded-xl bg-aubergine text-white font-display font-bold text-sm hover:bg-aubergine-light transition-all">New blast</button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-5">
+      <div>
+        <h2 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: "-0.02em" }}>Email Blast</h2>
+        <p className="font-ui text-ink-muted text-sm mt-0.5">Target users by tag, upload, location, or past attendance — and invite them to an upcoming event. Honors marketing opt-outs.</p>
+      </div>
+
+      <div className="grid lg:grid-cols-2 gap-5">
+        {/* ── Audience ── */}
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-ivory-200 p-5 space-y-4">
+            <div className="flex items-center justify-between">
+              <p className="font-display font-bold text-ink text-sm">Who to reach</p>
+              <div className="flex items-center gap-1 bg-ivory rounded-lg p-0.5 border border-ivory-200">
+                {[{ v: false, l: "Match all" }, { v: true, l: "Match any" }].map(o => (
+                  <button key={o.l} onClick={() => setMatchAny(o.v)} className={`px-2.5 py-1 rounded-md font-ui text-xs font-semibold transition-all ${matchAny === o.v ? "bg-white text-ink shadow-sm" : "text-ink-muted"}`}>{o.l}</button>
+                ))}
+              </div>
+            </div>
+
+            <MultiPick title="Tags" options={tags.map(t => ({ value: t, label: t }))} selected={selTags} onChange={setSelTags} />
+            <MultiPick title="Uploads" options={batches.map(b => ({ value: b.id, label: b.label, sub: `${b.created_count} added` }))} selected={selBatches} onChange={setSelBatches} labelOf={id => batches.find(b => b.id === id)?.label ?? id} />
+            <div className="grid grid-cols-2 gap-4">
+              <MultiPick title="States" options={states.map(s => ({ value: s, label: s }))} selected={selStates} onChange={setSelStates} />
+              <MultiPick title="Cities" options={cities.map(c => ({ value: c, label: c }))} selected={selCities} onChange={setSelCities} />
+            </div>
+            <MultiPick title="Attended event" options={allEvents.map(e => ({ value: e.id, label: e.title, sub: fmtDay(e.start_date) }))} selected={selAttended} onChange={setSelAttended} labelOf={eventTitleOf} />
+
+            <div>
+              <label className={labelCls}>Joined via</label>
+              <div className="flex gap-1.5">
+                {[{ v: "", l: "Anyone" }, { v: "signup", l: "Signed up" }, { v: "import", l: "Imported" }].map(o => (
+                  <button key={o.l} onClick={() => setSource(o.v)} className={`px-3 py-1.5 rounded-xl font-ui text-xs font-semibold border transition-all ${source === o.v ? "bg-aubergine text-white border-aubergine" : "border-ivory-200 text-ink-muted hover:border-aubergine/30"}`}>{o.l}</button>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* Recipient count */}
+          <div className="bg-aubergine rounded-2xl p-5 text-white">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-white/50">Recipients {!hasFilters && "(everyone opted-in)"}</p>
+            <p className="font-display font-bold text-4xl mt-1" style={{ letterSpacing: "-0.03em" }}>{counting ? "…" : (count ?? "—")}</p>
+            {sample.length > 0 && <p className="font-mono text-[10px] text-white/40 mt-2 truncate">{sample.join(" · ")}{(count ?? 0) > sample.length ? " …" : ""}</p>}
+          </div>
+        </div>
+
+        {/* ── Compose ── */}
+        <div className="space-y-4">
+          <div className="bg-white rounded-2xl border border-ivory-200 p-5 space-y-4">
+            <p className="font-display font-bold text-ink text-sm">The message</p>
+            <div>
+              <label className={labelCls}>Feature an upcoming event <span className="text-ink-muted/50 normal-case">(optional)</span></label>
+              <select value={eventId} onChange={e => setEventId(e.target.value)} className={inputCls}>
+                <option value="">No event — text only</option>
+                {upcoming.map(e => <option key={e.id} value={e.id}>{e.title} · {fmtDay(e.start_date)}</option>)}
+              </select>
+              {eventId && <p className="font-mono text-[10px] text-ink-muted/70 mt-1.5">The event banner, artist, date, venue, and a “Get tickets” button are added automatically.</p>}
+            </div>
+            <div>
+              <label className={labelCls}>Subject line *</label>
+              <input value={subject} onChange={e => setSubject(e.target.value)} placeholder="Your VIP invite to Diwali Dhamaka 🎟️" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Headline <span className="text-ink-muted/50 normal-case">(optional)</span></label>
+              <input value={headline} onChange={e => setHeadline(e.target.value)} placeholder="You're invited" className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Message {eventId ? <span className="text-ink-muted/50 normal-case">(optional with an event)</span> : "*"}</label>
+              <textarea rows={6} value={body} onChange={e => setBody(e.target.value)} placeholder={"Hey — tickets are moving fast for this one.\n\nWe saved you a spot. Grab yours before they're gone!"} className={`${inputCls} resize-none`} />
+              <p className="font-mono text-[10px] text-ink-muted/60 mt-1.5">Blank lines start new paragraphs. Each recipient is greeted by first name automatically.</p>
+            </div>
+          </div>
+
+          {sendErr && <p className="font-ui text-sm text-durga bg-durga/8 border border-durga/20 rounded-xl px-3.5 py-2.5">{sendErr}</p>}
+
+          <button onClick={() => setConfirming(true)} disabled={!canSend}
+            className="w-full py-3.5 rounded-2xl bg-peacock text-white font-display font-bold text-base hover:bg-peacock/90 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+            Send to {count ?? 0} {count === 1 ? "person" : "people"}
+          </button>
+        </div>
+      </div>
+
+      {/* History */}
+      {blasts.length > 0 && (
+        <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+          <div className="px-5 py-3 bg-ivory border-b border-ivory-200"><p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Sent blasts</p></div>
+          <div className="divide-y divide-ivory-200">
+            {blasts.map(b => (
+              <div key={b.id} className="px-5 py-2.5 flex items-center justify-between gap-3">
+                <div className="min-w-0"><p className="font-ui text-sm text-ink truncate">{b.subject}</p><p className="font-mono text-[10px] text-ink-muted">{fmtTS(b.created_at)}{b.event_id && ` · ${eventTitleOf(b.event_id)}`}</p></div>
+                <span className="font-mono text-[10px] shrink-0"><span className="text-peacock font-bold">{b.sent_count} sent</span>{b.failed_count > 0 && <span className="text-durga"> · {b.failed_count} failed</span>}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Confirm modal */}
+      {confirming && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => !sending && setConfirming(false)}>
+          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 space-y-4" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-peacock/10 flex items-center justify-center text-xl shrink-0">📣</div>
+              <div>
+                <p className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.015em" }}>Send this blast?</p>
+                <p className="font-ui text-xs text-ink-muted">This emails real people. It can&rsquo;t be unsent.</p>
+              </div>
+            </div>
+            <div className="rounded-xl border border-ivory-200 bg-ivory/40 divide-y divide-ivory-200">
+              {[["Recipients", String(count ?? 0)], ["Subject", subject.trim()], ["Event", eventId ? eventTitleOf(eventId) : "— none"]].map(([k, v]) => (
+                <div key={k} className="flex items-center justify-between gap-4 px-4 py-2.5"><span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">{k}</span><span className="font-ui text-sm text-ink text-right truncate max-w-[60%]">{v}</span></div>
+              ))}
+            </div>
+            <div className="flex gap-3">
+              <button onClick={() => setConfirming(false)} disabled={sending} className="flex-1 py-2.5 rounded-xl border border-ivory-200 font-ui font-semibold text-sm text-ink-muted hover:bg-ivory transition-colors">Cancel</button>
+              <button onClick={send} disabled={sending} className="flex-1 py-2.5 rounded-xl bg-peacock text-white font-display font-bold text-sm hover:bg-peacock/90 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {sending ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Sending…</> : `Send to ${count ?? 0}`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

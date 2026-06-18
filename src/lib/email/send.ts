@@ -28,7 +28,7 @@ export function fromAddressForType(type?: string): string {
 }
 
 export async function sendEmail({
-  to, subject, html, text, type, from,
+  to, subject, html, text, type, from, headers,
 }: {
   to: string;
   subject: string;
@@ -38,6 +38,8 @@ export async function sendEmail({
   type?: string;
   /** Explicit From override; takes precedence over the type-based default. */
   from?: string;
+  /** Extra headers, e.g. List-Unsubscribe for marketing mail. */
+  headers?: Record<string, string>;
 }): Promise<{ id: string | null; error: string | null }> {
   if (!process.env.RESEND_API_KEY) {
     return { id: null, error: "Email is not configured (RESEND_API_KEY is missing in this environment)." };
@@ -50,6 +52,7 @@ export async function sendEmail({
     html,
     text,
     replyTo: EMAIL.replyTo,
+    ...(headers ? { headers } : {}),
   });
   if (error) return { id: null, error: error.message ?? "send failed" };
   return { id: data?.id ?? null, error: null };
