@@ -13,6 +13,7 @@ type Profile = {
   city: string;
   state: string;
   role: UserRole;
+  source: string | null;
   created_at: string;
 };
 
@@ -20,6 +21,12 @@ const ROLE_STYLES: Record<UserRole, string> = {
   user: "bg-ivory-200 text-ink-muted",
   organizer: "bg-peacock/15 text-peacock",
   admin: "bg-durga/15 text-durga",
+};
+
+// How the account was created — shown so admins can tell self-signups from imports.
+const SOURCE_META: Record<string, { label: string; cls: string }> = {
+  signup: { label: "Signed up", cls: "bg-peacock/10 text-peacock" },
+  import: { label: "Imported", cls: "bg-aubergine/10 text-aubergine" },
 };
 
 const PAGE_SIZE = 10;
@@ -47,7 +54,7 @@ export default function AdminUsersPage() {
       const supabase = createClient();
       let q = supabase
         .from("profiles")
-        .select("id, first_name, last_name, email, city, state, role, created_at", { count: "exact" })
+        .select("id, first_name, last_name, email, city, state, role, source, created_at", { count: "exact" })
         .order("created_at", { ascending: false });
 
       const term = query.trim().replace(/[%,()]/g, ""); // sanitize for the .or filter
@@ -127,9 +134,14 @@ export default function AdminUsersPage() {
                           {(profile.first_name[0] ?? "?")}
                         </div>
                         <div className="min-w-0">
-                          <p className="font-ui font-semibold text-ink leading-tight truncate group-hover:text-aubergine transition-colors">
-                            {profile.first_name} {profile.last_name}
-                          </p>
+                          <div className="flex items-center gap-1.5">
+                            <p className="font-ui font-semibold text-ink leading-tight truncate group-hover:text-aubergine transition-colors">
+                              {profile.first_name} {profile.last_name}
+                            </p>
+                            {(() => { const s = SOURCE_META[profile.source ?? "signup"] ?? SOURCE_META.signup; return (
+                              <span className={`shrink-0 font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${s.cls}`}>{s.label}</span>
+                            ); })()}
+                          </div>
                           <p className="font-mono text-[10px] text-ink-muted truncate">{profile.email}</p>
                         </div>
                       </Link>

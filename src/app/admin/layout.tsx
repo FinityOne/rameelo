@@ -52,6 +52,15 @@ const SECTIONS: NavSection[] = [
         ),
       },
       {
+        href: "/admin/import-users",
+        label: "Import Users",
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-7l-4-4m0 0L8 9m4-4v12" />
+          </svg>
+        ),
+      },
+      {
         href: "/admin/organizations",
         label: "Organizations",
         icon: (
@@ -258,6 +267,7 @@ const SECTIONS: NavSection[] = [
 const PAGE_TITLES: Array<{ test: (p: string) => boolean; title: string }> = [
   { test: (p) => p === "/admin",                                  title: "Dashboard" },
   { test: (p) => p === "/admin/users",                            title: "User Management" },
+  { test: (p) => p === "/admin/import-users",                     title: "Import Users" },
   { test: (p) => /^\/admin\/users\/[^/]+$/.test(p),              title: "User Details" },
   { test: (p) => p === "/admin/organizations",                    title: "Organizations" },
   { test: (p) => /^\/admin\/organizations\/[^/]+$/.test(p),      title: "Organization Details" },
