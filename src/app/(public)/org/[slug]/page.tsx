@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { EventCard } from "@/components/ui/EventCard";
 
 type PublicOrg = {
   id: string;
@@ -176,8 +175,8 @@ export default function OrgPage() {
               <p className="font-ui text-sm text-ink-muted">No upcoming events listed right now — check back soon.</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {upcoming.map(ev => <OrgEventCard key={ev.id} ev={ev} />)}
+            <div className="space-y-2.5">
+              {upcoming.map(ev => <OrgEventRow key={ev.id} ev={ev} isPast={false} />)}
             </div>
           )}
         </section>
@@ -186,8 +185,8 @@ export default function OrgPage() {
         {past.length > 0 && (
           <section>
             <h2 className="font-display font-bold text-ink text-lg mb-4">Past events</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {past.map(ev => <OrgEventCard key={ev.id} ev={ev} />)}
+            <div className="space-y-2.5">
+              {past.map(ev => <OrgEventRow key={ev.id} ev={ev} isPast />)}
             </div>
           </section>
         )}
@@ -196,32 +195,52 @@ export default function OrgPage() {
   );
 }
 
-function OrgEventCard({ ev }: { ev: OrgEvent }) {
-  const prices = (ev.ticket_tiers ?? []).map(t => t.price);
-  const minPrice = prices.length ? Math.min(...prices) : null;
-  const maxPrice = prices.length ? Math.max(...prices) : null;
+// Minimal event row for the org page: thumbnail + title + date/location, with a
+// single right-aligned action. Upcoming events get a "Get tickets / Get early
+// access" CTA; past events just get a "View event" link.
+function OrgEventRow({ ev, isPast }: { ev: OrgEvent; isPast: boolean }) {
   const totalQty = (ev.ticket_tiers ?? []).reduce((s, t) => s + (t.quantity ?? 0), 0);
   const totalSold = (ev.ticket_tiers ?? []).reduce((s, t) => s + (t.quantity_sold ?? 0), 0);
-  const soldPct = totalQty > 0 ? Math.round((totalSold / totalQty) * 100) : 0;
   const soldOut = totalQty > 0 && totalSold >= totalQty;
   const artistName = ev.artists?.name ?? ev.artist ?? null;
+  const location = [ev.metro_city ?? ev.city, ev.state].filter(Boolean).join(", ");
+
+  const cta = isPast
+    ? { label: "View event", cls: "border border-ivory-200 bg-white text-ink-muted group-hover:border-aubergine/30 group-hover:text-aubergine" }
+    : soldOut
+      ? { label: "Sold out", cls: "bg-ivory-200 text-ink-muted" }
+      : ev.selling_on_rameelo
+        ? { label: "Get tickets", cls: "bg-marigold text-aubergine group-hover:bg-marigold-dark" }
+        : { label: "Get early access", cls: "bg-marigold text-aubergine group-hover:bg-marigold-dark" };
+
   return (
-    <EventCard
-      title={ev.title}
-      category={ev.category}
-      city={ev.city}
-      state={ev.state}
-      date={fmtDate(ev.start_date)}
-      artistName={artistName}
-      metroCity={ev.metro_city}
-      detailsBelow
-      minPrice={minPrice}
-      maxPrice={maxPrice}
-      sellingOnRameelo={ev.selling_on_rameelo}
-      soldPct={soldPct}
-      soldOut={soldOut}
+    <Link
       href={`/events/${ev.id}`}
-      coverImageUrl={ev.cover_image_url}
-    />
+      className={`group flex items-center gap-3.5 p-2.5 rounded-2xl border border-ivory-200 bg-white hover:shadow-sm hover:border-ivory-200 transition-all ${isPast ? "opacity-90" : ""}`}
+    >
+      {/* Thumbnail */}
+      <div
+        className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl overflow-hidden shrink-0 flex items-center justify-center text-white font-display font-bold text-xl"
+        style={{ background: "linear-gradient(145deg, #2E1B30 0%, #7C1F2C 70%, #F5A623 140%)" }}
+      >
+        {ev.cover_image_url
+          ? <img src={ev.cover_image_url} alt={ev.title} className="w-full h-full object-cover" />
+          : ev.title.charAt(0)}
+      </div>
+
+      {/* Details */}
+      <div className="flex-1 min-w-0">
+        <p className="font-display font-semibold text-ink text-[15px] leading-snug truncate" style={{ letterSpacing: "-0.01em" }}>{ev.title}</p>
+        <p className="font-ui text-xs text-ink-muted truncate mt-0.5">
+          {fmtDate(ev.start_date)}{location ? ` · ${location}` : ""}
+        </p>
+        {artistName && <p className="font-ui text-xs text-aubergine/80 truncate mt-0.5">🎤 {artistName}</p>}
+      </div>
+
+      {/* Action */}
+      <span className={`shrink-0 px-3.5 py-2 rounded-xl text-xs font-ui font-semibold transition-colors ${cta.cls}`}>
+        {cta.label}
+      </span>
+    </Link>
   );
 }
