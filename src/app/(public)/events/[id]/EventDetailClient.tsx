@@ -91,6 +91,7 @@ type Event = {
   capacity: number | null;
   selling_on_rameelo: boolean;
   kids_5_under_free: boolean;
+  show_social_proof: boolean;
   org_id: string | null;
   artist: Artist | null;
   organization: Organization | null;
@@ -378,25 +379,28 @@ function UrgencyBanner({
 
         {/* Social proof — only show the real count once it's high enough to
             persuade. Below the threshold a low number hurts conversion, so we
-            lean on encouraging early-buyer framing with no number instead. */}
-        {totalSold >= SOCIAL_PROOF_MIN_SOLD ? (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-aubergine/5 border border-aubergine/10">
-            <span className="text-base">🎟️</span>
-            <p className="font-ui text-xs text-ink-muted">
-              <strong className="text-ink">{totalSold} people</strong> have already secured their spot.
-              {holderNum <= 100 && (
-                <> You&rsquo;d be ticket holder <strong className="text-aubergine">#{holderNum}</strong>.</>
-              )}
-            </p>
-          </div>
-        ) : (
-          <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-marigold/8 border border-marigold/20">
-            <span className="text-base">🌟</span>
-            <p className="font-ui text-xs text-ink-muted">
-              <strong className="text-ink">{totalSold === 0 ? "Be the first to grab tickets." : "Get in early."}</strong>{" "}
-              Early buyers always get the best seats and more time to plan their night.
-            </p>
-          </div>
+            lean on encouraging early-buyer framing with no number instead.
+            Admins can hide this whole block per event (show_social_proof). */}
+        {event.show_social_proof !== false && (
+          totalSold >= SOCIAL_PROOF_MIN_SOLD ? (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-aubergine/5 border border-aubergine/10">
+              <span className="text-base">🎟️</span>
+              <p className="font-ui text-xs text-ink-muted">
+                <strong className="text-ink">{totalSold} people</strong> have already secured their spot.
+                {holderNum <= 100 && (
+                  <> You&rsquo;d be ticket holder <strong className="text-aubergine">#{holderNum}</strong>.</>
+                )}
+              </p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-marigold/8 border border-marigold/20">
+              <span className="text-base">🌟</span>
+              <p className="font-ui text-xs text-ink-muted">
+                <strong className="text-ink">{totalSold === 0 ? "Be the first to grab tickets." : "Get in early."}</strong>{" "}
+                Early buyers always get the best seats and more time to plan their night.
+              </p>
+            </div>
+          )
         )}
 
         {/* Historical FOMO — educational, never deceptive */}
@@ -673,7 +677,7 @@ export default function EventDetailClient({ id }: { id: string }) {
           venue_name, address_line1, city, state, zip, metro_city,
           parking, parking_notes, website_url,
           cover_image_url, cover_gradient,
-          dress_code, dress_code_details, dandiya_sticks, age_restriction, capacity, selling_on_rameelo, kids_5_under_free,
+          dress_code, dress_code_details, dandiya_sticks, age_restriction, capacity, selling_on_rameelo, kids_5_under_free, show_social_proof,
           artist:artists!events_artist_id_fkey (
             id, name, slug, tagline, bio, profile_image_url, genres, years_active_since, follower_count, performance_style
           ),

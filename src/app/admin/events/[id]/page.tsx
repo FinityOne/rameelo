@@ -84,6 +84,7 @@ type EventFull = {
   status: string;
   selling_on_rameelo: boolean;
   kids_5_under_free: boolean;
+  show_social_proof: boolean;
   review_note: string | null;
   reviewed_at: string | null;
   created_at: string;
@@ -202,6 +203,7 @@ export default function AdminEventReviewPage() {
   const [done, setDone]       = useState<'approved' | 'rejected' | null>(null);
   const [togglingRameelo, setTogglingRameelo] = useState(false);
   const [togglingKidsFree, setTogglingKidsFree] = useState(false);
+  const [togglingSocialProof, setTogglingSocialProof] = useState(false);
   const [orderEmailsOn, setOrderEmailsOn] = useState(true);
   const [togglingOrderEmails, setTogglingOrderEmails] = useState(false);
   const [interests, setInterests] = useState<InterestSubmission[]>([]);
@@ -227,7 +229,7 @@ export default function AdminEventReviewPage() {
             parking, parking_notes, website_url,
             cover_image_url, cover_gradient,
             dress_code, dress_code_details, dandiya_sticks, age_restriction,
-            capacity, status, selling_on_rameelo, kids_5_under_free, review_note, reviewed_at, created_at,
+            capacity, status, selling_on_rameelo, kids_5_under_free, show_social_proof, review_note, reviewed_at, created_at,
             ticket_tiers (id, name, price, quantity, description, sale_start_date, sale_end_date, group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value, group_discount_tiers),
             organizer:profiles!events_organizer_id_fkey (first_name, last_name, email, phone, city, state)
           `)
@@ -323,6 +325,16 @@ export default function AdminEventReviewPage() {
     await supabase.from('events').update({ kids_5_under_free: next }).eq('id', id);
     setEvent(prev => prev ? { ...prev, kids_5_under_free: next } : prev);
     setTogglingKidsFree(false);
+  }
+
+  async function toggleSocialProof() {
+    if (!event) return;
+    setTogglingSocialProof(true);
+    const supabase = createClient();
+    const next = !event.show_social_proof;
+    await supabase.from('events').update({ show_social_proof: next }).eq('id', id);
+    setEvent(prev => prev ? { ...prev, show_social_proof: next } : prev);
+    setTogglingSocialProof(false);
   }
 
   async function toggleOrderEmails() {
@@ -1045,6 +1057,17 @@ export default function AdminEventReviewPage() {
             on={event.kids_5_under_free}
             busy={togglingKidsFree}
             onToggle={toggleKidsFree}
+          />
+
+          <ToggleRow
+            icon="📣"
+            title="Show ticket-count social proof"
+            desc={event.show_social_proof
+              ? 'The "X people have already secured their spot · you’d be ticket holder #N" block shows on the event page.'
+              : 'Hidden — the "people have already secured their spot / ticket holder #" block won’t show on the event page.'}
+            on={event.show_social_proof}
+            busy={togglingSocialProof}
+            onToggle={toggleSocialProof}
           />
 
           <ToggleRow
