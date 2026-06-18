@@ -28,6 +28,7 @@ type OrgEvent = {
   artist: string | null;
   city: string;
   state: string;
+  metro_city: string | null;
   start_date: string;
   selling_on_rameelo: boolean;
   cover_image_url: string | null;
@@ -75,7 +76,7 @@ export default function OrgPage() {
 
       const { data: evData } = await supabase
         .from("events")
-        .select("id, title, category, artist, city, state, start_date, selling_on_rameelo, cover_image_url, artists (name), ticket_tiers (price, quantity, quantity_sold)")
+        .select("id, title, category, artist, city, state, metro_city, start_date, selling_on_rameelo, cover_image_url, artists (name), ticket_tiers (price, quantity, quantity_sold)")
         .eq("org_id", o.id)
         .eq("status", "published")
         .order("start_date");
@@ -212,6 +213,7 @@ function OrgEventCard({ ev }: { ev: OrgEvent }) {
       state={ev.state}
       date={fmtDate(ev.start_date)}
       artistName={artistName}
+      metroCity={ev.metro_city}
       detailsBelow
       minPrice={minPrice}
       maxPrice={maxPrice}
