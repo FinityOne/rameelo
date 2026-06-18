@@ -128,6 +128,7 @@ export default function AdminEventsPage() {
   const router = useRouter();
   const [events, setEvents]   = useState<EventRow[]>([]);
   const [salesMap, setSalesMap] = useState<Record<string, Sales>>({});
+  const [groupsMap, setGroupsMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [tab, setTab]         = useState<Tab>('published');
 
@@ -143,7 +144,7 @@ export default function AdminEventsPage() {
 
   async function load() {
     const supabase = createClient();
-    const [eventsRes, salesRes] = await Promise.all([
+    const [eventsRes, salesRes, groupsRes] = await Promise.all([
       supabase
         .from('events')
         .select(`
@@ -155,6 +156,9 @@ export default function AdminEventsPage() {
         `)
         .order('start_date', { ascending: true }),
       supabase.rpc('admin_event_sales_summary'),
+      // Group orders per event (publicly readable; small) — so admins can see at a
+      // glance which event has groups before opening it.
+      supabase.from('group_orders').select('event_id'),
     ]);
     setEvents((eventsRes.data ?? []) as unknown as EventRow[]);
     const map: Record<string, Sales> = {};
@@ -162,6 +166,9 @@ export default function AdminEventsPage() {
       map[r.event_id] = { tickets_sold: Number(r.tickets_sold) || 0, net_revenue: Number(r.net_revenue) || 0, paid_orders: Number(r.paid_orders) || 0 };
     }
     setSalesMap(map);
+    const gmap: Record<string, number> = {};
+    for (const r of (groupsRes.data ?? []) as { event_id: string }[]) gmap[r.event_id] = (gmap[r.event_id] ?? 0) + 1;
+    setGroupsMap(gmap);
     setLoading(false);
   }
 
@@ -445,6 +452,11 @@ export default function AdminEventsPage() {
                           <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 ${d.pill.cls}`}>
                             {d.pill.label}
                           </span>
+                          {(groupsMap[ev.id] ?? 0) > 0 && (
+                            <span className="font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 bg-aubergine/10 text-aubergine" title={`${groupsMap[ev.id]} group${groupsMap[ev.id] !== 1 ? 's' : ''} formed`}>
+                              {groupsMap[ev.id]} grp{groupsMap[ev.id] !== 1 ? 's' : ''}
+                            </span>
+                          )}
                         </div>
                         <p className="font-ui font-semibold text-ink text-sm truncate group-hover:text-aubergine transition-colors" style={{ letterSpacing: '-0.01em' }}>
                           {ev.title}
@@ -535,6 +547,9 @@ export default function AdminEventsPage() {
                       <div className="flex items-center gap-1.5 mb-1">
                         <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${d.pill.cls}`}>{d.pill.label}</span>
                         <ModeTag selling={ev.selling_on_rameelo} />
+                        {(groupsMap[ev.id] ?? 0) > 0 && (
+                          <span className="font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full bg-aubergine/10 text-aubergine">{groupsMap[ev.id]} grp{groupsMap[ev.id] !== 1 ? 's' : ''}</span>
+                        )}
                       </div>
                       <p className="font-ui font-semibold text-ink text-sm truncate" style={{ letterSpacing: '-0.01em' }}>{ev.title}</p>
                       <p className="font-ui text-[11px] text-ink-muted/80 truncate">{d.subline || '—'}</p>

@@ -265,13 +265,16 @@ export default function AdminEventReviewPage() {
       setEvent(eventRes.data as unknown as EventFull);
       setInterests((interestRes.data ?? []) as InterestSubmission[]);
       setOrders((orderRes.data ?? []) as OrderRow[]);
+      // Load groups first and independently — it must not be gated behind the
+      // optional order-email / interest-blast RPCs below (if one of those throws,
+      // groups would silently never load).
+      await loadGroups();
       // This admin's own order-email subscription for this event (default on).
       const { data: emailPref } = await supabase.rpc('is_admin_order_email_enabled', { p_event_id: id });
       setOrderEmailsOn(emailPref !== false);
       // History of "tickets are live" blasts sent to this event's interest list.
       const { data: blastRows } = await supabase.rpc('get_interest_blasts', { p_event_id: id });
       setBlasts((blastRows ?? []) as Blast[]);
-      await loadGroups();
       setLoading(false);
     }
     load();
