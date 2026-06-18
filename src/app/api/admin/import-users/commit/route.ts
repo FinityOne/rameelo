@@ -55,11 +55,13 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
-  // Which emails already exist (skip creation; optionally enrich).
+  // Which emails already exist (skip creation; optionally enrich). Matched
+  // case-insensitively via the admin-gated RPC so no near-duplicate (different
+  // casing) ever gets recreated — email is the unique key.
   const emails = rows.map(r => r.email);
   const existingByEmail = new Map<string, { id: string; tags: string[] }>();
   for (let i = 0; i < emails.length; i += 500) {
-    const { data } = await admin.from("profiles").select("id, email, tags").in("email", emails.slice(i, i + 500));
+    const { data } = await supabase.rpc("find_existing_profiles", { p_emails: emails.slice(i, i + 500) });
     for (const p of (data ?? []) as { id: string; email: string | null; tags: string[] | null }[]) {
       if (p.email) existingByEmail.set(p.email.toLowerCase(), { id: p.id, tags: p.tags ?? [] });
     }
