@@ -25,11 +25,13 @@ type OrgEvent = {
   id: string;
   title: string;
   category: string;
+  artist: string | null;
   city: string;
   state: string;
   start_date: string;
   selling_on_rameelo: boolean;
   cover_image_url: string | null;
+  artists: { name: string } | null;
   ticket_tiers: { price: number; quantity: number; quantity_sold: number }[];
 };
 
@@ -73,7 +75,7 @@ export default function OrgPage() {
 
       const { data: evData } = await supabase
         .from("events")
-        .select("id, title, category, city, state, start_date, selling_on_rameelo, cover_image_url, ticket_tiers (price, quantity, quantity_sold)")
+        .select("id, title, category, artist, city, state, start_date, selling_on_rameelo, cover_image_url, artists (name), ticket_tiers (price, quantity, quantity_sold)")
         .eq("org_id", o.id)
         .eq("status", "published")
         .order("start_date");
@@ -201,6 +203,7 @@ function OrgEventCard({ ev }: { ev: OrgEvent }) {
   const totalSold = (ev.ticket_tiers ?? []).reduce((s, t) => s + (t.quantity_sold ?? 0), 0);
   const soldPct = totalQty > 0 ? Math.round((totalSold / totalQty) * 100) : 0;
   const soldOut = totalQty > 0 && totalSold >= totalQty;
+  const artistName = ev.artists?.name ?? ev.artist ?? null;
   return (
     <EventCard
       title={ev.title}
@@ -208,6 +211,8 @@ function OrgEventCard({ ev }: { ev: OrgEvent }) {
       city={ev.city}
       state={ev.state}
       date={fmtDate(ev.start_date)}
+      artistName={artistName}
+      detailsBelow
       minPrice={minPrice}
       maxPrice={maxPrice}
       sellingOnRameelo={ev.selling_on_rameelo}

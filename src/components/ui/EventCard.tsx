@@ -19,6 +19,11 @@ interface EventCardProps {
   href?: string;
   /** Event cover photo; shown when uploaded, otherwise the gradient fallback. */
   coverImageUrl?: string | null;
+  /** Headlining artist/performer — shown when provided (e.g. on org pages). */
+  artistName?: string | null;
+  /** Render date/location in the white body instead of over the image, for
+   *  readability. Defaults to the overlay layout so existing cards are unchanged. */
+  detailsBelow?: boolean;
 }
 
 export function EventCard({
@@ -35,6 +40,8 @@ export function EventCard({
   isLive = false,
   href = "/events",
   coverImageUrl = null,
+  artistName = null,
+  detailsBelow = false,
 }: EventCardProps) {
   return (
     <div className="bg-ivory rounded-[16px] overflow-hidden border border-ivory-200 hover:shadow-md transition-all group">
@@ -76,9 +83,11 @@ export function EventCard({
         </div>
 
         <div className="relative z-10">
-          <p className="font-mono text-[10px] text-white/70 tracking-widest uppercase mb-1">
-            {date} · {city}, {state}
-          </p>
+          {!detailsBelow && (
+            <p className="font-mono text-[10px] text-white/70 tracking-widest uppercase mb-1">
+              {date} · {city}, {state}
+            </p>
+          )}
           <h3
             className="font-display font-semibold text-white text-lg leading-tight line-clamp-2"
             style={{ letterSpacing: "-0.015em" }}
@@ -99,6 +108,26 @@ export function EventCard({
       <div className="border-t border-dashed border-ivory-200 mx-4" />
 
       <div className="p-4 pt-3">
+        {/* Event details in the readable white area (artist + date/location) */}
+        {detailsBelow && (
+          <div className="mb-3 space-y-1.5">
+            {artistName && (
+              <p className="flex items-center gap-1.5 font-ui text-[13px] font-semibold text-aubergine truncate">
+                <svg className="w-3.5 h-3.5 shrink-0 text-marigold-dark" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" /></svg>
+                {artistName}
+              </p>
+            )}
+            <p className="flex items-center gap-1.5 font-ui text-xs text-ink-muted">
+              <svg className="w-3.5 h-3.5 shrink-0 text-ink-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              <span className="truncate">{date}</span>
+            </p>
+            <p className="flex items-center gap-1.5 font-ui text-xs text-ink-muted">
+              <svg className="w-3.5 h-3.5 shrink-0 text-ink-muted/70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+              <span className="truncate">{[city, state].filter(Boolean).join(", ")}</span>
+            </p>
+          </div>
+        )}
+
         {/* Progress bar */}
         {!soldOut && (
           <div className="mb-3">
