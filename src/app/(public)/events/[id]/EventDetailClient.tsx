@@ -14,6 +14,7 @@ import { ComboBanner, ComboTicketCard, comboBuyable, type ComboTicket } from "./
 import MetroSticker from "./MetroSticker";
 import MoreFromOrganizer from "./MoreFromOrganizer";
 import EventWhenWhere from "./EventWhenWhere";
+import EventPresenter from "./EventPresenter";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -984,6 +985,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                 </span>
               </div>
               <MetroSticker metro={event.metro_city} category={event.category} />
+              <EventPresenter org={event.organization} />
               <h1 className="font-display text-xl sm:text-3xl md:text-4xl font-bold text-white leading-tight mb-2">
                 {event.title}
               </h1>
@@ -1166,6 +1168,9 @@ export default function EventDetailClient({ id }: { id: string }) {
 
             {/* Major-metro destination sticker — the standout regional cue */}
             <MetroSticker metro={event.metro_city} category={event.category} />
+
+            {/* Organizer top billing — "{Org} presents" leading into the title */}
+            <EventPresenter org={event.organization} />
 
             <h1 className="font-display text-xl sm:text-3xl md:text-4xl font-bold text-white leading-tight">
               {event.title}
