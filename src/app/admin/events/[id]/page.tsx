@@ -527,13 +527,25 @@ export default function AdminEventReviewPage() {
           <span className="text-ink-muted/40 text-xs">/</span>
           <span className="font-ui text-xs text-ink-muted truncate max-w-[200px]">{event.title}</span>
         </div>
-        <Link
-          href={`/admin/events/${id}/edit`}
-          className="flex items-center gap-1.5 shrink-0 font-ui font-semibold text-xs px-3.5 py-2 rounded-xl border border-ivory-200 bg-white text-ink-muted hover:text-aubergine hover:border-aubergine/30 transition-all"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-          Edit event
-        </Link>
+        <div className="flex items-center gap-2 shrink-0">
+          <a
+            href={`/events/${id}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Open the public event page in a new tab"
+            className="flex items-center gap-1.5 font-ui font-semibold text-xs px-3.5 py-2 rounded-xl border border-ivory-200 bg-white text-ink-muted hover:text-aubergine hover:border-aubergine/30 transition-all"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+            Preview
+          </a>
+          <Link
+            href={`/admin/events/${id}/edit`}
+            className="flex items-center gap-1.5 font-ui font-semibold text-xs px-3.5 py-2 rounded-xl border border-ivory-200 bg-white text-ink-muted hover:text-aubergine hover:border-aubergine/30 transition-all"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+            Edit event
+          </Link>
+        </div>
       </div>
 
       {/* Success banner */}
