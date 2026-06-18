@@ -181,16 +181,23 @@ type DecisionModal = { type: 'reject' | 'unpublish'; note: string };
 
 type Blast = { id: string; recipient_count: number; success_count: number; created_at: string; sent_by_name: string | null };
 
-type TabKey = 'overview' | 'tickets' | 'orders' | 'interest' | 'settings';
+type TabKey = 'overview' | 'tickets' | 'orders' | 'groups' | 'interest' | 'settings';
 
 // Inline icons for the in-event sub-nav (kept SVG, no emoji, per house style).
 const TAB_ICON: Record<TabKey, React.ReactNode> = {
   overview: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M4 5a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1V5zM14 5a1 1 0 011-1h4a1 1 0 011 1v3a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM14 13a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4z" />,
   tickets: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M15 5v2m0 4v2m0 4v2M5 5h14a2 2 0 012 2v3a2 2 0 000 4v3a2 2 0 01-2 2H5a2 2 0 01-2-2v-3a2 2 0 000-4V7a2 2 0 012-2z" />,
   orders: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />,
+  groups: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />,
   interest: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />,
   settings: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065zM15 12a3 3 0 11-6 0 3 3 0 016 0z" />,
 };
+
+type AdminGroup = {
+  id: string; name: string | null; target_size: number; organizer_name: string | null;
+  group_order_members: { name: string | null; email: string | null; qty: number; is_organizer: boolean }[];
+};
+type GroupBlast = { id: string; recipient_count: number; sent_count: number; skipped_count: number; created_at: string };
 
 export default function AdminEventReviewPage() {
   const { id } = useParams<{ id: string }>();
@@ -210,6 +217,13 @@ export default function AdminEventReviewPage() {
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [togglingOrderId, setTogglingOrderId] = useState<string | null>(null);
   const [tab, setTab] = useState<TabKey>('overview');
+  const [groups, setGroups] = useState<AdminGroup[]>([]);
+  const [groupBlasts, setGroupBlasts] = useState<GroupBlast[]>([]);
+  const [groupBlasting, setGroupBlasting] = useState(false);
+  const [groupMsg, setGroupMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [testEmail, setTestEmail] = useState("");
+  const [testing, setTesting] = useState(false);
+  const [testMsg, setTestMsg] = useState("");
   const [blasts, setBlasts] = useState<Blast[]>([]);
   const [blasting, setBlasting] = useState(false);
   const [blastMsg, setBlastMsg] = useState<{ ok: boolean; text: string } | null>(null);
@@ -257,6 +271,7 @@ export default function AdminEventReviewPage() {
       // History of "tickets are live" blasts sent to this event's interest list.
       const { data: blastRows } = await supabase.rpc('get_interest_blasts', { p_event_id: id });
       setBlasts((blastRows ?? []) as Blast[]);
+      await loadGroups();
       setLoading(false);
     }
     load();
@@ -335,6 +350,39 @@ export default function AdminEventReviewPage() {
     await supabase.from('events').update({ show_social_proof: next }).eq('id', id);
     setEvent(prev => prev ? { ...prev, show_social_proof: next } : prev);
     setTogglingSocialProof(false);
+  }
+
+  async function loadGroups() {
+    const supabase = createClient();
+    const [{ data: g }, { data: gb }] = await Promise.all([
+      supabase.from('group_orders').select('id, name, target_size, organizer_name, group_order_members(name, email, qty, is_organizer)').eq('event_id', id).order('created_at', { ascending: false }),
+      supabase.from('group_reminder_blasts').select('id, recipient_count, sent_count, skipped_count, created_at').eq('event_id', id).order('created_at', { ascending: false }).limit(8),
+    ]);
+    setGroups((g ?? []) as unknown as AdminGroup[]);
+    setGroupBlasts((gb ?? []) as GroupBlast[]);
+  }
+
+  async function sendGroupReminders() {
+    setGroupBlasting(true); setGroupMsg(null);
+    try {
+      const res = await fetch('/api/admin/group-reminders/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId: id }) });
+      const d = await res.json().catch(() => ({}));
+      if (!res.ok) setGroupMsg({ ok: false, text: d.error || 'Could not send the reminders.' });
+      else { setGroupMsg({ ok: true, text: d.sent === 0 ? (d.note || 'Nobody to remind right now.') : `Reminded ${d.sent} of ${d.recipients} group member${d.recipients !== 1 ? 's' : ''}${d.skipped ? ` · ${d.skipped} skipped (reminded in last 7 days)` : ''}.` }); await loadGroups(); }
+    } catch { setGroupMsg({ ok: false, text: 'Could not send the reminders.' }); }
+    setGroupBlasting(false);
+  }
+
+  async function sendGroupTest() {
+    if (!testEmail.trim()) return;
+    setTesting(true); setTestMsg("");
+    try {
+      const res = await fetch('/api/admin/group-reminders/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ eventId: id, testEmail: testEmail.trim() }) });
+      const d = await res.json().catch(() => ({}));
+      setTestMsg(res.ok ? `✓ Test sent to ${testEmail.trim()}` : (d.error || 'Could not send the test.'));
+      if (res.ok) setTimeout(() => setTestMsg(""), 4000);
+    } catch { setTestMsg('Could not send the test.'); }
+    setTesting(false);
   }
 
   async function toggleOrderEmails() {
@@ -454,9 +502,15 @@ export default function AdminEventReviewPage() {
     { key: 'overview', label: 'Overview' },
     { key: 'tickets',  label: 'Tickets & Sales', count: event.ticket_tiers.length },
     { key: 'orders',   label: 'Orders',          count: orders.length },
+    { key: 'groups',   label: 'Groups',          count: groups.length },
     { key: 'interest', label: 'Interest',        count: interests.length },
     { key: 'settings', label: 'Settings' },
   ];
+
+  // Group stats for the Groups tab.
+  const groupPeople = groups.reduce((s, g) => s + (g.group_order_members?.length ?? 0), 0);
+  const groupEmailable = groups.reduce((s, g) => s + (g.group_order_members?.filter(m => (m.email ?? '').includes('@')).length ?? 0), 0);
+  const groupTickets = groups.reduce((s, g) => s + (g.group_order_members?.reduce((t, m) => t + (m.qty || 0), 0) ?? 0), 0);
 
   return (
     <div className="max-w-5xl mx-auto space-y-5">
@@ -871,6 +925,109 @@ export default function AdminEventReviewPage() {
                   <p className="font-ui text-[11px] text-ink-muted">Test orders are excluded from live totals and labeled as test in the member portal.</p>
                 </div>
               </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ════════ GROUPS ════════ */}
+      {tab === 'groups' && (
+        <div className="space-y-5">
+          {/* Summary */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {[
+              { label: 'Groups', value: groups.length, cls: 'text-ink' },
+              { label: 'People', value: groupPeople, cls: 'text-aubergine' },
+              { label: 'Tickets in groups', value: groupTickets, cls: 'text-ink' },
+              { label: 'With email', value: groupEmailable, cls: 'text-peacock' },
+            ].map(c => (
+              <div key={c.label} className="bg-white rounded-2xl border border-ivory-200 px-4 py-3.5">
+                <p className={`font-display font-bold text-2xl ${c.cls}`} style={{ letterSpacing: '-0.02em' }}>{c.value}</p>
+                <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted mt-1">{c.label}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Reminder blast card */}
+          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+            <CardHead label="Remind groups to invite more" sub="Emails each group member their group's progress + a single 'invite more' link. Once per person every 7 days." />
+            <div className="px-5 py-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="font-ui text-sm text-ink-muted max-w-md">Personalized to each group (members, % to goal, discount nudge) with this event&rsquo;s details. Sends to the {groupEmailable} member{groupEmailable !== 1 ? 's' : ''} with an email.</p>
+                <button onClick={sendGroupReminders} disabled={groupBlasting || groupEmailable === 0}
+                  className={`shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl font-display font-bold text-sm transition-all ${groupBlasting || groupEmailable === 0 ? 'bg-black/[0.06] text-ink-muted cursor-not-allowed' : 'bg-aubergine text-white hover:bg-aubergine/90 active:scale-[0.98] shadow-sm'}`}>
+                  {groupBlasting ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Sending…</> : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>Send group reminders</>}
+                </button>
+              </div>
+              {groupEmailable === 0 && <p className="font-ui text-xs text-ink-muted">No group members have an email yet — nothing to send.</p>}
+              {groupMsg && <p className={`font-ui text-sm rounded-xl px-3.5 py-2.5 border ${groupMsg.ok ? 'text-peacock bg-peacock/8 border-peacock/25' : 'text-durga bg-durga/8 border-durga/20'}`}>{groupMsg.ok ? '✅ ' : ''}{groupMsg.text}</p>}
+
+              {/* Test send */}
+              <div className="pt-1 border-t border-ivory-200">
+                <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted mb-1.5 mt-3">Send a test to review</p>
+                <div className="flex gap-2">
+                  <input type="email" value={testEmail} onChange={e => setTestEmail(e.target.value)} placeholder="you@example.com" className="flex-1 rounded-xl border border-ivory-200 bg-white px-3.5 py-2 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/20" />
+                  <button onClick={sendGroupTest} disabled={testing || !testEmail.trim()} className="px-4 py-2 rounded-xl border border-ivory-200 text-ink-muted font-ui font-semibold text-sm hover:border-aubergine/30 hover:text-aubergine transition-colors disabled:opacity-50">
+                    {testing ? 'Sending…' : 'Send test'}
+                  </button>
+                </div>
+                {testMsg && <p className="font-ui text-xs text-ink-muted mt-1.5">{testMsg}</p>}
+              </div>
+            </div>
+
+            {/* Blast history */}
+            {groupBlasts.length > 0 && (
+              <div className="border-t border-ivory-200">
+                <p className="px-5 pt-3 pb-1 font-mono text-[9px] uppercase tracking-widest text-ink-muted">Reminder history</p>
+                <div className="divide-y divide-ivory-200">
+                  {groupBlasts.map(b => (
+                    <div key={b.id} className="px-5 py-2.5 flex items-center justify-between gap-3">
+                      <p className="font-ui text-sm text-ink">{fmtTS(b.created_at)}</p>
+                      <span className="font-mono text-[10px] shrink-0"><span className="text-peacock font-bold">{b.sent_count} sent</span>{b.skipped_count > 0 && <span className="text-ink-muted"> · {b.skipped_count} skipped</span>}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Groups list */}
+          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+            <CardHead label="Groups" right={<span className="font-mono text-[10px] text-ink-muted">{groups.length} group{groups.length !== 1 ? 's' : ''}</span>} />
+            {groups.length === 0 ? (
+              <div className="px-5 py-12 text-center"><p className="text-3xl mb-2">👥</p><p className="font-ui text-sm text-ink-muted">No groups formed for this event yet.</p></div>
+            ) : (
+              <div className="divide-y divide-ivory-200">
+                {groups.map(g => {
+                  const members = g.group_order_members ?? [];
+                  const people = members.length;
+                  const tickets = members.reduce((s, m) => s + (m.qty || 0), 0);
+                  const target = Math.max(g.target_size || people, 1);
+                  const pct = Math.min(100, Math.round((people / target) * 100));
+                  const color = pct >= 100 ? 'bg-peacock' : pct >= 50 ? 'bg-marigold' : 'bg-marigold/50';
+                  return (
+                    <div key={g.id} className="px-5 py-3.5">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <div className="min-w-0">
+                          <p className="font-ui text-sm font-semibold text-ink truncate">{g.name || `${g.organizer_name || 'Group'}'s group`}</p>
+                          <p className="font-mono text-[10px] text-ink-muted">{people} {people === 1 ? 'person' : 'people'} · {tickets} ticket{tickets !== 1 ? 's' : ''} · goal {target}</p>
+                        </div>
+                        <span className="font-mono text-[11px] font-bold text-ink shrink-0">{pct}%</span>
+                      </div>
+                      <div className="h-1.5 rounded-full bg-ivory-200 overflow-hidden mb-2">
+                        <div className={`h-full rounded-full ${color}`} style={{ width: `${Math.max(pct, people > 0 ? 4 : 0)}%` }} />
+                      </div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {members.map((m, i) => (
+                          <span key={i} className={`font-mono text-[10px] px-2 py-0.5 rounded-full ${m.is_organizer ? 'bg-aubergine/8 text-aubergine' : 'bg-ivory text-ink-muted'}`} title={m.email ?? ''}>
+                            {m.name || m.email || 'Member'}{m.is_organizer ? ' · host' : ''}{!(m.email ?? '').includes('@') ? ' · no email' : ''}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>

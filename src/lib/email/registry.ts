@@ -82,6 +82,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     fires: "When someone joins a group order link",
   },
   {
+    key: "group-reminder",
+    name: "Group reminder — invite more",
+    description: "A follow-up to each member of a group, with their group's live progress (members, % to goal, discount needed) and the event details, nudging them to invite more friends. One clear CTA to the group page. Sent by an admin from an event's Groups tab; capped to once per person every 7 days.",
+    audience: "Members",
+    category: "Orders & Tickets",
+    status: "live",
+    trigger: "manual",
+    fires: "When an admin sends group reminders from an event's Groups tab",
+  },
+  {
     key: "group-ticket-claim",
     name: "Group ticket claim",
     description: "Tells a group member that someone paid for the group and reserved tickets for them, with a link to sign in / create an account and claim them.",

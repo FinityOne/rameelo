@@ -20,6 +20,7 @@ const TICKETING_EMAIL_TYPES = new Set<string>([
   "group_ticket_claim",        // group buyer → per-member claim link
   "group_created",             // group order link created
   "group_joined",              // group member joined
+  "group_reminder",            // "invite more to your group" reminder
 ]);
 
 /** Pick the From identity for an email type: ticketing/order mail → tickets@, else hello@. */
