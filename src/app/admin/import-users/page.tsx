@@ -196,7 +196,7 @@ export default function ImportUsersPage() {
               </div>
               <div>
                 <p className="font-display font-bold text-ink text-sm">{filename || "Drop a CSV here, or click to browse"}</p>
-                <p className="font-ui text-xs text-ink-muted mt-0.5">CSV exported from Excel/Sheets · must include an email column</p>
+                <p className="font-ui text-xs text-ink-muted mt-0.5">CSV from Excel/Sheets · <strong className="text-ink">email is required</strong> on every row — it&rsquo;s the unique key and how future campaigns reach them. Rows without a valid email are skipped.</p>
               </div>
               <input ref={fileRef} type="file" accept=".csv,text/csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) onFile(f); }} />
             </label>
