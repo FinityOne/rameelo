@@ -9,12 +9,20 @@ import { EMAIL, C, FONT_BODY, FONT_HEAD } from "../theme";
 //   • selling-fast  — scarcity + FOMO
 //   • final-call    — sales-closing deadline (max urgency)
 //   • we-miss-you   — re-engagement / win-back for past attendees
-// Each honors marketing opt-out via the unsubscribe footer (also a
-// List-Unsubscribe header at send time).
+//
+// Urgency is honest: we lead with the metro city, and instead of a misleading
+// "tickets close in N days" (later tiers usually sell right up to the event),
+// we surface the *specific tier whose sale window is ending soon* ("Early Bird
+// ends Fri, Sep 25") and only claim an overall countdown when sales truly close
+// in the near term. Each honors marketing opt-out via the unsubscribe footer.
 
 export type BlastTier = { name: string; price: number; soldOut: boolean };
 
 export type EventBlastVariant = "tickets-live" | "selling-fast" | "final-call" | "we-miss-you";
+
+// A tier whose sale window ends before overall sales close — a genuine
+// "this price is going away" hook.
+export type TierDeadline = { name: string; label: string; days: number };
 
 export type BlastEventData = {
   title: string;
@@ -26,71 +34,104 @@ export type BlastEventData = {
   url: string;
   tiers: BlastTier[];
   fromPrice?: number | null;
-  saleEndLabel?: string | null;  // e.g. "Sat, Sep 26"
-  daysAway?: number | null;      // whole days until sales close
+  closeLabel?: string | null;       // date ALL ticket sales close (latest tier / event)
+  closeDays?: number | null;        // whole days until that
+  deadlineTier?: TierDeadline | null; // soonest tier ending before overall close
 };
 
 const money = (n: number) => `$${Number(n).toFixed(Number(n) % 1 === 0 ? 0 : 2)}`;
+const plural = (n: number) => (n === 1 ? "" : "s");
 
 type VariantCopy = {
   eyebrow: string;
   h1: string;
   cta: string;
-  subject: (ev: BlastEventData, first: string, days: number | null) => string;
-  preheader: (ev: BlastEventData, days: number | null) => string;
+  subject: (ev: BlastEventData, first: string) => string;
+  preheader: (ev: BlastEventData) => string;
   lead: (ev: BlastEventData, first: string) => string;
   closing: string;
 };
+
+// Soft metro helpers shared by the copy below.
+const metroOf = (ev: BlastEventData) => (ev.metroCity ?? "").trim();
+const inMetro = (ev: BlastEventData) => { const m = metroOf(ev); return m ? ` in ${m}` : ""; };
+// A tier deadline is worth a subject mention only when it's genuinely near.
+const soonDeadline = (ev: BlastEventData) => (ev.deadlineTier && ev.deadlineTier.days <= 12 ? ev.deadlineTier : null);
 
 const VARIANTS: Record<EventBlastVariant, VariantCopy> = {
   "tickets-live": {
     eyebrow: "On sale now",
     h1: "Tickets are LIVE 🎟️",
     cta: "Get tickets →",
-    subject: (ev, _f, days) =>
-      days != null && days <= 3 ? `⏳ Last chance — ${ev.title} tickets close in ${days} day${days === 1 ? "" : "s"}`
-      : days != null && days <= 10 ? `🎟️ ${ev.title} tickets are selling fast — ${days} days left`
-      : `🎟️ Tickets are LIVE: ${ev.title}`,
-    preheader: (ev) =>
-      ev.saleEndLabel ? `Tickets${ev.fromPrice != null ? ` from ${money(ev.fromPrice)}` : ""} — sales close ${ev.saleEndLabel}. Grab yours before they're gone.`
-      : `Tickets are on sale now${ev.fromPrice != null ? ` from ${money(ev.fromPrice)}` : ""}. Get yours on Rameelo.`,
-    lead: (ev, first) =>
-      `${first ? `Hi ${first}, t` : "T"}ickets for <strong>${ev.title}</strong> just went on sale${ev.fromPrice != null ? ` — starting at <strong>${money(ev.fromPrice)}</strong>` : ""}. The best nights sell out early, so grab your spot while you can.`,
+    subject: (ev) => {
+      const dl = soonDeadline(ev), m = metroOf(ev);
+      return dl ? `🎟️ ${ev.title}${inMetro(ev)} is on sale — ${dl.name} ends ${dl.label}`
+        : `🎟️ Tickets are LIVE${m ? ` in ${m}` : ""}: ${ev.title}`;
+    },
+    preheader: (ev) => {
+      const dl = soonDeadline(ev);
+      return dl ? `${dl.name} pricing ends ${dl.label} — lock in the best deal now.`
+        : `Tickets${ev.fromPrice != null ? ` from ${money(ev.fromPrice)}` : ""}${inMetro(ev)} are on sale now. Grab yours before they're gone.`;
+    },
+    lead: (ev, first) => {
+      const dl = soonDeadline(ev);
+      return `${first ? `Hi ${first}, t` : "T"}ickets for <strong>${ev.title}</strong>${inMetro(ev)} are on sale${ev.fromPrice != null ? ` — starting at <strong>${money(ev.fromPrice)}</strong>` : ""}.${dl ? ` Heads up: <strong>${dl.name}</strong> pricing ends <strong>${dl.label}</strong>, so lock in the best deal while you can.` : " The best nights sell out early, so grab your spot while you can."}`;
+    },
     closing: "Round up your crew and lock in your tickets now — you don't want to be the one watching the reels from home. 💃🕺",
   },
   "selling-fast": {
     eyebrow: "Selling fast",
     h1: "It's filling up 🔥",
     cta: "Grab your tickets →",
-    subject: (ev, _f, days) =>
-      days != null && days <= 7 ? `🔥 Going fast — only ${days} day${days === 1 ? "" : "s"} to get ${ev.title} tickets`
-      : `🔥 ${ev.title} is selling fast — don't get left out`,
-    preheader: (ev) => `${ev.title} tickets are moving fast${ev.fromPrice != null ? ` (from ${money(ev.fromPrice)})` : ""}. The best spots always go first.`,
-    lead: (ev, first) =>
-      `${first ? `Hi ${first}, w` : "W"}ord's out — tickets for <strong>${ev.title}</strong> are moving fast${ev.fromPrice != null ? ` (from <strong>${money(ev.fromPrice)}</strong>)` : ""}. The best seats and the lowest prices always go first, so don't wait and miss out.`,
+    subject: (ev) => {
+      const dl = soonDeadline(ev);
+      return dl ? `🔥 Hurry — ${dl.name} for ${ev.title}${inMetro(ev)} is almost gone`
+        : `🔥 ${ev.title}${inMetro(ev)} is selling fast`;
+    },
+    preheader: (ev) => {
+      const dl = soonDeadline(ev);
+      return dl ? `${dl.name} is nearly gone — ends ${dl.label}. Grab yours before it's gone.`
+        : `${ev.title}${inMetro(ev)} tickets are moving fast. The best spots always go first.`;
+    },
+    lead: (ev, first) => {
+      const dl = soonDeadline(ev);
+      return `${first ? `Hi ${first}, w` : "W"}ord's out — <strong>${ev.title}</strong>${inMetro(ev)} is filling up${ev.fromPrice != null ? ` (tickets from <strong>${money(ev.fromPrice)}</strong>)` : ""}.${dl ? ` <strong>${dl.name}</strong> is nearly gone and ends <strong>${dl.label}</strong>.` : ""} The best seats and lowest prices always go first — don't wait and miss out.`;
+    },
     closing: "Lock in your spot before your favorite tier sells out — your future self will thank you. ✨",
   },
   "final-call": {
     eyebrow: "Final call",
     h1: "Almost gone ⏳",
     cta: "Get tickets before they're gone →",
-    subject: (ev, _f, days) =>
-      days != null && days <= 1 ? `🚨 Final hours — ${ev.title} tickets close ${days === 0 ? "today" : "tomorrow"}`
-      : days != null && days <= 3 ? `⏳ Final call — ${ev.title} tickets close in ${days} days`
-      : `⏳ Don't miss ${ev.title} — tickets are closing soon`,
-    preheader: (ev) => `${ev.saleEndLabel ? `Sales close ${ev.saleEndLabel}` : "Sales closing soon"} — last chance to get ${ev.title} tickets.`,
-    lead: (ev, first) =>
-      `${first ? `Hi ${first}, this` : "This"} is your final call for <strong>${ev.title}</strong>. ${ev.saleEndLabel ? `Sales close <strong>${ev.saleEndLabel}</strong>` : "Sales are closing soon"} — once they're gone, they're gone. Don't miss the night everyone's going to be talking about.`,
+    subject: (ev) => {
+      const dl = soonDeadline(ev);
+      if (dl) return `⏳ Last call: ${dl.name} for ${ev.title}${inMetro(ev)} ends ${dl.label}`;
+      if (ev.closeDays != null && ev.closeDays <= 7) return `🚨 Final days for ${ev.title}${inMetro(ev)} tickets`;
+      return `⏳ Don't miss ${ev.title}${inMetro(ev)}`;
+    },
+    preheader: (ev) => {
+      const dl = soonDeadline(ev);
+      return dl ? `${dl.name} ends ${dl.label} — once it's gone, that price is gone.`
+        : ev.closeLabel && ev.closeDays != null && ev.closeDays <= 14 ? `Sales close ${ev.closeLabel}. Don't miss your chance to be there.`
+        : `Don't miss ${ev.title}${inMetro(ev)} — get your tickets while you still can.`;
+    },
+    lead: (ev, first) => {
+      const dl = soonDeadline(ev);
+      return `${first ? `Hi ${first}, this` : "This"} is your final call for <strong>${ev.title}</strong>${inMetro(ev)}.${dl ? ` <strong>${dl.name}</strong> ends <strong>${dl.label}</strong> — once it's gone, that price is gone.` : ev.closeLabel && ev.closeDays != null && ev.closeDays <= 14 ? ` Sales close <strong>${ev.closeLabel}</strong>.` : ""} Don't miss the night everyone's going to be talking about.`;
+    },
     closing: "This is it — once sales close, that's the end. Don't watch this one sell out without you.",
   },
   "we-miss-you": {
     eyebrow: "You're invited back",
     h1: "We saved you a spot 💛",
     cta: "Come back & get tickets →",
-    subject: (ev, first) => `${first ? `${first}, we` : "We"} saved you a spot at ${ev.title} 💛`,
-    preheader: (ev) => `${ev.title} is back — we saved you a spot. Come dance with us again.`,
+    subject: (ev, first) => {
+      const m = metroOf(ev);
+      return `${first ? `${first}, the` : "The"} garba floor misses you${m ? ` — ${ev.title} is back in ${m}` : ` — ${ev.title} is back`} 💛`;
+    },
+    preheader: (ev) => `${ev.title} is back${inMetro(ev)}. We saved you a spot — come dance with us again.`,
     lead: (ev, first) =>
-      `${first ? `Hi ${first} — the` : "The"} dandiya sticks are coming back out. <strong>${ev.title}</strong> is happening, and a night like the ones you loved is waiting. Come dance with us again. 💃`,
+      `${first ? `Hi ${first} — the` : "The"} dandiya sticks are coming back out. <strong>${ev.title}</strong> is happening${inMetro(ev)}, and a night like the ones you loved is waiting. Come dance with us again. 💃`,
     closing: "Grab your tickets and let's make new memories on the garba floor — we can't wait to see you there. 💛",
   },
 };
@@ -104,11 +145,9 @@ export function eventBlastEmail(p: {
   const v = VARIANTS[p.variant];
   const first = (p.recipientFirstName ?? "").trim().split(" ")[0];
   const ev = p.event;
-  const days = ev.daysAway ?? null;
-  const hot = p.variant === "final-call" || (days != null && days <= 3);
 
-  const subject = v.subject(ev, first, days);
-  const preheader = v.preheader(ev, days);
+  const subject = v.subject(ev, first);
+  const preheader = v.preheader(ev);
 
   // Event-at-a-glance card.
   const eventCard = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:6px 0 14px;background:#fff;border:1px solid ${C.ivory200};border-radius:16px;overflow:hidden;">
@@ -131,12 +170,23 @@ export function eventBlastEmail(p: {
     ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;background:${C.ivory};border:1px solid ${C.ivory200};border-radius:14px;overflow:hidden;">${tierRows}</table>`
     : "";
 
-  // Urgency callout off the sale-close date — red when hot, marigold otherwise.
-  const urgencyBlock = ev.saleEndLabel && days != null
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px;background:${hot ? `${C.durga}0F` : `${C.marigold}14`};border:1px solid ${hot ? `${C.durga}40` : `${C.marigold}40`};border-radius:14px;"><tr><td style="padding:14px 16px;text-align:center;">
-        <p style="margin:0;font-family:${FONT_BODY};font-size:14px;font-weight:700;color:${C.ink};">${hot ? "⏳" : "⏰"} Sales close <span style="color:${hot ? C.durga : C.marigoldDark};">${ev.saleEndLabel}</span> — that's just <span style="color:${hot ? C.durga : C.marigoldDark};">${days} day${days === 1 ? "" : "s"} away</span>.</p>
-      </td></tr></table>`
-    : "";
+  // Urgency callout — prefer the specific tier deadline (honest), else an overall
+  // sales-close countdown only when it's genuinely near. Red when hot.
+  const callout = (hot: boolean, inner: string) =>
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 18px;background:${hot ? `${C.durga}0F` : `${C.marigold}14`};border:1px solid ${hot ? `${C.durga}40` : `${C.marigold}40`};border-radius:14px;"><tr><td style="padding:14px 16px;text-align:center;">
+      <p style="margin:0;font-family:${FONT_BODY};font-size:14px;font-weight:700;color:${C.ink};">${inner}</p>
+    </td></tr></table>`;
+  const hi = (hot: boolean, s: string) => `<span style="color:${hot ? C.durga : C.marigoldDark};">${s}</span>`;
+
+  let urgencyBlock = "";
+  const dl = ev.deadlineTier;
+  if (dl) {
+    const hot = p.variant === "final-call" || dl.days <= 3;
+    urgencyBlock = callout(hot, `${hot ? "⏳" : "⏰"} ${hi(hot, dl.name)} ends ${hi(hot, dl.label)} — just ${hi(hot, `${dl.days} day${plural(dl.days)} left`)} at this price.`);
+  } else if (ev.closeLabel && ev.closeDays != null && ev.closeDays <= 21) {
+    const hot = p.variant === "final-call" || ev.closeDays <= 3;
+    urgencyBlock = callout(hot, `${hot ? "⏳" : "⏰"} Sales close ${hi(hot, ev.closeLabel)} — that's ${hi(hot, `${ev.closeDays} day${plural(ev.closeDays)} away`)}.`);
+  }
 
   const content = [
     eyebrow(v.eyebrow),
@@ -157,10 +207,16 @@ export function eventBlastEmail(p: {
 
   const html = renderEmail({ preheader, contentHtml: content + footer });
 
+  const urgencyText = dl
+    ? `${dl.name} ends ${dl.label} — only ${dl.days} day${plural(dl.days)} left at this price.`
+    : ev.closeLabel && ev.closeDays != null && ev.closeDays <= 21
+      ? `Sales close ${ev.closeLabel} — ${ev.closeDays} day${plural(ev.closeDays)} away.`
+      : "";
+
   const text = [
     first ? `Hi ${first},` : "Hi there,",
     "",
-    `${ev.title}${ev.fromPrice != null ? ` — tickets from ${money(ev.fromPrice)}` : ""}.`,
+    `${ev.title}${inMetro(ev)}${ev.fromPrice != null ? ` — tickets from ${money(ev.fromPrice)}` : ""}.`,
     ev.artistName ? `Featuring ${ev.artistName}.` : "",
     ev.eventWhen ? `When: ${ev.eventWhen}` : "",
     ev.eventWhere ? `Where: ${ev.eventWhere}` : "",
@@ -168,13 +224,13 @@ export function eventBlastEmail(p: {
     ev.tiers.length ? "TICKET OPTIONS" : "",
     ...ev.tiers.map(t => `  ${t.name}: ${t.soldOut ? "Sold out" : money(t.price)}`),
     "",
-    ev.saleEndLabel && days != null ? `Sales close ${ev.saleEndLabel} — only ${days} day${days === 1 ? "" : "s"} away.` : "",
+    urgencyText,
     "",
     `Get tickets: ${ev.url}`,
     "",
     `Unsubscribe from marketing emails: ${p.unsubscribeUrl}`,
     `— Rameelo (${EMAIL.site})`,
-  ].filter(v => v !== "").join("\n");
+  ].filter(s => s !== "").join("\n");
 
   return { subject, html, text };
 }

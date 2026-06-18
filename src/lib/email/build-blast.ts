@@ -1,6 +1,6 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { marketingBlastEmail } from "./templates/marketingBlast";
-import { eventBlastEmail, type BlastTier, type EventBlastVariant } from "./templates/eventBlast";
+import { eventBlastEmail, type BlastTier, type BlastEventData, type EventBlastVariant } from "./templates/eventBlast";
 import { EMAIL } from "./theme";
 
 // Template keys that map to the shared event-blast renderer (event required).
@@ -10,19 +10,7 @@ const EVENT_BLAST_VARIANTS = new Set<string>(["tickets-live", "selling-fast", "f
 // route and the preview route so what an admin previews/tests is exactly what
 // recipients get.
 
-export type BlastEvent = {
-  title: string;
-  artistName: string | null;
-  eventWhen: string;
-  eventWhere: string;
-  metroCity: string | null;
-  bannerUrl: string | null;
-  url: string;
-  fromPrice: number | null;
-  tiers: BlastTier[];
-  saleEndLabel: string | null;
-  daysAway: number | null;
-};
+export type BlastEvent = BlastEventData;
 
 function fmtDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric", year: "numeric" });
@@ -58,6 +46,7 @@ export async function loadBlastEvent(supabase: SupabaseClient, eventId: string):
   };
 
   const artist = Array.isArray(e.artists) ? e.artists[0]?.name : e.artists?.name;
+  const today = new Date().toISOString().slice(0, 10);
   const visible = (e.ticket_tiers ?? []).filter(t => t.is_visible)
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.price - b.price);
 
@@ -67,12 +56,34 @@ export async function loadBlastEvent(supabase: SupabaseClient, eventId: string):
     return { name: t.name, price: Number(t.price), soldOut: cap != null && used >= cap };
   });
 
-  const availablePrices = tiers.filter(t => !t.soldOut).map(t => t.price);
+  // "Available" = still buyable: not sold out and its sale window hasn't passed.
+  // Each tier's effective close = its sale_end_date, else the event date.
+  const available = visible
+    .map(t => {
+      const cap = t.quantity ?? null;
+      const used = (t.quantity_sold ?? 0) + (t.quantity_comped ?? 0);
+      return { name: t.name, price: Number(t.price), soldOut: cap != null && used >= cap, end: t.sale_end_date ?? e.start_date };
+    })
+    .filter(t => !t.soldOut && t.end >= today);
+
+  const availablePrices = available.map(t => t.price);
   const fromPrice = availablePrices.length ? Math.min(...availablePrices) : null;
 
-  // Sale close = earliest visible-tier sale_end_date, else the event date itself.
-  const tierEnds = visible.map(t => t.sale_end_date).filter((d): d is string => !!d).sort();
-  const saleEnd = tierEnds[0] ?? e.start_date;
+  // When do ALL ticket sales close? The latest effective close among available
+  // tiers (later tiers usually sell right up to the event), else the event date.
+  const closeDate = available.length
+    ? available.reduce((max, t) => (t.end > max ? t.end : max), available[0].end)
+    : e.start_date;
+
+  // A "tier deadline" is an available tier whose window ends *before* the overall
+  // close — i.e. a price/option going away while others remain. Pick the soonest;
+  // this is the honest, compelling urgency hook (not a false "tickets close" date).
+  const earlier = available
+    .filter(t => t.end < closeDate)
+    .sort((a, b) => a.end.localeCompare(b.end));
+  const deadlineTier = earlier.length
+    ? { name: earlier[0].name, label: fmtDateShort(earlier[0].end), days: daysUntil(earlier[0].end) }
+    : null;
 
   return {
     title: e.title,
@@ -84,8 +95,9 @@ export async function loadBlastEvent(supabase: SupabaseClient, eventId: string):
     url: `${EMAIL.site}/events/${eventId}`,
     fromPrice,
     tiers,
-    saleEndLabel: saleEnd ? fmtDateShort(saleEnd) : null,
-    daysAway: saleEnd ? daysUntil(saleEnd) : null,
+    closeLabel: fmtDateShort(closeDate),
+    closeDays: daysUntil(closeDate),
+    deadlineTier,
   };
 }
 
