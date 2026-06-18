@@ -365,7 +365,7 @@ export default function FriendsPage() {
       setMyUid(user.id);
 
       const [{ data: profiles }, { data: ships }] = await Promise.all([
-        sb.from("profiles")
+        sb.from("public_profiles")
           .select("id, first_name, last_name, display_name, city, state, bio, avatar_emoji, avatar_url, xp, level")
           .neq("id", user.id)
           .order("xp", { ascending: false })
