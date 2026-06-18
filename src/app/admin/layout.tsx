@@ -498,6 +498,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         {/* Bottom — back to portal + user */}
         <div className="px-2 py-3 border-t border-white/[0.06] space-y-1">
           <Link
+            href="/organizer"
+            className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-ui text-white/30 hover:text-white/60 hover:bg-white/[0.04] transition-all"
+          >
+            <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 21h18M5 21V7l8-4v18M19 21V11l-6-3M9 9v.01M9 12v.01M9 15v.01M9 18v.01" />
+            </svg>
+            <span>Organizer Portal</span>
+          </Link>
+          <Link
             href="/portal"
             className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-ui text-white/30 hover:text-white/60 hover:bg-white/[0.04] transition-all"
           >
