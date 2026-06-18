@@ -224,7 +224,7 @@ export const EMAIL_REGISTRY: EmailDef[] = [
   {
     key: "marketing-blast",
     name: "Marketing blast",
-    description: "An admin-composed marketing email to a targeted group (by tag, upload batch, location, or past-event attendance) inviting them to an upcoming event with a 'Get tickets' CTA. Honors per-user marketing opt-out and includes one-click unsubscribe. Sent from hello@.",
+    description: "A marketing email to a targeted group (by tag, upload batch, location, or past-event attendance) about an upcoming event, sent from a selectable, ready-made template — Tickets are live, Selling fast, Final call, We saved you a spot, or a Custom message. Each lists the event's ticket tiers & prices and builds urgency off the sale-close date, with one 'Get tickets' CTA. Admins can preview and send a test before blasting. Honors per-user marketing opt-out and includes one-click unsubscribe. Sent from hello@.",
     audience: "Members",
     category: "Platform",
     status: "live",

@@ -1,7 +1,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { marketingBlastEmail } from "./templates/marketingBlast";
-import { ticketsLiveBlastEmail, type BlastTier } from "./templates/ticketsLiveBlast";
+import { eventBlastEmail, type BlastTier, type EventBlastVariant } from "./templates/eventBlast";
 import { EMAIL } from "./theme";
+
+// Template keys that map to the shared event-blast renderer (event required).
+const EVENT_BLAST_VARIANTS = new Set<string>(["tickets-live", "selling-fast", "final-call", "we-miss-you"]);
 
 // Shared building blocks for the admin Email Blast tool — used by both the send
 // route and the preview route so what an admin previews/tests is exactly what
@@ -98,8 +101,8 @@ export function buildBlastEmail(opts: {
 }): { subject: string; html: string; text: string } {
   const { templateKey, recipientFirstName, event, unsubscribeUrl, custom } = opts;
 
-  if (templateKey === "tickets-live" && event) {
-    return ticketsLiveBlastEmail({ recipientFirstName, event, unsubscribeUrl });
+  if (EVENT_BLAST_VARIANTS.has(templateKey) && event) {
+    return eventBlastEmail({ variant: templateKey as EventBlastVariant, recipientFirstName, event, unsubscribeUrl });
   }
 
   // Custom / fallback: free compose wrapped around an optional event card.
