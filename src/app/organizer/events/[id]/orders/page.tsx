@@ -266,8 +266,14 @@ export default function EventOrdersPage() {
 
   const filtered = filter === "all" ? orders : orders.filter(o => o.status === filter);
 
-  const totalRevenue = orders.filter(o => o.status === "confirmed").reduce((s, o) => s + o.grand_total, 0);
-  const totalTickets = orders.filter(o => o.status === "confirmed").reduce((s, o) => s + o.qty, 0);
+  const confirmedOrders = orders.filter(o => o.status === "confirmed");
+  // Online (Rameelo-collected) totals exclude manual/offline orders, which are shown separately.
+  const onlineConfirmed = confirmedOrders.filter(o => o.order_type !== "manual");
+  const manualConfirmed = confirmedOrders.filter(o => o.order_type === "manual");
+  const totalRevenue = onlineConfirmed.reduce((s, o) => s + o.grand_total, 0);
+  const totalTickets = onlineConfirmed.reduce((s, o) => s + o.qty, 0);
+  const manualRevenue = manualConfirmed.reduce((s, o) => s + o.grand_total, 0);
+  const manualTickets = manualConfirmed.reduce((s, o) => s + o.qty, 0);
   const cancelledCount = orders.filter(o => o.status === "cancelled").length;
   const cancelledRevenue = orders.filter(o => o.status === "cancelled").reduce((s, o) => s + o.grand_total, 0);
 
@@ -312,13 +318,30 @@ export default function EventOrdersPage() {
             <div>
               <h1 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: "-0.02em" }}>All Orders</h1>
               <p className="font-ui text-sm text-ink-muted mt-0.5">
-                {orders.length} order{orders.length !== 1 ? "s" : ""} · {totalTickets} tickets · ${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} confirmed revenue
+                {orders.length} order{orders.length !== 1 ? "s" : ""} · {totalTickets} tickets · ${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} online revenue
               </p>
+              {manualConfirmed.length > 0 && (
+                <p className="font-ui text-xs text-marigold-dark mt-0.5">
+                  + {manualTickets} ticket{manualTickets !== 1 ? "s" : ""} · ${manualRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} manual / offline (settled by you)
+                </p>
+              )}
             </div>
-            <Link href={`/organizer/events/${id}`}
-              className="font-ui text-sm font-semibold text-ink-muted hover:text-ink flex items-center gap-1 transition-colors">
-              ← Dashboard
-            </Link>
+            <div className="flex items-center gap-3">
+              <Link href={`/organizer/events/${id}/manual`}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-aubergine/30 bg-white text-aubergine font-ui font-semibold text-sm hover:bg-aubergine/5 transition-all">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                Manual order
+              </Link>
+              <Link href={`/organizer/events/${id}/checkin-sheet`}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:opacity-90 transition-all">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+                Check-in sheet
+              </Link>
+              <Link href={`/organizer/events/${id}`}
+                className="font-ui text-sm font-semibold text-ink-muted hover:text-ink flex items-center gap-1 transition-colors">
+                ← Dashboard
+              </Link>
+            </div>
           </div>
         </div>
 
@@ -437,12 +460,14 @@ export default function EventOrdersPage() {
                               <p className={`font-display font-bold ${isCancelled ? "line-through text-ink-muted" : "text-aubergine"}`} style={{ letterSpacing: "-0.02em" }}>Free</p>
                             ) : (
                               <>
-                                <p className={`font-display font-bold ${isCancelled ? "line-through text-ink-muted" : "text-peacock"}`} style={{ letterSpacing: "-0.02em" }}>
+                                <p className={`font-display font-bold ${isCancelled ? "line-through text-ink-muted" : order.order_type === "manual" ? "text-marigold-dark" : "text-peacock"}`} style={{ letterSpacing: "-0.02em" }}>
                                   ${order.grand_total.toFixed(2)}
                                 </p>
-                                {order.discount_amount > 0 && (
+                                {order.order_type === "manual" ? (
+                                  <p className="font-mono text-[9px] text-marigold-dark">offline</p>
+                                ) : order.discount_amount > 0 ? (
                                   <p className="font-mono text-[9px] text-ink-muted">−${order.discount_amount.toFixed(2)} disc.</p>
-                                )}
+                                ) : null}
                               </>
                             )}
                           </td>
@@ -452,6 +477,8 @@ export default function EventOrdersPage() {
                           <td className="px-5 py-3.5 text-center">
                             {order.order_type === "comp" ? (
                               <span className="font-mono text-[9px] text-aubergine bg-aubergine/8 px-2 py-0.5 rounded-full">Comp</span>
+                            ) : order.order_type === "manual" ? (
+                              <span className="font-mono text-[9px] text-marigold-dark bg-marigold/15 px-2 py-0.5 rounded-full">Manual</span>
                             ) : order.order_type === "combo" ? (
                               <span className="font-mono text-[9px] text-[#a06b00] bg-marigold/15 px-2 py-0.5 rounded-full">✨ Combo</span>
                             ) : order.group_id ? (
@@ -515,8 +542,8 @@ export default function EventOrdersPage() {
                         <p className="font-mono text-[9px] text-ink-muted">{order.ticket_tiers?.name ?? order.combo_tickets?.name ?? "—"} · {order.qty} ticket{order.qty !== 1 ? "s" : ""}</p>
                       </div>
                       <div className="text-right shrink-0">
-                        <p className={`font-display font-bold ${isCancelled ? "line-through text-ink-muted" : order.order_type === "comp" ? "text-aubergine" : "text-peacock"}`} style={{ letterSpacing: "-0.02em" }}>{order.order_type === "comp" ? "Free" : `$${order.grand_total.toFixed(2)}`}</p>
-                        <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${order.order_type === "comp" ? "bg-aubergine/12 text-aubergine" : s.cls}`}>{order.order_type === "comp" ? "Comp" : s.label}</span>
+                        <p className={`font-display font-bold ${isCancelled ? "line-through text-ink-muted" : order.order_type === "comp" ? "text-aubergine" : order.order_type === "manual" ? "text-marigold-dark" : "text-peacock"}`} style={{ letterSpacing: "-0.02em" }}>{order.order_type === "comp" ? "Free" : `$${order.grand_total.toFixed(2)}`}</p>
+                        <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${order.order_type === "comp" ? "bg-aubergine/12 text-aubergine" : order.order_type === "manual" ? "bg-marigold/15 text-marigold-dark" : s.cls}`}>{order.order_type === "comp" ? "Comp" : order.order_type === "manual" ? "Manual" : s.label}</span>
                       </div>
                     </div>
                     <p className="font-mono text-[9px] text-ink-muted">{fmtDate(order.created_at)} · {fmtTime(order.created_at)}</p>

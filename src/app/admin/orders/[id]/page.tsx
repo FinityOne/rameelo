@@ -26,6 +26,7 @@ type OrderFull = {
   payment_last4: string | null;
   payment_brand: string | null;
   is_test: boolean;
+  order_type: string;
   group_id: string | null;
   created_at: string;
   cancellation_reason: string | null;
@@ -105,7 +106,7 @@ export default function AdminOrderDetailPage() {
           id, user_id, buyer_name, buyer_email, buyer_phone,
           qty, unit_price, discount_pct, discount_amount,
           rameelo_fee, processing_fee, service_fee, grand_total,
-          status, payment_method, payment_last4, payment_brand, is_test, group_id, created_at,
+          status, payment_method, payment_last4, payment_brand, is_test, order_type, group_id, created_at,
           cancellation_reason, cancelled_at,
           events (id, title, start_date, start_time, venue_name, city, state, status),
           ticket_tiers (id, name, price)
@@ -275,6 +276,9 @@ export default function AdminOrderDetailPage() {
               {order.is_test && (
                 <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full bg-marigold/20 text-marigold-dark">Test order</span>
               )}
+              {order.order_type === "manual" && (
+                <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full bg-marigold/15 text-marigold-dark">Manual · offline</span>
+              )}
             </div>
             <p className="font-display font-bold text-ink text-2xl" style={{ letterSpacing: "-0.02em" }}>{receiptNum(order.id)}</p>
             <p className="font-ui text-sm text-ink-muted mt-0.5">Placed {fmtTS(order.created_at)} · {paymentDisplay(order)}</p>
@@ -384,9 +388,15 @@ export default function AdminOrderDetailPage() {
             <span className="font-display font-bold text-ink">Grand total</span>
             <span className="font-display font-bold text-ink text-lg">${money(order.grand_total)}</span>
           </div>
-          <p className="font-mono text-[10px] text-ink-muted pt-1">
-            Platform take (Rameelo fee): <span className="font-bold text-ink">${money(order.rameelo_fee)}</span>
-          </p>
+          {order.order_type === "manual" ? (
+            <p className="font-mono text-[10px] text-marigold-dark pt-1">
+              Manual / offline order — settled directly by the organizer. Not processed or collected by Rameelo, and excluded from platform revenue &amp; payouts.
+            </p>
+          ) : (
+            <p className="font-mono text-[10px] text-ink-muted pt-1">
+              Platform take (Rameelo fee): <span className="font-bold text-ink">${money(order.rameelo_fee)}</span>
+            </p>
+          )}
         </div>
       </div>
 

@@ -11,6 +11,7 @@ type Order = {
   id: string; buyer_email: string; buyer_name: string;
   qty: number; unit_price: number; discount_amount: number; grand_total: number;
   status: string; created_at: string; event_id: string; tier_id: string;
+  order_type: string;
   eventTitle: string; eventState: string; tierName: string;
 };
 type EventInfo = { id: string; title: string; state: string; start_date: string; capacity: number | null; cap: number };
@@ -122,10 +123,11 @@ export default function ReportsPage() {
 
       const { data: rawOrders } = await supabase
         .from("orders")
-        .select("id, buyer_email, buyer_name, qty, unit_price, discount_amount, grand_total, status, created_at, event_id, tier_id")
+        .select("id, buyer_email, buyer_name, qty, unit_price, discount_amount, grand_total, status, created_at, event_id, tier_id, order_type")
         .in("event_id", events.map(e => e.id))
         .eq("is_test", false)
         .neq("status", "pending")   // organizers only see paid orders, never pending ones
+        .neq("order_type", "manual")  // manual/offline orders are reported separately, not in online analytics
         .order("created_at", { ascending: true });
 
       const rows: Order[] = ((rawOrders ?? []) as Omit<Order, "eventTitle" | "eventState" | "tierName">[]).map(o => ({

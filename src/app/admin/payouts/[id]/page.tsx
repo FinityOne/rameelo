@@ -60,7 +60,7 @@ export default function AdminPayoutDetailPage() {
     const eventIds = (evs ?? []).map((e: { id: string }) => e.id);
     let ords: BalanceOrder[] = [];
     if (eventIds.length) {
-      const { data: od } = await supabase.from("orders").select("created_at, qty, unit_price, discount_amount, status, dispute_status").in("event_id", eventIds).eq("is_test", false);
+      const { data: od } = await supabase.from("orders").select("created_at, qty, unit_price, discount_amount, status, dispute_status, order_type").in("event_id", eventIds).eq("is_test", false);
       ords = (od ?? []) as BalanceOrder[];
     }
     let reqQ = supabase.from("payout_requests").select("amount, status");

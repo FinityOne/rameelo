@@ -57,7 +57,7 @@ export default function AdminPayoutManagementPage() {
           let ords: BalanceOrder[] = [];
           if (eventIds.length) {
             const { data } = await supabase.from("orders")
-              .select("created_at, qty, unit_price, discount_amount, status, dispute_status")
+              .select("created_at, qty, unit_price, discount_amount, status, dispute_status, order_type")
               .in("event_id", eventIds).eq("is_test", false);
             ords = (data ?? []) as BalanceOrder[];
           }

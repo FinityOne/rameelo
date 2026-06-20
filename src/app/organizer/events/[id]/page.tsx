@@ -179,6 +179,7 @@ export default function EventDashboardPage() {
   const [orderCount, setOrderCount]   = useState(0);
   const [groupCount, setGroupCount]   = useState(0);
   const [comboStats, setComboStats]   = useState<{ tickets: number; revenue: number; orders: number }>({ tickets: 0, revenue: 0, orders: 0 });
+  const [manualStats, setManualStats] = useState<{ tickets: number; revenue: number; orders: number }>({ tickets: 0, revenue: 0, orders: 0 });
   const [loading, setLoading]         = useState(true);
 
   useEffect(() => {
@@ -187,7 +188,7 @@ export default function EventDashboardPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [evRes, ordRes, grpRes, comboRes] = await Promise.all([
+      const [evRes, ordRes, grpRes, comboRes, manualRes] = await Promise.all([
         supabase
           .from("events")
           .select("id, title, category, artist, description, start_date, end_date, start_time, end_time, doors_open_time, is_multi_day, venue_name, address_line1, address_line2, city, state, zip, status, selling_on_rameelo, review_note, cover_image_url, cover_gradient, capacity, ticket_tiers(id, name, price, quantity, quantity_sold, quantity_comped)")
@@ -219,6 +220,15 @@ export default function EventDashboardPage() {
           .eq("order_type", "combo")
           .eq("is_test", false)
           .eq("status", "confirmed"),
+
+        // Manual / offline orders anchored to this event (settled by the organizer).
+        supabase
+          .from("orders")
+          .select("qty, grand_total")
+          .eq("event_id", id)
+          .eq("order_type", "manual")
+          .eq("is_test", false)
+          .eq("status", "confirmed"),
       ]);
 
       if (!evRes.data) { router.replace("/organizer/events"); return; }
@@ -233,6 +243,12 @@ export default function EventDashboardPage() {
         tickets: comboRows.reduce((s, o) => s + o.qty, 0),
         revenue: comboRows.reduce((s, o) => s + (o.qty * o.unit_price - (o.discount_amount ?? 0)), 0),
         orders: comboRows.length,
+      });
+      const manualRows = (manualRes.data ?? []) as { qty: number; grand_total: number | null }[];
+      setManualStats({
+        tickets: manualRows.reduce((s, o) => s + o.qty, 0),
+        revenue: manualRows.reduce((s, o) => s + (Number(o.grand_total) || 0), 0),
+        orders: manualRows.length,
       });
       setLoading(false);
     }
@@ -271,10 +287,15 @@ export default function EventDashboardPage() {
     `of ${totalCap.toLocaleString()} total`,
     totalComped > 0 ? `${totalComped} comp` : null,
     comboStats.tickets > 0 ? `${comboStats.tickets} combo` : null,
+    manualStats.tickets > 0 ? `${manualStats.tickets} manual` : null,
   ].filter(Boolean).join(" · ");
 
+  const revenueSub = manualStats.revenue > 0
+    ? `+ ${fmtCurrency(manualStats.revenue)} manual / offline`
+    : comboStats.revenue > 0 ? `incl. ${fmtCurrency(comboStats.revenue)} combo` : `of ${fmtCurrency(maxRev)} potential`;
+
   const kpis = [
-    { label: "Revenue", value: fmtCurrency(revenueTotal), sub: comboStats.revenue > 0 ? `incl. ${fmtCurrency(comboStats.revenue)} combo` : `of ${fmtCurrency(maxRev)} potential`, color: "#0E8C7A", icon: "💰" },
+    { label: "Revenue", value: fmtCurrency(revenueTotal), sub: revenueSub, color: "#0E8C7A", icon: "💰" },
     { label: "Tickets Sold", value: ticketsTotal.toLocaleString(), sub: soldSub, color: "#2E1B30", icon: "🎟️" },
     { label: "Fill Rate", value: `${Math.round(fillPct)}%`, sub: fillPct >= 80 ? "Almost sold out!" : fillPct >= 50 ? "Good momentum" : "Still growing", color: fillColor, icon: "📊" },
     { label: "Total Orders", value: orderCount.toLocaleString(), sub: totalComped > 0 ? "incl. comp tickets" : "individual orders", color: "#2E1B30", icon: "🧾" },
@@ -533,6 +554,8 @@ export default function EventDashboardPage() {
                         <p className="font-ui text-sm font-semibold text-ink truncate">{order.buyer_name}</p>
                         {isComp ? (
                           <span className="font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 bg-aubergine/12 text-aubergine">Comp</span>
+                        ) : order.order_type === "manual" ? (
+                          <span className="font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 bg-marigold/15 text-marigold-dark">Manual</span>
                         ) : isCombo ? (
                           <span className="font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full shrink-0 bg-marigold/15 text-[#a06b00]">✨ Combo</span>
                         ) : (

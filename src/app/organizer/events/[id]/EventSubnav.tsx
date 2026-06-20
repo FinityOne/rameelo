@@ -6,7 +6,7 @@ import Link from "next/link";
 // (overview, orders, groups, comp tickets) without bouncing back to the events list.
 // `active` marks the current tab. Edit stays a separate primary action on each page.
 
-type TabKey = "overview" | "orders" | "groups" | "comp";
+type TabKey = "overview" | "orders" | "groups" | "comp" | "manual";
 
 const TABS: { key: TabKey; label: string; suffix: string; icon: React.ReactNode }[] = [
   {
@@ -24,6 +24,10 @@ const TABS: { key: TabKey; label: string; suffix: string; icon: React.ReactNode 
   {
     key: "comp", label: "Comp Tickets", suffix: "/comp",
     icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M20 12v6a2 2 0 01-2 2H6a2 2 0 01-2-2v-6M12 8V4m0 4a3 3 0 01-3-3 1.5 1.5 0 013-1 1.5 1.5 0 013 1 3 3 0 01-3 3zM4 8h16v4H4z" />,
+  },
+  {
+    key: "manual", label: "Manual Order", suffix: "/manual",
+    icon: <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M12 4v16m8-8H4" />,
   },
 ];
 

@@ -64,11 +64,16 @@ export interface SalesReport {
   generatedAt: Date;
   lines: SalesReportLine[];
   totals: Omit<SalesReportLine, "name" | "price">;
+  // Manual / offline sales — settled directly by the organizer, NOT via Rameelo.
+  // Tracked as a separate section so online (Rameelo-collected) totals stay clean.
+  manualLines: SalesReportLine[];
+  manualTotals: Omit<SalesReportLine, "name" | "price">;
   // Memo: fees collected from buyers + order counts.
   rameeloFees: number;
   processingFees: number;
   liveOrders: number;
   testOrders: number;
+  manualOrders: number;
 }
 
 // An order counts toward revenue only if it's a real, confirmed, undisputed sale.
@@ -79,12 +84,20 @@ function isRevenueOrder(o: SalesReportOrder): boolean {
   return true;
 }
 
+// Empty per-column accumulator used for the manual totals + a no-op fallback.
+function emptyTotals(): Omit<SalesReportLine, "name" | "price"> {
+  return { capacity: 0, sold: 0, remaining: 0, pctSold: 0, grossFace: 0, discounts: 0, netRevenue: 0 };
+}
+
 export function buildSalesReport(
   event: SalesReportEvent,
   tiers: SalesReportTier[],
   orders: SalesReportOrder[],
 ): SalesReport {
-  const revenueOrders = orders.filter(isRevenueOrder);
+  const allRevenue = orders.filter(isRevenueOrder);
+  // Online (Rameelo-collected) vs manual (offline, organizer-settled).
+  const revenueOrders = allRevenue.filter(o => (o.order_type ?? "") !== "manual");
+  const manualRevenueOrders = allRevenue.filter(o => (o.order_type ?? "") === "manual");
 
   // Aggregate revenue orders by tier. Combo tickets aren't a tier — they're an
   // org-spanning bundle anchored to this event — so they roll up into their own line.
@@ -183,15 +196,45 @@ export function buildSalesReport(
   );
   totals.pctSold = totals.capacity > 0 ? totals.sold / totals.capacity : 0;
 
+  // ── Manual / offline lines — one per tier that has manual sales, plus orphans. ──
+  const manualByTier = new Map<string, { sold: number; grossFace: number; discounts: number }>();
+  for (const o of manualRevenueOrders) {
+    const key = o.tier_id ?? "__unassigned__";
+    const acc = manualByTier.get(key) ?? { sold: 0, grossFace: 0, discounts: 0 };
+    acc.sold += o.qty;
+    acc.grossFace += o.qty * (o.unit_price ?? 0);
+    acc.discounts += o.discount_amount ?? 0;
+    manualByTier.set(key, acc);
+  }
+  const tierName = new Map(tiers.map(t => [t.id, t.name]));
+  const manualLines: SalesReportLine[] = [...manualByTier.entries()].map(([key, agg]) => ({
+    name: `${tierName.get(key) ?? "Other / archived tier"} — Manual (offline)`,
+    price: 0,
+    capacity: 0,
+    sold: agg.sold,
+    remaining: 0,
+    pctSold: 0,
+    grossFace: agg.grossFace,
+    discounts: agg.discounts,
+    netRevenue: agg.grossFace - agg.discounts,
+  }));
+  const manualTotals = manualLines.reduce((a, l) => {
+    a.sold += l.sold; a.grossFace += l.grossFace; a.discounts += l.discounts; a.netRevenue += l.netRevenue;
+    return a;
+  }, emptyTotals());
+
   return {
     event,
     generatedAt: new Date(),
     lines,
     totals,
+    manualLines,
+    manualTotals,
     rameeloFees: revenueOrders.reduce((s, o) => s + (o.rameelo_fee ?? 0), 0),
     processingFees: revenueOrders.reduce((s, o) => s + (o.processing_fee ?? 0), 0),
     liveOrders: revenueOrders.length,
     testOrders: orders.filter(o => o.is_test).length,
+    manualOrders: manualRevenueOrders.length,
   };
 }
 
@@ -245,10 +288,30 @@ export function salesReportCSV(report: SalesReport): string {
     ]));
   }
   rows.push(csvRow([
-    "TOTAL", "", totals.capacity, totals.sold, totals.remaining, fmtPct(totals.pctSold),
+    "ONLINE TOTAL (collected by Rameelo)", "", totals.capacity, totals.sold, totals.remaining, fmtPct(totals.pctSold),
     totals.grossFace.toFixed(2), totals.discounts.toFixed(2), totals.netRevenue.toFixed(2),
   ]));
   rows.push("");
+
+  // Manual / offline sales — settled directly by the organizer, never via Rameelo.
+  if (report.manualLines.length > 0) {
+    const m = report.manualTotals;
+    rows.push(csvRow(["MANUAL / OFFLINE SALES — settled directly by organizer (not via Rameelo)"]));
+    for (const l of report.manualLines) {
+      rows.push(csvRow([
+        l.name, "", "", l.sold, "", "",
+        l.grossFace.toFixed(2), l.discounts.toFixed(2), l.netRevenue.toFixed(2),
+      ]));
+    }
+    rows.push(csvRow(["MANUAL / OFFLINE TOTAL", "", "", m.sold, "", "", m.grossFace.toFixed(2), m.discounts.toFixed(2), m.netRevenue.toFixed(2)]));
+    rows.push("");
+    rows.push(csvRow([
+      "COMBINED TOTAL (online + offline)", "", "", totals.sold + m.sold, "", "",
+      (totals.grossFace + m.grossFace).toFixed(2), (totals.discounts + m.discounts).toFixed(2),
+      (totals.netRevenue + m.netRevenue).toFixed(2),
+    ]));
+    rows.push("");
+  }
 
   rows.push(csvRow(["PLATFORM FEES — charged to buyers (memo, not netted from revenue)"]));
   rows.push(csvRow(["Rameelo platform fee (3% of face)", report.rameeloFees.toFixed(2)]));

@@ -32,7 +32,7 @@ export default function EarningsPage() {
       if (events.length === 0) { setOrders([]); setLoading(false); return; }
       const { data } = await supabase
         .from("orders")
-        .select("event_id, created_at, qty, unit_price, discount_amount, status, dispute_status")
+        .select("event_id, created_at, qty, unit_price, discount_amount, status, dispute_status, order_type")
         .in("event_id", events.map(e => e.id))
         .eq("is_test", false);
       setOrders((data ?? []) as (BalanceOrder & { event_id: string })[]);
@@ -41,9 +41,14 @@ export default function EarningsPage() {
     load();
   }, [activeOrg]);
 
-  const confirmed = useMemo(() => orders.filter(o => o.status === "confirmed" && o.dispute_status !== "open" && o.dispute_status !== "lost"), [orders]);
+  const settled = useMemo(() => orders.filter(o => o.status === "confirmed" && o.dispute_status !== "open" && o.dispute_status !== "lost"), [orders]);
+  // Online (Rameelo-collected) earnings exclude manual/offline orders, shown separately.
+  const confirmed = useMemo(() => settled.filter(o => (o.order_type ?? "purchase") !== "manual"), [settled]);
+  const manualOrders = useMemo(() => settled.filter(o => (o.order_type ?? "purchase") === "manual"), [settled]);
   const revenue = confirmed.reduce((s, o) => s + orderRevenue(o), 0);
   const tickets = confirmed.reduce((s, o) => s + o.qty, 0);
+  const manualRevenue = manualOrders.reduce((s, o) => s + orderRevenue(o), 0);
+  const manualTickets = manualOrders.reduce((s, o) => s + o.qty, 0);
 
   const byEvent = useMemo(() => {
     const m = new Map<string, EventAgg>();
@@ -78,7 +83,7 @@ export default function EarningsPage() {
 
       {loading ? (
         <div className="flex items-center justify-center py-24"><div className="w-8 h-8 rounded-full border-4 border-ivory-200 border-t-marigold animate-spin" /></div>
-      ) : confirmed.length === 0 ? (
+      ) : settled.length === 0 ? (
         <div className="rounded-2xl border-2 border-dashed border-ivory-200 p-16 text-center">
           <div className="w-16 h-16 rounded-2xl bg-marigold/10 border border-marigold/20 flex items-center justify-center mx-auto mb-4 text-3xl">💰</div>
           <p className="font-display font-semibold text-ink text-xl mb-2" style={{ letterSpacing: "-0.015em" }}>No earnings yet</p>
@@ -93,7 +98,12 @@ export default function EarningsPage() {
               <div>
                 <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Gross earned · lifetime</p>
                 <p className="font-display font-bold text-ink" style={{ fontSize: 40, letterSpacing: "-0.03em", lineHeight: 1.05 }}>${money(revenue)}</p>
-                <p className="font-mono text-[10px] text-ink-muted mt-1">Full ticket face value — platform fees are paid by buyers</p>
+                <p className="font-mono text-[10px] text-ink-muted mt-1">Online (Rameelo) earnings — full ticket face value; platform fees are paid by buyers</p>
+                {manualRevenue > 0 && (
+                  <p className="font-ui text-xs text-marigold-dark mt-1.5">
+                    + ${money(manualRevenue)} from {manualTickets} manual / offline ticket{manualTickets !== 1 ? "s" : ""} — settled by you, not via Rameelo
+                  </p>
+                )}
               </div>
               <div className="grid grid-cols-3 gap-4 text-right">
                 {[

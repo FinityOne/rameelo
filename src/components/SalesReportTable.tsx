@@ -45,7 +45,7 @@ export default function SalesReportTable({ report }: { report: SalesReport }) {
             </tbody>
             <tfoot>
               <tr className="bg-white border-t-2 border-ink">
-                <td className="px-3 py-2.5 text-left font-display font-bold text-xs text-ink border border-ink">TOTAL</td>
+                <td className="px-3 py-2.5 text-left font-display font-bold text-xs text-ink border border-ink">{report.manualLines.length > 0 ? "ONLINE TOTAL" : "TOTAL"}</td>
                 <td className="px-3 py-2.5 font-mono text-xs text-ink-muted border border-ink">—</td>
                 <td className="px-3 py-2.5 font-mono text-xs text-ink font-bold tabular-nums border border-ink">{t.capacity.toLocaleString()}</td>
                 <td className="px-3 py-2.5 font-mono text-xs text-ink font-bold tabular-nums border border-ink">{t.sold.toLocaleString()}</td>
@@ -59,6 +59,45 @@ export default function SalesReportTable({ report }: { report: SalesReport }) {
           </table>
         </div>
       )}
+
+      {/* Manual / offline sales — settled by the organizer, NOT via Rameelo. Separate section. */}
+      {report.manualLines.length > 0 && (() => {
+        const m = report.manualTotals;
+        const t = report.totals;
+        return (
+          <div className="px-5 pt-4 pb-1">
+            <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted mb-1.5">
+              Manual / offline sales — settled directly by organizer (not via Rameelo)
+            </p>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse text-right">
+                <tbody>
+                  {report.manualLines.map((l, i) => (
+                    <tr key={i} className={i % 2 === 1 ? "bg-ivory/60" : "bg-white"}>
+                      <td className="px-3 py-2 text-left font-ui text-xs text-ink font-medium border border-ivory-200 whitespace-nowrap">{l.name}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-ink tabular-nums border border-ivory-200">{l.sold.toLocaleString()} sold</td>
+                      <td className="px-3 py-2 font-mono text-xs text-ink tabular-nums border border-ivory-200">${money(l.grossFace)}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-ink-muted tabular-nums border border-ivory-200">{l.discounts > 0 ? `−$${money(l.discounts)}` : "$0.00"}</td>
+                      <td className="px-3 py-2 font-mono text-xs text-ink font-bold tabular-nums border border-ivory-200">${money(l.netRevenue)}</td>
+                    </tr>
+                  ))}
+                  <tr className="bg-marigold/10 border-t border-marigold/30">
+                    <td className="px-3 py-2.5 text-left font-display font-bold text-xs text-ink border border-marigold/30">MANUAL / OFFLINE TOTAL</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-ink font-bold tabular-nums border border-marigold/30">{m.sold.toLocaleString()} sold</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-ink font-bold tabular-nums border border-marigold/30">${money(m.grossFace)}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-ink-muted tabular-nums border border-marigold/30">{m.discounts > 0 ? `−$${money(m.discounts)}` : "$0.00"}</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-ink font-bold tabular-nums border border-marigold/30">${money(m.netRevenue)}</td>
+                  </tr>
+                  <tr className="bg-white border-t-2 border-ink">
+                    <td className="px-3 py-2.5 text-left font-display font-bold text-xs text-ink border border-ink" colSpan={4}>COMBINED TOTAL (online + offline)</td>
+                    <td className="px-3 py-2.5 font-mono text-xs text-ink font-bold tabular-nums border border-ink">${money(t.netRevenue + m.netRevenue)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* Memo strip — fees collected from buyers + order counts */}
       <div className="px-5 py-3 bg-ivory/50 border-t border-ivory-200 grid grid-cols-2 sm:grid-cols-4 gap-3">
