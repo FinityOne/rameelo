@@ -22,7 +22,7 @@ const QA = [
   },
   {
     question: "How do I get a refund?",
-    answer: "Refund policies are set by each event organizer. Email hello@rameelo.com with your order ID and we'll work with the organizer on your behalf. Most events allow full refunds up to 7 days before the event date.",
+    answer: "Refund policies are set by each event organizer. Email support@rameelo.com with your order ID and we'll work with the organizer on your behalf. Most events allow full refunds up to 7 days before the event date.",
     cta: { label: "Contact support →", href: "/contact" },
   },
   {

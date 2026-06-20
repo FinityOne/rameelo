@@ -120,7 +120,7 @@ export async function GET(
           { key: "ticketid", label: "Ticket ID",      value: ticketId },
           { key: "order",    label: "Order ID",       value: serialNumber },
           { key: "paid",     label: "Amount Paid",    value: `$${Number(raw.grand_total).toFixed(2)}` },
-          { key: "support",  label: "Support",        value: "help@rameelo.com" },
+          { key: "support",  label: "Support",        value: "support@rameelo.com" },
         ],
       },
 

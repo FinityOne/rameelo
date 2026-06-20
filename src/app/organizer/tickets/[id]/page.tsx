@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
@@ -45,6 +45,17 @@ type Transfer = {
   accepted_at: string | null;
 };
 
+type EmailLog = {
+  id: string;
+  to_email: string;
+  type: string;
+  subject: string | null;
+  status: "sent" | "failed";
+  trigger: "automatic" | "manual";
+  created_at: string;
+  sent_by_name: string | null;
+};
+
 // ── Helpers ──────────────────────────────────────────────────────────────────────
 
 const STATUS_META: Record<string, { label: string; cls: string; icon: string }> = {
@@ -57,6 +68,11 @@ const TRANSFER_META: Record<string, { label: string; cls: string }> = {
   accepted:  { label: "Accepted",  cls: "bg-peacock/15 text-peacock" },
   pending:   { label: "Pending",   cls: "bg-marigold/20 text-[#a06b00]" },
   cancelled: { label: "Cancelled", cls: "bg-ivory-200 text-ink-muted" },
+};
+const EMAIL_TYPE_LABEL: Record<string, string> = {
+  order_confirmation: "Order confirmation",
+  tickets_pending:    "Tickets pending (bank payment)",
+  payment_failed:     "Payment failed",
 };
 
 function receiptNum(id: string) { return "RM-" + id.replace(/-/g, "").slice(0, 10).toUpperCase(); }
@@ -97,7 +113,16 @@ export default function OrganizerOrderDetailPage() {
 
   const [order, setOrder] = useState<OrderFull | null>(null);
   const [transfers, setTransfers] = useState<Transfer[]>([]);
+  const [emailLogs, setEmailLogs] = useState<EmailLog[]>([]);
   const [loading, setLoading] = useState(true);
+  const [resending, setResending] = useState(false);
+  const [resendResult, setResendResult] = useState<"sent" | "error" | null>(null);
+
+  const loadEmailLogs = useCallback(async () => {
+    const supabase = createClient();
+    const { data } = await supabase.rpc("get_order_email_logs", { p_order_id: id });
+    setEmailLogs((data ?? []) as EmailLog[]);
+  }, [id]);
 
   useEffect(() => {
     async function load() {
@@ -123,10 +148,30 @@ export default function OrganizerOrderDetailPage() {
         .eq("order_id", id)
         .order("created_at", { ascending: false });
       setTransfers((tr ?? []) as Transfer[]);
+      await loadEmailLogs();
       setLoading(false);
     }
     load();
-  }, [id, router]);
+  }, [id, router, loadEmailLogs]);
+
+  async function resendConfirmation() {
+    if (!order) return;
+    setResending(true);
+    setResendResult(null);
+    try {
+      const res = await fetch("/api/organizer/send-order-confirmation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ orderId: order.id }),
+      });
+      setResendResult(res.ok ? "sent" : "error");
+      if (res.ok) await loadEmailLogs();
+    } catch {
+      setResendResult("error");
+    }
+    setResending(false);
+    setTimeout(() => setResendResult(null), 5000);
+  }
 
   if (loading) {
     return (
@@ -289,6 +334,70 @@ export default function OrganizerOrderDetailPage() {
                 </div>
               );
             })}
+          </div>
+        )}
+      </SectionCard>
+
+      {/* Resend confirmation */}
+      <SectionCard title="Confirmation Email">
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <div className="min-w-0 flex-1">
+            <p className="font-display font-bold text-ink text-sm" style={{ letterSpacing: "-0.01em" }}>
+              Resend order confirmation
+            </p>
+            <p className="font-ui text-xs text-ink-muted mt-0.5 leading-relaxed">
+              {resendResult === "sent"
+                ? <span className="text-peacock font-semibold">Sent to {order.buyer_email} ✓</span>
+                : resendResult === "error"
+                  ? <span className="text-durga font-semibold">Couldn&rsquo;t send — please try again.</span>
+                  : <>Re-sends the receipt &amp; ticket-access email to <span className="text-ink break-all">{order.buyer_email}</span> — handy when a customer can&rsquo;t find their original confirmation.</>}
+            </p>
+          </div>
+          <button
+            onClick={resendConfirmation}
+            disabled={resending || !order.buyer_email}
+            className="shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:opacity-90 transition-all disabled:opacity-60"
+          >
+            {resending ? (
+              <><span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Sending…</>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                Resend confirmation
+              </>
+            )}
+          </button>
+        </div>
+      </SectionCard>
+
+      {/* Email History */}
+      <SectionCard title="Email History">
+        {emailLogs.length === 0 ? (
+          <div className="py-4 text-center">
+            <p className="font-ui text-sm text-ink-muted">No emails recorded for this order yet.</p>
+            <p className="font-mono text-[10px] text-ink-muted/70 mt-1">The purchase confirmation and any resends will appear here.</p>
+          </div>
+        ) : (
+          <div className="space-y-2.5">
+            {emailLogs.map(log => (
+              <div key={log.id} className="flex items-start gap-3 rounded-xl border border-ivory-200 px-3.5 py-3">
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${log.status === "sent" ? "bg-peacock/10 text-peacock" : "bg-durga/10 text-durga"}`}>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-ui font-semibold text-ink text-sm truncate">{EMAIL_TYPE_LABEL[log.type] ?? log.type}</p>
+                    <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${log.status === "sent" ? "bg-peacock/15 text-peacock" : "bg-durga/15 text-durga"}`}>{log.status}</span>
+                    <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full ${log.trigger === "automatic" ? "bg-ivory-200 text-ink-muted" : "bg-marigold/15 text-marigold-dark"}`}>{log.trigger === "automatic" ? "Auto" : "Manual"}</span>
+                  </div>
+                  {log.subject && <p className="font-ui text-xs text-ink-muted truncate mt-0.5">{log.subject}</p>}
+                  <p className="font-mono text-[10px] text-ink-muted/70 mt-0.5 break-all">
+                    To {log.to_email} · {fmtTS(log.created_at)}
+                    {log.trigger === "manual" && log.sent_by_name ? ` · by ${log.sent_by_name}` : ""}
+                  </p>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </SectionCard>

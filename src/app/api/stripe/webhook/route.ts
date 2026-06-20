@@ -182,7 +182,7 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
       ticketsUrl: `${EMAIL.site}/portal/tickets`, buyMoreUrl: `${EMAIL.site}/events`,
     });
     const r1 = await sendEmail({ to: order.buyer_email, subject: conf.subject, html: conf.html, text: conf.text, type: "order_confirmation" });
-    await recordEmailLog(admin as SupabaseClient, { userId: order.user_id, toEmail: order.buyer_email, type: "order_confirmation", subject: conf.subject, status: r1.error ? "failed" : "sent", trigger: "automatic", providerId: r1.id, error: r1.error });
+    await recordEmailLog(admin as SupabaseClient, { userId: order.user_id, toEmail: order.buyer_email, type: "order_confirmation", subject: conf.subject, status: r1.error ? "failed" : "sent", trigger: "automatic", providerId: r1.id, error: r1.error, orderId: order.id });
   } catch (e) { console.error("buyer confirmation email error:", e instanceof Error ? e.message : e); }
 
   // 3) Organizing team alert (org owners/admins + the event creator).
@@ -276,7 +276,7 @@ async function notifyAchProcessing(paymentIntentId: string) {
     eventWhen, eventWhere: where, ticketsUrl: `${EMAIL.site}/portal/tickets`,
   });
   const sent = await sendEmail({ to: order.buyer_email, subject, html, text, type: "tickets_pending" });
-  await recordEmailLog(admin as SupabaseClient, { userId: order.user_id, toEmail: order.buyer_email, type: "tickets_pending", subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error });
+  await recordEmailLog(admin as SupabaseClient, { userId: order.user_id, toEmail: order.buyer_email, type: "tickets_pending", subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error, orderId: order.id });
 }
 
 // Cancels the order tied to a failed/canceled PaymentIntent and releases its seat.
@@ -314,5 +314,5 @@ async function failOrderForIntent(pi: Stripe.PaymentIntent, reason: string, forc
     reason, retryUrl: `${EMAIL.site}/events`,
   });
   const sent = await sendEmail({ to: order.buyer_email, subject, html, text, type: "payment_failed" });
-  await recordEmailLog(admin as SupabaseClient, { userId: order.user_id, toEmail: order.buyer_email, type: "payment_failed", subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error });
+  await recordEmailLog(admin as SupabaseClient, { userId: order.user_id, toEmail: order.buyer_email, type: "payment_failed", subject, status: sent.error ? "failed" : "sent", trigger: "automatic", providerId: sent.id, error: sent.error, orderId: order.id });
 }

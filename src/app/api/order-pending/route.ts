@@ -70,6 +70,7 @@ export async function POST(request: Request) {
     trigger: "automatic",
     providerId,
     error: sendError,
+    orderId,
   });
 
   return NextResponse.json({ ok: true, emailed: !sendError });

@@ -137,15 +137,16 @@ const ARTICLES = [
     cat: "Tickets & Orders",
     catId: "tickets",
     q: "Where are my tickets after purchase?",
-    a: "After completing checkout, your tickets are available in two places: your Rameelo account under My Tickets, and via the confirmation email sent to the address you used at checkout. If you don't see the email, check your spam or promotions folder. The email arrives within 2–3 minutes of purchase.",
+    a: "After completing checkout, your tickets are available in two places: your Rameelo account under My Tickets, and via the confirmation email sent to the address you used at checkout. If you don't see the email, check your spam or promotions folder. The email arrives within 2–3 minutes of purchase. Still can't find them? You may have entered the wrong email at checkout — see the guide below to get it corrected.",
     cta: { label: "My Tickets", href: "/portal/tickets" },
+    cta2: { label: "Can't find your tickets? Read the guide", href: "/help/wrong-email" },
     min: 2,
   },
   {
     cat: "Tickets & Orders",
     catId: "tickets",
     q: "Can I get a refund or cancel my order?",
-    a: "Refund eligibility depends on the event organizer's policy. To request a refund, email hello@rameelo.com with your Order ID (found in your confirmation email or My Tickets). Our team will contact the organizer on your behalf. Most events allow full refunds when requested at least 7 days before the event date.",
+    a: "Refund eligibility depends on the event organizer's policy. To request a refund, email support@rameelo.com with your Order ID (found in your confirmation email or My Tickets). Our team will contact the organizer on your behalf. Most events allow full refunds when requested at least 7 days before the event date.",
     cta: { label: "Contact support", href: "/contact" },
     min: 2,
   },
@@ -268,7 +269,7 @@ const ARTICLES = [
     cat: "Account & Profile",
     catId: "account",
     q: "How do I delete my account?",
-    a: "To delete your Rameelo account, email hello@rameelo.com from the email address on your account with the subject line 'Account Deletion Request.' We'll process your request within 5 business days and confirm by email when complete. Note that any active tickets or pending group orders will be permanently cancelled.",
+    a: "To delete your Rameelo account, email support@rameelo.com from the email address on your account with the subject line 'Account Deletion Request.' We'll process your request within 5 business days and confirm by email when complete. Note that any active tickets or pending group orders will be permanently cancelled.",
     cta: { label: "Contact us", href: "/contact" },
     min: 2,
   },
@@ -292,7 +293,7 @@ const ARTICLES = [
     cat: "Payments & Billing",
     catId: "payments",
     q: "How do I get a receipt or invoice?",
-    a: "A receipt is automatically emailed to you at checkout. You can also download it from My Tickets by selecting your order and tapping Download Receipt. If you need a formal invoice for expense reporting, email hello@rameelo.com with your Order ID and we'll generate one within 1 business day.",
+    a: "A receipt is automatically emailed to you at checkout. You can also download it from My Tickets by selecting your order and tapping Download Receipt. If you need a formal invoice for expense reporting, email support@rameelo.com with your Order ID and we'll generate one within 1 business day.",
     cta: { label: "My Tickets", href: "/portal/tickets" },
     min: 2,
   },
@@ -337,12 +338,69 @@ export default function HelpPage() {
           <p className="font-ui text-white/45 text-base sm:text-lg max-w-lg mx-auto">
             Find answers instantly with our support assistant, or browse the articles below.
           </p>
+          <div className="mt-7">
+            <Link
+              href="/help/request"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-display font-bold text-sm text-aubergine hover:opacity-90 transition-all"
+              style={{ backgroundColor: "#F5A623" }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+              Submit a request
+            </Link>
+            <p className="font-mono text-[9px] uppercase tracking-widest text-white/30 mt-3">Having an issue? We&rsquo;ll get back to you within 1–2 business days</p>
+          </div>
         </div>
       </div>
 
       {/* ── Floating chat card ── */}
       <div className="max-w-2xl mx-auto px-4 sm:px-6 -mt-24 sm:-mt-28 relative z-10">
         <HelpChat />
+      </div>
+
+      {/* ── Top issues ── */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-14">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="h-px flex-1 bg-ink/8" />
+          <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Top Issues</span>
+          <div className="h-px flex-1 bg-ink/8" />
+        </div>
+        <div className="grid sm:grid-cols-2 gap-4">
+          {[
+            {
+              q: "I'm unable to find my tickets",
+              d: "Check your inbox, sign in with the right email, or request a correction.",
+            },
+            {
+              q: "I put the wrong email during checkout",
+              d: "Here's exactly how to get your order's email corrected by support.",
+            },
+          ].map((item) => (
+            <Link
+              key={item.q}
+              href="/help/wrong-email"
+              className="group flex items-start gap-4 p-5 rounded-2xl bg-white border border-ivory-200 hover:border-aubergine/20 hover:shadow-md transition-all"
+            >
+              <div
+                className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                style={{ backgroundColor: "#2E1B30", color: "#F5A623" }}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                    d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-display font-bold text-ink text-sm mb-1 group-hover:text-aubergine transition-colors" style={{ letterSpacing: "-0.01em" }}>
+                  {item.q}
+                </p>
+                <p className="font-ui text-xs text-ink-muted leading-relaxed">{item.d}</p>
+              </div>
+              <svg className="w-4 h-4 text-ink-muted/40 group-hover:text-aubergine/60 transition-colors shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </Link>
+          ))}
+        </div>
       </div>
 
       {/* ── Browse by topic ── */}
@@ -444,16 +502,31 @@ export default function HelpPage() {
                       <p className="font-ui text-sm text-ink-muted leading-relaxed">
                         {article.a}
                       </p>
-                      {article.cta && (
-                        <Link
-                          href={article.cta.href}
-                          className="inline-flex items-center gap-1.5 mt-3 font-ui font-semibold text-aubergine text-sm hover:text-aubergine/70 transition-colors"
-                        >
-                          {article.cta.label}
-                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </Link>
+                      {(article.cta || article.cta2) && (
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-2 mt-3">
+                          {article.cta && (
+                            <Link
+                              href={article.cta.href}
+                              className="inline-flex items-center gap-1.5 font-ui font-semibold text-aubergine text-sm hover:text-aubergine/70 transition-colors"
+                            >
+                              {article.cta.label}
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </Link>
+                          )}
+                          {article.cta2 && (
+                            <Link
+                              href={article.cta2.href}
+                              className="inline-flex items-center gap-1.5 font-ui font-semibold text-aubergine text-sm hover:text-aubergine/70 transition-colors"
+                            >
+                              {article.cta2.label}
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                              </svg>
+                            </Link>
+                          )}
+                        </div>
                       )}
                     </div>
                   </details>
@@ -477,19 +550,19 @@ export default function HelpPage() {
             We&rsquo;re a message away
           </h2>
           <p className="font-ui text-white/45 text-sm mb-8 max-w-md mx-auto">
-            Our support team is real people who love garba just as much as you do. Reach us by email or text.
+            The fastest way to get help is to submit a request — you&rsquo;ll get a confirmation with a reference number, and our team (real people who love garba) will follow up. Prefer texting? We&rsquo;re here too.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a
-              href="mailto:hello@rameelo.com"
+            <Link
+              href="/help/request"
               className="flex items-center gap-2.5 px-6 py-3 rounded-2xl font-display font-bold text-sm text-aubergine hover:opacity-90 transition-all"
               style={{ backgroundColor: "#F5A623" }}
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
               </svg>
-              Email us
-            </a>
+              Submit a request
+            </Link>
             <a
               href="sms:+19498670499"
               className="flex items-center gap-2.5 px-6 py-3 rounded-2xl font-display font-bold text-sm text-white border border-white/15 hover:border-white/35 transition-all"

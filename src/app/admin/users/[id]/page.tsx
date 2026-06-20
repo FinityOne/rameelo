@@ -154,6 +154,10 @@ export default function AdminUserDetailPage() {
   const [sendingReset, setSendingReset]     = useState(false);
   const [resetStatus, setResetStatus]       = useState<"" | "sent" | "error">("");
   const [emailLogs, setEmailLogs]   = useState<EmailLog[]>([]);
+  const [newEmail, setNewEmail]     = useState("");
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [emailStatus, setEmailStatus] = useState<"" | "saved" | "error">("");
+  const [emailError, setEmailError]   = useState("");
 
   const loadEmailLogs = useCallback(async () => {
     const supabase = createClient();
@@ -298,6 +302,37 @@ export default function AdminUserDetailPage() {
     }
     setSendingReset(false);
     setTimeout(() => setResetStatus(""), 4000);
+  }
+
+  async function changeEmail() {
+    if (!profile) return;
+    const email = newEmail.trim().toLowerCase();
+    setEmailError("");
+    setEmailStatus("");
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailError("Enter a valid email address."); return; }
+    if (email === (profile.email ?? "").toLowerCase()) { setEmailError("That's already this account's email."); return; }
+    setSavingEmail(true);
+    try {
+      const res = await fetch("/api/admin/change-user-email", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: profile.id, newEmail: email }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setEmailError(json.error || "Couldn't change the email — try again.");
+        setEmailStatus("error");
+      } else {
+        setProfile(p => p ? { ...p, email } : p);
+        setNewEmail("");
+        setEmailStatus("saved");
+        setTimeout(() => setEmailStatus(""), 4000);
+      }
+    } catch {
+      setEmailError("Couldn't change the email — try again.");
+      setEmailStatus("error");
+    }
+    setSavingEmail(false);
   }
 
   async function sendNotification() {
@@ -694,6 +729,44 @@ export default function AdminUserDetailPage() {
                 </p>
               )}
               {resetStatus === "error" && <p className="font-mono text-[9px] text-durga uppercase tracking-widest mt-2">Failed to send — try again</p>}
+            </div>
+
+            {/* Change email address */}
+            <div className="rounded-xl border border-ivory-200 p-4 mb-3">
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="w-7 h-7 rounded-lg bg-aubergine/10 text-aubergine flex items-center justify-center shrink-0">
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
+                </span>
+                <p className="font-ui text-sm font-semibold text-ink">Change email address</p>
+              </div>
+              <p className="font-ui text-xs text-ink-muted leading-relaxed mb-1">
+                Current: <span className="text-ink font-medium break-all">{profile.email || "—"}</span>
+              </p>
+              <p className="font-ui text-xs text-ink-muted leading-relaxed mb-3">
+                Updates their login and re-labels all their tickets. Emails must be unique across all accounts.
+              </p>
+              <input
+                type="email"
+                placeholder="new-email@example.com"
+                value={newEmail}
+                onChange={e => { setNewEmail(e.target.value); setEmailError(""); setEmailStatus(""); }}
+                className="w-full rounded-lg border border-ivory-200 px-3 py-2 font-ui text-sm text-ink placeholder-ink/30 focus:outline-none focus:ring-2 focus:ring-aubergine/25 focus:border-aubergine transition-all mb-2.5"
+              />
+              <button onClick={changeEmail} disabled={savingEmail || !newEmail.trim()}
+                className={`w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl font-ui font-semibold text-sm transition-all ${!savingEmail && newEmail.trim() ? "bg-aubergine text-white hover:opacity-90" : "bg-ivory text-ink-muted cursor-not-allowed"}`}>
+                {savingEmail
+                  ? <><div className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Saving…</>
+                  : "Change email"}
+              </button>
+              {emailStatus === "saved" && (
+                <p className="font-mono text-[9px] text-peacock uppercase tracking-widest mt-2 flex items-center gap-1.5">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                  Email updated
+                </p>
+              )}
+              {emailError && (
+                <p className="font-ui text-[11px] text-durga font-medium mt-2">{emailError}</p>
+              )}
             </div>
 
             {/* In-app notification */}

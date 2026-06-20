@@ -23,20 +23,21 @@ function receiptNum(id: string) {
   return "RM-" + id.replace(/-/g, "").slice(0, 10).toUpperCase();
 }
 
-// Admin-triggered resend of an order confirmation / receipt. Admins can read any
-// order via RLS, so we query it directly (no freshness limit) and resend.
+// Organizer-triggered resend of an order confirmation / receipt. Authorization is
+// handled by RLS: the order read only succeeds for the event's org staff/organizer
+// (or the buyer / a platform admin). The email always goes to the order's own
+// buyer_email, so there's nothing for the caller to redirect.
 export async function POST(request: Request) {
   const supabase = await createClient();
 
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { data: me } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle();
-  if (me?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const body = await request.json().catch(() => ({}));
   const orderId = typeof body.orderId === "string" ? body.orderId : "";
   if (!orderId) return NextResponse.json({ error: "Missing orderId" }, { status: 400 });
 
+  // RLS gate: returns the order only if this organizer is allowed to see it.
   const { data: order } = await supabase
     .from("orders")
     .select(`
@@ -46,9 +47,10 @@ export async function POST(request: Request) {
       ticket_tiers ( name )
     `)
     .eq("id", orderId)
-    .single();
+    .maybeSingle();
 
-  if (!order || !order.buyer_email) return NextResponse.json({ error: "Order not found" }, { status: 404 });
+  if (!order) return NextResponse.json({ error: "Order not found or not accessible" }, { status: 404 });
+  if (!order.buyer_email) return NextResponse.json({ error: "This order has no email on file" }, { status: 400 });
 
   const ev = one(order.events as unknown) as { title: string; start_date: string; start_time: string | null; city: string; state: string; venue_name: string | null; artists: { name: string } | { name: string }[] | null } | null;
   const artist = ev ? one(ev.artists) : null;
@@ -91,8 +93,8 @@ export async function POST(request: Request) {
   });
 
   if (sendError) {
-    console.error("admin send-order-confirmation error:", sendError);
+    console.error("organizer send-order-confirmation error:", sendError);
     return NextResponse.json({ error: "Failed to send email" }, { status: 500 });
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, email: order.buyer_email });
 }
