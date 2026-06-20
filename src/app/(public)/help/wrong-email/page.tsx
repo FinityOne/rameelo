@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { breadcrumbSchema, faqSchema, ld } from "@/lib/jsonld";
-import EmailTemplate from "./EmailTemplate";
 
 export const metadata: Metadata = {
   title: "Can't find your tickets or used the wrong email? — Rameelo Help",
@@ -67,7 +66,7 @@ export default function WrongEmailArticle() {
     {
       question: "I entered the wrong email at guest checkout. How do I fix it?",
       answer:
-        "Email support@rameelo.com using the request template provided, including your event name, ticket count, the incorrect and correct emails, purchase date, amount charged, and last 4 of your card, plus a screenshot of the charge. Once we verify you're the purchaser, we update the email on your order and the tickets appear under your correct address.",
+        "Submit a request from the Help Center and choose 'I used the wrong email at checkout'. Include your event name, the incorrect and correct emails, the approximate purchase date and amount, and upload a screenshot of the charge. Once we verify you're the purchaser, we update the email on your order and the tickets appear under your correct address.",
     },
     {
       question: "How long does an email correction take?",
@@ -151,36 +150,55 @@ export default function WrongEmailArticle() {
           </h2>
           <p className="font-ui text-sm text-ink-muted leading-relaxed mb-6">
             Guest checkout sends tickets to the email you entered. If that address was wrong, our support team can verify you as the
-            purchaser and update your order — moving the tickets to your correct email. Here&rsquo;s how to request it:
+            purchaser and update your order — moving the tickets to your correct email. The fastest way is to submit a request:
           </p>
           <ol className="space-y-6 mb-8">
-            <Step n={1} title="Email support@rameelo.com">
+            <Step n={1} title="Open the support request form">
               <p>
-                Send your request to <span className="font-semibold text-ink">support@rameelo.com</span> from any inbox you have access
-                to (it doesn&rsquo;t need to be the wrong or right email — we verify with the details below).
+                Use the <span className="font-semibold text-ink">Submit a request</span> button below. Pick
+                <span className="font-semibold text-ink"> &ldquo;I used the wrong email at checkout&rdquo;</span> as the issue type
+                (it&rsquo;s pre-selected for you from this page).
               </p>
             </Step>
-            <Step n={2} title="Fill in every field of the template">
+            <Step n={2} title="Tell us the details">
               <p>
-                Copy the template below and complete each line. The more accurate the details, the faster we can confirm the order is yours.
+                In the description, include the <span className="font-semibold text-ink">event name</span>, the
+                <span className="font-semibold text-ink"> incorrect</span> and <span className="font-semibold text-ink">correct</span> emails,
+                roughly when you purchased, and the amount charged. Add your order/receipt number if you have it.
               </p>
             </Step>
             <Step n={3} title="Attach a screenshot of the charge">
               <p>
-                Include a screenshot of the transaction/charge confirmation from your bank or card statement. This is how we confirm
-                you&rsquo;re the rightful purchaser before changing any contact details.
+                Upload a screenshot of the transaction/charge confirmation from your bank or card statement using the file upload on the
+                form. This is how we confirm you&rsquo;re the rightful purchaser before changing any contact details.
               </p>
             </Step>
-            <Step n={4} title="Send it — and watch for our reply">
+            <Step n={4} title="Submit — and watch for our reply">
               <p>
-                We typically respond within 1–2 business days. Once we&rsquo;ve updated your order, sign in with the corrected email and
-                your tickets will appear in <Link href="/portal/tickets" className="text-aubergine font-semibold hover:underline">My Tickets</Link>.
+                You&rsquo;ll get an instant email confirmation with a reference number, and we typically respond within 1–2 business days.
+                Once your order is updated, sign in with the corrected email and your tickets will appear in{" "}
+                <Link href="/portal/tickets" className="text-aubergine font-semibold hover:underline">My Tickets</Link>.
               </p>
             </Step>
           </ol>
 
-          {/* Template */}
-          <EmailTemplate />
+          {/* Submit a request CTA */}
+          <div className="rounded-2xl border border-ivory-200 bg-white p-6 text-center">
+            <p className="font-display font-bold text-ink text-base mb-1.5" style={{ letterSpacing: "-0.01em" }}>
+              Ready to get your tickets back?
+            </p>
+            <p className="font-ui text-sm text-ink-muted mb-4 max-w-md mx-auto leading-relaxed">
+              Submit a request and our team will move your tickets to the right email. It only takes a minute.
+            </p>
+            <Link
+              href="/help/request?type=wrong_email"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-display font-bold text-sm text-aubergine hover:opacity-90 transition-all"
+              style={{ backgroundColor: "#F5A623" }}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+              Submit a request
+            </Link>
+          </div>
         </section>
 
         {/* ── Section 3: Avoid it next time ── */}
@@ -219,14 +237,14 @@ export default function WrongEmailArticle() {
             Our support team is real people who love garba just as much as you do. Reach us by email or text.
           </p>
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-            <a
-              href="mailto:support@rameelo.com"
+            <Link
+              href="/help/request?type=wrong_email"
               className="flex items-center gap-2.5 px-6 py-3 rounded-2xl font-display font-bold text-sm text-aubergine hover:opacity-90 transition-all"
               style={{ backgroundColor: "#F5A623" }}
             >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-              Email support
-            </a>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+              Submit a request
+            </Link>
             <a
               href="sms:+19498670499"
               className="flex items-center gap-2.5 px-6 py-3 rounded-2xl font-display font-bold text-sm text-white border border-white/15 hover:border-white/35 transition-all"
