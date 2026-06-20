@@ -87,6 +87,15 @@ export default function AdminOrderDetailPage() {
   const [sendingTeam, setSendingTeam] = useState(false);
   const [teamResult, setTeamResult] = useState<"sent" | "error" | null>(null);
 
+  // Buyer-email edit modal
+  const [emailModalOpen, setEmailModalOpen] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [resolving, setResolving] = useState(false);
+  const [matchedAccount, setMatchedAccount] = useState<{ id: string; name: string } | null>(null);
+  const [resolved, setResolved] = useState(false);
+  const [savingEmail, setSavingEmail] = useState(false);
+  const [emailError, setEmailError] = useState<string | null>(null);
+
   useEffect(() => {
     async function load() {
       const supabase = createClient();
@@ -165,6 +174,69 @@ export default function AdminOrderDetailPage() {
     }
     setSendingTeam(false);
     setTimeout(() => setTeamResult(null), 4000);
+  }
+
+  function openEmailModal() {
+    setNewEmail("");
+    setMatchedAccount(null);
+    setResolved(false);
+    setEmailError(null);
+    setEmailModalOpen(true);
+  }
+
+  // Look up whether the typed email already belongs to an account, so the admin
+  // sees exactly what will happen before committing.
+  async function resolveEmail() {
+    const email = newEmail.trim().toLowerCase();
+    setResolved(false);
+    setMatchedAccount(null);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    if (order && email === order.buyer_email.toLowerCase()) return;
+    setResolving(true);
+    const supabase = createClient();
+    const { data } = await supabase
+      .from("profiles")
+      .select("id, first_name, last_name")
+      .ilike("email", email)
+      .maybeSingle();
+    if (data) {
+      const name = [data.first_name, data.last_name].filter(Boolean).join(" ") || email;
+      setMatchedAccount({ id: data.id as string, name });
+    }
+    setResolving(false);
+    setResolved(true);
+  }
+
+  async function saveEmail() {
+    if (!order) return;
+    const email = newEmail.trim().toLowerCase();
+    setEmailError(null);
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setEmailError("Enter a valid email address."); return; }
+    if (email === order.buyer_email.toLowerCase()) { setEmailError("That's already the email on this order."); return; }
+    setSavingEmail(true);
+    const supabase = createClient();
+    const { data, error } = await supabase.rpc("admin_change_order_email", { p_order_id: order.id, p_email: email });
+    if (error) {
+      setEmailError(error.message || "Couldn't update the email — try again.");
+      setSavingEmail(false);
+      return;
+    }
+    const res = (data ?? {}) as { matched_account?: boolean; user_id?: string | null; buyer_email?: string };
+    const nextUserId = res.user_id ?? null;
+    setOrder(prev => prev ? { ...prev, buyer_email: res.buyer_email ?? email, user_id: nextUserId } : prev);
+    // Refresh the linked profile card (or clear it when detached to guest).
+    if (nextUserId) {
+      const { data: prof } = await supabase
+        .from("profiles")
+        .select("id, first_name, last_name, email, city, state")
+        .eq("id", nextUserId)
+        .single();
+      setBuyer((prof as BuyerProfile) ?? null);
+    } else {
+      setBuyer(null);
+    }
+    setSavingEmail(false);
+    setEmailModalOpen(false);
   }
 
   if (loading) {
@@ -265,6 +337,19 @@ export default function AdminOrderDetailPage() {
             <Row label="Phone" value={order.buyer_phone || "—"} />
             {buyer && (buyer.city || buyer.state) && (
               <Row label="Home" value={[buyer.city, buyer.state].filter(Boolean).join(", ")} />
+            )}
+            <button
+              onClick={openEmailModal}
+              className="mt-3 inline-flex items-center gap-1.5 font-ui text-xs font-semibold text-aubergine hover:underline"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+              Change buyer email
+            </button>
+            {order.user_id && (
+              <p className="font-ui text-[11px] text-ink-muted mt-2 leading-relaxed">
+                Need to fix this person&rsquo;s account email everywhere instead?{" "}
+                <Link href={`/admin/users/${order.user_id}`} className="text-aubergine hover:underline font-semibold">Edit their profile →</Link>
+              </p>
             )}
           </div>
         </div>
@@ -401,6 +486,71 @@ export default function AdminOrderDetailPage() {
           </button>
         </div>
       </div>
+
+      {/* Change buyer email modal */}
+      {emailModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-aubergine/40 backdrop-blur-sm" onClick={() => !savingEmail && setEmailModalOpen(false)}>
+          <div className="bg-white rounded-2xl border border-ivory-200 shadow-xl w-full max-w-md" onClick={e => e.stopPropagation()}>
+            <div className="px-5 py-4 border-b border-ivory-200">
+              <p className="font-display font-bold text-ink text-base">Change buyer email</p>
+              <p className="font-ui text-xs text-ink-muted mt-0.5">
+                Currently <span className="text-ink font-medium">{order.buyer_email}</span>
+              </p>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <input
+                type="email"
+                autoFocus
+                placeholder="new-email@example.com"
+                value={newEmail}
+                onChange={e => { setNewEmail(e.target.value); setResolved(false); setMatchedAccount(null); setEmailError(null); }}
+                onBlur={resolveEmail}
+                className="w-full rounded-xl border border-ivory-200 px-3 py-2.5 font-ui text-sm text-ink placeholder-ink/30 focus:outline-none focus:ring-2 focus:ring-aubergine/25 focus:border-aubergine transition-all"
+              />
+
+              {/* Consequence preview */}
+              {resolving && <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Checking…</p>}
+              {resolved && !resolving && matchedAccount && (
+                <div className="rounded-xl bg-peacock/8 border border-peacock/20 px-3.5 py-3">
+                  <p className="font-ui text-xs text-ink leading-relaxed">
+                    ✓ Will attach to <span className="font-semibold">{matchedAccount.name}</span>&rsquo;s account — these tickets move to their portal.
+                  </p>
+                </div>
+              )}
+              {resolved && !resolving && !matchedAccount && (
+                <div className="rounded-xl bg-marigold/10 border border-marigold/25 px-3.5 py-3">
+                  <p className="font-ui text-xs text-ink leading-relaxed">
+                    No account uses this email — saved as a <span className="font-semibold">guest order</span> under the new address.
+                    {order.user_id && <> It will be <span className="font-semibold">detached</span> from the current account.</>}
+                  </p>
+                </div>
+              )}
+
+              {emailError && (
+                <p className="font-ui text-xs text-durga font-medium">{emailError}</p>
+              )}
+            </div>
+            <div className="px-5 py-4 border-t border-ivory-200 flex items-center justify-end gap-2">
+              <button
+                onClick={() => setEmailModalOpen(false)}
+                disabled={savingEmail}
+                className="px-4 py-2.5 rounded-xl font-ui font-semibold text-sm text-ink-muted hover:bg-ivory transition-all disabled:opacity-60"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={saveEmail}
+                disabled={savingEmail || !newEmail.trim()}
+                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-aubergine text-white font-ui font-semibold text-sm hover:bg-aubergine-light transition-all disabled:opacity-60"
+              >
+                {savingEmail
+                  ? <><span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" /> Saving…</>
+                  : "Save email"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

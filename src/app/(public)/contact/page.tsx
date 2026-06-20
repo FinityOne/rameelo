@@ -11,7 +11,7 @@ export default function ContactPage() {
   function handleEmailSubmit(e: React.FormEvent) {
     e.preventDefault();
     const body = `Name: ${name}\n\n${message}`;
-    window.location.href = `mailto:hello@rameelo.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = `mailto:support@rameelo.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
   }
 
   return (
@@ -42,7 +42,7 @@ export default function ContactPage() {
               </div>
               <div>
                 <p className="font-display font-bold text-ink text-sm" style={{ letterSpacing: "-0.01em" }}>Send an Email</p>
-                <p className="font-mono text-[10px] text-ink-muted">hello@rameelo.com</p>
+                <p className="font-mono text-[10px] text-ink-muted">support@rameelo.com</p>
               </div>
             </div>
 
@@ -89,6 +89,13 @@ export default function ContactPage() {
               </button>
               <p className="font-mono text-[9px] text-ink-muted text-center">
                 Opens your default mail client pre-filled
+              </p>
+              <p className="font-ui text-[11px] text-ink-muted text-center leading-relaxed border-t border-ivory-200 pt-3">
+                Questions, tickets &amp; order issues go to{" "}
+                <a href="mailto:support@rameelo.com" className="text-aubergine font-semibold hover:underline">support@rameelo.com</a>.
+                <br />
+                Just saying hello or exploring a partnership?{" "}
+                <a href="mailto:hello@rameelo.com" className="text-aubergine font-semibold hover:underline">hello@rameelo.com</a>
               </p>
             </form>
           </div>
