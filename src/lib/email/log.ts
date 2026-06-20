@@ -13,6 +13,7 @@ export async function recordEmailLog(
     trigger: "automatic" | "manual";
     providerId?: string | null;
     error?: string | null;
+    orderId?: string | null;
   },
 ): Promise<void> {
   try {
@@ -25,6 +26,7 @@ export async function recordEmailLog(
       p_trigger: p.trigger,
       p_provider_id: p.providerId ?? "",
       p_error: p.error ?? "",
+      p_order_id: p.orderId ?? null,
     });
   } catch {
     /* logging is best-effort */
