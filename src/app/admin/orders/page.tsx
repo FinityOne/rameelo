@@ -19,6 +19,7 @@ type OrderRow = {
   status: string;
   payment_method: string;
   is_test: boolean;
+  order_type: string;
   group_id: string | null;
   created_at: string;
   event_id: string;
@@ -26,7 +27,7 @@ type OrderRow = {
   ticket_tiers: { name: string } | null;
 };
 
-type TypeFilter = "all" | "live" | "test";
+type TypeFilter = "all" | "live" | "test" | "manual";
 type Sort = "newest" | "oldest" | "amount_high" | "amount_low";
 
 const STATUS_PILL: Record<string, { label: string; cls: string }> = {
@@ -51,8 +52,8 @@ function money(n: number) {
   return n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-type Stats = { count: number; testCount: number; tickets: number; revenue: number; fees: number };
-const EMPTY_STATS: Stats = { count: 0, testCount: 0, tickets: 0, revenue: 0, fees: 0 };
+type Stats = { count: number; testCount: number; tickets: number; revenue: number; fees: number; manualCount: number; manualTickets: number; manualRevenue: number };
+const EMPTY_STATS: Stats = { count: 0, testCount: 0, tickets: 0, revenue: 0, fees: 0, manualCount: 0, manualTickets: 0, manualRevenue: 0 };
 
 export default function AdminOrdersPage() {
   const router = useRouter();
@@ -108,7 +109,7 @@ export default function AdminOrdersPage() {
       } else {
         const d = data as {
           rows: OrderRow[]; total: number;
-          stats: { count: number; test_count: number; tickets: number; revenue: number; fees: number };
+          stats: { count: number; test_count: number; tickets: number; revenue: number; fees: number; manual_count: number; manual_tickets: number; manual_revenue: number };
           events: { id: string; title: string }[];
         };
         setRows(d.rows ?? []);
@@ -119,6 +120,9 @@ export default function AdminOrdersPage() {
           tickets:  d.stats?.tickets ?? 0,
           revenue:  d.stats?.revenue ?? 0,
           fees:     d.stats?.fees ?? 0,
+          manualCount:   d.stats?.manual_count ?? 0,
+          manualTickets: d.stats?.manual_tickets ?? 0,
+          manualRevenue: d.stats?.manual_revenue ?? 0,
         });
         setEventOptions(d.events ?? []);
       }
@@ -192,8 +196,10 @@ export default function AdminOrdersPage() {
         {[
           { label: "Orders", value: stats.count.toLocaleString(), sub: stats.testCount > 0 ? `${stats.testCount} test` : "all live" },
           { label: "Tickets (live)", value: stats.tickets.toLocaleString(), sub: "excludes test" },
-          { label: "Gross revenue (live)", value: `$${money(stats.revenue)}`, sub: "excludes test" },
-          { label: "Rameelo fees (live)", value: `$${money(stats.fees)}`, sub: "platform take" },
+          { label: "Online revenue (live)", value: `$${money(stats.revenue)}`, sub: "Rameelo-collected · excl. manual" },
+          stats.manualRevenue > 0
+            ? { label: "Manual / offline", value: `$${money(stats.manualRevenue)}`, sub: `${stats.manualTickets} tix · not via Rameelo` }
+            : { label: "Rameelo fees (live)", value: `$${money(stats.fees)}`, sub: "platform take" },
         ].map(s => (
           <div key={s.label} className="bg-white rounded-2xl border border-ivory-200 px-4 py-3.5">
             <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">{s.label}</p>
@@ -206,7 +212,7 @@ export default function AdminOrdersPage() {
       {/* Type toggle + filters */}
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex gap-1 bg-ivory rounded-2xl p-1 border border-ivory-200">
-          {(["all", "live", "test"] as TypeFilter[]).map(t => (
+          {(["all", "live", "test", "manual"] as TypeFilter[]).map(t => (
             <button key={t} type="button" onClick={() => setType(t)}
               className={`px-3.5 py-1.5 rounded-xl font-ui font-semibold text-sm capitalize transition-all ${
                 typeFilter === t ? "bg-white text-ink shadow-sm border border-ivory-200" : "text-ink-muted hover:text-ink"
@@ -306,6 +312,7 @@ export default function AdminOrdersPage() {
                     <div className="flex items-center gap-1.5">
                       <p className="font-mono text-[11px] font-bold text-ink truncate">{receiptNum(o.id)}</p>
                       {o.is_test && <span className="font-mono text-[8px] uppercase tracking-widest bg-marigold/20 text-marigold-dark px-1.5 py-0.5 rounded-full shrink-0">Test</span>}
+                      {o.order_type === "manual" && <span className="font-mono text-[8px] uppercase tracking-widest bg-marigold/15 text-marigold-dark px-1.5 py-0.5 rounded-full shrink-0">Manual</span>}
                     </div>
                     <p className="font-ui text-xs text-ink-muted truncate">{o.buyer_name}</p>
                   </div>

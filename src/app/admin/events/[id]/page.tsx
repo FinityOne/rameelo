@@ -497,8 +497,13 @@ export default function AdminEventReviewPage() {
   // the Orders tab share one source of truth.
   const liveOrders     = orders.filter(o => !o.is_test);
   const testCount      = orders.length - liveOrders.length;
-  const liveRevenue    = liveOrders.reduce((s, o) => s + o.grand_total, 0);
-  const liveTickets    = liveOrders.reduce((s, o) => s + o.qty, 0);
+  // Online (Rameelo-collected) live revenue excludes manual/offline orders.
+  const onlineLive     = liveOrders.filter(o => o.order_type !== "manual");
+  const manualLive     = liveOrders.filter(o => o.order_type === "manual");
+  const liveRevenue    = onlineLive.reduce((s, o) => s + o.grand_total, 0);
+  const liveTickets    = onlineLive.reduce((s, o) => s + o.qty, 0);
+  const manualRevenue  = manualLive.reduce((s, o) => s + o.grand_total, 0);
+  const manualTickets  = manualLive.reduce((s, o) => s + o.qty, 0);
   const interestWanted = interests.reduce((s, i) => s + i.qty_interested, 0);
 
   const TABS: { key: TabKey; label: string; count?: number }[] = [
@@ -605,7 +610,7 @@ export default function AdminEventReviewPage() {
         {[
           { label: 'Live orders',   value: liveOrders.length.toLocaleString(), color: 'text-ink' },
           { label: 'Live tickets',  value: liveTickets.toLocaleString(),       color: 'text-aubergine' },
-          { label: 'Live revenue',  value: `$${liveRevenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, color: 'text-peacock' },
+          { label: 'Live revenue',  value: `$${liveRevenue.toLocaleString(undefined, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`, color: 'text-peacock', sub: manualRevenue > 0 ? `+ $${manualRevenue.toLocaleString(undefined, { maximumFractionDigits: 0 })} manual` : undefined },
           { label: 'Interest',      value: interestWanted.toLocaleString(),    color: 'text-ink', sub: 'tickets wanted' },
         ].map(k => (
           <div key={k.label} className="bg-white rounded-2xl border border-ivory-200 px-4 py-3.5">
@@ -905,6 +910,9 @@ export default function AdminEventReviewPage() {
                               {o.buyer_name}
                               {o.order_type === 'combo' && (
                                 <span className="font-mono text-[8px] uppercase tracking-widest bg-marigold/15 text-[#a06b00] px-1.5 py-0.5 rounded-full">✨ Combo</span>
+                              )}
+                              {o.order_type === 'manual' && (
+                                <span className="font-mono text-[8px] uppercase tracking-widest bg-marigold/15 text-marigold-dark px-1.5 py-0.5 rounded-full">Manual</span>
                               )}
                               {o.is_test && (
                                 <span className="font-mono text-[8px] uppercase tracking-widest bg-marigold/20 text-marigold-dark px-1.5 py-0.5 rounded-full">Test</span>

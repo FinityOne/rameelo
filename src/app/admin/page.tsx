@@ -80,7 +80,7 @@ export default function AdminDashboardPage() {
     Promise.all([
       supabase.from("profiles").select("id, first_name, last_name, email, city, state, role, created_at").order("created_at", { ascending: false }),
       supabase.from("events").select("id, title, city, status, created_at"),
-      supabase.from("orders").select("grand_total, rameelo_fee, created_at, status").eq("status", "confirmed"),
+      supabase.from("orders").select("grand_total, rameelo_fee, created_at, status").eq("status", "confirmed").neq("order_type", "manual"),
       supabase.from("chat_groups").select("id, member_count, is_active").eq("is_active", true),
     ]).then(([profiles, events, orders, groups]) => {
       const p = profiles.data ?? [];

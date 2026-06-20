@@ -137,13 +137,14 @@ export default function OrganizerHubPage() {
 
       const eventIds = (rawEvents ?? []).map((e: { id: string }) => e.id);
       const { data: orders } = eventIds.length > 0
-        ? await supabase.from("orders").select("event_id, qty, unit_price, discount_amount, created_at, status, dispute_status").in("event_id", eventIds).eq("status", "confirmed").eq("is_test", false).order("created_at", { ascending: false })
+        ? await supabase.from("orders").select("event_id, qty, unit_price, discount_amount, created_at, status, dispute_status, order_type").in("event_id", eventIds).eq("status", "confirmed").eq("is_test", false).order("created_at", { ascending: false })
         : { data: [] };
 
-      // Paid orders only: confirmed + non-test (already filtered above) and not a
-      // lost/open chargeback. Disputed-but-won orders still count as paid.
+      // Paid ONLINE orders: confirmed + non-test (already filtered above), not a
+      // lost/open chargeback, and not a manual/offline order (those are settled off
+      // Rameelo and tracked separately). Disputed-but-won orders still count as paid.
       const allOrders: OrderRow[] = ((orders ?? []) as OrderRow[]).filter(
-        (o) => o.dispute_status !== "open" && o.dispute_status !== "lost"
+        (o) => o.dispute_status !== "open" && o.dispute_status !== "lost" && (o as { order_type?: string }).order_type !== "manual"
       );
 
       const cards: EventCard[] = ((rawEvents ?? []) as RawEvent[]).map((ev) => {

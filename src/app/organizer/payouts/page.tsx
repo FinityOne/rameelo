@@ -45,7 +45,7 @@ export default function OrganizerPayoutsPage() {
     if (eventIds.length) {
       const { data } = await supabase
         .from("orders")
-        .select("created_at, qty, unit_price, discount_amount, status, dispute_status")
+        .select("created_at, qty, unit_price, discount_amount, status, dispute_status, order_type")
         .in("event_id", eventIds)
         .eq("is_test", false);
       ords = (data ?? []) as BalanceOrder[];
@@ -127,9 +127,24 @@ export default function OrganizerPayoutsPage() {
             ))}
           </div>
 
+          {/* Offline / manual sales — collected directly by the organizer, NOT part of the Rameelo payout. */}
+          {balance.manualRevenue > 0 && (
+            <div className="rounded-2xl border border-marigold/30 bg-marigold/[0.06] px-4 py-3.5 flex items-start gap-3">
+              <div className="w-8 h-8 rounded-lg bg-marigold/20 text-marigold-dark flex items-center justify-center shrink-0">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              </div>
+              <div className="min-w-0">
+                <p className="font-ui text-sm font-semibold text-ink">Offline / manual sales: ${money(balance.manualRevenue)}</p>
+                <p className="font-ui text-xs text-ink-muted mt-0.5 leading-relaxed">
+                  This is revenue from manual orders you settled directly (cash, Zelle, at the door). It&rsquo;s shown for your records but is <strong>not</strong> collected or paid out by Rameelo — it&rsquo;s excluded from the balances above.
+                </p>
+              </div>
+            </div>
+          )}
+
           <div className="rounded-xl bg-ivory border border-ivory-200 px-4 py-2.5">
             <p className="font-mono text-[10px] text-ink-muted/80">
-              Rameelo collects ticket revenue and settles it to you on request. Funds become available {SETTLEMENT_HOLD_DAYS} days after each sale; refunded, disputed, and test orders are excluded.
+              Rameelo collects ticket revenue and settles it to you on request. Funds become available {SETTLEMENT_HOLD_DAYS} days after each sale; refunded, disputed, test, and manual/offline orders are excluded.
             </p>
           </div>
 

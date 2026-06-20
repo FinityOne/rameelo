@@ -85,6 +85,9 @@ export default function AdminFinancialsPage() {
           events (title, city, state, org_id, organizations (id, name))
         `)
         .eq("status", "confirmed")
+        // Manual/offline orders never flowed through Rameelo — exclude from all
+        // platform financials (processed volume, fees, Stripe cost, profit).
+        .neq("order_type", "manual")
         .order("created_at", { ascending: false });
 
       const rows = (data ?? []) as unknown as OrderRow[];
