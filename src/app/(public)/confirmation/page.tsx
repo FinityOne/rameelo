@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { money } from "@/lib/money";
+import { trackPixelOnce, eventPixelParams } from "@/lib/meta-pixel";
 
 interface StoredOrder {
   orderId: string;
@@ -28,6 +29,13 @@ interface StoredOrder {
   purchasedAt: string;
   paymentMethod?: string;     // 'card' | 'ach'
   paymentPending?: boolean;   // ACH order awaiting bank-transfer clearance
+  // Meta Pixel attribution fields (written by checkout's order snapshot).
+  eventId?: string;
+  artistName?: string | null;
+  organizer?: string | null;
+  category?: string | null;
+  eventMetro?: string | null;
+  eventStartDate?: string | null;
 }
 
 function formatTime(iso: string) {
@@ -87,6 +95,33 @@ export default function ConfirmationPage() {
     poll();
     return () => { active = false; };
   }, [order?.orderId]);
+
+  // Meta Pixel: fire Purchase exactly once, and ONLY after the order is confirmed
+  // (Stripe verified → webhook marked it paid → status poll returns "confirmed").
+  // Deduped by order id so a refresh or revisit never double-counts. Pending/ACH
+  // orders that haven't cleared never reach "confirmed" here, so no false Purchase.
+  useEffect(() => {
+    if (phase !== "confirmed" || !order) return;
+    const params: Record<string, unknown> = order.eventId
+      ? eventPixelParams({
+          eventId: order.eventId,
+          eventName: order.eventTitle ?? "Event",
+          artistName: order.artistName,
+          organizer: order.organizer,
+          category: order.category,
+          city: order.eventCity,
+          state: order.eventState,
+          metroCity: order.eventMetro,
+          eventDate: order.eventStartDate ?? order.eventDate,
+        })
+      : { content_type: "product", currency: "USD" };
+    trackPixelOnce(order.orderId, "Purchase", {
+      ...params,
+      value: order.grandTotal,
+      currency: "USD",
+      num_items: order.qty,
+    });
+  }, [phase, order]);
 
   function copyOrderId() {
     if (order) {

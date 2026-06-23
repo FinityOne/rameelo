@@ -11,6 +11,7 @@ import { money } from "@/lib/money";
 import { computeFees } from "@/lib/fees";
 import { getStripe, stripeConfigured, STRIPE_TEST_MODE } from "@/lib/stripe/client";
 import { friendlyStripeError, paymentIntentError } from "@/lib/stripe/errors";
+import { trackPixel, eventPixelParams } from "@/lib/meta-pixel";
 
 const stripePromise = getStripe();
 
@@ -38,7 +39,10 @@ interface CheckoutPayload {
   eventVenue: string;
   eventCity: string;
   eventState: string;
+  eventMetro?: string | null;
+  category?: string | null;
   artistName: string | null;
+  organizer?: string | null;
   qty: number;
   unitPrice: number;
   discount: number;
@@ -211,6 +215,7 @@ export default function CheckoutPage() {
   const [intentError, setIntentError]   = useState("");
   // The pending order created for the current PaymentIntent (idempotent per PI).
   const pendingOrderIdRef = useRef<string | null>(null);
+  const initiateFiredRef = useRef(false);
 
   // Terms acceptance + IP (for dispute evidence)
   const [agreedTerms, setAgreedTerms] = useState(false);
@@ -280,6 +285,28 @@ export default function CheckoutPage() {
     if (!achAllowed && paymentMethod === "ach") setPaymentMethod("card");
   }, [achAllowed, paymentMethod]);
 
+  // Meta Pixel: InitiateCheckout once the cart is loaded — the buyer has begun
+  // checkout. Value = what they'll pay; same event params as ViewContent/Purchase.
+  useEffect(() => {
+    if (!payload || initiateFiredRef.current) return;
+    initiateFiredRef.current = true;
+    trackPixel("InitiateCheckout", {
+      ...eventPixelParams({
+        eventId: payload.eventId,
+        eventName: payload.eventTitle,
+        artistName: payload.artistName,
+        organizer: payload.organizer,
+        category: payload.category,
+        city: payload.eventCity,
+        state: payload.eventState,
+        metroCity: payload.eventMetro,
+        eventDate: payload.eventStartDate ?? payload.eventDate,
+      }),
+      value: grandTotal,
+      num_items: payload.qty,
+    });
+  }, [payload, grandTotal]);
+
   // Paying as a group member who has an account: lock + mask their contact details
   // (the purchaser may not be them). Doesn't apply when the buyer is signed in.
   const groupPayerLocked = !!payload?.isGroupPay && !!payload?.groupPayerHasAccount && !isSignedIn;
@@ -346,6 +373,14 @@ export default function CheckoutPage() {
       grandTotal, qty: payload.qty, tierName: payload.tierName,
       groupId: payload.groupId, isGroupPay: payload.isGroupPay ?? false,
       paymentMethod, purchasedAt: new Date().toISOString(),
+      // Meta Pixel attribution — same fields as ViewContent/InitiateCheckout so
+      // the confirmation-page Purchase ties to the same event/artist/organizer.
+      eventId: payload.eventId,
+      artistName: payload.artistName,
+      organizer: payload.organizer ?? null,
+      category: payload.category ?? null,
+      eventMetro: payload.eventMetro ?? null,
+      eventStartDate: payload.eventStartDate ?? null,
     }));
   }
 

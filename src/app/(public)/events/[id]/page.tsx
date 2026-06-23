@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import EventDetailClient from "./EventDetailClient";
+import MetaPixelViewContent from "@/components/MetaPixelViewContent";
 import { eventSchema, breadcrumbSchema, ld } from "@/lib/jsonld";
 
 // Always render fresh — event inventory (ticket quantities) changes in admin and
@@ -85,13 +86,22 @@ export default async function EventDetailPage({ params }: Props) {
   const supabase = await createClient();
   const { data: event } = await supabase
     .from("events")
-    .select("title, description, category, start_date, city, state, venue_name, venue_address, cover_image_url, artist:artists!events_artist_id_fkey(name), ticket_tiers(price)")
+    .select("title, description, category, start_date, city, state, metro_city, org_id, venue_name, address_line1, cover_image_url, artist:artists!events_artist_id_fkey(name), ticket_tiers(price)")
     .eq("id", id)
     .eq("status", "published")
     .single();
 
   const artistRaw = event?.artist as { name: string } | { name: string }[] | null | undefined;
   const artistName = artistRaw ? (Array.isArray(artistRaw) ? artistRaw[0]?.name : artistRaw.name) : undefined;
+  // Organizer name for pixel attribution — via the public RPC, since RLS hides
+  // the organizations table from anonymous visitors (most ad traffic).
+  // Organizer name for pixel attribution — via the public RPC, since RLS hides
+  // the organizations table from anonymous visitors (most ad traffic).
+  let organizerName: string | undefined;
+  if (event?.org_id) {
+    const { data: orgRows } = await supabase.rpc("get_public_organization", { p_id: event.org_id });
+    organizerName = (Array.isArray(orgRows) ? orgRows[0]?.name : (orgRows as { name?: string } | null)?.name) ?? undefined;
+  }
   const prices = ((event?.ticket_tiers ?? []) as { price: number }[]).map(t => t.price).filter(p => p > 0);
 
   const evSchema = event
@@ -103,7 +113,7 @@ export default async function EventDetailPage({ params }: Props) {
         city: event.city,
         state: event.state,
         venueName: event.venue_name,
-        venueAddress: event.venue_address ?? undefined,
+        venueAddress: event.address_line1 ?? undefined,
         performerName: artistName,
         imageUrl: event.cover_image_url ?? undefined,
         lowestPrice: prices.length > 0 ? Math.min(...prices) : undefined,
@@ -132,6 +142,20 @@ export default async function EventDetailPage({ params }: Props) {
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(evSchema) }} />
       )}
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(crumbs) }} />
+      {event && (
+        <MetaPixelViewContent
+          id={id}
+          name={event.title}
+          category={event.category}
+          city={event.city}
+          state={event.state}
+          metroCity={event.metro_city}
+          startDate={event.start_date}
+          artistName={artistName ?? null}
+          organizer={organizerName ?? null}
+          minPrice={prices.length > 0 ? Math.min(...prices) : null}
+        />
+      )}
       <EventDetailClient id={id} />
     </>
   );

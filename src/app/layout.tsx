@@ -6,6 +6,7 @@ import {
   JetBrains_Mono,
 } from "next/font/google";
 import "./globals.css";
+import MetaPixel from "@/components/MetaPixel";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -154,6 +155,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       className={`${bricolage.variable} ${inter.variable} ${fraunces.variable} ${jetbrainsMono.variable}`}
     >
       <body className="min-h-screen flex flex-col antialiased">
+        <MetaPixel />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_ORG) }}
