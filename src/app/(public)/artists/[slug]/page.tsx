@@ -125,6 +125,7 @@ type EventRow = {
   venue_name: string | null;
   city: string;
   state: string;
+  metro_city: string | null;
   cover_gradient: string | null;
   cover_image_url: string | null;
   featured_on_artist: boolean;
@@ -253,6 +254,13 @@ function EventRow({ event, heroColor, past = false }: { event: EventRow; heroCol
   const featured = !past && event.featured_on_artist;
   const selling = event.selling_on_rameelo;
   const cityState = [event.city, event.state].filter(Boolean).join(", ");
+  // Show the metro only when it adds info (i.e. the event city isn't already the metro) —
+  // a subtle "near {metro}" cue so attendees who think in metros recognize the area.
+  const metro = (event.metro_city ?? "").trim();
+  const showMetro = metro && metro.toLowerCase() !== event.city.trim().toLowerCase();
+  // "Los Angeles" → "Los Angeles area"; but don't double up when the metro label
+  // already reads as an area (e.g. "SF / Bay Area").
+  const metroLabel = /\barea\b/i.test(metro) ? metro : `${metro} area`;
   const eventGradient = GRADIENTS.find((g) => g.id === event.cover_gradient)?.css ?? `linear-gradient(135deg, ${heroColor}, #1a0a1f)`;
   return (
     <Link
@@ -297,10 +305,15 @@ function EventRow({ event, heroColor, past = false }: { event: EventRow; heroCol
             </p>
           )}
           {cityState && (
-            <p className="flex items-center gap-1.5 font-ui text-xs sm:text-sm font-medium text-ink-muted truncate">
+            <p className="flex items-center gap-1.5 font-ui text-xs sm:text-sm font-medium text-ink-muted min-w-0">
               {/* fa-map-pin */}
               <svg className="w-3.5 h-3.5 text-durga shrink-0" fill="currentColor" viewBox="0 0 320 512"><path d="M112 316.9V456c0 30.9 21.5 56 48 56s48-25.1 48-56V316.9c54.7-15.6 96-69.3 96-132.9C352 82.5 273.5 0 176 0S0 82.5 0 184c0 63.6 41.3 117.3 96 132.9zM176 96a88 88 0 110 176 88 88 0 110-176z" /></svg>
               <span className="truncate">{cityState}</span>
+              {showMetro && (
+                <span className="shrink-0 inline-flex items-center font-mono text-[9px] font-semibold uppercase tracking-wider text-marigold-dark bg-marigold/10 border border-marigold/25 px-1.5 py-0.5 rounded-full leading-none">
+                  {metroLabel}
+                </span>
+              )}
             </p>
           )}
         </div>
@@ -356,7 +369,7 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
   const { data: eventsRaw } = await supabase
     .from("events")
     .select(`
-      id, title, start_date, start_time, venue_name, city, state, cover_gradient, cover_image_url, featured_on_artist, selling_on_rameelo,
+      id, title, start_date, start_time, venue_name, city, state, metro_city, cover_gradient, cover_image_url, featured_on_artist, selling_on_rameelo,
       ticket_tiers (id, name, price, quantity, quantity_sold, is_visible)
     `)
     .eq("status", "published")

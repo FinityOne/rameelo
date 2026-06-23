@@ -72,15 +72,17 @@ export default function Footer() {
                   Help Center
                 </Link>
               </li>
-              {["Organizer Hub", "Privacy Policy", "Terms of Service"].map(
-                (item) => (
-                  <li key={item}>
-                    <a href="#" className="text-white/50 hover:text-white transition-colors">
-                      {item}
-                    </a>
-                  </li>
-                )
-              )}
+              {[
+                { label: "Organizer Hub", href: "/organizers" },
+                { label: "Privacy Policy", href: "/privacy" },
+                { label: "Terms of Service", href: "/terms" },
+              ].map((item) => (
+                <li key={item.label}>
+                  <Link href={item.href} className="text-white/50 hover:text-white transition-colors">
+                    {item.label}
+                  </Link>
+                </li>
+              ))}
               <li>
                 <Link href="/contact" className="text-white/50 hover:text-white transition-colors">
                   Contact Us

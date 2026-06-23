@@ -17,6 +17,8 @@ const TICKETING_EMAIL_TYPES = new Set<string>([
   "order_team_notification",   // organizer order alert
   "order_admin_notification",  // platform-admin order alert
   "comp_ticket",               // organizer-issued free tickets
+  "ticket_transfer",           // member → member ticket transfer claim link
+  "ticket_transfer_declined",  // recipient declined → notify the sender
   "group_ticket_claim",        // group buyer → per-member claim link
   "group_created",             // group order link created
   "group_joined",              // group member joined

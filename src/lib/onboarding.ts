@@ -4,8 +4,8 @@
 // Rameelo organizer affiliation terms below. Bump ONBOARDING_AGREEMENT_VERSION
 // whenever the agreement text materially changes.
 
-export const ONBOARDING_AGREEMENT_VERSION = "2.4";
-export const ONBOARDING_AGREEMENT_EFFECTIVE = "June 9, 2026";
+export const ONBOARDING_AGREEMENT_VERSION = "2.5";
+export const ONBOARDING_AGREEMENT_EFFECTIVE = "June 23, 2026";
 
 // Short, friendly summary shown next to the acceptance control.
 export const ONBOARDING_AGREEMENT_SUMMARY =
@@ -50,6 +50,7 @@ const AGREEMENT_SECTIONS_BASE: AgreementSection[] = [
     "Organizer is creating a Rameelo account and agrees to Rameelo's Terms of Service and Privacy Policy.",
     "Organizer represents and warrants that they have the legal authority to act on behalf of the organization, venue, artist, or event being listed.",
     "Organizer has all necessary rights, permissions, permits, licenses, and approvals required to host, market, and sell tickets for the event.",
+    "Organizer represents and warrants that the event and any advertised artist, performer, or venue are genuine, authorized, and confirmed, and that Organizer is not listing an event or artist it is not authorized to present. Rameelo acts only as a ticketing and payment facilitator and does not produce, host, or guarantee the event.",
   ]},
   { n: 2, title: "Promotional Pricing Acknowledgment", points: [
     "Organizer acknowledges that Rameelo's current pricing structure is promotional in nature and may be modified for future events at Rameelo's sole discretion.",
@@ -104,12 +105,15 @@ const AGREEMENT_SECTIONS_BASE: AgreementSection[] = [
   ]},
   { n: 13, title: "Refunds", points: [
     "Organizer remains responsible for event refund decisions unless otherwise required by law or payment processor requirements.",
+    "Organizer is solely and financially responsible for funding all refunds owed to attendees, including refunds arising from cancellation, postponement, non-occurrence, relocation, artist or performer non-appearance, or an event later found to be unauthorized or fraudulent.",
+    "Rameelo is not obligated to fund, advance, or absorb any refund, fee, or chargeback from its own funds. Where Rameelo has already disbursed payouts, Organizer shall promptly repay Rameelo any amounts needed to fund such refunds, and Rameelo may recover them from future payouts, reserves, the established reserve, or directly from Organizer.",
     "Rameelo reserves the right to issue refunds in cases involving fraud, duplicate transactions, system errors, legal obligations, or payment processor requirements.",
     "Refund amounts may be deducted from future payouts.",
   ]},
   { n: 14, title: "Event Cancellations & Postponements", points: [
-    "Organizer remains financially responsible for cancellations, postponements, venue issues, artist issues, and other event-related obligations.",
-    "Rameelo may withhold payouts, establish reserves, or issue refunds as necessary to protect attendees and the platform.",
+    "Organizer remains solely and financially responsible for cancellations, postponements, venue issues, artist or performer issues, non-occurrence, relocation, and any event later found to be unauthorized or fraudulent, and for all attendee refunds and obligations arising from them.",
+    "Rameelo bears no responsibility or liability for the event taking place, and is not responsible for paying any refund, fee, chargeback, or other amount from its own funds in the event of a cancellation, postponement, non-occurrence, or unauthorized event, artist, or other extremity.",
+    "Organizer shall reimburse Rameelo for any refunds, chargebacks, fees, or costs Rameelo incurs as a result, and Rameelo may withhold payouts, establish or draw on reserves, or issue refunds as necessary to protect attendees and the platform.",
   ]},
   { n: 15, title: "Tax Responsibility", points: [
     "Organizer is solely responsible for determining, collecting, reporting, and remitting any applicable taxes associated with the event, including local, state, federal, entertainment, admissions, or amusement taxes.",

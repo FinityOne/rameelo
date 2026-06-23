@@ -119,7 +119,7 @@ function TransferModal({
   async function handleConfirm() {
     setSubmitting(true);
     setError("");
-    const { token, error: err } = await initiateTransfer({
+    const { transferId, token, error: err } = await initiateTransfer({
       orderId: order.orderId,
       fromUserId: userId,
       toEmail: email,
@@ -130,6 +130,16 @@ function TransferModal({
     setSubmitting(false);
     if (err) { setError(err); return; }
     if (token) setClaimLink(`${location.origin}/tickets/claim/${token}`);
+    // Email the recipient their claim link (branded, personal, with account
+    // instructions). Best-effort — the copy-link fallback in the Done step still
+    // works if the email send fails, so we don't block or surface an error here.
+    if (transferId) {
+      fetch("/api/transfer-send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transferId }),
+      }).catch(() => {});
+    }
     onTransferred();
     setStep("done");
   }
@@ -335,7 +345,9 @@ function TransferModal({
               <div>
                 <p className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.015em" }}>Transfer sent!</p>
                 <p className="font-ui text-sm text-ink-muted mt-1">
-                  {lookupResult?.exists ? `${displayName} will see it in their Rameelo portal.` : `Share the link below so ${email} can claim their ticket${selectedSeats.length !== 1 ? "s" : ""}.`}
+                  {lookupResult?.exists
+                    ? `We emailed ${displayName} a claim link — they'll also see it in their Rameelo portal.`
+                    : `We emailed ${email} a link to claim their ticket${selectedSeats.length !== 1 ? "s" : ""}. You can also share it directly below.`}
                 </p>
               </div>
               {!lookupResult?.exists && claimLink && (
@@ -375,8 +387,19 @@ function IncomingTransferCard({ transfer, onAccepted, onDeclined }: {
 
   async function handleDecline() {
     setStep("loading");
-    const supabase = createClient();
-    await supabase.from("ticket_transfers").update({ status: "cancelled" }).eq("id", transfer.id);
+    // Decline via the route so the sender gets notified (tickets back in their
+    // wallet). The RPC persists the decline even if the email send fails.
+    const res = await fetch("/api/transfer-declined", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token: transfer.token }),
+    }).catch(() => null);
+    if (!res || !res.ok) {
+      const msg = res ? (await res.json().catch(() => ({}))).error : null;
+      setError(msg || "Couldn't decline this transfer. Please try again.");
+      setStep("idle");
+      return;
+    }
     onDeclined(transfer.id);
   }
 

@@ -236,6 +236,13 @@ export default function OnboardingPage() {
     });
     setSubmitting(false);
     if (error) { setSubmitError(error.message || "Something went wrong. Please try again."); return; }
+    // Alert platform admins that the agreement was signed. Best-effort — never
+    // blocks or fails the organizer's submission.
+    fetch("/api/onboarding-notify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ token }),
+    }).catch(() => {});
     setShowConfirm(false);
     setSubmitted(true);
     window.scrollTo({ top: 0, behavior: "smooth" });

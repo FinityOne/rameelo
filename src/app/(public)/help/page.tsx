@@ -102,8 +102,8 @@ const CATEGORIES = [
   {
     id: "account",
     title: "Account & Profile",
-    description: "Signing in, profile settings, organization linking, and privacy.",
-    count: 3,
+    description: "Creating an account, signing in, profile settings, and privacy.",
+    count: 4,
     iconBg: "#3B4A6B",
     iconFg: "#ffffff",
     icon: (
@@ -154,8 +154,9 @@ const ARTICLES = [
     cat: "Tickets & Orders",
     catId: "tickets",
     q: "How do I transfer a ticket to someone else?",
-    a: "In My Tickets, tap the ticket you want to transfer and select Transfer Ticket. Enter the recipient's email address and confirm. They'll receive an email prompting them to claim the ticket to their own Rameelo account. Transfers are available any time before the event starts.",
+    a: "In My Tickets, tap the ticket you want to transfer and select Transfer Ticket. Enter the recipient's email address and confirm. They'll instantly receive a personalized email with a one-tap link to claim the ticket to their own Rameelo account — and if they're new to Rameelo, it walks them through creating a free account with that same email. The QR code is hidden on your end until they accept (or you cancel), so a ticket is never valid in two places. Transfers are available any time before the event starts.",
     cta: { label: "My Tickets", href: "/portal/tickets" },
+    cta2: { label: "New here? How to create an account", href: "/help/create-account" },
     min: 2,
   },
   {
@@ -250,6 +251,15 @@ const ARTICLES = [
   },
 
   // Account & Profile
+  {
+    cat: "Account & Profile",
+    catId: "account",
+    q: "How do I create a Rameelo account?",
+    a: "Go to rameelo.com/auth/signup and enter your email — Rameelo is passwordless, so there's nothing to memorize. We email you a 6-digit code; type it in and your free account is created. You can also continue with Google. If someone sent or transferred tickets to you, sign up with the same email the tickets were sent to and they attach to your account automatically.",
+    cta: { label: "Create account", href: "/auth/signup" },
+    cta2: { label: "Read the step-by-step guide", href: "/help/create-account" },
+    min: 2,
+  },
   {
     cat: "Account & Profile",
     catId: "account",
