@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { createClient } from "@/lib/supabase/server";
 import EventDetailClient from "./EventDetailClient";
 import MetaPixelViewContent from "@/components/MetaPixelViewContent";
+import PostHogCapture from "@/components/PostHogCapture";
 import { eventSchema, breadcrumbSchema, ld } from "@/lib/jsonld";
 
 // Always render fresh — event inventory (ticket quantities) changes in admin and
@@ -154,6 +155,22 @@ export default async function EventDetailPage({ params }: Props) {
           artistName={artistName ?? null}
           organizer={organizerName ?? null}
           minPrice={prices.length > 0 ? Math.min(...prices) : null}
+        />
+      )}
+      {event && (
+        <PostHogCapture
+          event="event_viewed"
+          dedupeKey={id}
+          properties={{
+            event_id: id,
+            event_name: event.title,
+            artist: artistName ?? null,
+            organizer: organizerName ?? null,
+            category: event.category,
+            event_city: event.city,
+            event_state: event.state,
+            event_metro: event.metro_city,
+          }}
         />
       )}
       <EventDetailClient id={id} />

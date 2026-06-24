@@ -7,6 +7,7 @@ import {
 } from "next/font/google";
 import "./globals.css";
 import MetaPixel from "@/components/MetaPixel";
+import PostHogPageview from "@/components/PostHog";
 
 const bricolage = Bricolage_Grotesque({
   subsets: ["latin"],
@@ -156,6 +157,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body className="min-h-screen flex flex-col antialiased">
         <MetaPixel />
+        <PostHogPageview />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(JSON_LD_ORG) }}
