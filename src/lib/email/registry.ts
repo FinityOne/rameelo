@@ -252,6 +252,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     fires: "When a sponsorship inquiry is submitted",
   },
   {
+    key: "promotion-entry",
+    name: "Promotion entry alert",
+    description: "Notifies all platform admins when someone enters a giveaway/raffle promotion, with the entrant's name, email, phone, and location, plus a running entry total. Only fires for genuinely new entries (duplicate emails don't re-notify).",
+    audience: "Admins",
+    category: "Platform",
+    status: "live",
+    trigger: "automatic",
+    fires: "When a new promotion entry is submitted",
+  },
+  {
     key: "onboarding-invite",
     name: "Organizer onboarding link",
     description: "Emails a lead the onboarding questionnaire link (currently copy-pasted from the admin org page).",

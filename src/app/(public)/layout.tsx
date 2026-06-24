@@ -1,5 +1,6 @@
 import Nav from "@/components/Nav";
 import Footer from "@/components/Footer";
+import PromoModal from "@/components/PromoModal";
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -7,6 +8,7 @@ export default function PublicLayout({ children }: { children: React.ReactNode }
       <Nav />
       <main className="flex-1">{children}</main>
       <Footer />
+      <PromoModal />
     </>
   );
 }
