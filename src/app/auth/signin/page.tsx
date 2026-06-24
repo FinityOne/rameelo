@@ -6,6 +6,8 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 import { createUser, saveUser, type UserRole } from "@/lib/auth";
 import OtpVerify, { type VerifyResult } from "../OtpVerify";
+import Turnstile from "@/components/Turnstile";
+import { TURNSTILE_SITE_KEY } from "@/lib/turnstile";
 
 function SignInInner() {
   const router = useRouter();
@@ -18,19 +20,22 @@ function SignInInner() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [noAccount, setNoAccount] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const captchaRequired = !!TURNSTILE_SITE_KEY;
 
   useEffect(() => { document.title = "Sign In | Rameelo"; }, []);
 
   // Email-only → send a 6-digit code.
   async function handleRequest(e: React.FormEvent) {
     e.preventDefault();
+    if (captchaRequired && !captchaToken) { setError("Please complete the human verification below."); return; }
     setLoading(true);
     setError("");
     setNoAccount(false);
     try {
       const res = await fetch("/api/auth/request-otp", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), purpose: "login" }),
+        body: JSON.stringify({ email: email.trim(), purpose: "login", turnstileToken: captchaToken }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -147,10 +152,12 @@ function SignInInner() {
                 </div>
               )}
 
+              <Turnstile onVerify={setCaptchaToken} onExpire={() => setCaptchaToken("")} />
+
               <button
                 type="submit"
-                disabled={loading}
-                className="w-full py-4 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-lg mt-2 flex items-center justify-center gap-2"
+                disabled={loading || (captchaRequired && !captchaToken)}
+                className="w-full py-4 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-lg mt-2 flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {loading ? <><div className="w-4 h-4 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" />Sending code…</> : "Email me a code →"}
               </button>

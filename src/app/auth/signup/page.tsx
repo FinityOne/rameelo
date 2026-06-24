@@ -6,6 +6,8 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 import { createUser, saveUser, type UserRole } from "@/lib/auth";
 import OtpVerify, { type VerifyResult } from "../OtpVerify";
+import Turnstile from "@/components/Turnstile";
+import { TURNSTILE_SITE_KEY } from "@/lib/turnstile";
 
 const US_STATES = ["AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY"];
 
@@ -38,6 +40,8 @@ export default function SignUpPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [accountExists, setAccountExists] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState("");
+  const captchaRequired = !!TURNSTILE_SITE_KEY;
   const [inviteToken, setInviteToken] = useState<string | null>(null);
   const [nextDest, setNextDest] = useState<string>("");
 
@@ -85,13 +89,14 @@ export default function SignUpPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (step !== 1 || !step1Valid) return;
+    if (captchaRequired && !captchaToken) { setError("Please complete the human verification below."); return; }
     setLoading(true);
     setError("");
     setAccountExists(false);
     try {
       const res = await fetch("/api/auth/request-otp", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: email.trim(), purpose: "signup", firstName, lastName, phone, city, state }),
+        body: JSON.stringify({ email: email.trim(), purpose: "signup", firstName, lastName, phone, city, state, turnstileToken: captchaToken }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -256,9 +261,16 @@ export default function SignUpPage() {
                   </div>
                 )}
 
-                <button type="submit" disabled={!step1Valid || loading} className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all mt-2 flex items-center justify-center gap-2 ${step1Valid && !loading ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-lg" : "bg-white/10 text-white/30 cursor-not-allowed"}`}>
-                  {loading ? <><div className="w-4 h-4 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" />Sending code…</> : "Send me a code →"}
-                </button>
+                <Turnstile onVerify={setCaptchaToken} onExpire={() => setCaptchaToken("")} />
+
+                {(() => {
+                  const canSubmit = step1Valid && !loading && (!captchaRequired || !!captchaToken);
+                  return (
+                    <button type="submit" disabled={!canSubmit} className={`w-full py-4 rounded-2xl font-display font-bold text-base transition-all mt-2 flex items-center justify-center gap-2 ${canSubmit ? "bg-marigold text-aubergine hover:bg-marigold-dark active:scale-[0.98] shadow-lg" : "bg-white/10 text-white/30 cursor-not-allowed"}`}>
+                      {loading ? <><div className="w-4 h-4 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" />Sending code…</> : "Send me a code →"}
+                    </button>
+                  );
+                })()}
             </form>
           ) : (
             <OtpVerify

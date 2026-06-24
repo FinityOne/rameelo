@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient, serviceRoleConfigured } from "@/lib/supabase/admin";
 import { otpMatches } from "@/lib/auth-otp";
+import { getLockout, recordFailedAttempt, clearLockout } from "@/lib/auth-lockout";
 
 export const runtime = "nodejs";
 
@@ -26,6 +27,12 @@ export async function POST(request: Request) {
 
   const admin = createAdminClient();
 
+  // Account lockout: refuse all attempts while locked (after repeated failures).
+  const lock = await getLockout(admin, email);
+  if (lock.locked) {
+    return NextResponse.json({ error: `Too many incorrect attempts. Your account is locked for security — try again in about ${lock.minutesLeft} minute${lock.minutesLeft === 1 ? "" : "s"}.` }, { status: 429 });
+  }
+
   // Latest live (unconsumed, unexpired) request for this email+purpose.
   const { data: rows } = await admin
     .from("auth_otp_requests")
@@ -44,16 +51,22 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Too many incorrect attempts. Request a new code." }, { status: 429 });
   }
 
-  // Check OUR code (HMAC, timing-safe). Wrong code → count an attempt.
+  // Check OUR code (HMAC, timing-safe). Wrong code → count an attempt, both on
+  // this code (expiry guard) and against the per-email lockout.
   if (!otpMatches(email, purpose, code, req.code_hash)) {
     await admin.from("auth_otp_requests").update({ attempts: req.attempts + 1 }).eq("id", req.id);
-    const left = MAX_ATTEMPTS - (req.attempts + 1);
-    return NextResponse.json({ error: left > 0 ? "That code is incorrect. Please check and try again." : "Too many incorrect attempts. Request a new code." }, { status: 400 });
+    const locked = await recordFailedAttempt(admin, email);
+    if (locked.locked) {
+      return NextResponse.json({ error: `Too many incorrect attempts. Your account is locked for security — try again in about ${locked.minutesLeft} minutes.` }, { status: 429 });
+    }
+    return NextResponse.json({ error: "That code is incorrect. Please check and try again." }, { status: 400 });
   }
 
-  // Code is correct → burn it, then mint a session. Mint a fresh native token_hash
-  // via the admin API and redeem it on the cookie-bound server client so the auth
-  // cookies are written (and an unconfirmed signup gets confirmed).
+  // Code is correct → clear any failure count, burn the code, then mint a session.
+  // Mint a fresh native token_hash via the admin API and redeem it on the
+  // cookie-bound server client so the auth cookies are written (and an
+  // unconfirmed signup gets confirmed).
+  await clearLockout(admin, email);
   await admin.from("auth_otp_requests").update({ consumed_at: new Date().toISOString() }).eq("id", req.id);
 
   const { data: linkData, error: linkErr } = await admin.auth.admin.generateLink({ type: "magiclink", email });

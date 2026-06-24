@@ -5,9 +5,16 @@ import { loginCodeEmail } from "@/lib/email/templates/loginCode";
 import { sendEmail } from "@/lib/email/send";
 import { recordEmailLog } from "@/lib/email/log";
 import { hashOtp } from "@/lib/auth-otp";
+import { verifyTurnstile, turnstileEnabled } from "@/lib/turnstile";
+import { getLockout } from "@/lib/auth-lockout";
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export const runtime = "nodejs";
+
+function clientIp(request: Request): string | null {
+  const xff = request.headers.get("x-forwarded-for");
+  return xff ? xff.split(",")[0].trim() : request.headers.get("x-real-ip");
+}
 
 const OTP_TTL_MIN = 30;
 const RATE_WINDOW_MIN = 10;
@@ -33,6 +40,33 @@ export async function POST(request: Request) {
   }
 
   const admin = createAdminClient();
+
+  // Don't issue codes to a locked-out account (prevents bypassing the lockout
+  // by simply requesting a fresh code).
+  const lock = await getLockout(admin, email);
+  if (lock.locked) {
+    return NextResponse.json({ error: `Too many incorrect attempts. Try again in about ${lock.minutesLeft} minute${lock.minutesLeft === 1 ? "" : "s"}.` }, { status: 429 });
+  }
+
+  // Human verification (Cloudflare Turnstile). Required on a FRESH request; a
+  // resend (there's already a live, unconsumed code for this email) skips it —
+  // the user already passed the check, and resends are rate-limited below.
+  if (turnstileEnabled) {
+    const { count: liveCodes } = await admin
+      .from("auth_otp_requests")
+      .select("*", { count: "exact", head: true })
+      .eq("email", email)
+      .eq("purpose", purpose)
+      .is("consumed_at", null)
+      .gte("expires_at", new Date().toISOString());
+    const isResend = (liveCodes ?? 0) > 0;
+    if (!isResend) {
+      const ok = await verifyTurnstile(String(body.turnstileToken ?? ""), clientIp(request));
+      if (!ok) {
+        return NextResponse.json({ error: "Please complete the human verification and try again.", code: "captcha_failed" }, { status: 400 });
+      }
+    }
+  }
 
   // Rate limit per email.
   const since = new Date(Date.now() - RATE_WINDOW_MIN * 60_000).toISOString();
