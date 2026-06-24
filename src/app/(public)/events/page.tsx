@@ -4,6 +4,7 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
+import { regionForState } from "@/lib/us-regions";
 
 type DBEvent = {
   id: string;
@@ -66,6 +67,24 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 const SORT_OPTIONS = ['Date: Soonest', 'Price: Low to High', 'Price: High to Low'];
 
+const DATE_OPTIONS = [
+  { id: 'any',     label: 'Any date' },
+  { id: 'weekend', label: 'This weekend' },
+  { id: 'week',    label: 'Next 7 days' },
+  { id: 'month',   label: 'Next 30 days' },
+] as const;
+
+const PRICE_OPTIONS = [
+  { id: 'any',     label: 'Any price' },
+  { id: 'free',    label: 'Free' },
+  { id: 'under25', label: 'Under $25' },
+  { id: '25to50',  label: '$25 – $50' },
+  { id: '50plus',  label: '$50+' },
+] as const;
+
+// Location selection: anywhere, a specific city/metro, or a broad US region.
+type LocSel = { kind: 'all' } | { kind: 'city'; value: string } | { kind: 'region'; value: string };
+
 function fmtDate(d: string) {
   return new Date(d + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
@@ -97,6 +116,68 @@ function isPastEvent(lastDay: string): boolean {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return today.getTime() > cutoff.getTime();
+}
+
+// ── Filter predicates (pure; one per facet so we can compute faceted counts) ──
+function matchSearch(e: EventVM, search: string): boolean {
+  const q = search.trim().toLowerCase();
+  if (!q) return true;
+  return (
+    e.title.toLowerCase().includes(q) ||
+    (e.artist ?? '').toLowerCase().includes(q) ||
+    (e.city ?? '').toLowerCase().includes(q) ||
+    (e.metroCity ?? '').toLowerCase().includes(q) ||
+    (e.state ?? '').toLowerCase().includes(q) ||
+    (e.venue ?? '').toLowerCase().includes(q)
+  );
+}
+function matchCategory(e: EventVM, cat: string): boolean {
+  return cat === 'All' || (CATEGORY_LABELS[e.category] ?? e.category) === cat;
+}
+function matchLocation(e: EventVM, loc: LocSel): boolean {
+  if (loc.kind === 'all') return true;
+  if (loc.kind === 'city') return e.city === loc.value || e.metroCity === loc.value;
+  return regionForState(e.state) === loc.value;
+}
+function matchArtist(e: EventVM, artist: string): boolean {
+  return artist === 'All' || e.artist === artist;
+}
+function matchPrice(e: EventVM, p: string): boolean {
+  if (p === 'any') return true;
+  if (e.minPrice === null) return false;
+  if (p === 'free')    return e.minPrice === 0;
+  if (p === 'under25') return e.minPrice > 0 && e.minPrice < 25;
+  if (p === '25to50')  return e.minPrice >= 25 && e.minPrice <= 50;
+  if (p === '50plus')  return e.minPrice > 50;
+  return true;
+}
+function rangeOverlap(s1: number, e1: number, s2: number, e2: number) {
+  return s1 <= e2 && s2 <= e1;
+}
+function matchDate(e: EventVM, f: string): boolean {
+  if (f === 'any') return true;
+  const start = new Date(e.date + 'T00:00:00').getTime();
+  const end   = new Date((e.endDate ?? e.date) + 'T00:00:00').getTime();
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (f === 'weekend') {
+    const day = today.getDay();
+    const sat = new Date(today); sat.setDate(today.getDate() + ((6 - day + 7) % 7));
+    const sun = new Date(sat);   sun.setDate(sat.getDate() + 1); sun.setHours(23, 59, 59, 999);
+    // Already the weekend? include today through Sunday.
+    const from = (day === 0 || day === 6) ? today.getTime() : sat.getTime();
+    return rangeOverlap(start, end, from, sun.getTime());
+  }
+  if (f === 'week')  { const to = new Date(today); to.setDate(today.getDate() + 7);  return rangeOverlap(start, end, today.getTime(), to.getTime()); }
+  if (f === 'month') { const to = new Date(today); to.setDate(today.getDate() + 30); return rangeOverlap(start, end, today.getTime(), to.getTime()); }
+  // Specific calendar date (yyyy-mm-dd)
+  const d = new Date(f + 'T00:00:00').getTime();
+  return start <= d && d <= end;
+}
+const isPresetDate = (f: string) => DATE_OPTIONS.some(o => o.id === f);
+function dateLabel(f: string): string {
+  const preset = DATE_OPTIONS.find(o => o.id === f);
+  if (preset) return preset.id === 'any' ? 'Any date' : preset.label;
+  return new Date(f + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
 function ArtistAvatar({ name, photo, size = 28 }: { name: string; photo: string | null; size?: number }) {
@@ -226,20 +307,96 @@ function EventCard({ event, isPast = false }: { event: EventVM; isPast?: boolean
   );
 }
 
-type Panel = 'location' | 'category' | 'sort' | null;
+// ── Small reusable filter primitives ──
+const chevron = (
+  <svg className="w-3 h-3 shrink-0 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+  </svg>
+);
+
+function OptionRow({ selected, onClick, label, count, accent }: {
+  selected: boolean; onClick: () => void; label: string; count?: number; accent?: string;
+}) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`w-full text-left px-4 py-2.5 font-ui text-sm transition-colors flex items-center gap-2.5 ${
+        selected ? 'text-aubergine font-semibold bg-marigold/8' : 'text-ink hover:bg-ivory'
+      }`}>
+      <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${selected ? 'bg-marigold' : 'bg-transparent'}`} />
+      <span className="truncate">{label}</span>
+      {accent && <span className="font-mono text-[8px] uppercase tracking-widest text-ink-muted/60">{accent}</span>}
+      {count !== undefined && (
+        <span className="ml-auto font-mono text-[10px] text-ink-muted/55 shrink-0">{count}</span>
+      )}
+    </button>
+  );
+}
+
+function Facet({ id, label, valueLabel, isActive, openPanel, setOpenPanel, align = 'left', width = 'w-60', children }: {
+  id: string; label: string; valueLabel: string; isActive: boolean;
+  openPanel: string | null; setOpenPanel: (v: string | null) => void;
+  align?: 'left' | 'right'; width?: string; children: React.ReactNode;
+}) {
+  const open = openPanel === id;
+  return (
+    <div className="relative shrink-0">
+      <button type="button" onClick={() => setOpenPanel(open ? null : id)}
+        className={`flex items-center gap-2 pl-3.5 pr-3 py-2 rounded-full border text-sm whitespace-nowrap transition-all ${
+          isActive
+            ? 'border-aubergine bg-aubergine text-white'
+            : open
+              ? 'border-aubergine/40 bg-ivory text-ink'
+              : 'border-ivory-200 bg-white text-ink hover:border-aubergine/30'
+        }`}>
+        <span className={`font-mono text-[8px] font-bold uppercase tracking-widest ${isActive ? 'text-white/55' : 'text-ink-muted'}`}>{label}</span>
+        <span className="font-ui font-medium max-w-[10rem] truncate">{valueLabel}</span>
+        {chevron}
+      </button>
+      {open && (
+        <div className={`absolute top-[calc(100%+8px)] ${align === 'right' ? 'right-0' : 'left-0'} bg-white rounded-2xl shadow-xl border border-ivory-200 overflow-hidden z-50 ${width}`}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PanelHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="px-3 py-2 border-b border-ivory-200">
+      <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">{children}</p>
+    </div>
+  );
+}
+
+function Chip({ selected, onClick, children }: { selected: boolean; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button type="button" onClick={onClick}
+      className={`px-3.5 py-2 rounded-full border text-sm font-medium transition-all active:scale-95 ${
+        selected ? 'border-aubergine bg-aubergine text-white' : 'border-ivory-200 bg-white text-ink'
+      }`}
+      style={{ minHeight: 40 }}>
+      {children}
+    </button>
+  );
+}
 
 export default function EventsPage() {
   const [events, setEvents]               = useState<EventVM[]>([]);
   const [loading, setLoading]             = useState(true);
   const [search, setSearch]               = useState('');
   const [activeCategory, setActiveCategory] = useState('All');
-  const [activeCity, setActiveCity]       = useState('All Cities');
+  const [location, setLocation]           = useState<LocSel>({ kind: 'all' });
+  const [activeArtist, setActiveArtist]   = useState('All');
+  const [dateFilter, setDateFilter]       = useState('any');
+  const [price, setPrice]                 = useState('any');
   const [sort, setSort]                   = useState('Date: Soonest');
   const [view, setView]                   = useState<'upcoming' | 'past'>('upcoming');
   const [showAll, setShowAll]             = useState(false);
-  const [openPanel, setOpenPanel]         = useState<Panel>(null);
+  const [openPanel, setOpenPanel]         = useState<string | null>(null);
+  const [mobileFilters, setMobileFilters] = useState(false);
   const [geoCity, setGeoCity]             = useState<string | null>(null);
-  const pillRef = useRef<HTMLDivElement>(null);
+  const toolbarRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { document.title = "Find Garba & Navratri Events | Rameelo"; }, []);
 
@@ -294,16 +451,8 @@ export default function EventsPage() {
 
       setEvents(vms);
       setLoading(false);
-
-      // After events load, match geo city to an actual event city (or its metro)
-      if (geoCity) {
-        const g = geoCity.toLowerCase();
-        const matched = vms.find(e => e.city?.toLowerCase() === g || e.metroCity?.toLowerCase() === g);
-        if (matched) setActiveCity(matched.metroCity?.toLowerCase() === g ? matched.metroCity! : matched.city!);
-      }
     }
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Read hero search params (?city=Atlanta&vibe=Garba) on first mount
@@ -311,26 +460,22 @@ export default function EventsPage() {
     const params = new URLSearchParams(window.location.search);
     const cityParam = params.get("city");
     const vibeParam = params.get("vibe");
-    if (cityParam) setActiveCity(cityParam);
+    if (cityParam) setLocation({ kind: 'city', value: cityParam });
     if (vibeParam && vibeParam !== "All") setActiveCategory(vibeParam);
-  }, []); // eslint-disable-line
+  }, []);
 
   // IP-based geolocation — no permission dialog needed
   useEffect(() => {
     fetch('https://ipapi.co/json/')
       .then(r => r.json())
-      .then((d: { city?: string }) => {
-        if (d.city) setGeoCity(d.city);
-      })
+      .then((d: { city?: string }) => { if (d.city) setGeoCity(d.city); })
       .catch(() => { /* silent — geo is best-effort */ });
   }, []);
 
-  // Close dropdowns when clicking outside the pill
+  // Close dropdowns when clicking outside the toolbar
   useEffect(() => {
     function handleClick(e: MouseEvent) {
-      if (pillRef.current && !pillRef.current.contains(e.target as Node)) {
-        setOpenPanel(null);
-      }
+      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) setOpenPanel(null);
     }
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
@@ -338,48 +483,44 @@ export default function EventsPage() {
 
   // Once geo city is known and events are loaded, auto-select nearest city (or metro)
   useEffect(() => {
-    if (!geoCity || events.length === 0 || activeCity !== 'All Cities') return;
+    if (!geoCity || events.length === 0 || location.kind !== 'all') return;
     const g = geoCity.toLowerCase();
     const matched = events.find(e => e.city?.toLowerCase() === g || e.metroCity?.toLowerCase() === g);
-    if (matched) setActiveCity(matched.metroCity?.toLowerCase() === g ? matched.metroCity! : matched.city!);
+    if (matched) {
+      const value = matched.metroCity?.toLowerCase() === g ? matched.metroCity! : matched.city!;
+      setLocation({ kind: 'city', value });
+    }
   }, [geoCity, events]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Split into upcoming vs past using the 2-day grace rule
   const { upcoming, past } = useMemo(() => {
     const up: EventVM[] = [];
     const pa: EventVM[] = [];
-    for (const e of events) {
-      (isPastEvent(e.endDate ?? e.date) ? pa : up).push(e);
-    }
+    for (const e of events) (isPastEvent(e.endDate ?? e.date) ? pa : up).push(e);
     return { upcoming: up, past: pa };
   }, [events]);
 
   const base = view === 'past' ? past : upcoming;
 
-  // Filter options derive from all events so the picker stays stable across views
-  const categories = ['All', ...Array.from(new Set(events.map(e => CATEGORY_LABELS[e.category] ?? e.category))).sort()];
-  // City picker includes both the event's city AND its major-metro label, so a
-  // metro selection (e.g. "Los Angeles") surfaces its city-level events (e.g. Irvine).
-  const cities = ['All Cities', ...Array.from(new Set(
-    events.flatMap(e => [e.city, e.metroCity]).filter((c): c is string => !!c)
-  )).sort()];
+  // Category list is stable across views (derived from all events).
+  const categories = useMemo(
+    () => ['All', ...Array.from(new Set(events.map(e => CATEGORY_LABELS[e.category] ?? e.category))).sort()],
+    [events]
+  );
 
-  const filtered = useMemo(() => {
-    let result = [...base];
-    if (activeCategory !== 'All') result = result.filter(e => (CATEGORY_LABELS[e.category] ?? e.category) === activeCategory);
-    if (activeCity !== 'All Cities') result = result.filter(e => e.city === activeCity || e.metroCity === activeCity);
-    if (search.trim()) {
-      const q = search.toLowerCase();
-      result = result.filter(e =>
-        e.title.toLowerCase().includes(q) ||
-        (e.artist ?? '').toLowerCase().includes(q) ||
-        (e.city ?? '').toLowerCase().includes(q) ||
-        (e.metroCity ?? '').toLowerCase().includes(q) ||
-        (e.venue ?? '').toLowerCase().includes(q)
-      );
-    }
+  // Main filter + faceted-count computation. Each facet's option counts reflect
+  // every OTHER active filter (Amazon-style), so counts shrink as you narrow.
+  const { filtered, regionOpts, cityOpts, artistOpts, priceCounts, categoryCounts } = useMemo(() => {
+    const pass = (e: EventVM, except: string) =>
+      (except === 'search'   || matchSearch(e, search)) &&
+      (except === 'date'     || matchDate(e, dateFilter)) &&
+      (except === 'location' || matchLocation(e, location)) &&
+      (except === 'artist'   || matchArtist(e, activeArtist)) &&
+      (except === 'price'    || matchPrice(e, price)) &&
+      (except === 'category' || matchCategory(e, activeCategory));
+
+    const result = base.filter(e => pass(e, ''));
     result.sort((a, b) => {
-      // Upcoming surfaces featured, then live-selling events first; past doesn't.
       if (view !== 'past') {
         const featured = (b.featuredOnEvents ? 1 : 0) - (a.featuredOnEvents ? 1 : 0);
         if (featured !== 0) return featured;
@@ -388,25 +529,69 @@ export default function EventsPage() {
       }
       if (sort === 'Price: Low to High') return (a.minPrice ?? 0) - (b.minPrice ?? 0);
       if (sort === 'Price: High to Low') return (b.minPrice ?? 0) - (a.minPrice ?? 0);
-      // Date: upcoming = soonest first, past = most recent first
       return view === 'past' ? b.date.localeCompare(a.date) : a.date.localeCompare(b.date);
     });
-    return result;
-  }, [base, view, activeCategory, activeCity, search, sort]);
+
+    const byCount = (a: [string, number], b: [string, number]) => b[1] - a[1] || a[0].localeCompare(b[0]);
+
+    const locBase = base.filter(e => pass(e, 'location'));
+    const cityMap = new Map<string, number>();
+    const regionMap = new Map<string, number>();
+    for (const e of locBase) {
+      const labels = new Set([e.city, e.metroCity].filter((c): c is string => !!c));
+      for (const c of labels) cityMap.set(c, (cityMap.get(c) ?? 0) + 1);
+      const r = regionForState(e.state);
+      if (r) regionMap.set(r, (regionMap.get(r) ?? 0) + 1);
+    }
+
+    const artistBase = base.filter(e => pass(e, 'artist'));
+    const artistMap = new Map<string, number>();
+    for (const e of artistBase) if (e.artist) artistMap.set(e.artist, (artistMap.get(e.artist) ?? 0) + 1);
+
+    const priceBase = base.filter(e => pass(e, 'price'));
+    const priceCounts = Object.fromEntries(PRICE_OPTIONS.map(o => [o.id, priceBase.filter(e => matchPrice(e, o.id)).length])) as Record<string, number>;
+
+    const catBase = base.filter(e => pass(e, 'category'));
+    const categoryCounts = new Map<string, number>();
+    for (const e of catBase) {
+      const l = CATEGORY_LABELS[e.category] ?? e.category;
+      categoryCounts.set(l, (categoryCounts.get(l) ?? 0) + 1);
+    }
+
+    return {
+      filtered: result,
+      regionOpts: [...regionMap.entries()].sort(byCount),
+      cityOpts:   [...cityMap.entries()].sort(byCount),
+      artistOpts: [...artistMap.entries()].sort(byCount),
+      priceCounts,
+      categoryCounts,
+    };
+  }, [base, view, search, dateFilter, location, activeArtist, price, activeCategory, sort]);
 
   const displayed = showAll ? filtered : filtered.slice(0, 24);
 
-  const locationLabel = activeCity === 'All Cities'
+  // ── Labels & active-filter bookkeeping ──
+  const locationLabel = location.kind === 'all'
     ? (geoCity ? `Near ${geoCity}` : 'Anywhere')
-    : activeCity;
-
+    : location.kind === 'region' ? location.value : location.value;
+  const artistLabel = activeArtist === 'All' ? 'Any artist' : activeArtist;
+  const priceLabel = (PRICE_OPTIONS.find(o => o.id === price) ?? PRICE_OPTIONS[0]).label;
   const categoryLabel = activeCategory === 'All' ? 'All types' : activeCategory;
 
-  const chevron = (
-    <svg className="w-3 h-3 text-aubergine/50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-    </svg>
-  );
+  const activeChips: { key: string; label: string; clear: () => void }[] = [];
+  if (search.trim())             activeChips.push({ key: 'q',   label: `“${search.trim()}”`, clear: () => setSearch('') });
+  if (dateFilter !== 'any')      activeChips.push({ key: 'd',   label: dateLabel(dateFilter), clear: () => setDateFilter('any') });
+  if (location.kind !== 'all')   activeChips.push({ key: 'loc', label: location.kind === 'region' ? `${location.value} region` : location.value, clear: () => setLocation({ kind: 'all' }) });
+  if (activeArtist !== 'All')    activeChips.push({ key: 'art', label: activeArtist, clear: () => setActiveArtist('All') });
+  if (price !== 'any')           activeChips.push({ key: 'pr',  label: priceLabel, clear: () => setPrice('any') });
+  if (activeCategory !== 'All')  activeChips.push({ key: 'cat', label: activeCategory, clear: () => setActiveCategory('All') });
+  const activeCount = activeChips.length;
+
+  const reset = () => {
+    setSearch(''); setDateFilter('any'); setLocation({ kind: 'all' });
+    setActiveArtist('All'); setPrice('any'); setActiveCategory('All'); setShowAll(false);
+  };
+  const onFacetPick = () => { setOpenPanel(null); setShowAll(false); };
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: '#FCF9F2' }}>
@@ -423,164 +608,30 @@ export default function EventsPage() {
             <br />
             <span className="text-white/60 text-3xl md:text-4xl font-medium">Every artist. Every city.</span>
           </h1>
-          <p className="font-ui text-white/60 text-base max-w-xl mb-8 leading-relaxed">
-            Garba, Dandiya, and Navratri events across the USA — from Edison to LA. Browse and get tickets in seconds.
+          <p className="font-ui text-white/60 text-base max-w-xl mb-7 leading-relaxed">
+            Garba, Dandiya, and Navratri events across the USA — from Edison to LA. Search by date, artist, city, region, or price.
           </p>
 
-          {/* Filter pill — desktop: inline dropdowns / mobile: tap-through chips */}
-          <div ref={pillRef} className="w-full max-w-xl">
-
-            {/* Desktop pill */}
-            <div className="hidden sm:flex items-stretch bg-white rounded-full shadow-lg border border-white/10 overflow-visible">
-
-              {/* Location segment */}
-              <div className="relative flex-1">
-                <button
-                  type="button"
-                  onClick={() => setOpenPanel(openPanel === 'location' ? null : 'location')}
-                  className={`flex items-center gap-2 px-5 py-3 w-full h-full whitespace-nowrap transition-colors rounded-l-full ${openPanel === 'location' ? 'bg-ivory/60' : 'hover:bg-ivory/40'}`}
-                >
-                  <span className="text-sm leading-none">📍</span>
-                  <span className="font-ui text-sm text-aubergine font-medium truncate">{locationLabel}</span>
-                  {chevron}
+          {/* Big search bar — the centerpiece */}
+          <div className="w-full max-w-2xl">
+            <div className="relative">
+              <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-aubergine/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={search}
+                onChange={e => { setSearch(e.target.value); setShowAll(false); }}
+                placeholder="Search by event, artist, city, or venue…"
+                className="w-full bg-white rounded-full shadow-lg pl-12 pr-11 py-4 font-ui text-[15px] text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-2 focus:ring-marigold"
+              />
+              {search && (
+                <button type="button" onClick={() => setSearch('')} aria-label="Clear search"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 w-7 h-7 rounded-full bg-ivory hover:bg-ivory-200 flex items-center justify-center text-ink-muted transition-colors">
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
-
-                {openPanel === 'location' && (
-                  <div className="absolute top-[calc(100%+8px)] left-0 bg-white rounded-2xl shadow-xl border border-ivory-200 overflow-hidden z-50 w-52">
-                    <div className="px-3 py-2 border-b border-ivory-200">
-                      <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Location</p>
-                    </div>
-                    <div className="max-h-64 overflow-y-auto overscroll-contain py-1.5">
-                      {cities.map(c => (
-                        <button key={c} type="button"
-                          onClick={() => { setActiveCity(c); setOpenPanel(null); setShowAll(false); }}
-                          className={`w-full text-left px-4 py-2.5 font-ui text-sm transition-colors flex items-center gap-2.5 ${
-                            activeCity === c ? 'text-aubergine font-semibold bg-marigold/8' : 'text-ink hover:bg-ivory'
-                          }`}>
-                          {activeCity === c
-                            ? <span className="w-1.5 h-1.5 rounded-full bg-marigold shrink-0" />
-                            : <span className="w-1.5 h-1.5 shrink-0" />}
-                          {c === 'All Cities' ? 'Anywhere' : c}
-                          {c === 'All Cities' && geoCity && (
-                            <span className="ml-auto font-mono text-[9px] text-ink-muted/60">Near {geoCity}</span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="w-px bg-ivory-200 my-2.5 shrink-0" />
-
-              {/* Category segment */}
-              <div className="relative flex-1">
-                <button
-                  type="button"
-                  onClick={() => setOpenPanel(openPanel === 'category' ? null : 'category')}
-                  className={`flex items-center gap-2 px-5 py-3 w-full h-full whitespace-nowrap transition-colors ${openPanel === 'category' ? 'bg-ivory/60' : 'hover:bg-ivory/40'}`}
-                >
-                  <span className="font-ui text-sm text-aubergine font-medium">{categoryLabel}</span>
-                  {chevron}
-                </button>
-
-                {openPanel === 'category' && (
-                  <div className="absolute top-[calc(100%+8px)] right-0 bg-white rounded-2xl shadow-xl border border-ivory-200 overflow-hidden z-50 w-44">
-                    <div className="px-3 py-2 border-b border-ivory-200">
-                      <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Event type</p>
-                    </div>
-                    <div className="py-1.5">
-                      {categories.map(cat => (
-                        <button key={cat} type="button"
-                          onClick={() => { setActiveCategory(cat); setOpenPanel(null); setShowAll(false); }}
-                          className={`w-full text-left px-4 py-2.5 font-ui text-sm transition-colors flex items-center gap-2.5 ${
-                            activeCategory === cat ? 'text-aubergine font-semibold bg-marigold/8' : 'text-ink hover:bg-ivory'
-                          }`}>
-                          {activeCategory === cat
-                            ? <span className="w-1.5 h-1.5 rounded-full bg-marigold shrink-0" />
-                            : <span className="w-1.5 h-1.5 shrink-0" />}
-                          {cat}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="p-1.5 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setOpenPanel(null)}
-                  className="flex items-center justify-center w-10 h-full rounded-full bg-marigold hover:bg-[#d4891b] transition-colors"
-                  aria-label="Search"
-                >
-                  <svg className="w-4 h-4 text-aubergine" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </button>
-              </div>
+              )}
             </div>
-
-            {/* Mobile: vibe pills + city chips */}
-            <div className="sm:hidden space-y-3">
-              {/* Vibe row */}
-              <div className="flex gap-2 overflow-x-auto no-scrollbar -mx-1 px-1 pb-0.5">
-                {(['All', 'Garba', 'Dandiya', 'Raas', 'Workshop'] as const).map(cat => (
-                  <button
-                    key={cat}
-                    type="button"
-                    onClick={() => { setActiveCategory(cat === 'All' ? 'All' : cat); setShowAll(false); }}
-                    className={`flex items-center gap-1.5 px-4 py-2.5 rounded-full border shrink-0 transition-all active:scale-95 ${
-                      (cat === 'All' ? activeCategory === 'All' : activeCategory === cat)
-                        ? 'bg-marigold border-marigold text-aubergine font-bold'
-                        : 'border-white/25 bg-white/10 text-white/80'
-                    }`}
-                    style={{ minHeight: 44 }}
-                  >
-                    <span className="font-ui text-sm font-medium">{cat === 'All' ? '✨ All' : cat}</span>
-                  </button>
-                ))}
-              </div>
-
-              {/* City chips grid */}
-              <div className="grid grid-cols-3 gap-2">
-                {['All Cities', ...cities.filter(c => c !== 'All Cities').slice(0, 8)].map(c => (
-                  <button
-                    key={c}
-                    type="button"
-                    onClick={() => { setActiveCity(c); setShowAll(false); }}
-                    className={`py-2.5 px-2 rounded-xl border text-center transition-all active:scale-95 ${
-                      activeCity === c
-                        ? 'border-marigold bg-marigold/20 text-white font-semibold'
-                        : 'border-white/20 bg-white/8 text-white/70'
-                    }`}
-                    style={{ minHeight: 44 }}
-                  >
-                    <span className="font-ui text-xs font-medium leading-tight block">
-                      {c === 'All Cities' ? '📍 All' : c}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Active filter chips (desktop) */}
-            {(activeCity !== 'All Cities' || activeCategory !== 'All') && (
-              <div className="hidden sm:flex flex-wrap gap-2 mt-3">
-                {activeCity !== 'All Cities' && (
-                  <button onClick={() => { setActiveCity('All Cities'); setShowAll(false); }}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-white/15 text-white hover:bg-white/25 transition-colors backdrop-blur-sm">
-                    📍 {activeCity} <span className="opacity-60">×</span>
-                  </button>
-                )}
-                {activeCategory !== 'All' && (
-                  <button onClick={() => { setActiveCategory('All'); setShowAll(false); }}
-                    className="flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium bg-white/15 text-white hover:bg-white/25 transition-colors backdrop-blur-sm">
-                    {activeCategory} <span className="opacity-60">×</span>
-                  </button>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Quick stats */}
@@ -601,25 +652,150 @@ export default function EventsPage() {
         </div>
       </section>
 
-      {/* Sort / category strip */}
-      <div className="sticky top-0 z-30 bg-white/95 border-b border-ivory-200" style={{ backdropFilter: 'blur(12px)' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-3 overflow-x-auto">
-          <div className="flex gap-1.5 shrink-0">
-            {categories.map(cat => (
-              <button key={cat} onClick={() => { setActiveCategory(cat); setShowAll(false); }}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap transition-all ${
-                  activeCategory === cat ? 'bg-marigold text-aubergine font-semibold' : 'text-ink-muted hover:text-ink hover:bg-ivory'
-                }`}>
-                {cat}
+      {/* Sticky filter toolbar */}
+      <div ref={toolbarRef} className="sticky top-0 z-30 bg-white/95 border-b border-ivory-200" style={{ backdropFilter: 'blur(12px)' }}>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+
+          {/* Desktop: inline facet dropdowns */}
+          <div className="hidden md:flex items-center gap-2">
+            <Facet id="date" label="Date" valueLabel={dateLabel(dateFilter)} isActive={dateFilter !== 'any'}
+              openPanel={openPanel} setOpenPanel={setOpenPanel} width="w-60">
+              <PanelHeader>When</PanelHeader>
+              <div className="py-1.5">
+                {DATE_OPTIONS.map(o => (
+                  <OptionRow key={o.id} selected={dateFilter === o.id} label={o.label}
+                    onClick={() => { setDateFilter(o.id); onFacetPick(); }} />
+                ))}
+              </div>
+              <div className="px-3 py-2.5 border-t border-ivory-200">
+                <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted mb-1.5">Pick a date</p>
+                <input type="date" value={isPresetDate(dateFilter) ? '' : dateFilter}
+                  onChange={e => { setDateFilter(e.target.value || 'any'); setShowAll(false); }}
+                  className="w-full text-sm font-ui text-ink border border-ivory-200 rounded-lg px-2.5 py-2 focus:outline-none focus:border-aubergine" />
+              </div>
+            </Facet>
+
+            <Facet id="location" label="Location" valueLabel={locationLabel} isActive={location.kind !== 'all'}
+              openPanel={openPanel} setOpenPanel={setOpenPanel} width="w-64">
+              <div className="max-h-80 overflow-y-auto overscroll-contain">
+                <PanelHeader>Location</PanelHeader>
+                <div className="py-1.5">
+                  <OptionRow selected={location.kind === 'all'} label={geoCity ? `Anywhere (near ${geoCity})` : 'Anywhere'}
+                    onClick={() => { setLocation({ kind: 'all' }); onFacetPick(); }} />
+                </div>
+                {regionOpts.length > 0 && (
+                  <>
+                    <PanelHeader>Regions</PanelHeader>
+                    <div className="py-1.5">
+                      {regionOpts.map(([name, count]) => (
+                        <OptionRow key={name} selected={location.kind === 'region' && location.value === name}
+                          label={name} count={count}
+                          onClick={() => { setLocation({ kind: 'region', value: name }); onFacetPick(); }} />
+                      ))}
+                    </div>
+                  </>
+                )}
+                {cityOpts.length > 0 && (
+                  <>
+                    <PanelHeader>Cities</PanelHeader>
+                    <div className="py-1.5">
+                      {cityOpts.map(([name, count]) => (
+                        <OptionRow key={name} selected={location.kind === 'city' && location.value === name}
+                          label={name} count={count}
+                          onClick={() => { setLocation({ kind: 'city', value: name }); onFacetPick(); }} />
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+            </Facet>
+
+            <Facet id="artist" label="Artist" valueLabel={artistLabel} isActive={activeArtist !== 'All'}
+              openPanel={openPanel} setOpenPanel={setOpenPanel} width="w-60">
+              <div className="max-h-80 overflow-y-auto overscroll-contain">
+                <PanelHeader>Artist</PanelHeader>
+                <div className="py-1.5">
+                  <OptionRow selected={activeArtist === 'All'} label="Any artist"
+                    onClick={() => { setActiveArtist('All'); onFacetPick(); }} />
+                  {artistOpts.map(([name, count]) => (
+                    <OptionRow key={name} selected={activeArtist === name} label={name} count={count}
+                      onClick={() => { setActiveArtist(name); onFacetPick(); }} />
+                  ))}
+                  {artistOpts.length === 0 && (
+                    <p className="px-4 py-3 font-ui text-xs text-ink-muted">No artists in this view.</p>
+                  )}
+                </div>
+              </div>
+            </Facet>
+
+            <Facet id="price" label="Price" valueLabel={priceLabel} isActive={price !== 'any'}
+              openPanel={openPanel} setOpenPanel={setOpenPanel} width="w-52">
+              <PanelHeader>Price</PanelHeader>
+              <div className="py-1.5">
+                {PRICE_OPTIONS.map(o => (
+                  <OptionRow key={o.id} selected={price === o.id} label={o.label} count={priceCounts[o.id]}
+                    onClick={() => { setPrice(o.id); onFacetPick(); }} />
+                ))}
+              </div>
+            </Facet>
+
+            <Facet id="category" label="Type" valueLabel={categoryLabel} isActive={activeCategory !== 'All'}
+              openPanel={openPanel} setOpenPanel={setOpenPanel} width="w-52">
+              <PanelHeader>Event type</PanelHeader>
+              <div className="py-1.5">
+                {categories.map(cat => (
+                  <OptionRow key={cat} selected={activeCategory === cat} label={cat === 'All' ? 'All types' : cat}
+                    count={cat === 'All' ? undefined : (categoryCounts.get(cat) ?? 0)}
+                    onClick={() => { setActiveCategory(cat); onFacetPick(); }} />
+                ))}
+              </div>
+            </Facet>
+
+            {activeCount > 0 && (
+              <button type="button" onClick={reset}
+                className="ml-1 shrink-0 font-ui text-xs font-semibold text-durga hover:underline">
+                Clear all
               </button>
-            ))}
+            )}
+
+            <div className="ml-auto shrink-0">
+              <select value={sort} onChange={e => setSort(e.target.value)}
+                className="text-xs font-ui text-ink-muted bg-transparent border border-ivory-200 rounded-lg px-3 py-2 focus:outline-none focus:border-aubergine cursor-pointer">
+                {SORT_OPTIONS.map(o => <option key={o}>{o}</option>)}
+              </select>
+            </div>
           </div>
-          <div className="ml-auto shrink-0">
-            <select value={sort} onChange={e => setSort(e.target.value)}
-              className="text-xs font-ui text-ink-muted bg-transparent border border-ivory-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-aubergine cursor-pointer">
-              {SORT_OPTIONS.map(o => <option key={o}>{o}</option>)}
-            </select>
+
+          {/* Mobile: Filters button + sort */}
+          <div className="md:hidden flex items-center gap-2">
+            <button type="button" onClick={() => setMobileFilters(true)}
+              className="flex items-center gap-2 px-4 py-2.5 rounded-full border border-ivory-200 bg-white text-sm font-semibold text-ink active:scale-95 transition-transform" style={{ minHeight: 44 }}>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4h18M6 12h12M10 20h4" /></svg>
+              Filters
+              {activeCount > 0 && (
+                <span className="font-mono text-[10px] font-bold bg-marigold text-aubergine rounded-full min-w-5 h-5 px-1.5 flex items-center justify-center">{activeCount}</span>
+              )}
+            </button>
+            <div className="ml-auto shrink-0">
+              <select value={sort} onChange={e => setSort(e.target.value)}
+                className="text-xs font-ui text-ink-muted bg-white border border-ivory-200 rounded-full px-3 py-2.5 focus:outline-none focus:border-aubergine cursor-pointer" style={{ minHeight: 44 }}>
+                {SORT_OPTIONS.map(o => <option key={o}>{o}</option>)}
+              </select>
+            </div>
           </div>
+
+          {/* Active filter chips (both breakpoints) */}
+          {activeChips.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5 mt-2.5">
+              {activeChips.map(c => (
+                <button key={c.key} onClick={c.clear}
+                  className="flex items-center gap-1.5 pl-3 pr-2 py-1 rounded-full text-xs font-medium bg-ivory border border-ivory-200 text-ink hover:border-durga/40 hover:text-durga transition-colors">
+                  {c.label}
+                  <svg className="w-3 h-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -648,7 +824,8 @@ export default function EventsPage() {
               <p className="font-ui text-sm text-ink">
                 <span className="font-bold">{filtered.length}</span>
                 <span className="text-ink-muted"> {view === 'past' ? 'past ' : ''}event{filtered.length !== 1 ? 's' : ''}</span>
-                {activeCity !== 'All Cities' && <span className="text-ink-muted"> in {activeCity}</span>}
+                {location.kind === 'city' && <span className="text-ink-muted"> in {location.value}</span>}
+                {location.kind === 'region' && <span className="text-ink-muted"> in the {location.value}</span>}
               </p>
 
               {/* Upcoming / Past toggle — only when past events exist */}
@@ -697,8 +874,8 @@ export default function EventsPage() {
                 ) : (
                   <>
                     <p className="font-display text-2xl font-bold text-ink mb-2">No events found</p>
-                    <p className="font-ui text-ink-muted text-sm mb-6">Try adjusting your filters.</p>
-                    <button onClick={() => { setSearch(''); setActiveCategory('All'); setActiveCity('All Cities'); }}
+                    <p className="font-ui text-ink-muted text-sm mb-6">Try adjusting or clearing your filters.</p>
+                    <button onClick={reset}
                       className="px-6 py-3 rounded-2xl bg-marigold text-aubergine font-semibold text-sm hover:bg-[#d4891b] transition-colors">
                       Clear all filters
                     </button>
@@ -725,6 +902,116 @@ export default function EventsPage() {
           </>
         )}
       </div>
+
+      {/* Mobile filter bottom-sheet */}
+      {mobileFilters && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileFilters(false)} />
+          <div className="absolute bottom-0 inset-x-0 bg-white rounded-t-3xl flex flex-col" style={{ maxHeight: '88vh' }}>
+            <div className="flex items-center justify-between px-5 py-4 border-b border-ivory-200">
+              <p className="font-display font-bold text-ink text-lg">Filters</p>
+              <button type="button" onClick={() => setMobileFilters(false)} aria-label="Close"
+                className="w-9 h-9 rounded-full bg-ivory flex items-center justify-center text-ink-muted">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+
+            <div className="overflow-y-auto px-5 py-5 space-y-6 flex-1">
+              {/* Search inside the sheet too */}
+              <div className="relative">
+                <svg className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-muted" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search events, artists, cities…"
+                  className="w-full bg-ivory rounded-xl pl-10 pr-3 py-3 font-ui text-sm text-ink placeholder:text-ink-muted/60 focus:outline-none focus:ring-2 focus:ring-marigold" />
+              </div>
+
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2.5">Date</p>
+                <div className="flex flex-wrap gap-2">
+                  {DATE_OPTIONS.map(o => (
+                    <Chip key={o.id} selected={dateFilter === o.id} onClick={() => setDateFilter(o.id)}>{o.label}</Chip>
+                  ))}
+                </div>
+                <input type="date" value={isPresetDate(dateFilter) ? '' : dateFilter}
+                  onChange={e => setDateFilter(e.target.value || 'any')}
+                  className="mt-2.5 w-full text-sm font-ui text-ink border border-ivory-200 rounded-xl px-3 py-2.5 focus:outline-none focus:border-aubergine" />
+              </div>
+
+              {regionOpts.length > 0 && (
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2.5">Region</p>
+                  <div className="flex flex-wrap gap-2">
+                    {regionOpts.map(([name, count]) => (
+                      <Chip key={name} selected={location.kind === 'region' && location.value === name}
+                        onClick={() => setLocation(location.kind === 'region' && location.value === name ? { kind: 'all' } : { kind: 'region', value: name })}>
+                        {name} <span className="opacity-50">{count}</span>
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {cityOpts.length > 0 && (
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2.5">City</p>
+                  <div className="flex flex-wrap gap-2">
+                    {cityOpts.map(([name, count]) => (
+                      <Chip key={name} selected={location.kind === 'city' && location.value === name}
+                        onClick={() => setLocation(location.kind === 'city' && location.value === name ? { kind: 'all' } : { kind: 'city', value: name })}>
+                        {name} <span className="opacity-50">{count}</span>
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {artistOpts.length > 0 && (
+                <div>
+                  <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2.5">Artist</p>
+                  <div className="flex flex-wrap gap-2">
+                    {artistOpts.map(([name, count]) => (
+                      <Chip key={name} selected={activeArtist === name}
+                        onClick={() => setActiveArtist(activeArtist === name ? 'All' : name)}>
+                        {name} <span className="opacity-50">{count}</span>
+                      </Chip>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2.5">Price</p>
+                <div className="flex flex-wrap gap-2">
+                  {PRICE_OPTIONS.map(o => (
+                    <Chip key={o.id} selected={price === o.id} onClick={() => setPrice(o.id)}>{o.label}</Chip>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2.5">Event type</p>
+                <div className="flex flex-wrap gap-2">
+                  {categories.map(cat => (
+                    <Chip key={cat} selected={activeCategory === cat} onClick={() => setActiveCategory(cat)}>
+                      {cat === 'All' ? 'All types' : cat}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 px-5 py-4 border-t border-ivory-200">
+              <button type="button" onClick={reset}
+                className="px-5 py-3 rounded-2xl border border-ivory-200 text-ink font-semibold text-sm" style={{ minHeight: 48 }}>
+                Clear all
+              </button>
+              <button type="button" onClick={() => { setMobileFilters(false); setShowAll(false); }}
+                className="flex-1 px-5 py-3 rounded-2xl bg-marigold text-aubergine font-bold text-sm hover:bg-[#d4891b] transition-colors" style={{ minHeight: 48 }}>
+                Show {filtered.length} event{filtered.length !== 1 ? 's' : ''}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Gradient color key */}
       <section className="border-t border-ivory-200 py-12" style={{ backgroundColor: '#2E1B30' }}>
