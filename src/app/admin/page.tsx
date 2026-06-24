@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import DailySummaryCard from "./DailySummaryCard";
 
 type DashboardData = {
   totalUsers: number;
@@ -167,6 +168,9 @@ export default function AdminDashboardPage() {
           accent="#8B2252"
         />
       </div>
+
+      {/* ── Daily summary email ───────────────────────────────────── */}
+      <DailySummaryCard />
 
       {/* ── Two-col row ───────────────────────────────────────────── */}
       <div className="grid lg:grid-cols-5 gap-4">

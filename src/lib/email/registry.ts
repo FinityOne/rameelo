@@ -202,6 +202,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     fires: "When an admin clicks “Notify interested people” in an event's Interest tab",
   },
   {
+    key: "daily-summary",
+    name: "Daily activity summary",
+    description: "A daily digest to all platform admins for the prior Pacific-time day: new users, online orders, tickets, ticket revenue, platform fees, total collected, offline/manual sales, comp tickets, and an event-by-event sales breakdown — enough context to decide what to focus on.",
+    audience: "Admins",
+    category: "Platform",
+    status: "live",
+    trigger: "both",
+    fires: "Automatically each midnight (Pacific) via cron · Manual send for any date from the admin Dashboard",
+  },
+  {
     key: "payout-status",
     name: "Payout status",
     description: "Updates an organizer when a payout request is approved, paid, or declined.",
