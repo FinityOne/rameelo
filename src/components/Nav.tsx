@@ -43,34 +43,29 @@ function ComingSoon({ children, label = "Coming soon" }: { children: React.React
   );
 }
 
-// ─── Category nav item (with subtitle + optional badge) ───────────────────────
+// ─── Category nav item (label + optional badge) ───────────────────────────────
 function CatItem({
-  href, label, sub, badge, active, comingSoon,
+  href, label, badge, active, comingSoon,
 }: {
-  href: string; label: string; sub: string; badge?: string; active?: boolean; comingSoon?: boolean;
+  href: string; label: string; badge?: string; active?: boolean; comingSoon?: boolean;
 }) {
   const inner = (
-    <span className={`flex flex-col items-start px-4 py-3 rounded-xl transition-colors ${
+    <span className={`flex items-center gap-1.5 px-4 py-3.5 rounded-xl transition-colors ${
       active ? "bg-aubergine/6" : "hover:bg-ink/5"
     }`}>
-      <span className="flex items-center gap-1.5">
-        <span className={`font-ui font-semibold text-[13px] leading-none ${active ? "text-aubergine" : "text-ink"}`}>
-          {label}
+      <span className={`font-ui font-semibold text-[13px] leading-none ${active ? "text-aubergine" : "text-ink"}`}>
+        {label}
+      </span>
+      {badge && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[8px] font-bold uppercase tracking-wide bg-red-500 text-white leading-none">
+          {badge}
         </span>
-        {badge && (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[8px] font-bold uppercase tracking-wide bg-red-500 text-white leading-none">
-            {badge}
-          </span>
-        )}
-        {comingSoon && (
-          <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[8px] font-medium uppercase tracking-wide bg-ink/8 text-ink/35 leading-none">
-            Soon
-          </span>
-        )}
-      </span>
-      <span className={`font-ui text-[11px] mt-1 leading-none ${active ? "text-aubergine/55" : "text-ink/45"}`}>
-        {sub}
-      </span>
+      )}
+      {comingSoon && (
+        <span className="inline-flex items-center px-1.5 py-0.5 rounded font-mono text-[8px] font-medium uppercase tracking-wide bg-ink/8 text-ink/35 leading-none">
+          Soon
+        </span>
+      )}
     </span>
   );
 
@@ -125,12 +120,12 @@ export default function Nav() {
       : null;
 
   const CATEGORIES = [
-    { href: "/events",     label: "Events",      sub: "Buy tickets",          live: true, badge: "NEW" },
-    { href: "/artists",    label: "Artists",      sub: "Singers · DJs · Dholis", live: true  },
-    { href: "/collegiate", label: "Collegiate",   sub: "Teams & competitions", live: true },
-    { href: "/community",  label: "Communities",  sub: "Circles · chats",      live: false },
-    { href: "/photos",     label: "Photos",       sub: "Garba memory book",    live: false },
-    { href: "/blog",       label: "Blog",         sub: "Culture & guides",     live: true  },
+    { href: "/events",     label: "Events",      live: true, badge: "NEW" },
+    { href: "/artists",    label: "Artists",     live: true  },
+    { href: "/collegiate", label: "Collegiate",  live: true },
+    { href: "/community",  label: "Communities", live: false },
+    { href: "/photos",     label: "Photos",      live: false },
+    { href: "/blog",       label: "Blog",        live: true  },
   ];
 
   return (
@@ -199,19 +194,6 @@ export default function Nav() {
           {/* Logo */}
           <div className="shrink-0">
             <Logo variant="red" height={28} />
-          </div>
-
-          {/* Search bar — compact + centered */}
-          <div className="hidden lg:block absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md px-4">
-            <div className="flex items-center gap-2.5 bg-ink/[0.06] border border-ink/[0.07] rounded-full px-4 py-1.5 hover:bg-ink/[0.09] transition-colors cursor-text">
-              <svg className="w-4 h-4 text-ink/35 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <span className="flex-1 font-ui text-[13px] text-ink/45 select-none">Search events, artists, cities…</span>
-              <kbd className="flex items-center gap-0.5 font-mono text-[10px] bg-white/50 border border-ink/10 text-ink/40 px-1.5 py-0.5 rounded-md">
-                <span style={{ fontSize: 11 }}>⌘</span>K
-              </kbd>
-            </div>
           </div>
 
           {/* Right: wishlist, cart, auth */}
@@ -302,7 +284,6 @@ export default function Nav() {
                 key={cat.href}
                 href={cat.href}
                 label={cat.label}
-                sub={cat.sub}
                 badge={cat.badge}
                 active={pathname.startsWith(cat.href) && cat.href !== "/"}
                 comingSoon={!cat.live}
@@ -341,14 +322,6 @@ export default function Nav() {
             </div>
           )}
 
-          {/* Search bar mobile */}
-          <div className="flex items-center gap-2.5 bg-white border border-ivory-200 rounded-xl px-4 py-2.5 mb-3">
-            <svg className="w-4 h-4 text-ink/30 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
-            <span className="font-ui text-sm text-ink/30">Search events, artists, cities…</span>
-          </div>
-
           {CATEGORIES.map((cat) => {
             const active = pathname.startsWith(cat.href) && cat.href !== "/";
             return (
@@ -362,7 +335,9 @@ export default function Nav() {
                     }`}
                   >
                     <span>{cat.label}</span>
-                    <span className="font-mono text-[9px] text-ink/30">{cat.sub}</span>
+                    {cat.badge && (
+                      <span className="font-mono text-[8px] font-bold uppercase tracking-wide bg-red-500 text-white px-1.5 py-0.5 rounded">{cat.badge}</span>
+                    )}
                   </Link>
                 ) : (
                   <div className="flex items-center justify-between px-4 py-2.5 rounded-[8px] text-ink/30">
