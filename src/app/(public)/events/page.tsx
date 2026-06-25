@@ -30,7 +30,7 @@ type DBEvent = {
   capacity: number | null;
   selling_on_rameelo: boolean;
   featured_on_events: boolean;
-  ticket_tiers: { price: number; quantity: number }[];
+  ticket_tiers: { price: number; quantity: number; quantity_sold: number; sold_out: boolean }[];
   artists: { name: string; tagline: string | null; profile_image_url: string | null; is_featured: boolean } | null;
 };
 
@@ -55,6 +55,7 @@ type EventVM = {
   minPrice: number | null;
   maxPrice: number | null;
   totalQty: number;
+  soldOut: boolean;
   dressCode: string;
   ageRestriction: string;
   navratriNights: number[];
@@ -220,6 +221,11 @@ function EventCard({ event, isPast = false }: { event: EventVM; isPast?: boolean
               style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}>
               Ended
             </span>
+          ) : event.sellingOnRameelo && event.soldOut ? (
+            <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full text-white bg-ink"
+              style={{ backdropFilter: 'blur(4px)' }}>
+              Sold Out
+            </span>
           ) : event.navratriNights.length > 1 && (
             <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full text-white/80"
               style={{ background: 'rgba(0,0,0,0.3)', backdropFilter: 'blur(4px)' }}>
@@ -296,10 +302,16 @@ function EventCard({ event, isPast = false }: { event: EventVM; isPast?: boolean
             className={`px-3.5 py-2 rounded-xl text-xs font-semibold transition-all ${
               isPast
                 ? 'bg-ivory text-ink-muted border border-ivory-200 hover:border-aubergine/30 hover:text-aubergine'
-                : 'bg-marigold text-aubergine hover:bg-[#d4891b]'
+                : !isPast && event.sellingOnRameelo && event.soldOut
+                  ? 'bg-ink/90 text-white hover:bg-ink'
+                  : 'bg-marigold text-aubergine hover:bg-[#d4891b]'
             }`}
           >
-            {isPast ? "View event" : event.sellingOnRameelo ? "Get Tickets" : "Get Early Access"}
+            {isPast
+              ? "View event"
+              : event.sellingOnRameelo
+                ? (event.soldOut ? "Join waitlist" : "Get Tickets")
+                : "Get Early Access"}
           </Link>
         </div>
       </div>
@@ -410,7 +422,7 @@ export default function EventsPage() {
           start_date, end_date, is_multi_day, city, state, metro_city, venue_name, start_time,
           cover_image_url, cover_gradient, dress_code, dandiya_sticks,
           age_restriction, navratri_nights, capacity, selling_on_rameelo, featured_on_events,
-          ticket_tiers (price, quantity),
+          ticket_tiers (price, quantity, quantity_sold, sold_out),
           artists (name, tagline, profile_image_url, is_featured)
         `)
         .eq('status', 'published')
@@ -441,6 +453,8 @@ export default function EventsPage() {
           minPrice: prices.length ? Math.min(...prices) : null,
           maxPrice: prices.length ? Math.max(...prices) : null,
           totalQty: ev.ticket_tiers.reduce((s, t) => s + t.quantity, 0),
+          // Fully sold out only when every tier is gone (forced or inventory-exhausted).
+          soldOut: ev.ticket_tiers.length > 0 && ev.ticket_tiers.every(t => t.sold_out || t.quantity_sold >= t.quantity),
           dressCode: ev.dress_code,
           ageRestriction: ev.age_restriction,
           navratriNights: ev.navratri_nights ?? [],

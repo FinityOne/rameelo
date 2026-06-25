@@ -47,7 +47,7 @@ type LiveEvent = {
   selling_on_rameelo: boolean;
   featured_on_tour: boolean;
   cover_image_url: string | null;
-  ticket_tiers: { price: number; quantity: number; quantity_sold: number }[];
+  ticket_tiers: { name: string; price: number; quantity: number; quantity_sold: number; sold_out: boolean; sale_end_date: string | null }[];
 };
 
 export default async function HomePage() {
@@ -57,7 +57,7 @@ export default async function HomePage() {
   const [platformStats, { data: rawEvents }, { data: rawArtists }] = await Promise.all([
     getPlatformStats(),
     supabase.from("events")
-      .select("id, title, category, city, state, metro_city, start_date, start_time, venue_name, selling_on_rameelo, featured_on_tour, cover_image_url, artists(name), ticket_tiers(price, quantity, quantity_sold)")
+      .select("id, title, category, city, state, metro_city, start_date, start_time, venue_name, selling_on_rameelo, featured_on_tour, cover_image_url, artists(name), ticket_tiers(name, price, quantity, quantity_sold, sold_out, sale_end_date)")
       .eq("status", "published")
       // Only events the admin has toggled to SELL on Rameelo — interest-only
       // events never surface on the home page (matches the /garba rule).
@@ -89,7 +89,7 @@ export default async function HomePage() {
       sellingOnRameelo: !!e.selling_on_rameelo,
       featured: !!e.featured_on_tour,
       artistName: Array.isArray(artist) ? artist[0]?.name ?? null : artist?.name ?? null,
-      tiers: (e.ticket_tiers ?? []).map((t) => ({ price: t.price, quantity: t.quantity, quantitySold: t.quantity_sold })),
+      tiers: (e.ticket_tiers ?? []).map((t) => ({ name: t.name, price: t.price, quantity: t.quantity, quantitySold: t.quantity_sold, soldOut: t.sold_out, saleEndDate: t.sale_end_date })),
     };
   });
   const trendingArtists: TrendingArtist[] = ((rawArtists ?? []) as {

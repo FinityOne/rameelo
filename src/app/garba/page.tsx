@@ -40,7 +40,7 @@ export default async function TourPage() {
   const { data: raw } = await supabase
     .from("events")
     .select(
-      "id, title, category, city, state, metro_city, start_date, start_time, venue_name, cover_image_url, cover_gradient, selling_on_rameelo, featured_on_tour, artists(name), ticket_tiers(price, quantity, quantity_sold)",
+      "id, title, category, city, state, metro_city, start_date, start_time, venue_name, cover_image_url, cover_gradient, selling_on_rameelo, featured_on_tour, artists(name), ticket_tiers(name, price, quantity, quantity_sold, sold_out, sale_end_date)",
     )
     .eq("status", "published")
     .eq("selling_on_rameelo", true)
@@ -50,7 +50,7 @@ export default async function TourPage() {
     .limit(80);
 
   const events: GarbaEvent[] = (raw ?? []).map((e: Record<string, unknown>) => {
-    const tiers = (e.ticket_tiers as { price: number; quantity: number; quantity_sold: number }[] | null) ?? [];
+    const tiers = (e.ticket_tiers as { name: string; price: number; quantity: number; quantity_sold: number; sold_out: boolean; sale_end_date: string | null }[] | null) ?? [];
     const artist = e.artists as { name: string } | { name: string }[] | null;
     return {
       id: e.id as string,
@@ -67,7 +67,7 @@ export default async function TourPage() {
       sellingOnRameelo: !!e.selling_on_rameelo,
       featured: !!e.featured_on_tour,
       artistName: Array.isArray(artist) ? artist[0]?.name ?? null : artist?.name ?? null,
-      tiers: tiers.map((t) => ({ price: t.price, quantity: t.quantity, quantitySold: t.quantity_sold })),
+      tiers: tiers.map((t) => ({ name: t.name, price: t.price, quantity: t.quantity, quantitySold: t.quantity_sold, soldOut: t.sold_out, saleEndDate: t.sale_end_date })),
     };
   });
 

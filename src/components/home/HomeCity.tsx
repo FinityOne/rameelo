@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState } from 
 import Link from "next/link";
 import { EventCard } from "@/components/ui";
 import { useNearestMetro } from "@/hooks/useNearestMetro";
+import { missedTierNames } from "./missed-tiers";
 
 // ── Shared, geolocation-aware "find garba in your city" experience for the home
 // page. One provider owns the user's nearest metro + the selected city; the hero
@@ -25,7 +26,7 @@ export type HomeEvent = {
   sellingOnRameelo: boolean;
   featured: boolean;
   artistName: string | null;
-  tiers: { price: number; quantity: number; quantitySold: number }[];
+  tiers: { name: string; price: number; quantity: number; quantitySold: number; soldOut: boolean; saleEndDate: string | null }[];
 };
 
 const ALL = "All cities";
@@ -202,6 +203,9 @@ function EventGrid({ list }: { list: HomeEvent[] }) {
         const total = e.tiers.reduce((s, t) => s + t.quantity, 0);
         const sold = e.tiers.reduce((s, t) => s + t.quantitySold, 0);
         const pct = total > 0 ? Math.round((sold / total) * 100) : 0;
+        // A forced sold-out tier reads as fully claimed regardless of real sales.
+        const remaining = e.tiers.reduce((s, t) => s + (t.soldOut ? 0 : Math.max(0, t.quantity - t.quantitySold)), 0);
+        const allSoldOut = e.tiers.length > 0 && e.tiers.every((t) => t.soldOut || t.quantitySold >= t.quantity);
         const prices = e.tiers.map((t) => t.price);
         const minPrice = prices.length ? Math.min(...prices) : null;
         const maxPrice = prices.length ? Math.max(...prices) : null;
@@ -209,7 +213,7 @@ function EventGrid({ list }: { list: HomeEvent[] }) {
         const lowTiers = minPrice != null ? e.tiers.filter((t) => t.price === minPrice) : [];
         const lowQty = lowTiers.reduce((s, t) => s + t.quantity, 0);
         const lowSold = lowTiers.reduce((s, t) => s + t.quantitySold, 0);
-        const lowTierPctSold = lowQty > 0 ? Math.round((lowSold / lowQty) * 100) : null;
+        const lowTierPctSold = lowTiers.some((t) => t.soldOut) ? 100 : (lowQty > 0 ? Math.round((lowSold / lowQty) * 100) : null);
         const daysUntil = Math.round(
           (new Date(e.startDate + "T00:00:00").getTime() - new Date(new Date().toDateString()).getTime()) / 86_400_000
         );
@@ -225,8 +229,9 @@ function EventGrid({ list }: { list: HomeEvent[] }) {
             maxPrice={maxPrice}
             sellingOnRameelo={e.sellingOnRameelo}
             soldPct={pct}
-            soldOut={total > 0 && sold >= total}
-            ticketsLeft={total > 0 ? Math.max(0, total - sold) : null}
+            soldOut={allSoldOut}
+            soldOutTiers={missedTierNames(e.tiers)}
+            ticketsLeft={total > 0 ? remaining : null}
             daysUntil={daysUntil}
             lowTierPctSold={lowTierPctSold}
             coverImageUrl={e.coverImageUrl}

@@ -114,6 +114,7 @@ type Tier = {
   price: number;
   quantity: number;
   quantity_sold: number;
+  sold_out: boolean;
   is_visible: boolean;
 };
 
@@ -181,7 +182,8 @@ function eventStats(tiers: Tier[]) {
   const totalSold = visible.reduce((s, t) => s + t.quantity_sold, 0);
   const soldPct   = totalQty > 0 ? Math.round((totalSold / totalQty) * 100) : 0;
   const minPrice  = visible.length > 0 ? Math.min(...visible.map((t) => t.price)) : null;
-  const isSoldOut = totalQty > 0 && totalSold >= totalQty;
+  // Sold out when every visible tier is gone — forced by the organizer or inventory-exhausted.
+  const isSoldOut = visible.length > 0 && visible.every((t) => t.sold_out || t.quantity_sold >= t.quantity);
   return { soldPct, totalQty, totalSold, minPrice, isSoldOut };
 }
 
@@ -370,7 +372,7 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
     .from("events")
     .select(`
       id, title, start_date, start_time, venue_name, city, state, metro_city, cover_gradient, cover_image_url, featured_on_artist, selling_on_rameelo,
-      ticket_tiers (id, name, price, quantity, quantity_sold, is_visible)
+      ticket_tiers (id, name, price, quantity, quantity_sold, sold_out, is_visible)
     `)
     .eq("status", "published")
     .or(`artist_id.eq.${artist.id},artist.ilike.${artist.name}`)

@@ -32,7 +32,7 @@ type OrgEvent = {
   selling_on_rameelo: boolean;
   cover_image_url: string | null;
   artists: { name: string } | null;
-  ticket_tiers: { price: number; quantity: number; quantity_sold: number }[];
+  ticket_tiers: { price: number; quantity: number; quantity_sold: number; sold_out: boolean }[];
 };
 
 const ORG_TYPE_LABEL: Record<string, string> = {
@@ -75,7 +75,7 @@ export default function OrgPage() {
 
       const { data: evData } = await supabase
         .from("events")
-        .select("id, title, category, artist, city, state, metro_city, start_date, selling_on_rameelo, cover_image_url, artists (name), ticket_tiers (price, quantity, quantity_sold)")
+        .select("id, title, category, artist, city, state, metro_city, start_date, selling_on_rameelo, cover_image_url, artists (name), ticket_tiers (price, quantity, quantity_sold, sold_out)")
         .eq("org_id", o.id)
         .eq("status", "published")
         .order("start_date");
@@ -199,9 +199,9 @@ export default function OrgPage() {
 // single right-aligned action. Upcoming events get a "Get tickets / Get early
 // access" CTA; past events just get a "View event" link.
 function OrgEventRow({ ev, isPast }: { ev: OrgEvent; isPast: boolean }) {
-  const totalQty = (ev.ticket_tiers ?? []).reduce((s, t) => s + (t.quantity ?? 0), 0);
-  const totalSold = (ev.ticket_tiers ?? []).reduce((s, t) => s + (t.quantity_sold ?? 0), 0);
-  const soldOut = totalQty > 0 && totalSold >= totalQty;
+  const tiers = ev.ticket_tiers ?? [];
+  // Sold out only when every tier is gone — forced by the organizer or inventory-exhausted.
+  const soldOut = tiers.length > 0 && tiers.every(t => t.sold_out || (t.quantity_sold ?? 0) >= (t.quantity ?? 0));
   const artistName = ev.artists?.name ?? ev.artist ?? null;
   const location = [ev.metro_city ?? ev.city, ev.state].filter(Boolean).join(", ");
 

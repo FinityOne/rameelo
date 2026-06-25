@@ -15,6 +15,8 @@ type Tier = {
   description: string;
   price: number;
   quantity: number;
+  quantity_sold?: number;
+  sold_out: boolean;
   sale_start_date: string;
   sale_end_date: string;
   group_discount_mode: "simple" | "scaling" | null;
@@ -165,6 +167,9 @@ function TierCard({ tier, idx, onChange }: {
         <p className="font-display font-semibold text-ink text-sm flex-1 truncate" style={{ letterSpacing: "-0.01em" }}>
           {tier.name || `Tier ${idx + 1}`}
         </p>
+        {tier.sold_out && (
+          <span className="font-mono text-[8px] font-bold uppercase tracking-widest bg-ink text-white px-1.5 py-0.5 rounded-full shrink-0">Sold Out</span>
+        )}
         {tier._dirty && (
           <span className="font-mono text-[8px] uppercase tracking-widest bg-marigold/20 text-marigold-dark px-1.5 py-0.5 rounded-full shrink-0">Unsaved</span>
         )}
@@ -195,6 +200,22 @@ function TierCard({ tier, idx, onChange }: {
               onChange={e => onChange({ quantity: parseInt(e.target.value) || 1 })}
               className={inputCls} />
           </div>
+        </div>
+
+        {/* ── Force sold out ──
+            Closes the tier for purchase regardless of inventory and shows a
+            "Sold Out" treatment on the public event page (FOMO driver). */}
+        <div className={`rounded-xl border p-3 transition-colors ${tier.sold_out ? "bg-ink/[0.04] border-ink/20" : "bg-ivory/60 border-ivory-200"}`}>
+          <ToggleRow
+            title="Mark as sold out"
+            desc={
+              tier.sold_out
+                ? `Closed — buyers see “Sold Out.” ${typeof tier.quantity_sold === "number" ? `${tier.quantity_sold} of ${tier.quantity} sold.` : ""}`.trim()
+                : "Force this tier closed no matter how many are sold. Surfaces a “Sold Out” badge on the event page to drive urgency."
+            }
+            checked={tier.sold_out}
+            onChange={v => onChange({ sold_out: v })}
+          />
         </div>
 
         <div>
@@ -428,6 +449,7 @@ export default function AdminEventEditPage() {
         description:     (t as unknown as Record<string, string>).description ?? "",
         sale_start_date: (t as unknown as Record<string, string>).sale_start_date ?? "",
         sale_end_date:   (t as unknown as Record<string, string>).sale_end_date ?? "",
+        sold_out:        (t as unknown as Record<string, boolean>).sold_out ?? false,
         _dirty: false,
       })));
 
@@ -459,7 +481,7 @@ export default function AdminEventEditPage() {
     if (tiers.length >= 6) return;
     setTiers(prev => [...prev, {
       id: `new-${Date.now()}`,
-      name: "", description: "", price: 0, quantity: 100,
+      name: "", description: "", price: 0, quantity: 100, sold_out: false,
       sale_start_date: "", sale_end_date: "",
       group_discount_mode: null, group_discount_min_qty: null, group_discount_type: null, group_discount_value: null, group_discount_tiers: null,
       sort_order: prev.length,
@@ -542,6 +564,7 @@ export default function AdminEventEditPage() {
           description:            tier.description || null,
           price:                  tier.price,
           quantity:               tier.quantity,
+          sold_out:               tier.sold_out,
           sale_start_date:        tier.sale_start_date || null,
           sale_end_date:          tier.sale_end_date || null,
           group_discount_mode:    tier.group_discount_mode,
