@@ -1,5 +1,7 @@
 import Link from "next/link";
+import { SoldOutTierTags } from "@/components/ui";
 import type { HomeEvent } from "./HomeCity";
+import { missedTierNames } from "./missed-tiers";
 
 // Ticketmaster-style hero: the top events shown big and image-forward, so an
 // attendee recognizes the artist/event instantly and taps straight to buy.
@@ -25,6 +27,7 @@ function FeatureCard({ e, large }: { e: HomeEvent; large?: boolean }) {
   const headline = e.artistName || e.title;
   const sub = e.artistName ? e.title : "";
   const place = [e.city, e.state].filter(Boolean).join(", ");
+  const missed = missedTierNames(e.tiers);
 
   return (
     <Link
@@ -33,11 +36,12 @@ function FeatureCard({ e, large }: { e: HomeEvent; large?: boolean }) {
     >
       <div className={large ? "aspect-[4/3] lg:aspect-auto lg:h-full lg:min-h-[420px]" : "aspect-[16/10] sm:aspect-[3/2]"} style={{ background: bg }} />
 
-      {/* Top tag */}
-      <div className="absolute top-3 left-3">
+      {/* Top tag + sold-out tier tags ("you missed the Early Bird / VIP" FOMO) */}
+      <div className="absolute top-3 left-3 right-3 flex flex-col items-start gap-2">
         <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-marigold text-aubergine shadow">
           {e.featured ? "★ Featured" : "On sale"}
         </span>
+        <SoldOutTierTags names={missed} />
       </div>
 
       {/* Bottom content */}

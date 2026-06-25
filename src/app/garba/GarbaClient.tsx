@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
+import { SoldOutTierTags } from "@/components/ui";
+import { missedTierNames } from "@/components/home/missed-tiers";
 
 // ── Types ───────────────────────────────────────────────────────────────────
 export type GarbaEvent = {
@@ -21,7 +23,7 @@ export type GarbaEvent = {
   sellingOnRameelo: boolean;
   featured: boolean;
   artistName: string | null;
-  tiers: { price: number; quantity: number; quantitySold: number }[];
+  tiers: { name: string; price: number; quantity: number; quantitySold: number; soldOut: boolean; saleEndDate: string | null }[];
 };
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -51,8 +53,11 @@ function priceLabel(e: GarbaEvent): string {
 
 function availability(e: GarbaEvent): { label: string; cls: string } | null {
   if (!e.sellingOnRameelo || e.tiers.length === 0) return null;
+  // A tier the organizer force-closed counts as fully sold regardless of inventory.
+  const allSoldOut = e.tiers.every((t) => t.soldOut || t.quantitySold >= t.quantity);
+  if (allSoldOut) return { label: "Sold out", cls: "bg-durga/25 text-red-200 border-durga/40" };
   const total = e.tiers.reduce((s, t) => s + t.quantity, 0);
-  const sold = e.tiers.reduce((s, t) => s + t.quantitySold, 0);
+  const sold = e.tiers.reduce((s, t) => s + (t.soldOut ? t.quantity : t.quantitySold), 0);
   const pct = total > 0 ? sold / total : 0;
   if (pct >= 1) return { label: "Sold out", cls: "bg-durga/25 text-red-200 border-durga/40" };
   if (pct >= 0.9) return { label: "Almost gone", cls: "bg-durga/20 text-red-200 border-durga/40" };
@@ -85,10 +90,13 @@ function FeaturedCard({ e }: { e: GarbaEvent }) {
       style={{ scrollSnapAlign: "center" }}
     >
       <div className="aspect-[4/5]" style={{ background: coverBackground(e.coverImageUrl, e.coverGradient) }} />
-      {/* Top tags */}
-      <div className="absolute top-3 left-3 right-3 flex items-center justify-between">
-        <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-marigold text-aubergine shadow-lg">★ Featured</span>
-        {avail && <span className={`font-mono text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border ${avail.cls}`}>{avail.label}</span>}
+      {/* Top tags + sold-out tier tags ("you missed the Early Bird / VIP" FOMO) */}
+      <div className="absolute top-3 left-3 right-3 flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <span className="font-mono text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-marigold text-aubergine shadow-lg">★ Featured</span>
+          {avail && <span className={`font-mono text-[9px] font-bold uppercase tracking-widest px-2.5 py-1 rounded-full border ${avail.cls}`}>{avail.label}</span>}
+        </div>
+        <SoldOutTierTags names={missedTierNames(e.tiers)} />
       </div>
       {/* Bottom content */}
       <div className="absolute inset-x-0 bottom-0 p-4">
@@ -134,6 +142,8 @@ function EventCard({ e, i }: { e: GarbaEvent; i: number }) {
           <span className="font-display font-bold text-marigold text-xs">{priceLabel(e)}</span>
           {avail && <span className={`font-mono text-[8px] font-bold uppercase tracking-widest px-1.5 py-0.5 rounded-full border ${avail.cls}`}>{avail.label}</span>}
         </div>
+        {/* Sold-out tier tags — the "you missed the Early Bird" gut-punch. */}
+        <SoldOutTierTags names={missedTierNames(e.tiers)} className="mt-1.5" />
       </div>
       {/* Chevron */}
       <svg className="w-4 h-4 text-white/30 group-hover:text-marigold shrink-0 transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>

@@ -59,6 +59,42 @@ function UrgencyPill({ u }: { u: Urgency }) {
   );
 }
 
+// ── Sold-out tier tags ────────────────────────────────────────────────────────
+// A little ticket-stub chip per sold-out tier, sat on top of the cover image. The
+// tier name is struck through with a red "Sold out" — designed to make a fan feel
+// they missed that specific ticket. Shared by the city cards and the hero so both
+// surfaces read identically. Caps at 2 names + a "+N" overflow to stay clean.
+export function SoldOutTierTags({ names, className = "" }: { names: string[]; className?: string }) {
+  if (!names.length) return null;
+  const show = names.slice(0, 2);
+  const extra = names.length - show.length;
+  return (
+    <div className={`flex flex-wrap items-center gap-1.5 ${className}`}>
+      {show.map((n) => (
+        <span
+          key={n}
+          className="inline-flex items-center gap-1.5 rounded-full bg-durga pl-2 pr-1 py-0.5 shadow-md ring-1 ring-black/10"
+        >
+          <svg className="w-3 h-3 shrink-0 text-white/90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 5v2m0 4v2m0 4v2M5 5a2 2 0 00-2 2v3a2 2 0 110 4v3a2 2 0 002 2h14a2 2 0 002-2v-3a2 2 0 110-4V7a2 2 0 00-2-2H5z" />
+          </svg>
+          <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-white max-w-[110px] truncate">
+            {n}
+          </span>
+          <span className="font-mono text-[8px] font-extrabold uppercase tracking-wider text-durga bg-white rounded-full px-1.5 py-0.5 leading-none">
+            Sold out
+          </span>
+        </span>
+      ))}
+      {extra > 0 && (
+        <span className="inline-flex items-center rounded-full bg-durga/90 px-2 py-1 ring-1 ring-black/10 font-mono text-[9px] font-bold uppercase tracking-widest text-white">
+          +{extra}
+        </span>
+      )}
+    </div>
+  );
+}
+
 interface EventCardProps {
   title: string;
   category: string;
@@ -73,6 +109,9 @@ interface EventCardProps {
   sellingOnRameelo?: boolean;
   soldPct: number;
   soldOut?: boolean;
+  /** Names of tiers that sold out and can no longer be bought — shown as
+   *  "you missed it" tags over the cover image to drive FOMO. */
+  soldOutTiers?: string[];
   /** Tickets remaining — used (silently, never shown) to detect hard scarcity. */
   ticketsLeft?: number | null;
   /** Whole days until the event — drives the deadline urgency pill. */
@@ -103,6 +142,7 @@ export function EventCard({
   sellingOnRameelo = true,
   soldPct,
   soldOut = false,
+  soldOutTiers = [],
   ticketsLeft = null,
   daysUntil = null,
   lowTierPctSold = null,
@@ -140,13 +180,17 @@ export function EventCard({
             />
           </>
         )}
-        <div className="relative z-10 flex items-center justify-between">
-          <Badge variant={isLive ? "peacock" : "marigold"} dot={isLive}>
-            {isLive ? "Live now" : category}
-          </Badge>
-          {soldOut && (
-            <Badge variant="ivory">Sold out</Badge>
-          )}
+        <div className="relative z-10 space-y-2">
+          <div className="flex items-center justify-between">
+            <Badge variant={isLive ? "peacock" : "marigold"} dot={isLive}>
+              {isLive ? "Live now" : category}
+            </Badge>
+            {soldOut && (
+              <Badge variant="ivory">Sold out</Badge>
+            )}
+          </div>
+          {/* Sold-out tier tags — "you missed the Early Bird / VIP" FOMO. */}
+          <SoldOutTierTags names={soldOutTiers} />
         </div>
 
         <div className="relative z-10">

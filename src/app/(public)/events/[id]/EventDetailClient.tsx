@@ -51,6 +51,7 @@ type Tier = {
   price: number;
   quantity: number;
   quantity_sold: number;
+  sold_out: boolean;
   sale_start_date: string | null;
   sale_end_date: string | null;
   is_visible: boolean;
@@ -118,6 +119,17 @@ function getNextScalingTier(tier: Tier | null, qty: number): { min: number; disc
   return null;
 }
 
+// Tickets remaining for a tier. An admin-forced `sold_out` flag closes the tier
+// immediately, regardless of how many were actually sold — so it always reads 0.
+function tierRemaining(tier: Tier): number {
+  if (tier.sold_out) return 0;
+  return tier.quantity - tier.quantity_sold;
+}
+// A tier counts as sold out when the admin forced it OR real inventory ran out.
+function tierIsSoldOut(tier: Tier): boolean {
+  return tier.sold_out || tier.quantity_sold >= tier.quantity;
+}
+
 function fmtDate(d: string) {
   return new Date(d + "T00:00:00").toLocaleDateString("en-US", {
     weekday: "long", month: "long", day: "numeric", year: "numeric",
@@ -159,9 +171,12 @@ const SOCIAL_PROOF_MIN_SOLD = 50;
 function getUrgencyState(tiers: Tier[]): "early" | "momentum" | "urgent" | "critical" | "soldout" {
   if (!tiers.length) return "early";
   const all = tiers.filter(t => t.quantity > 0);
-  if (all.every(t => t.quantity_sold >= t.quantity)) return "soldout";
-  const totalQty  = all.reduce((s, t) => s + t.quantity, 0);
-  const totalSold = all.reduce((s, t) => s + t.quantity_sold, 0);
+  if (all.every(tierIsSoldOut)) return "soldout";
+  // Exclude force-closed tiers from the fill math so a half-empty tier the admin
+  // marked sold out doesn't drag the urgency signal down for the live tiers.
+  const live = all.filter(t => !t.sold_out);
+  const totalQty  = live.reduce((s, t) => s + t.quantity, 0);
+  const totalSold = live.reduce((s, t) => s + t.quantity_sold, 0);
   const pct = totalQty > 0 ? totalSold / totalQty : 0;
   if (pct >= 0.85) return "critical";
   if (pct >= 0.5)  return "urgent";
@@ -454,11 +469,14 @@ function TierAvailabilityBar({ tier, ev, isSelected, onClick, isBestDeal, isMost
 }) {
   const notStarted = isTierNotStarted(tier);
   const expired    = isTierExpired(tier, ev);
-  const locked     = notStarted || expired;
+  // An admin-forced sold out outranks the sale window — a tier the organizer
+  // closed reads "Sold out" even if its sale dates say it's open or upcoming.
+  const forcedSoldOut = tier.sold_out;
+  const locked     = !forcedSoldOut && (notStarted || expired);
 
-  const rem  = tier.quantity - tier.quantity_sold;
+  const rem  = tierRemaining(tier);
   const pct  = tier.quantity > 0 ? Math.round((tier.quantity_sold / tier.quantity) * 100) : 0;
-  const soldOut    = !locked && rem <= 0;
+  const soldOut    = forcedSoldOut || (!locked && rem <= 0);
   const almostGone = !soldOut && !locked && rem <= Math.ceil(tier.quantity * 0.15);
   const sellingFast = !almostGone && !soldOut && !locked && pct >= 50;
 
@@ -467,16 +485,17 @@ function TierAvailabilityBar({ tier, ev, isSelected, onClick, isBestDeal, isMost
 
   const disabled = locked || soldOut;
 
-  const barColor = soldOut || expired ? "#6B5E6E"
+  const barColor = expired ? "#6B5E6E"
     : almostGone ? "#C0392B"
     : sellingFast ? "#D4891B"
     : "#0E8C7A";
 
-  // Primary status badge (only one shown — priority order)
-  const badge = expired        ? { label: "Sale ended",    bg: "bg-ivory-200",   text: "text-ink-muted" }
-    : notStarted               ? { label: "Not yet open",  bg: "bg-ivory-200",   text: "text-ink-muted" }
-    : soldOut                  ? { label: "Sold out",       bg: "bg-ivory-200",   text: "text-ink-muted" }
-    : almostGone               ? { label: `${rem} left`,   bg: "bg-durga/10",    text: "text-durga font-bold" }
+  // Primary status badge (only one shown — priority order). Note: the sold-out
+  // state is handled by its own dedicated render branch above, so it never
+  // reaches this badge logic.
+  const badge = expired        ? { label: "Sale ended",     bg: "bg-ivory-200",   text: "text-ink-muted" }
+    : notStarted               ? { label: "Not yet open",   bg: "bg-ivory-200",   text: "text-ink-muted" }
+    : almostGone               ? { label: `${rem} left`,    bg: "bg-durga/10",    text: "text-durga font-bold" }
     : sellingFast              ? { label: "Selling fast",   bg: "bg-marigold/10", text: "text-marigold-dark font-bold" }
     : null;
 
@@ -484,6 +503,64 @@ function TierAvailabilityBar({ tier, ev, isSelected, onClick, isBestDeal, isMost
   const accentLabels: { label: string; cls: string }[] = [];
   if (!disabled && isBestDeal)    accentLabels.push({ label: "Best deal",      cls: "bg-peacock/10 text-peacock font-bold" });
   if (!disabled && isMostPopular) accentLabels.push({ label: "Most popular",   cls: "bg-aubergine/10 text-aubergine font-bold" });
+
+  // ── SOLD OUT ── a distinct, emotionally-loaded "you missed it" treatment.
+  // Caution-tape diagonal wash + a rubber-stamp badge + struck-through name and
+  // price make the lost opportunity land — on phone and desktop alike. Rendered
+  // as a plain div (not a dimmed disabled button) so it reads bold, not faded.
+  if (soldOut) {
+    return (
+      <div
+        aria-disabled
+        className="group/sold relative w-full overflow-hidden rounded-xl border-2 border-durga/30 bg-durga/[0.04] p-3.5 select-none"
+      >
+        {/* caution-tape diagonal wash — the "this is closed off" cue */}
+        <div
+          className="pointer-events-none absolute inset-0 opacity-70"
+          style={{ background: "repeating-linear-gradient(135deg, rgba(124,31,44,0.07) 0px, rgba(124,31,44,0.07) 11px, transparent 11px, transparent 22px)" }}
+        />
+        {/* huge ghosted watermark — the gut-punch, clipped tastefully by the card */}
+        <span
+          aria-hidden
+          className="pointer-events-none absolute -right-2 -bottom-3 font-display font-extrabold uppercase italic leading-none tracking-tighter text-durga/[0.07] text-5xl sm:text-6xl whitespace-nowrap"
+        >
+          Sold&nbsp;out
+        </span>
+
+        <div className="relative flex items-center justify-between gap-3">
+          <div className="min-w-0 flex-1">
+            <p className="font-display font-bold text-sm text-ink/55 truncate line-through decoration-durga/40 decoration-2">
+              {tier.name}
+            </p>
+            {tier.description && (
+              <p className="font-ui text-xs text-ink-muted/70 mt-0.5 leading-snug line-clamp-1">{tier.description}</p>
+            )}
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-durga shrink-0" />
+              <p className="font-mono text-[10px] uppercase tracking-widest text-durga font-bold">
+                Gone — claimed before you got here
+              </p>
+            </div>
+          </div>
+
+          <div className="shrink-0 flex flex-col items-end gap-1.5">
+            {/* rubber-stamp badge */}
+            <span
+              className="font-display font-extrabold text-[11px] uppercase tracking-[0.16em] text-durga border-[2.5px] border-durga/45 rounded-md px-2.5 py-1 -rotate-6 transition-transform group-hover/sold:-rotate-3"
+              style={{ boxShadow: "inset 0 0 0 1px rgba(124,31,44,0.12)" }}
+            >
+              Sold Out
+            </span>
+            {tier.price > 0 && (
+              <span className="font-display font-bold text-sm text-ink/35 line-through decoration-durga/40">
+                ${money(tier.price)}
+              </span>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <button
@@ -536,7 +613,7 @@ function TierAvailabilityBar({ tier, ev, isSelected, onClick, isBestDeal, isMost
             Ended {fmtShortDate(tier.sale_end_date)}
           </p>
         )}
-        {!locked && !soldOut && tier.sale_end_date && (
+        {!locked && tier.sale_end_date && (
           <p className={`font-mono text-[10px] flex items-center gap-1 ${endingSoon ? "text-durga font-bold" : "text-ink-muted"}`}>
             {endingSoon && <span className="w-1.5 h-1.5 bg-durga rounded-full animate-pulse shrink-0" />}
             {endingSoon
@@ -555,7 +632,7 @@ function TierAvailabilityBar({ tier, ev, isSelected, onClick, isBestDeal, isMost
         <div className="h-1 bg-ivory-200 rounded-full overflow-hidden">
           <div
             className="h-full rounded-full transition-all"
-            style={{ width: `${soldOut || expired ? 100 : pct}%`, backgroundColor: barColor }}
+            style={{ width: `${expired ? 100 : pct}%`, backgroundColor: barColor }}
           />
         </div>
       )}
@@ -683,7 +760,7 @@ export default function EventDetailClient({ id }: { id: string }) {
             id, name, slug, tagline, bio, profile_image_url, genres, years_active_since, follower_count, performance_style
           ),
           ticket_tiers (
-            id, name, description, price, quantity, quantity_sold,
+            id, name, description, price, quantity, quantity_sold, sold_out,
             sale_start_date, sale_end_date, is_visible, sort_order,
             group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value, group_discount_tiers
           )
@@ -703,7 +780,7 @@ export default function EventDetailClient({ id }: { id: string }) {
 
       if (initial) {
         const firstSelectable = ev.ticket_tiers.find(t =>
-          !isTierNotStarted(t) && !isTierExpired(t, ev) && t.quantity - t.quantity_sold > 0
+          !isTierNotStarted(t) && !isTierExpired(t, ev) && tierRemaining(t) > 0
         );
         if (firstSelectable) setSelectedTierId(firstSelectable.id);
         setLoading(false);
@@ -828,7 +905,7 @@ export default function EventDetailClient({ id }: { id: string }) {
   }
 
   const selectedTier = event?.ticket_tiers.find(t => t.id === selectedTierId) ?? null;
-  const remaining = selectedTier ? selectedTier.quantity - selectedTier.quantity_sold : 0;
+  const remaining = selectedTier ? tierRemaining(selectedTier) : 0;
   const soldOut = selectedTier ? remaining <= 0 : false;
 
   const unitPrice = selectedTier?.price ?? 0;
@@ -851,9 +928,9 @@ export default function EventDetailClient({ id }: { id: string }) {
   const soldToday  = event ? stableRandom(event.id, "sold", 3, 22) : 0;
 
   // For tier cascade warning: lowest tier + next tier's price
-  const lowestTier = event?.ticket_tiers.find(t => t.quantity - t.quantity_sold > 0) ?? null;
+  const lowestTier = event?.ticket_tiers.find(t => tierRemaining(t) > 0) ?? null;
   const tiersSortedByPrice = event ? [...event.ticket_tiers].sort((a, b) => a.price - b.price) : [];
-  const lowestAvailIdx = tiersSortedByPrice.findIndex(t => t.quantity - t.quantity_sold > 0);
+  const lowestAvailIdx = tiersSortedByPrice.findIndex(t => tierRemaining(t) > 0);
   const nextCheapestPrice = lowestAvailIdx >= 0 && lowestAvailIdx < tiersSortedByPrice.length - 1
     ? tiersSortedByPrice[lowestAvailIdx + 1].price
     : null;
@@ -950,7 +1027,7 @@ export default function EventDetailClient({ id }: { id: string }) {
     return <EventInterestView event={event} />;
   }
 
-  const totalSoldOut = event.ticket_tiers.every(t => t.quantity_sold >= t.quantity);
+  const totalSoldOut = event.ticket_tiers.length > 0 && event.ticket_tiers.every(tierIsSoldOut);
   // Sales close once doors open in the event's local timezone.
   const salesClosed = salesClosedForEvent(event);
   // Active, in-window combo tickets that include this event.
@@ -1552,7 +1629,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                     // Compute cross-tier signals once
                     const evCtx = { start_date: event.start_date, start_time: event.start_time, state: event.state };
                     const available = event.ticket_tiers.filter(t =>
-                      !isTierNotStarted(t) && !isTierExpired(t, evCtx) && t.quantity - t.quantity_sold > 0
+                      !isTierNotStarted(t) && !isTierExpired(t, evCtx) && tierRemaining(t) > 0
                     );
                     const minPrice = available.length ? Math.min(...available.map(t => t.price)) : null;
                     const maxSold  = available.length ? Math.max(...available.map(t => t.quantity_sold)) : null;
@@ -1567,18 +1644,18 @@ export default function EventDetailClient({ id }: { id: string }) {
                           minPrice !== null &&
                           tier.price === minPrice &&
                           !isTierNotStarted(tier) && !isTierExpired(tier, evCtx) &&
-                          tier.quantity - tier.quantity_sold > 0
+                          tierRemaining(tier) > 0
                         }
                         isMostPopular={
                           available.length > 1 &&
                           maxSold !== null && maxSold > 0 &&
                           tier.quantity_sold === maxSold &&
                           !isTierNotStarted(tier) && !isTierExpired(tier, evCtx) &&
-                          tier.quantity - tier.quantity_sold > 0
+                          tierRemaining(tier) > 0
                         }
                         onClick={() => {
-                          if (isTierNotStarted(tier) || isTierExpired(tier, evCtx) || salesClosed) return;
-                          const rem = tier.quantity - tier.quantity_sold;
+                          if (tier.sold_out || isTierNotStarted(tier) || isTierExpired(tier, evCtx) || salesClosed) return;
+                          const rem = tierRemaining(tier);
                           if (rem > 0) { setSelectedTierId(tier.id); setQty(Math.min(qty, rem)); }
                         }}
                       />
