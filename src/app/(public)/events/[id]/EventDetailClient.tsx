@@ -91,6 +91,7 @@ type Event = {
   capacity: number | null;
   selling_on_rameelo: boolean;
   kids_5_under_free: boolean;
+  kids_free_age: number;
   show_social_proof: boolean;
   org_id: string | null;
   artist: Artist | null;
@@ -677,7 +678,7 @@ export default function EventDetailClient({ id }: { id: string }) {
           venue_name, address_line1, city, state, zip, metro_city,
           parking, parking_notes, website_url,
           cover_image_url, cover_gradient,
-          dress_code, dress_code_details, dandiya_sticks, age_restriction, capacity, selling_on_rameelo, kids_5_under_free, show_social_proof,
+          dress_code, dress_code_details, dandiya_sticks, age_restriction, capacity, selling_on_rameelo, kids_5_under_free, kids_free_age, show_social_proof,
           artist:artists!events_artist_id_fkey (
             id, name, slug, tagline, bio, profile_image_url, genres, years_active_since, follower_count, performance_style
           ),
@@ -1361,8 +1362,8 @@ export default function EventDetailClient({ id }: { id: string }) {
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 7a2 2 0 100-4 2 2 0 000 4zm0 0v4m0 0l-3 3m3-3l3 3m-6 4h6" /></svg>
                   </div>
                   <div>
-                    <p className="font-display font-bold text-ink text-sm leading-tight">Children 5 &amp; under get in <span className="text-peacock">FREE</span></p>
-                    <p className="font-ui text-xs text-ink-muted mt-0.5">No ticket needed for little ones aged 5 and under.</p>
+                    <p className="font-display font-bold text-ink text-sm leading-tight">Children {event.kids_free_age} &amp; under get in <span className="text-peacock">FREE</span></p>
+                    <p className="font-ui text-xs text-ink-muted mt-0.5">No ticket needed for little ones aged {event.kids_free_age} and under.</p>
                   </div>
                 </div>
               )}
