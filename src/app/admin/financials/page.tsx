@@ -85,6 +85,9 @@ export default function AdminFinancialsPage() {
           events (title, city, state, org_id, organizations (id, name))
         `)
         .eq("status", "confirmed")
+        // Test orders (sandbox/checkout-test credentials) are not real money —
+        // exclude them from every revenue number, fee, and payout figure here.
+        .eq("is_test", false)
         // Manual/offline orders never flowed through Rameelo — exclude from all
         // platform financials (processed volume, fees, Stripe cost, profit).
         .neq("order_type", "manual")
