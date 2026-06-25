@@ -55,6 +55,8 @@ type EventData = {
   dress_code_details: string;
   dandiya_sticks: string;
   age_restriction: string;
+  kids_5_under_free: boolean;
+  kids_free_age: number;
   capacity: string;
   status: string;
   review_note: string | null;
@@ -357,6 +359,7 @@ export default function OrganizerEventEditPage() {
             venue_name, address_line1, address_line2, city, state, zip,
             parking, parking_notes, website_url, cover_image_url, cover_gradient,
             dress_code, dress_code_details, dandiya_sticks, age_restriction,
+            kids_5_under_free, kids_free_age,
             capacity, status, review_note, org_id
           `)
           .eq("id", id)
@@ -489,6 +492,8 @@ export default function OrganizerEventEditPage() {
             dress_code_details: ev.dress_code_details || null,
             dandiya_sticks:     ev.dandiya_sticks,
             age_restriction:    ev.age_restriction,
+            kids_5_under_free:  ev.kids_5_under_free,
+            kids_free_age:      ev.kids_free_age,
             capacity:           ev.capacity ? parseInt(ev.capacity) : null,
             org_id:             ev.org_id || null,
           }).eq("id", id);
@@ -921,6 +926,29 @@ export default function OrganizerEventEditPage() {
                 <input type="number" min="1" placeholder="Unlimited" value={ev.capacity}
                   onChange={e => patchEv({ capacity: e.target.value })}
                   className="w-36 rounded-xl border border-ivory-200 bg-white px-3.5 py-2.5 font-ui text-sm text-ink focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all" />
+              </div>
+
+              {/* Kids get in free — toggle + configurable age threshold */}
+              <div>
+                <label className={labelCls}>Kids get in free</label>
+                <div className="flex flex-wrap items-center gap-3">
+                  <button type="button" onClick={() => patchEv({ kids_5_under_free: !ev.kids_5_under_free })}
+                    className={`relative shrink-0 w-12 h-6 rounded-full transition-all duration-200 ${ev.kids_5_under_free ? "bg-peacock" : "bg-ivory-200"}`}>
+                    <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200 ${ev.kids_5_under_free ? "translate-x-6" : "translate-x-0"}`} />
+                  </button>
+                  {ev.kids_5_under_free ? (
+                    <div className="flex items-center gap-2">
+                      <span className="font-ui text-xs text-ink-muted">Free for ages</span>
+                      <select value={ev.kids_free_age} onChange={e => patchEv({ kids_free_age: Number(e.target.value) })}
+                        className="rounded-xl border border-ivory-200 bg-white px-2.5 py-2 font-ui text-sm text-ink focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all">
+                        {Array.from({ length: 12 }, (_, i) => i + 1).map(a => <option key={a} value={a}>{a}</option>)}
+                      </select>
+                      <span className="font-ui text-xs text-ink-muted">&amp; under</span>
+                    </div>
+                  ) : (
+                    <span className="font-ui text-xs text-ink-muted">Off — everyone needs a ticket.</span>
+                  )}
+                </div>
               </div>
             </div>
           </div>

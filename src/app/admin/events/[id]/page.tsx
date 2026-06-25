@@ -84,6 +84,7 @@ type EventFull = {
   status: string;
   selling_on_rameelo: boolean;
   kids_5_under_free: boolean;
+  kids_free_age: number;
   show_social_proof: boolean;
   review_note: string | null;
   reviewed_at: string | null;
@@ -139,8 +140,13 @@ function Row({ label, value }: { label: string; value?: string | null }) {
 }
 
 // Compact toggle row used in Settings.
-function ToggleRow({ icon, title, desc, on, busy, onToggle }: {
+// Selectable ages for the "kids [age] & under free" perk — shared by the
+// admin toggle and (mirrored) the organizer edit form.
+const KIDS_FREE_AGES = Array.from({ length: 12 }, (_, i) => i + 1); // 1–12
+
+function ToggleRow({ icon, title, desc, on, busy, onToggle, children }: {
   icon: string; title: React.ReactNode; desc: string; on: boolean; busy: boolean; onToggle: () => void;
+  children?: React.ReactNode; // optional control revealed below the row when `on`
 }) {
   return (
     <div className="rounded-2xl border border-ivory-200 bg-white p-5">
@@ -160,6 +166,9 @@ function ToggleRow({ icon, title, desc, on, busy, onToggle }: {
           <span className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-all duration-200 ${on ? 'translate-x-6' : 'translate-x-0'}`} />
         </button>
       </div>
+      {on && children && (
+        <div className="mt-4 pt-4 border-t border-ivory-200">{children}</div>
+      )}
     </div>
   );
 }
@@ -243,7 +252,7 @@ export default function AdminEventReviewPage() {
             parking, parking_notes, website_url,
             cover_image_url, cover_gradient,
             dress_code, dress_code_details, dandiya_sticks, age_restriction,
-            capacity, status, selling_on_rameelo, kids_5_under_free, show_social_proof, review_note, reviewed_at, created_at,
+            capacity, status, selling_on_rameelo, kids_5_under_free, kids_free_age, show_social_proof, review_note, reviewed_at, created_at,
             ticket_tiers (id, name, price, quantity, description, sale_start_date, sale_end_date, group_discount_mode, group_discount_min_qty, group_discount_type, group_discount_value, group_discount_tiers),
             organizer:profiles!events_organizer_id_fkey (first_name, last_name, email, phone, city, state)
           `)
@@ -343,6 +352,13 @@ export default function AdminEventReviewPage() {
     await supabase.from('events').update({ kids_5_under_free: next }).eq('id', id);
     setEvent(prev => prev ? { ...prev, kids_5_under_free: next } : prev);
     setTogglingKidsFree(false);
+  }
+
+  async function updateKidsFreeAge(age: number) {
+    if (!event) return;
+    const supabase = createClient();
+    await supabase.from('events').update({ kids_free_age: age }).eq('id', id);
+    setEvent(prev => prev ? { ...prev, kids_free_age: age } : prev);
   }
 
   async function toggleSocialProof() {
@@ -1230,14 +1246,26 @@ export default function AdminEventReviewPage() {
 
           <ToggleRow
             icon="🧒"
-            title="Kids 5 & under free"
+            title={`Kids ${event.kids_free_age} & under free`}
             desc={event.kids_5_under_free
-              ? 'Children 5 and under get FREE admission — shown on the event page.'
-              : 'Turn on to show that children 5 and under get in free on the event page.'}
+              ? `Children ${event.kids_free_age} and under get FREE admission — shown on the event page.`
+              : `Turn on to show that children ${event.kids_free_age} and under get in free on the event page.`}
             on={event.kids_5_under_free}
             busy={togglingKidsFree}
             onToggle={toggleKidsFree}
-          />
+          >
+            <div className="flex items-center gap-2.5">
+              <span className="font-ui text-xs text-ink-muted">Free admission for ages</span>
+              <select
+                value={event.kids_free_age}
+                onChange={e => updateKidsFreeAge(Number(e.target.value))}
+                className="rounded-lg border border-ivory-200 bg-white px-2.5 py-1.5 font-ui text-sm text-ink focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all"
+              >
+                {KIDS_FREE_AGES.map(a => <option key={a} value={a}>{a}</option>)}
+              </select>
+              <span className="font-ui text-xs text-ink-muted">&amp; under</span>
+            </div>
+          </ToggleRow>
 
           <ToggleRow
             icon="📣"
