@@ -272,6 +272,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     fires: "When a new promotion entry is submitted",
   },
   {
+    key: "event-interest",
+    name: "Event interest alert",
+    description: "Notifies all platform admins when someone submits the interest (\"notify me\") form on an event that isn't selling tickets on Rameelo yet — with the submitter's name, email, phone, city, tickets wanted, and message, plus the event and a running interest total. Surfaces which not-yet-live events are getting traction.",
+    audience: "Admins",
+    category: "Platform",
+    status: "live",
+    trigger: "automatic",
+    fires: "When an interest form is submitted for a non-selling event",
+  },
+  {
     key: "onboarding-invite",
     name: "Organizer onboarding link",
     description: "Emails a lead the onboarding questionnaire link (currently copy-pasted from the admin org page).",

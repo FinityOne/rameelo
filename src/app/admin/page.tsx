@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import DailySummaryCard from "./DailySummaryCard";
+import { TicketSalesChart, SignupsChart } from "./DashboardCharts";
+import { effectiveProfit } from "@/lib/fees";
 
 type DashboardData = {
   totalUsers: number;
@@ -13,11 +15,11 @@ type DashboardData = {
   totalEvents: number;
   pendingEvents: number;
   publishedEvents: number;
-  totalRevenue: number;
-  revenueThisMonth: number;
+  sellingEvents: number;
+  rameeloProfit: number;
+  profitThisMonth: number;
   totalOrders: number;
-  activeGroups: number;
-  totalGroupMembers: number;
+  totalTicketsSold: number;
   recentUsers: Array<{ id: string; first_name: string; last_name: string; email: string; city: string | null; state: string | null; role: string; created_at: string }>;
   pendingEventList: Array<{ id: string; title: string; city: string | null; created_at: string }>;
 };
@@ -80,19 +82,24 @@ export default function AdminDashboardPage() {
 
     Promise.all([
       supabase.from("profiles").select("id, first_name, last_name, email, city, state, role, created_at").order("created_at", { ascending: false }),
-      supabase.from("events").select("id, title, city, status, created_at"),
-      supabase.from("orders").select("grand_total, rameelo_fee, created_at, status").eq("status", "confirmed").neq("order_type", "manual"),
-      supabase.from("chat_groups").select("id, member_count, is_active").eq("is_active", true),
-    ]).then(([profiles, events, orders, groups]) => {
+      supabase.from("events").select("id, title, city, status, selling_on_rameelo, created_at"),
+      supabase.from("orders").select("grand_total, rameelo_fee, processing_fee, service_fee, payment_method, qty, created_at, status").eq("status", "confirmed").eq("is_test", false).neq("order_type", "manual"),
+    ]).then(([profiles, events, orders]) => {
       const p = profiles.data ?? [];
-      const ev = events.data ?? [];
-      const ord = orders.data ?? [];
-      const grp = groups.data ?? [];
+      const ev = (events.data ?? []) as Array<{ id: string; title: string; city: string | null; status: string; selling_on_rameelo: boolean; created_at: string }>;
+      const ord = (orders.data ?? []) as Array<{ grand_total: number; rameelo_fee: number | null; processing_fee: number | null; service_fee: number | null; payment_method: "card" | "ach" | null; qty: number | null; created_at: string }>;
 
-      const totalRevenue = ord.reduce((s, o) => s + (o.rameelo_fee ?? 0), 0);
-      const revenueThisMonth = ord
-        .filter((o) => o.created_at >= monthStart)
-        .reduce((s, o) => s + (o.rameelo_fee ?? 0), 0);
+      // Rameelo's net profit per order = platform fee + processing fee − Stripe's
+      // cut (same calc as the Revenue page). Legacy orders that predate the split
+      // columns fall back to splitting service_fee 30/70.
+      const profitOf = (o: typeof ord[number]) => {
+        const rf = o.rameelo_fee ?? (o.service_fee ?? 0) * 0.3;
+        const pf = o.processing_fee ?? (o.service_fee ?? 0) * 0.7;
+        return effectiveProfit(rf, pf, o.grand_total, o.payment_method ?? "card").netProfit;
+      };
+      const rameeloProfit    = ord.reduce((s, o) => s + profitOf(o), 0);
+      const profitThisMonth  = ord.filter((o) => o.created_at >= monthStart).reduce((s, o) => s + profitOf(o), 0);
+      const totalTicketsSold = ord.reduce((s, o) => s + (o.qty ?? 0), 0);
       const newUsersThisWeek = p.filter((u) => u.created_at >= weekAgo).length;
 
       setData({
@@ -103,12 +110,12 @@ export default function AdminDashboardPage() {
         totalEvents: ev.length,
         pendingEvents: ev.filter((x) => x.status === "pending_review").length,
         publishedEvents: ev.filter((x) => x.status === "published").length,
-        totalRevenue,
-        revenueThisMonth,
+        sellingEvents: ev.filter((x) => x.selling_on_rameelo).length,
+        rameeloProfit,
+        profitThisMonth,
         totalOrders: ord.length,
-        activeGroups: grp.length,
-        totalGroupMembers: grp.reduce((s, g) => s + (g.member_count ?? 0), 0),
-        recentUsers: p.slice(0, 8),
+        totalTicketsSold,
+        recentUsers: p.slice(0, 3),
         pendingEventList: ev.filter((x) => x.status === "pending_review").slice(0, 5),
       });
     });
@@ -117,7 +124,7 @@ export default function AdminDashboardPage() {
   const loading = data === null;
 
   return (
-    <div className="space-y-7 max-w-6xl">
+    <div className="space-y-7">
 
       {/* ── Pending review alert ─────────────────────────────────── */}
       {!loading && data.pendingEvents > 0 && (
@@ -149,28 +156,34 @@ export default function AdminDashboardPage() {
           accent="#2E1B30"
         />
         <KpiCard
-          label="Platform Revenue"
-          value={loading ? "—" : fmtMoney(data.totalRevenue)}
-          sub={loading ? undefined : `${fmtMoney(data.revenueThisMonth)} this month`}
+          label="Rameelo Profit"
+          value={loading ? "—" : fmtMoney(data.rameeloProfit)}
+          sub={loading ? undefined : `${fmtMoney(data.profitThisMonth)} this month · net of Stripe`}
           accent="#F5A623"
         />
         <KpiCard
           label="Events"
           value={loading ? "—" : String(data.totalEvents)}
-          sub={loading ? undefined : `${data.publishedEvents} published · ${data.pendingEvents} pending`}
-          delta={loading || data.pendingEvents === 0 ? undefined : { value: `${data.pendingEvents} pending`, positive: false }}
+          sub={loading ? undefined : `${data.sellingEvents} selling on Rameelo · ${data.publishedEvents} published`}
+          delta={loading || data.sellingEvents === 0 ? undefined : { value: `${data.sellingEvents} selling`, positive: true }}
           accent="#1A6B7C"
         />
         <KpiCard
-          label="Community Groups"
-          value={loading ? "—" : String(data.activeGroups)}
-          sub={loading ? undefined : `${data.totalGroupMembers.toLocaleString()} total members`}
+          label="Tickets Sold"
+          value={loading ? "—" : fmt(data.totalTicketsSold)}
+          sub={loading ? undefined : `${data.totalOrders} live order${data.totalOrders !== 1 ? "s" : ""} · test excluded`}
           accent="#8B2252"
         />
       </div>
 
+      {/* ── Ticket sales over time ────────────────────────────────── */}
+      <TicketSalesChart />
+
       {/* ── Daily summary email ───────────────────────────────────── */}
       <DailySummaryCard />
+
+      {/* ── User growth ───────────────────────────────────────────── */}
+      <SignupsChart />
 
       {/* ── Two-col row ───────────────────────────────────────────── */}
       <div className="grid lg:grid-cols-5 gap-4">
@@ -180,7 +193,7 @@ export default function AdminDashboardPage() {
           <div className="flex items-center justify-between px-5 py-4 border-b border-black/[0.05]">
             <div>
               <p className="font-display font-bold text-ink/80 text-sm" style={{ letterSpacing: "-0.01em" }}>Recent Signups</p>
-              <p className="font-mono text-[10px] text-ink/35 mt-0.5 uppercase tracking-widest">Latest 8 members</p>
+              <p className="font-mono text-[10px] text-ink/35 mt-0.5 uppercase tracking-widest">Latest 3 members</p>
             </div>
             <Link href="/admin/users" className="font-mono text-[10px] text-ink/35 hover:text-aubergine uppercase tracking-widest transition-colors">
               View all →

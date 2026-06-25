@@ -1,6 +1,64 @@
 import Link from "next/link";
 import { Badge } from "./Badge";
 
+// ── Ticket urgency ────────────────────────────────────────────────────────────
+// A near-empty progress bar signals "nobody's buying" and suppresses conversion,
+// so below ~75% sold we hide the bar and surface a positive momentum / scarcity /
+// deadline cue instead. Every signal is derived from real data (inventory + event
+// date); copy stays vague (never reveals exact stock counts) and is only as loud
+// as the evidence supports.
+type Urgency = { tone: "hot" | "warn" | "soft" | "new"; icon: string; text: string };
+
+const URGENCY_TONES: Record<Urgency["tone"], string> = {
+  hot:  "bg-durga/8 text-durga border border-durga/20",
+  warn: "bg-marigold/15 text-marigold-dark border border-marigold/30",
+  soft: "bg-peacock/10 text-peacock border border-peacock/20",
+  new:  "bg-aubergine/8 text-aubergine border border-aubergine/15",
+};
+
+function ticketUrgency(a: {
+  sellingOnRameelo: boolean;
+  soldPct: number;
+  ticketsLeft: number | null;
+  daysUntil: number | null;
+  lowTierPctSold: number | null;
+}): Urgency | null {
+  if (!a.sellingOnRameelo) return { tone: "new", icon: "✨", text: "Early access open" };
+
+  // Hard scarcity — kept vague, never prints the remaining number.
+  if (a.soldPct >= 90 || (a.ticketsLeft != null && a.ticketsLeft > 0 && a.ticketsLeft <= 10))
+    return { tone: "hot", icon: "🔥", text: "Almost gone" };
+  if (a.soldPct >= 75) return { tone: "hot", icon: "🔥", text: "Selling fast" };
+
+  // Price-tier FOMO — the cheapest tier is running out, so the price rises next.
+  if (a.lowTierPctSold != null && a.lowTierPctSold >= 75)
+    return { tone: "warn", icon: "⏳", text: "Lowest price almost gone" };
+
+  // Deadline urgency.
+  if (a.daysUntil != null && a.daysUntil >= 0) {
+    if (a.daysUntil === 0) return { tone: "hot", icon: "🔥", text: "Happening today" };
+    if (a.daysUntil === 1) return { tone: "hot", icon: "🔥", text: "Tomorrow" };
+    if (a.daysUntil <= 6)  return { tone: "hot", icon: "🔥", text: `In ${a.daysUntil} days` };
+    if (a.daysUntil <= 21) return { tone: "warn", icon: "⏳", text: `${a.daysUntil} days left` };
+  }
+
+  // Momentum — only claimed with genuine traction (balanced, not manufactured).
+  if (a.soldPct >= 30) return { tone: "hot", icon: "🔥", text: "Selling fast" };
+  if (a.soldPct > 0)   return { tone: "soft", icon: "📈", text: "Selling now" };
+
+  // No sales yet → frame as novelty, not emptiness.
+  return { tone: "new", icon: "✨", text: "Just announced" };
+}
+
+function UrgencyPill({ u }: { u: Urgency }) {
+  return (
+    <span className={`inline-flex items-center gap-1 font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full ${URGENCY_TONES[u.tone]}`}>
+      <span aria-hidden className="text-[10px] leading-none">{u.icon}</span>
+      {u.text}
+    </span>
+  );
+}
+
 interface EventCardProps {
   title: string;
   category: string;
@@ -15,6 +73,12 @@ interface EventCardProps {
   sellingOnRameelo?: boolean;
   soldPct: number;
   soldOut?: boolean;
+  /** Tickets remaining — used (silently, never shown) to detect hard scarcity. */
+  ticketsLeft?: number | null;
+  /** Whole days until the event — drives the deadline urgency pill. */
+  daysUntil?: number | null;
+  /** % sold of the cheapest tier — drives the "lowest price almost gone" pill. */
+  lowTierPctSold?: number | null;
   isLive?: boolean;
   href?: string;
   /** Event cover photo; shown when uploaded, otherwise the gradient fallback. */
@@ -39,6 +103,9 @@ export function EventCard({
   sellingOnRameelo = true,
   soldPct,
   soldOut = false,
+  ticketsLeft = null,
+  daysUntil = null,
+  lowTierPctSold = null,
   isLive = false,
   href = "/events",
   coverImageUrl = null,
@@ -46,6 +113,8 @@ export function EventCard({
   metroCity = null,
   detailsBelow = false,
 }: EventCardProps) {
+  // Below 75% sold the bar is replaced by this cue (see ticketUrgency).
+  const urgency = soldOut ? null : ticketUrgency({ sellingOnRameelo, soldPct, ticketsLeft, daysUntil, lowTierPctSold });
   return (
     <div className="bg-ivory rounded-[16px] overflow-hidden border border-ivory-200 hover:shadow-md transition-all group">
       {/* Ticket header — cover photo if uploaded, else gradient */}
@@ -77,11 +146,6 @@ export function EventCard({
           </Badge>
           {soldOut && (
             <Badge variant="ivory">Sold out</Badge>
-          )}
-          {!soldOut && soldPct >= 80 && !isLive && (
-            <span className="font-mono text-[10px] text-white/70 tracking-widest uppercase">
-              {soldPct}% sold
-            </span>
           )}
         </div>
 
@@ -139,16 +203,20 @@ export function EventCard({
           </div>
         )}
 
-        {/* Progress bar */}
-        {!soldOut && (
-          <div className="mb-3">
-            <div className="h-1 bg-ivory-200 rounded-full overflow-hidden">
-              <div
-                className="h-full rounded-full bg-marigold transition-all"
-                style={{ width: `${soldPct}%` }}
-              />
+        {/* Urgency: the bar earns its place only when genuinely filling up (≥75%);
+            below that a momentum/scarcity/deadline pill replaces the discouraging
+            near-empty bar. */}
+        {urgency && (
+          soldPct >= 75 ? (
+            <div className="mb-3 space-y-1.5">
+              <UrgencyPill u={urgency} />
+              <div className="h-1 bg-ivory-200 rounded-full overflow-hidden">
+                <div className="h-full rounded-full bg-marigold transition-all" style={{ width: `${soldPct}%` }} />
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="mb-3"><UrgencyPill u={urgency} /></div>
+          )
         )}
 
         <div className="flex items-center justify-between">

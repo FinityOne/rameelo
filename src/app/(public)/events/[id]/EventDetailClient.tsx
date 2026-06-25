@@ -805,7 +805,11 @@ export default function EventDetailClient({ id }: { id: string }) {
     setInterestSubmitting(true);
     setInterestError("");
     const supabase = createClient();
+    // Generate the id client-side so we can notify admins without a SELECT policy
+    // (RLS only lets admins/organizers read this table, so RETURNING is blocked).
+    const interestId = crypto.randomUUID();
     const { error } = await supabase.from("event_interests").insert({
+      id: interestId,
       event_id: event.id,
       name: interestName.trim(),
       email: interestEmail.trim(),
@@ -816,6 +820,11 @@ export default function EventDetailClient({ id }: { id: string }) {
     if (error) { setInterestError("Something went wrong. Please try again."); setInterestSubmitting(false); return; }
     setInterestSubmitted(true);
     setInterestSubmitting(false);
+    // Alert platform admins about the new interest (traction signal). Best-effort.
+    fetch("/api/event-interest-notify", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interestId }),
+    }).catch(() => {});
   }
 
   const selectedTier = event?.ticket_tiers.find(t => t.id === selectedTierId) ?? null;

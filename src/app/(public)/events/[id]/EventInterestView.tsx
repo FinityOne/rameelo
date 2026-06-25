@@ -128,7 +128,11 @@ export default function EventInterestView({ event }: { event: IVEvent }) {
     e.preventDefault();
     setSubmitting(true);
     setError("");
+    // Generate the id client-side so we can notify admins without a SELECT policy
+    // (RLS only lets admins/organizers read this table, so RETURNING is blocked).
+    const interestId = crypto.randomUUID();
     const { error: err } = await supabase.from("event_interests").insert({
+      id: interestId,
       event_id: event.id, name: name.trim(), email: email.trim(),
       phone: phone.trim() || null, qty_interested: qty, city: city.trim() || null,
     });
@@ -136,6 +140,11 @@ export default function EventInterestView({ event }: { event: IVEvent }) {
     if (err) { setError("Something went wrong. Please try again."); return; }
     setSubmitted(true);
     setInterestedCount(c => (c ?? 0) + 1);
+    // Alert platform admins about the new interest (traction signal). Best-effort.
+    fetch("/api/event-interest-notify", {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ interestId }),
+    }).catch(() => {});
   }
 
   function share() {

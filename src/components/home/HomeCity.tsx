@@ -205,6 +205,14 @@ function EventGrid({ list }: { list: HomeEvent[] }) {
         const prices = e.tiers.map((t) => t.price);
         const minPrice = prices.length ? Math.min(...prices) : null;
         const maxPrice = prices.length ? Math.max(...prices) : null;
+        // Cheapest-tier sell-through (price-rises-next FOMO) + whole days to event.
+        const lowTiers = minPrice != null ? e.tiers.filter((t) => t.price === minPrice) : [];
+        const lowQty = lowTiers.reduce((s, t) => s + t.quantity, 0);
+        const lowSold = lowTiers.reduce((s, t) => s + t.quantitySold, 0);
+        const lowTierPctSold = lowQty > 0 ? Math.round((lowSold / lowQty) * 100) : null;
+        const daysUntil = Math.round(
+          (new Date(e.startDate + "T00:00:00").getTime() - new Date(new Date().toDateString()).getTime()) / 86_400_000
+        );
         return (
           <EventCard
             key={e.id}
@@ -218,6 +226,9 @@ function EventGrid({ list }: { list: HomeEvent[] }) {
             sellingOnRameelo={e.sellingOnRameelo}
             soldPct={pct}
             soldOut={total > 0 && sold >= total}
+            ticketsLeft={total > 0 ? Math.max(0, total - sold) : null}
+            daysUntil={daysUntil}
+            lowTierPctSold={lowTierPctSold}
             coverImageUrl={e.coverImageUrl}
             href={`/events/${e.id}`}
             artistName={e.artistName}
