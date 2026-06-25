@@ -20,6 +20,7 @@ type DashboardData = {
   profitThisMonth: number;
   totalOrders: number;
   totalTicketsSold: number;
+  eventSales: Array<{ id: string; title: string; city: string | null; tickets: number }>;
   recentUsers: Array<{ id: string; first_name: string; last_name: string; email: string; city: string | null; state: string | null; role: string; created_at: string }>;
   pendingEventList: Array<{ id: string; title: string; city: string | null; created_at: string }>;
 };
@@ -83,11 +84,11 @@ export default function AdminDashboardPage() {
     Promise.all([
       supabase.from("profiles").select("id, first_name, last_name, email, city, state, role, created_at").order("created_at", { ascending: false }),
       supabase.from("events").select("id, title, city, status, selling_on_rameelo, created_at"),
-      supabase.from("orders").select("grand_total, rameelo_fee, processing_fee, service_fee, payment_method, qty, created_at, status").eq("status", "confirmed").eq("is_test", false).neq("order_type", "manual"),
+      supabase.from("orders").select("grand_total, rameelo_fee, processing_fee, service_fee, payment_method, qty, created_at, status, event_id").eq("status", "confirmed").eq("is_test", false).neq("order_type", "manual"),
     ]).then(([profiles, events, orders]) => {
       const p = profiles.data ?? [];
       const ev = (events.data ?? []) as Array<{ id: string; title: string; city: string | null; status: string; selling_on_rameelo: boolean; created_at: string }>;
-      const ord = (orders.data ?? []) as Array<{ grand_total: number; rameelo_fee: number | null; processing_fee: number | null; service_fee: number | null; payment_method: "card" | "ach" | null; qty: number | null; created_at: string }>;
+      const ord = (orders.data ?? []) as Array<{ grand_total: number; rameelo_fee: number | null; processing_fee: number | null; service_fee: number | null; payment_method: "card" | "ach" | null; qty: number | null; created_at: string; event_id: string | null }>;
 
       // Rameelo's net profit per order = platform fee + processing fee − Stripe's
       // cut (same calc as the Revenue page). Legacy orders that predate the split
@@ -102,6 +103,20 @@ export default function AdminDashboardPage() {
       const totalTicketsSold = ord.reduce((s, o) => s + (o.qty ?? 0), 0);
       const newUsersThisWeek = p.filter((u) => u.created_at >= weekAgo).length;
 
+      // Tickets sold per event (same confirmed/live/non-manual basis as the
+      // Tickets Sold KPI, so the widget's total tallies with it). Only events
+      // with at least one ticket sold, highest first.
+      const titleById = new Map(ev.map((e) => [e.id, e]));
+      const ticketsByEvent = new Map<string, number>();
+      for (const o of ord) {
+        if (!o.event_id) continue;
+        ticketsByEvent.set(o.event_id, (ticketsByEvent.get(o.event_id) ?? 0) + (o.qty ?? 0));
+      }
+      const eventSales = [...ticketsByEvent.entries()]
+        .map(([id, tickets]) => ({ id, tickets, title: titleById.get(id)?.title ?? "Untitled event", city: titleById.get(id)?.city ?? null }))
+        .filter((e) => e.tickets > 0)
+        .sort((a, b) => b.tickets - a.tickets);
+
       setData({
         totalUsers: p.length,
         members: p.filter((x) => x.role === "user").length,
@@ -115,6 +130,7 @@ export default function AdminDashboardPage() {
         profitThisMonth,
         totalOrders: ord.length,
         totalTicketsSold,
+        eventSales,
         recentUsers: p.slice(0, 3),
         pendingEventList: ev.filter((x) => x.status === "pending_review").slice(0, 5),
       });
@@ -178,6 +194,65 @@ export default function AdminDashboardPage() {
 
       {/* ── Ticket sales over time ────────────────────────────────── */}
       <TicketSalesChart />
+
+      {/* ── Tickets sold by event ─────────────────────────────────── */}
+      <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-black/[0.05]">
+          <div>
+            <p className="font-display font-bold text-ink/80 text-sm" style={{ letterSpacing: "-0.01em" }}>Tickets Sold by Event</p>
+            <p className="font-mono text-[10px] text-ink/35 mt-0.5 uppercase tracking-widest">Confirmed, live orders</p>
+          </div>
+          {!loading && data.eventSales.length > 0 && (
+            <div className="text-right">
+              <p className="font-display font-black text-ink/90" style={{ fontSize: 18, letterSpacing: "-0.03em", color: "#8B2252" }}>
+                {data.totalTicketsSold.toLocaleString()}
+              </p>
+              <p className="font-mono text-[9px] text-ink/35 uppercase tracking-widest">total</p>
+            </div>
+          )}
+        </div>
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="w-6 h-6 rounded-full border-2 border-black/10 border-t-aubergine animate-spin" />
+          </div>
+        ) : data.eventSales.length === 0 ? (
+          <div className="px-5 py-10 text-center">
+            <p className="text-2xl mb-1.5">🎟️</p>
+            <p className="font-ui text-xs text-ink/40">No tickets sold yet</p>
+          </div>
+        ) : (
+          <>
+            <div className="divide-y divide-black/[0.04] max-h-[420px] overflow-y-auto">
+              {data.eventSales.map((e, i) => {
+                const top = data.eventSales[0].tickets || 1;
+                const pct = Math.max(4, Math.round((e.tickets / top) * 100));
+                return (
+                  <Link key={e.id} href={`/admin/events/${e.id}`}
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-black/[0.02] transition-colors group">
+                    <span className="font-mono text-[10px] text-ink/25 w-4 shrink-0 text-right">{i + 1}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-ui font-semibold text-ink/75 text-[13px] truncate group-hover:text-aubergine transition-colors">{e.title}</p>
+                      <div className="h-1 rounded-full bg-black/[0.06] overflow-hidden mt-1.5">
+                        <div className="h-full rounded-full transition-all duration-700" style={{ width: `${pct}%`, backgroundColor: "#8B2252" }} />
+                      </div>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="font-display font-bold text-ink/80 text-sm" style={{ letterSpacing: "-0.02em" }}>{e.tickets.toLocaleString()}</p>
+                      {e.city && <p className="font-mono text-[9px] text-ink/30 truncate max-w-[90px]">{e.city}</p>}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+            <div className="flex items-center justify-between px-5 py-3 border-t border-black/[0.05] bg-black/[0.015]">
+              <span className="font-mono text-[10px] text-ink/40 uppercase tracking-widest">
+                {data.eventSales.length} event{data.eventSales.length !== 1 ? "s" : ""} with sales
+              </span>
+              <span className="font-mono text-[11px] font-bold text-ink/60">{data.totalTicketsSold.toLocaleString()} tickets</span>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* ── Daily summary email ───────────────────────────────────── */}
       <DailySummaryCard />

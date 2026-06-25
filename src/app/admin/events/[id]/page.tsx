@@ -101,6 +101,23 @@ const STATUS_META: Record<string, { label: string; cls: string; icon: string }> 
   cancelled:      { label: 'Cancelled',   cls: 'bg-ivory-200 text-ink-muted',     icon: '🚫' },
 };
 
+// Per-order payment status pill. ACH settles asynchronously, so a pending ACH
+// order is "awaiting verification" — called out distinctly so an admin can spot
+// money that hasn't cleared yet.
+function orderStatusPill(status: string, isAch: boolean): { label: string; cls: string } {
+  switch (status) {
+    case 'confirmed': return { label: 'Confirmed', cls: 'bg-peacock/10 text-peacock border-peacock/25' };
+    case 'pending':   return isAch
+      ? { label: 'Pending verification', cls: 'bg-marigold/15 text-marigold-dark border-marigold/35' }
+      : { label: 'Pending payment',      cls: 'bg-marigold/15 text-marigold-dark border-marigold/35' };
+    case 'cancelled': return { label: 'Cancelled', cls: 'bg-durga/10 text-durga border-durga/25' };
+    case 'refunded':  return { label: 'Refunded',  cls: 'bg-ink/[0.06] text-ink-muted border-ink/15' };
+    default:          return { label: status || '—', cls: 'bg-ink/[0.06] text-ink-muted border-ink/15' };
+  }
+}
+const isAchOrder = (o: OrderRow) => (o.payment_method || '').toLowerCase() === 'ach';
+const methodLabel = (m: string) => (m || '').toLowerCase() === 'ach' ? 'ACH (bank)' : (m || '').toLowerCase() === 'card' ? 'Card' : (m || '—');
+
 const CATEGORY_LABELS: Record<string, string> = {
   garba: 'Garba', dandiya: 'Dandiya', raas: 'Raas', workshop: 'Workshop', community: 'Community', other: 'Other',
 };
@@ -225,6 +242,10 @@ export default function AdminEventReviewPage() {
   const [interests, setInterests] = useState<InterestSubmission[]>([]);
   const [orders, setOrders] = useState<OrderRow[]>([]);
   const [togglingOrderId, setTogglingOrderId] = useState<string | null>(null);
+  // Orders tab filters — payment method (card vs ACH/bank) and order status, so an
+  // admin can isolate pending ACH payments awaiting verification.
+  const [orderMethod, setOrderMethod] = useState<'all' | 'card' | 'ach'>('all');
+  const [orderStatus, setOrderStatus] = useState<'all' | 'pending' | 'confirmed' | 'cancelled'>('all');
   const [tab, setTab] = useState<TabKey>('overview');
   const [groups, setGroups] = useState<AdminGroup[]>([]);
   const [groupBlasts, setGroupBlasts] = useState<GroupBlast[]>([]);
@@ -521,6 +542,20 @@ export default function AdminEventReviewPage() {
   const manualRevenue  = manualLive.reduce((s, o) => s + o.grand_total, 0);
   const manualTickets  = manualLive.reduce((s, o) => s + o.qty, 0);
   const interestWanted = interests.reduce((s, i) => s + i.qty_interested, 0);
+
+  // ── Orders tab: payment-method + status filtering ──
+  const cardCount       = orders.filter(o => !isAchOrder(o)).length;
+  const achCount        = orders.filter(isAchOrder).length;
+  const pendingCount    = orders.filter(o => o.status === 'pending').length;
+  const confirmedCount  = orders.filter(o => o.status === 'confirmed').length;
+  const cancelledCount  = orders.filter(o => o.status === 'cancelled').length;
+  const achPendingCount = orders.filter(o => o.status === 'pending' && isAchOrder(o)).length;
+  const filteredOrders  = orders.filter(o => {
+    if (orderMethod === 'ach'  && !isAchOrder(o)) return false;
+    if (orderMethod === 'card' &&  isAchOrder(o)) return false;
+    if (orderStatus !== 'all'  && o.status !== orderStatus) return false;
+    return true;
+  });
 
   const TABS: { key: TabKey; label: string; count?: number }[] = [
     { key: 'overview', label: 'Overview' },
@@ -904,6 +939,62 @@ export default function AdminEventReviewPage() {
                   </div>
                 </div>
 
+                {/* Pending-money callout — ACH settles asynchronously, so anything
+                    not yet cleared is flagged here for the admin. */}
+                {pendingCount > 0 && (
+                  <div className="px-5 py-3 border-b border-ivory-200 bg-marigold/[0.06] flex items-start gap-2.5">
+                    <span className="mt-0.5 shrink-0 text-base leading-none">⏳</span>
+                    <p className="font-ui text-xs text-ink leading-relaxed">
+                      <strong>{pendingCount} pending order{pendingCount !== 1 ? 's' : ''}</strong> awaiting payment.
+                      {achPendingCount > 0 && (
+                        <> {achPendingCount} {achPendingCount === 1 ? 'is an ACH bank payment' : 'are ACH bank payments'} pending verification — bank transfers can take 1–4 business days to clear before the tickets confirm.</>
+                      )}{' '}
+                      <button onClick={() => setOrderStatus('pending')} className="font-semibold text-marigold-dark hover:underline">View pending →</button>
+                    </p>
+                  </div>
+                )}
+
+                {/* Filters — payment method + status */}
+                <div className="px-5 py-3 border-b border-ivory-200 flex flex-wrap items-center gap-x-5 gap-y-2.5">
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Method</span>
+                    <div className="inline-flex rounded-lg border border-ivory-200 bg-ivory/60 p-0.5">
+                      {([['all', 'All', orders.length], ['card', 'Card', cardCount], ['ach', 'ACH', achCount]] as const).map(([key, label, count]) => {
+                        const active = orderMethod === key;
+                        return (
+                          <button key={key} onClick={() => setOrderMethod(key)}
+                            className={`px-2.5 py-1 rounded-md font-mono text-[10px] uppercase tracking-widest transition-colors ${active ? 'bg-white text-ink font-bold shadow-sm' : 'text-ink-muted font-semibold hover:text-ink'}`}>
+                            {label}<span className={`ml-1 ${active ? 'text-aubergine/55' : 'text-ink-muted/50'}`}>{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Status</span>
+                    <div className="inline-flex rounded-lg border border-ivory-200 bg-ivory/60 p-0.5">
+                      {([['all', 'All', orders.length], ['pending', 'Pending', pendingCount], ['confirmed', 'Confirmed', confirmedCount], ['cancelled', 'Cancelled', cancelledCount]] as const).map(([key, label, count]) => {
+                        const active = orderStatus === key;
+                        return (
+                          <button key={key} onClick={() => setOrderStatus(key)}
+                            className={`px-2.5 py-1 rounded-md font-mono text-[10px] uppercase tracking-widest transition-colors ${active ? 'bg-white text-ink font-bold shadow-sm' : 'text-ink-muted font-semibold hover:text-ink'}`}>
+                            {label}<span className={`ml-1 ${active ? 'text-aubergine/55' : 'text-ink-muted/50'}`}>{count}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  {(orderMethod !== 'all' || orderStatus !== 'all') && (
+                    <button onClick={() => { setOrderMethod('all'); setOrderStatus('all'); }}
+                      className="font-ui text-[11px] font-semibold text-ink-muted hover:text-ink transition-colors">
+                      Clear ✕
+                    </button>
+                  )}
+                  <span className="ml-auto font-mono text-[10px] text-ink-muted">
+                    Showing {filteredOrders.length} of {orders.length}
+                  </span>
+                </div>
+
                 {/* Table */}
                 <div className="overflow-x-auto">
                   <table className="w-full text-left">
@@ -913,13 +1004,23 @@ export default function AdminEventReviewPage() {
                         <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal hidden sm:table-cell">Email</th>
                         <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal text-right">Qty</th>
                         <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal text-right">Total</th>
+                        <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal">Status</th>
                         <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal hidden sm:table-cell">Method</th>
                         <th className="px-3 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal hidden md:table-cell">Placed</th>
                         <th className="px-5 py-3 font-mono text-[9px] uppercase tracking-widest text-ink-muted font-normal text-right">Category</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-ivory-200">
-                      {orders.map(o => (
+                      {filteredOrders.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} className="px-5 py-10 text-center font-ui text-sm text-ink-muted">
+                            No orders match this filter.
+                          </td>
+                        </tr>
+                      ) : filteredOrders.map(o => {
+                        const ach = isAchOrder(o);
+                        const sp = orderStatusPill(o.status, ach);
+                        return (
                         <tr key={o.id} className={`transition-colors ${o.is_test ? 'bg-marigold/[0.04] hover:bg-marigold/[0.08]' : 'hover:bg-ivory/50'}`}>
                           <td className="px-5 py-3 font-ui text-sm text-ink font-medium">
                             <div className="flex items-center gap-2">
@@ -934,11 +1035,19 @@ export default function AdminEventReviewPage() {
                                 <span className="font-mono text-[8px] uppercase tracking-widest bg-marigold/20 text-marigold-dark px-1.5 py-0.5 rounded-full">Test</span>
                               )}
                             </div>
+                            {/* Method shown inline on mobile (the Method column is hidden) */}
+                            <span className="sm:hidden font-mono text-[9px] uppercase tracking-widest text-ink-muted/70">{methodLabel(o.payment_method)}</span>
                           </td>
                           <td className="px-3 py-3 font-ui text-xs text-ink-muted hidden sm:table-cell">{o.buyer_email}</td>
                           <td className="px-3 py-3 text-right font-mono text-sm text-ink">{o.qty}</td>
                           <td className="px-3 py-3 text-right font-mono text-sm text-ink">${o.grand_total.toFixed(2)}</td>
-                          <td className="px-3 py-3 font-ui text-xs text-ink-muted hidden sm:table-cell uppercase">{o.payment_method}</td>
+                          <td className="px-3 py-3">
+                            <span className={`inline-flex items-center gap-1 font-mono text-[9px] font-bold uppercase tracking-widest px-2 py-1 rounded-full border whitespace-nowrap ${sp.cls}`}>
+                              {o.status === 'pending' && <span className="w-1.5 h-1.5 rounded-full bg-marigold-dark animate-pulse" />}
+                              {sp.label}
+                            </span>
+                          </td>
+                          <td className="px-3 py-3 font-ui text-xs text-ink-muted hidden sm:table-cell">{methodLabel(o.payment_method)}</td>
                           <td className="px-3 py-3 font-mono text-[10px] text-ink-muted hidden md:table-cell">{fmtTS(o.created_at)}</td>
                           <td className="px-5 py-3 text-right">
                             <button
@@ -956,7 +1065,8 @@ export default function AdminEventReviewPage() {
                             </button>
                           </td>
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
