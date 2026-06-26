@@ -135,7 +135,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <p>This is your complete guide to Navratri 2026 in the USA.</p>
 
 <h2>When Is Navratri 2026?</h2>
-<p>Navratri 2026 falls on <strong>October 21–30</strong>, with the most celebrated night being the final night (Navami) on October 29. Most major events run across the full nine nights, though many organizers hold their biggest single-night events on October 22, 23, 28, and 29.</p>
+<p>Navratri 2026 falls on <strong>October 11–19</strong> — nine nights beginning with Ghatasthapana on Sunday, October 11 and culminating in Maha Navami on Monday, October 19, followed by Vijayadashami (Dussehra) on Tuesday, October 20. The most celebrated nights are the Ashtami and Navami finale (October 18–19), but most major events run across the full nine nights, with the biggest single-night productions clustered on the weekends — the opening Sunday (October 11) and the Friday and Saturday of October 16–17.</p>
 <p>Mark your calendar early. The top events in cities like Edison, Houston, Chicago, and Atlanta sell out weeks — sometimes months — in advance.</p>
 
 <h2>The Best Cities for Garba in the USA</h2>
@@ -310,7 +310,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <h2>How to Navigate the NJ Scene</h2>
 
 <h3>Book Early — Seriously</h3>
-<p>For the best NJ events, "early" means August or September. Popular artist nights for Navratri 2026 (October 21–30) will begin selling tickets this summer. Waiting until October to buy is gambling with your Navratri.</p>
+<p>For the best NJ events, "early" means August or September. Popular artist nights for Navratri 2026 (October 11–19) will begin selling tickets this summer. Waiting until October to buy is gambling with your Navratri.</p>
 
 <h3>Come as a Group</h3>
 <p>Everything about NJ garba is better in a group. The social dynamics of dandiya raas require a group. The pre- and post-event dinners at the countless Gujarati restaurants in the area are better with 10 people. And with group ticket pricing on Rameelo, larger groups unlock automatic discounts of 10–15%.</p>
@@ -700,7 +700,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <p>Rameelo (rameelo.com/events) is the most complete directory of garba, dandiya, and Navratri events in the United States. Filter by city and date to find events near you. Every listing is verified — you won't find off-topic results.</p>
 
 <h3>When are Navratri events in 2026?</h3>
-<p>Navratri 2026 runs from October 21 to October 30. The most popular event nights are typically October 22–23 (opening weekend), October 28 (penultimate night), and October 29 (Navami, the final night). Major events in cities like Edison NJ, Houston TX, and Chicago IL typically announce dates by July and sell out by September.</p>
+<p>Navratri 2026 runs from October 11 to October 19. The most popular event nights are typically the opening Sunday (October 11), the middle weekend (October 16–17), and the Ashtami and Navami finale (October 18–19). Major events in cities like Edison NJ, Houston TX, and Chicago IL typically announce dates by July and sell out by September.</p>
 
 <h3>How much do garba tickets cost?</h3>
 <p>Garba tickets vary widely by event type, location, and artist. Community garba nights can be as low as $15–$25. Mid-range events with live music typically run $40–$80. High-production celebrity artist nights range from $80–$200+. Group tickets on Rameelo automatically discount 10–15% when your group hits the threshold — often saving $50–$150 for a group of 10.</p>
@@ -795,7 +795,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <p>Major garba events in New Jersey take place in Edison, Iselin, Parsippany, Piscataway, and New Brunswick. The most popular venues include the NJ Convention &amp; Expo Center in Edison, Raritan Center, and various community halls throughout Middlesex and Morris counties.</p>
 
 <h3>When do garba events start in New Jersey?</h3>
-<p>Navratri 2026 runs from October 21–30. Most major NJ garba events run across the full nine nights, with opening night typically October 21 and the biggest celebration on the final night (Navami), October 29–30. Some organizers also host pre-season garba workshops in September.</p>
+<p>Navratri 2026 runs from October 11–19. Most major NJ garba events run across the full nine nights, with opening night on October 11 and the biggest celebration on the final night (Navami), October 19. Some organizers also host pre-season garba workshops in September.</p>
 
 <h3>How much do garba tickets cost in New Jersey?</h3>
 <p>NJ garba ticket prices range from $30–$50 for folk garba community nights to $80–$150+ for celebrity artist entertainment nights. Multi-night passes typically offer 20–30% savings. Group tickets on Rameelo automatically discount 10–15% based on group size.</p>
@@ -870,7 +870,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <p>Atlanta garba events are concentrated in Alpharetta, Johns Creek, Duluth, and Suwanee in the northern suburbs. Major venues include the Georgia International Convention Center, Gwinnett Center, hotel convention facilities, and large community halls throughout North Fulton and Gwinnett counties.</p>
 
 <h3>When is Navratri 2026 in Atlanta?</h3>
-<p>Navratri 2026 runs October 21–30 nationally. Atlanta events begin on or near October 21 and run through the final night on October 29–30. The biggest Atlanta events — typically the mid-week and final weekend nights — sell out first.</p>
+<p>Navratri 2026 runs October 11–19 nationally. Atlanta events begin on or near October 11 and run through the final night on October 19. The biggest Atlanta events — typically the weekend and Ashtami–Navami nights — sell out first.</p>
 
 <h3>Are Atlanta garba events family-friendly?</h3>
 <p>Yes. Atlanta garba events are known for being welcoming to families, children, and first-time attendees. Many events have designated family seating areas. Children under a certain age (typically 5–8) are often admitted free.</p>
@@ -1011,7 +1011,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <p>LA garba events are spread across several areas: Artesia and Cerritos (Little India corridor), Irvine and Orange County, the San Fernando Valley (Northridge, Woodland Hills), and the Inland Empire (Chino, Ontario). Major venues include the Cerritos Performing Arts Center, Irvine Marriott, and convention centers throughout the region.</p>
 
 <h3>When do garba events happen in Los Angeles?</h3>
-<p>The primary garba season in LA is Navratri (October 21–30, 2026). Major events cluster around the opening and final weekends. Year-round workshop and community events are common in Artesia and Irvine.</p>
+<p>The primary garba season in LA is Navratri (October 11–19, 2026). Major events cluster around the opening and final weekends. Year-round workshop and community events are common in Artesia and Irvine.</p>
 
 <h3>What is the best garba event in Southern California?</h3>
 <p>The answer changes year to year depending on which artists are booked. Orange County events have grown into the most production-intensive in the region. Artesia remains the most culturally authentic. Check the current Rameelo listings for artist and venue details for the upcoming season.</p>
@@ -1076,7 +1076,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <p>Major Bay Area garba events are held in San Jose (Convention Center, large hotel venues), Fremont (Fremont Hub, community centers), Santa Clara, Milpitas, and the Tri-Valley (Dublin, Pleasanton). The South Bay is the primary hub — San Jose alone hosts multiple simultaneous Navratri productions during peak nights.</p>
 
 <h3>When do Bay Area garba events happen?</h3>
-<p>Navratri 2026 runs October 21–30. Bay Area events tend to sell out faster than most other cities due to the high density of demand relative to venue capacity. Early purchase — ideally by August — is strongly recommended for the major San Jose and Fremont events.</p>
+<p>Navratri 2026 runs October 11–19. Bay Area events tend to sell out faster than most other cities due to the high density of demand relative to venue capacity. Early purchase — ideally by August — is strongly recommended for the major San Jose and Fremont events.</p>
 
 <h3>How competitive are tickets for Bay Area garba?</h3>
 <p>Very. The Bay Area has high garba demand and somewhat constrained venue supply compared to cities with larger convention infrastructure. Celebrity artist nights at major San Jose venues routinely sell out within days of going on sale. Set up an account on <a href="/auth/signup">Rameelo</a> and follow your preferred events to be notified immediately when tickets go live.</p>
@@ -1140,7 +1140,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <p>Seattle-area garba events are primarily held on the Eastside: Bellevue (Meydenbauer Center, Hyatt Regency, hotel ballrooms), Redmond, Kirkland, and Issaquah. Events serving the broader Seattle metro sometimes use the Westin Seattle or Sheraton Grand Seattle for larger productions.</p>
 
 <h3>When do Navratri events happen in Seattle?</h3>
-<p>Navratri 2026 runs October 21–30. Seattle-area events typically run 4–7 nights of the full nine, with the biggest productions on weekends. Unlike NJ or Houston, Seattle events don't always run all nine nights — check Rameelo for confirmed dates each season.</p>
+<p>Navratri 2026 runs October 11–19. Seattle-area events typically run 4–7 nights of the full nine, with the biggest productions on weekends. Unlike NJ or Houston, Seattle events don't always run all nine nights — check Rameelo for confirmed dates each season.</p>
 
 <h3>How has the Seattle garba scene grown?</h3>
 <p>Seattle's garba scene has grown substantially over the past decade, tracking the growth of the South Asian tech workforce. Events that drew a few hundred people a decade ago now draw thousands. The community expects continued growth as Seattle solidifies its position as a top-tier tech hub.</p>
@@ -1206,7 +1206,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <p>Houston garba events are spread across the metro: major productions near NRG Park and the Energy Corridor, community events in Sugar Land and Missouri City, and suburban events in Katy, Pearland, and Stafford. The Smart Financial Centre in Sugar Land is a premier dedicated garba venue.</p>
 
 <h3>When is Navratri in Houston 2026?</h3>
-<p>Navratri 2026 runs October 21–30. Houston events run across most or all nine nights, with the biggest productions on opening weekend (October 21–22) and final weekend (October 28–30). Celebrity artist nights typically sell out first.</p>
+<p>Navratri 2026 runs October 11–19. Houston events run across most or all nine nights, with the biggest productions on the opening Sunday (October 11) and the Ashtami–Navami finale (October 18–19). Celebrity artist nights typically sell out first.</p>
 
 <h3>How much do Houston garba tickets cost?</h3>
 <p>Houston garba tickets range from $25–$50 for community events to $60–$150+ for celebrity artist entertainment nights. Sugar Land events tend to be mid-range. NRG-area mega-productions command premium pricing. Group tickets on Rameelo automatically discount 10–15% for groups of 5+.</p>
@@ -1270,7 +1270,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <p>DFW garba events are primarily in Irving (Las Colinas corridor), North Dallas (Plano, Allen, Frisco), and the Mid-Cities (Arlington, Grand Prairie). The Irving Convention Center and Plano Event Center are primary dedicated garba venues. Browse the full listing at <a href="/events">rameelo.com/events</a>.</p>
 
 <h3>When do Dallas garba events happen?</h3>
-<p>The main season is Navratri 2026, October 21–30. DFW events typically concentrate around the opening and final weekends. Pre-season workshops run through August and September, often taught by artists or community instructors in the Plano and Irving areas.</p>
+<p>The main season is Navratri 2026, October 11–19. DFW events typically concentrate around the opening and final weekends. Pre-season workshops run through August and September, often taught by artists or community instructors in the Plano and Irving areas.</p>
 
 <h3>Is the Dallas garba scene growing?</h3>
 <p>Significantly. DFW has been one of the fastest-growing South Asian metro areas in the country for the past decade, and the garba scene reflects that growth. Events that were small community gatherings five years ago are now professional productions with national artist bookings.</p>
@@ -1340,7 +1340,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 <p>Chicago-area garba events are primarily in the suburbs: Schaumburg (Convention Center, Renaissance Hotel), Naperville, Lisle, Rosemont (Donald E. Stephens Convention Center), and Itasca. The northwest suburbs are the primary hub. Some larger events use downtown Chicago or O'Hare-area venues.</p>
 
 <h3>When do Chicago Navratri events happen in 2026?</h3>
-<p>Navratri 2026 is October 21–30. Chicago events typically run 6–9 nights, with the major Schaumburg and Naperville events covering most of the festival. Weekends are the highest-demand nights — celebrity artist nights on the final weekend sell out weeks in advance.</p>
+<p>Navratri 2026 is October 11–19. Chicago events typically run 6–9 nights, with the major Schaumburg and Naperville events covering most of the festival. Weekends are the highest-demand nights — celebrity artist nights on the final weekend sell out weeks in advance.</p>
 
 <h3>How far do people travel for Chicago garba?</h3>
 <p>Chicago garba draws from a 6-state Midwest region. It's common to meet attendees who drove 3–5 hours from Michigan, Ohio, Indiana, Missouri, or Wisconsin. The major Schaumburg events are a regional pilgrimage for Midwest Gujarati-Americans.</p>
@@ -1377,7 +1377,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
 </ul>
 
 <h2>When is Navratri 2026 in Michigan?</h2>
-<p>Navratri 2026 runs October 21–30. Michigan's marquee events cluster on the weekends, with the biggest artist nights selling out first. Cold-weather season means most events are fully indoors — dress festive, not for the parking lot.</p>
+<p>Navratri 2026 runs October 11–19. Michigan's marquee events cluster on the weekends, with the biggest artist nights selling out first. Cold-weather season means most events are fully indoors — dress festive, not for the parking lot.</p>
 
 <h2>How to get tickets</h2>
 <p>Michigan's best nights sell out in advance, and prices rise in tiers as the date nears. Buy early, go as a group to unlock discounts, and keep an eye on the listings below — new Detroit and Michigan events are added throughout the season.</p>
