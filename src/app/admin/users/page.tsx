@@ -27,6 +27,7 @@ const ROLE_STYLES: Record<UserRole, string> = {
 const SOURCE_META: Record<string, { label: string; cls: string }> = {
   signup: { label: "Signed up", cls: "bg-peacock/10 text-peacock" },
   import: { label: "Imported", cls: "bg-aubergine/10 text-aubergine" },
+  manual: { label: "Added", cls: "bg-marigold/15 text-marigold-dark" },
 };
 
 const PAGE_SIZE = 10;
@@ -39,6 +40,8 @@ export default function AdminUsersPage() {
   const [query, setQuery] = useState("");   // debounced, server-side search
   const [page, setPage] = useState(0);       // 0-indexed
   const [total, setTotal] = useState(0);
+  const [showAdd, setShowAdd] = useState(false);
+  const [reloadTick, setReloadTick] = useState(0); // bump to refetch after add
 
   // Debounce the search box → reset to first page when it changes.
   useEffect(() => {
@@ -71,7 +74,7 @@ export default function AdminUsersPage() {
     }
     fetchProfiles();
     return () => { cancelled = true; };
-  }, [page, query]);
+  }, [page, query, reloadTick]);
 
   async function updateRole(id: string, role: UserRole) {
     setUpdating(id);
@@ -92,14 +95,30 @@ export default function AdminUsersPage() {
           <h2 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: "-0.02em" }}>User Management</h2>
           <p className="font-ui text-ink-muted text-sm mt-0.5">{total} total user{total !== 1 ? "s" : ""}</p>
         </div>
-        <input
-          type="text"
-          placeholder="Search by name, email, city…"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-64 rounded-xl border border-ivory-200 bg-white px-4 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/50 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all"
-        />
+        <div className="flex items-center gap-2.5">
+          <input
+            type="text"
+            placeholder="Search by name, email, city…"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-64 rounded-xl border border-ivory-200 bg-white px-4 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/50 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all"
+          />
+          <button
+            onClick={() => setShowAdd(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-marigold px-4 py-2.5 font-display font-bold text-sm text-aubergine hover:bg-marigold-dark active:scale-[0.98] transition-all whitespace-nowrap shrink-0"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+            Add user
+          </button>
+        </div>
       </div>
+
+      {showAdd && (
+        <AddUserModal
+          onClose={() => setShowAdd(false)}
+          onCreated={() => { setShowAdd(false); setSearch(""); setPage(0); setReloadTick((t) => t + 1); }}
+        />
+      )}
 
       <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
         {loading ? (
@@ -210,6 +229,151 @@ export default function AdminUsersPage() {
             </div>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+type EmailCheck = "" | "checking" | "available" | "taken";
+
+// Manually add a single member. Email is the unique key — it's checked against
+// existing profiles in the background (debounced) the moment it's a valid address,
+// so the admin is warned before submitting rather than after. On create the server
+// also re-checks and auto-sends the welcome email.
+function AddUserModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const [email, setEmail] = useState("");
+  const [phone, setPhone] = useState("");
+  const [emailCheck, setEmailCheck] = useState<EmailCheck>("");
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState("");
+
+  const emailValid = EMAIL_RE.test(email.trim());
+
+  // Background duplicate scan once the address looks valid — debounced so we
+  // don't fire on every keystroke. Uses the admin-gated find_existing_profiles RPC.
+  useEffect(() => {
+    const addr = email.trim().toLowerCase();
+    if (!EMAIL_RE.test(addr)) { setEmailCheck(""); return; }
+    setEmailCheck("checking");
+    let cancelled = false;
+    const t = setTimeout(async () => {
+      const supabase = createClient();
+      const { data } = await supabase.rpc("find_existing_profiles", { p_emails: [addr] });
+      if (cancelled) return;
+      setEmailCheck(Array.isArray(data) && data.length > 0 ? "taken" : "available");
+    }, 450);
+    return () => { cancelled = true; clearTimeout(t); };
+  }, [email]);
+
+  const canSubmit =
+    firstName.trim() !== "" && lastName.trim() !== "" && emailValid &&
+    emailCheck !== "checking" && emailCheck !== "taken" && !submitting;
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!canSubmit) return;
+    setSubmitting(true);
+    setError("");
+    try {
+      const res = await fetch("/api/admin/create-user", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ firstName: firstName.trim(), lastName: lastName.trim(), email: email.trim(), phone: phone.trim() }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        if (json.code === "duplicate") setEmailCheck("taken");
+        setError(json.error ?? "Could not add the user.");
+        setSubmitting(false);
+        return;
+      }
+      onCreated();
+    } catch {
+      setError("Could not add the user. Try again.");
+      setSubmitting(false);
+    }
+  }
+
+  const inputCls =
+    "w-full rounded-xl border border-ivory-200 bg-white px-3.5 py-2.5 font-ui text-sm text-ink placeholder-ink-muted/40 focus:outline-none focus:ring-2 focus:ring-aubergine/20 focus:border-aubergine/40 transition-all";
+  const labelCls = "block font-mono text-[9px] uppercase tracking-widest text-ink-muted mb-1.5";
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-aubergine/40 backdrop-blur-sm" onClick={onClose}>
+      <div
+        className="w-full sm:max-w-md bg-white rounded-t-2xl sm:rounded-2xl border border-ivory-200 shadow-xl max-h-[92vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-ivory-200">
+          <div>
+            <h3 className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>Add a user</h3>
+            <p className="font-ui text-xs text-ink-muted mt-0.5">We&apos;ll create the account and email them a welcome.</p>
+          </div>
+          <button onClick={onClose} className="shrink-0 w-8 h-8 rounded-lg flex items-center justify-center text-ink-muted hover:bg-ivory transition-colors" aria-label="Close">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className={labelCls}>First name *</label>
+              <input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="Priya" autoFocus className={inputCls} />
+            </div>
+            <div>
+              <label className={labelCls}>Last name *</label>
+              <input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Patel" className={inputCls} />
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Email *</label>
+            <input
+              type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="priya@example.com"
+              className={`${inputCls} ${emailCheck === "taken" ? "!border-durga/50 !ring-durga/20" : ""}`}
+            />
+            <div className="mt-1.5 min-h-[16px]">
+              {emailCheck === "checking" && (
+                <p className="flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-widest text-ink-muted">
+                  <span className="w-3 h-3 rounded-full border-2 border-ivory-200 border-t-marigold animate-spin" /> Checking…
+                </p>
+              )}
+              {emailCheck === "available" && (
+                <p className="flex items-center gap-1 font-mono text-[10px] uppercase tracking-widest text-peacock">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>
+                  Email available
+                </p>
+              )}
+              {emailCheck === "taken" && (
+                <p className="font-mono text-[10px] uppercase tracking-widest text-durga">A user with this email already exists</p>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <label className={labelCls}>Phone <span className="text-ink-muted/50 normal-case tracking-normal">(optional)</span></label>
+            <input type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="(555) 000-0000" className={inputCls} />
+          </div>
+
+          {error && <p className="font-ui text-xs text-durga">{error}</p>}
+
+          <div className="flex items-center gap-2.5 pt-1">
+            <button
+              type="submit" disabled={!canSubmit}
+              className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-marigold px-4 py-2.5 font-display font-bold text-sm text-aubergine hover:bg-marigold-dark active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100"
+            >
+              {submitting ? (
+                <><span className="w-4 h-4 rounded-full border-2 border-aubergine/30 border-t-aubergine animate-spin" /> Adding…</>
+              ) : "Add user & send welcome"}
+            </button>
+            <button type="button" onClick={onClose} className="rounded-xl border border-ivory-200 px-4 py-2.5 font-ui font-semibold text-sm text-ink-muted hover:text-ink hover:border-aubergine/30 transition-all">
+              Cancel
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );
