@@ -59,6 +59,15 @@ function SignInInner() {
       lastName: data.lastName || "Member",
       email: data.email || email, phone: "", city: "", state: "", role,
     }));
+    // Alert admins when an organizer signs in (fire-and-forget; the server-side
+    // login record gates it, so a forged role can't trigger the email).
+    if (role === "organizer" && data.userId) {
+      fetch("/api/organizer-login-notify", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: data.userId }),
+        keepalive: true,
+      }).catch(() => {});
+    }
     const destination = nextDest || (role === "admin" ? "/admin" : role === "organizer" ? "/organizer" : "/portal");
     router.push(destination);
     router.refresh();

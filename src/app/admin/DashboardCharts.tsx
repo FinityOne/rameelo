@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import {
-  ResponsiveContainer, AreaChart, Area, BarChart, Bar,
+  ResponsiveContainer, AreaChart, Area, BarChart, Bar, LineChart, Line,
   XAxis, YAxis, Tooltip, CartesianGrid,
 } from "recharts";
 import { createClient } from "@/lib/supabase/client";
@@ -244,6 +244,86 @@ export function SignupsChart() {
               <Tooltip content={<SignupTooltip />} cursor={{ fill: "#2E1B3010" }} />
               <Bar dataKey="signups" fill="#2E1B30" radius={[3, 3, 0, 0]} maxBarSize={34} />
             </BarChart>
+          </ResponsiveContainer>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ════════════════════════ Logins ════════════════════════
+type LoginPoint = { day: string; logins: number; users: number };
+
+function LoginTooltip({ active, payload }: { active?: boolean; payload?: { payload: LoginPoint }[] }) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0].payload;
+  return (
+    <div className="rounded-xl border border-ivory-200 bg-white shadow-lg px-3 py-2">
+      <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1">{fmtFull(p.day)}</p>
+      <p className="font-ui text-sm font-bold text-ink">{p.logins.toLocaleString()} login{p.logins !== 1 ? "s" : ""}</p>
+      <p className="font-ui text-xs text-peacock">{p.users.toLocaleString()} unique user{p.users !== 1 ? "s" : ""}</p>
+    </div>
+  );
+}
+
+export function LoginsChart() {
+  const [range, setRange] = useState<RangeKey>("7d");
+  const [data, setData] = useState<LoginPoint[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    const days = RANGES.find((r) => r.key === range)!.days;
+    createClient()
+      .rpc("admin_logins_timeseries", { p_from: fromDate(days) })
+      .then(({ data }) => {
+        if (cancelled) return;
+        setData(((data ?? []) as LoginPoint[]).map((r) => ({ day: r.day, logins: Number(r.logins), users: Number(r.users) })));
+        setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [range]);
+
+  const totals = useMemo(() => ({
+    logins: data.reduce((s, d) => s + d.logins, 0),
+    peakUsers: data.reduce((m, d) => Math.max(m, d.users), 0),
+  }), [data]);
+
+  return (
+    <div className="bg-white rounded-2xl border border-black/[0.06] shadow-sm p-5">
+      <div className="flex items-start justify-between gap-4 mb-1 flex-wrap">
+        <div>
+          <p className="font-display font-bold text-ink/80 text-sm" style={{ letterSpacing: "-0.01em" }}>Logins Over Time</p>
+          <p className="font-mono text-[10px] text-ink/35 mt-0.5 uppercase tracking-widest">
+            {totals.logins.toLocaleString()} login{totals.logins !== 1 ? "s" : ""} in range
+          </p>
+        </div>
+        <RangeTabs value={range} onChange={setRange} />
+      </div>
+
+      <div className="h-44 mt-3">
+        {loading ? (
+          <div className="h-full flex items-center justify-center">
+            <div className="w-6 h-6 rounded-full border-2 border-black/10 border-t-peacock animate-spin" />
+          </div>
+        ) : totals.logins === 0 ? (
+          <div className="h-full flex flex-col items-center justify-center text-center">
+            <p className="text-2xl mb-1.5">🔐</p>
+            <p className="font-ui text-xs text-ink/40">No logins in this range.</p>
+          </div>
+        ) : (
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={data} margin={{ top: 6, right: 6, left: -18, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#00000008" vertical={false} />
+              <XAxis dataKey="day" tickFormatter={fmtAxis} minTickGap={28}
+                tick={{ fontSize: 10, fill: "#9a9088" }} axisLine={false} tickLine={false} />
+              <YAxis allowDecimals={false} width={36}
+                tick={{ fontSize: 10, fill: "#9a9088" }} axisLine={false} tickLine={false} />
+              <Tooltip content={<LoginTooltip />} cursor={{ stroke: "#0E8C7A", strokeWidth: 1, strokeOpacity: 0.4 }} />
+              <Line type="monotone" dataKey="logins" stroke="#0E8C7A" strokeWidth={2.5}
+                dot={false} activeDot={{ r: 4, fill: "#0E8C7A" }} />
+            </LineChart>
           </ResponsiveContainer>
         )}
       </div>

@@ -252,6 +252,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     fires: "Automatically when a user creates an account",
   },
   {
+    key: "organizer-login",
+    name: "Organizer sign-in alert",
+    description: "Notifies all platform admins when an organizer signs in to the platform, with their name, email, phone, organization(s), a 30-day login count, and a link to their admin detail page — a live pulse on organizer activity. Every login (all roles) is recorded to the login_events activity log; this alert fires only for organizers.",
+    audience: "Admins",
+    category: "Platform",
+    status: "live",
+    trigger: "automatic",
+    fires: "Automatically when an organizer signs in",
+  },
+  {
     key: "marketing-blast",
     name: "Marketing blast",
     description: "A marketing email to a targeted group (by tag, upload batch, location, or past-event attendance) about an upcoming event, sent from a selectable, ready-made template — Tickets are live, Selling fast, Final call, We saved you a spot, or a Custom message. Each lists the event's ticket tiers & prices and builds urgency off the sale-close date, with one 'Get tickets' CTA. Admins can preview and send a test before blasting. Honors per-user marketing opt-out and includes one-click unsubscribe. Sent from hello@.",
