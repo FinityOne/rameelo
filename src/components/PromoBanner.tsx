@@ -42,22 +42,25 @@ export default function PromoBanner() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
         <button
           onClick={() => setOpen(true)}
-          className="group w-full flex items-center gap-3 sm:gap-4 rounded-xl border border-marigold/30 bg-white px-3.5 sm:px-4 py-3 text-left hover:border-marigold/60 hover:shadow-sm transition-all"
+          className="group w-full flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 rounded-xl border border-marigold/30 bg-white px-4 py-3.5 sm:py-3 text-left hover:border-marigold/60 hover:shadow-sm transition-all"
         >
-          <span className="shrink-0 w-9 h-9 rounded-lg bg-marigold/15 flex items-center justify-center text-lg">🎁</span>
-
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <span className="font-mono text-[8px] font-bold uppercase tracking-widest text-ink-muted/60 border border-ink/10 rounded px-1 py-0.5 leading-none">Giveaway</span>
-              {promo.prize_value > 0 && (
-                <span className="font-mono text-[9px] uppercase tracking-widest text-marigold-dark">${promo.prize_value} value</span>
-              )}
+          {/* Icon + copy */}
+          <div className="flex items-start gap-3 flex-1 min-w-0">
+            <span className="shrink-0 w-9 h-9 rounded-lg bg-marigold/15 flex items-center justify-center text-lg">🎁</span>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-mono text-[8px] font-bold uppercase tracking-widest text-ink-muted/60 border border-ink/10 rounded px-1 py-0.5 leading-none">Giveaway</span>
+                {promo.prize_value > 0 && (
+                  <span className="font-mono text-[9px] uppercase tracking-widest text-marigold-dark">${promo.prize_value} value</span>
+                )}
+              </div>
+              <p className="font-display font-bold text-ink text-[15px] sm:text-base leading-snug mt-1 sm:truncate">{promo.headline}</p>
+              <p className="font-ui text-xs text-ink-muted leading-snug mt-0.5 sm:truncate">{promo.subheadline}</p>
             </div>
-            <p className="font-display font-bold text-ink text-sm sm:text-base truncate mt-1">{promo.headline}</p>
-            <p className="font-ui text-xs text-ink-muted truncate hidden sm:block">{promo.subheadline}</p>
           </div>
 
-          <span className="shrink-0 inline-flex items-center gap-1.5 bg-marigold text-aubergine font-display font-bold text-xs sm:text-sm px-3 sm:px-4 py-2 rounded-lg group-hover:bg-marigold-dark transition-colors">
+          {/* CTA — full-width on mobile, compact on desktop */}
+          <span className="shrink-0 w-full sm:w-auto inline-flex items-center justify-center gap-1.5 bg-marigold text-aubergine font-display font-bold text-sm px-4 py-2.5 sm:py-2 rounded-lg group-hover:bg-marigold-dark transition-colors">
             {promo.cta_label}
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
           </span>
