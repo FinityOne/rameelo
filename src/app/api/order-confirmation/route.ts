@@ -47,6 +47,15 @@ export async function POST(request: Request) {
 
   if (!o || !o.buyer_email) return NextResponse.json({ ok: true, skipped: "not-found" });
 
+  // Combo orders: ensure per-event ticket/QR segments exist + gather event names
+  // so the email can call out the one-QR-per-event behavior. Best-effort.
+  let comboEventNames: string[] = [];
+  try {
+    await supabase.rpc("ensure_combo_event_tickets", { p_order_id: orderId });
+    const { data: names } = await supabase.rpc("get_order_combo_event_names", { p_order_id: orderId });
+    if (Array.isArray(names)) comboEventNames = names as string[];
+  } catch { /* non-combo or transient — skip the combo note */ }
+
   const eventWhen = `${fmtDate(o.event_start_date)}${fmtTime(o.event_start_time) ? ` · ${fmtTime(o.event_start_time)}` : ""}`;
   const eventWhere = [o.venue_name, o.city, o.state].filter(Boolean).join(", ");
   const directionsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent([o.venue_name, o.city, o.state].filter(Boolean).join(", "))}`;
@@ -69,6 +78,7 @@ export async function POST(request: Request) {
     directionsUrl,
     ticketsUrl: `${EMAIL.site}/portal/tickets`,
     buyMoreUrl: `${EMAIL.site}/events`,
+    comboEventNames,
   });
 
   const { id: providerId, error: sendError } = await sendEmail({ to: o.buyer_email, subject, html, text, type: "order_confirmation" });

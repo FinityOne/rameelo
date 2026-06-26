@@ -473,19 +473,25 @@ export async function loadMyOrders(userId: string): Promise<PortalOrderRow[]> {
 
   // The events a combo covers, fetched separately so a hiccup here never blocks the
   // core ticket load. Keyed by combo_ticket_id.
-  const comboEventsByCombo = new Map<string, { id: string; title: string; start_date: string }[]>();
+  const comboEventsByCombo = new Map<string, ComboEventDetail[]>();
   const comboIds = Array.from(new Set(orders.map(o => o.combo_ticket_id).filter((x): x is string => !!x)));
   if (comboIds.length > 0) {
     const { data: links } = await supabase
       .from("combo_ticket_events")
-      .select("combo_ticket_id, events (id, title, start_date)")
+      .select("combo_ticket_id, events (id, title, start_date, start_time, venue_name, city, state, cover_gradient, cover_image_url, artists (name))")
       .in("combo_ticket_id", comboIds);
-    type EvRow = { id: string; title: string; start_date: string };
+    type EvRow = { id: string; title: string; start_date: string; start_time: string | null; venue_name: string | null; city: string | null; state: string | null; cover_gradient: string | null; cover_image_url: string | null; artists: { name: string } | { name: string }[] | null };
     for (const l of (links ?? []) as unknown as { combo_ticket_id: string; events: EvRow | EvRow[] | null }[]) {
       const ev = Array.isArray(l.events) ? l.events[0] : l.events;
       if (!ev) continue;
+      const artist = Array.isArray(ev.artists) ? ev.artists[0] : ev.artists;
       const arr = comboEventsByCombo.get(l.combo_ticket_id) ?? [];
-      arr.push(ev);
+      arr.push({
+        id: ev.id, title: ev.title, start_date: ev.start_date, start_time: ev.start_time ?? "",
+        venue: ev.venue_name ?? "", city: ev.city ?? "", state: ev.state ?? "",
+        coverGradient: ev.cover_gradient ?? "", coverImageUrl: ev.cover_image_url ?? null,
+        artistName: artist?.name ?? "",
+      });
       comboEventsByCombo.set(l.combo_ticket_id, arr);
     }
     for (const arr of comboEventsByCombo.values()) arr.sort((a, b) => a.start_date.localeCompare(b.start_date));
@@ -729,6 +735,21 @@ interface RawOrderRow {
   combo_tickets: { id: string; name: string; price: number } | null;
 }
 
+// One event within a combo — carries enough detail to render its own ticket
+// slide + a distinct per-event QR in the member portal.
+export interface ComboEventDetail {
+  id: string;
+  title: string;
+  start_date: string;
+  start_time: string;
+  venue: string;
+  city: string;
+  state: string;
+  coverGradient: string;
+  coverImageUrl: string | null;
+  artistName: string;
+}
+
 export interface PortalOrderRow {
   orderId: string;
   groupId?: string;
@@ -749,7 +770,7 @@ export interface PortalOrderRow {
   grandTotal: number;
   isTest: boolean;
   isCombo?: boolean;         // combo ticket — grants entry to multiple events
-  comboEvents?: { id: string; title: string; start_date: string }[]; // events the combo covers
+  comboEvents?: ComboEventDetail[]; // events the combo covers (one QR each)
   purchasedAt: string;
   status: string;            // 'confirmed' | 'pending'
   paymentMethod: string;     // 'card' | 'ach'
