@@ -74,6 +74,7 @@ export default function Footer() {
               </li>
               {[
                 { label: "Organizer Hub", href: "/organizers" },
+                { label: "Sponsor with us", href: "/sponsor" },
                 { label: "Privacy Policy", href: "/privacy" },
                 { label: "Terms of Service", href: "/terms" },
               ].map((item) => (

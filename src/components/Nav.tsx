@@ -123,8 +123,6 @@ export default function Nav() {
     { href: "/events",     label: "Events",      live: true, badge: "NEW" },
     { href: "/artists",    label: "Artists",     live: true  },
     { href: "/collegiate", label: "Collegiate",  live: true },
-    { href: "/community",  label: "Communities", live: false },
-    { href: "/photos",     label: "Photos",      live: false },
     { href: "/blog",       label: "Blog",        live: true  },
   ];
 
@@ -141,7 +139,7 @@ export default function Nav() {
               <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-marigold" />
             </span>
             <span className="font-mono text-[10px] text-white/55 tracking-wide">
-              Navratri Oct 11 – 20 · season pass live
+              Navratri Oct 11 – 20
             </span>
           </div>
 
@@ -291,21 +289,6 @@ export default function Nav() {
             ))}
           </div>
 
-          {/* Right: utility links */}
-          <div className="flex items-center gap-6 shrink-0 py-3">
-            <Link
-              href="/sponsor"
-              className={`font-ui text-[13px] font-medium transition-colors whitespace-nowrap ${pathname === "/sponsor" ? "text-aubergine" : "text-ink/55 hover:text-ink"}`}
-            >
-              Sponsor with us
-            </Link>
-            <Link
-              href="/pricing"
-              className={`font-ui text-[13px] font-medium transition-colors whitespace-nowrap ${pathname === "/pricing" ? "text-aubergine" : "text-ink/55 hover:text-ink"}`}
-            >
-              Pricing
-            </Link>
-          </div>
         </div>
       </div>
 
@@ -351,8 +334,6 @@ export default function Nav() {
 
           <div className="border-t border-ink/6 pt-2 mt-2 space-y-0.5">
             <Link href="/organizers" onClick={() => setMobileOpen(false)} className="block px-4 py-2.5 rounded-[8px] font-ui text-sm text-ink-muted hover:text-ink hover:bg-ivory-200 transition-colors">Sell on Rameelo</Link>
-            <Link href="/sponsor" onClick={() => setMobileOpen(false)} className="block px-4 py-2.5 rounded-[8px] font-ui text-sm text-ink-muted hover:text-ink hover:bg-ivory-200 transition-colors">Sponsor with us</Link>
-            <Link href="/pricing" onClick={() => setMobileOpen(false)} className="block px-4 py-2.5 rounded-[8px] font-ui text-sm text-ink-muted hover:text-ink hover:bg-ivory-200 transition-colors">Pricing</Link>
             <Link href="/about" onClick={() => setMobileOpen(false)} className="block px-4 py-2.5 rounded-[8px] font-ui text-sm text-ink-muted hover:text-ink hover:bg-ivory-200 transition-colors">About</Link>
           </div>
 
