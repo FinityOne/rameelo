@@ -11,37 +11,52 @@ export async function generateStaticParams() {
   return BLOG_ARTICLES.map(a => ({ slug: a.slug }));
 }
 
+// Trim a description to a clean, ~155-char meta length without cutting a word.
+function metaDescription(text: string, max = 158): string {
+  const clean = text.replace(/\s+/g, " ").trim();
+  if (clean.length <= max) return clean;
+  const cut = clean.slice(0, max);
+  return cut.slice(0, cut.lastIndexOf(" ")).replace(/[,;:.\s]+$/, "") + "…";
+}
+
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const { slug } = await params;
   const article = getArticle(slug);
-  if (!article) return {};
+  if (!article) {
+    return { title: "Article not found — Rameelo", robots: { index: false, follow: true } };
+  }
 
-  const ogImage = { url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: article.title };
-
+  const description = metaDescription(article.excerpt);
+  const url = `https://rameelo.com/blog/${article.slug}`;
+  // og:image / twitter:image are supplied by the sibling opengraph-image.tsx
+  // (one branded card per article) — so we don't set images here.
   return {
-    title: article.title,
-    description: article.excerpt,
+    title: `${article.title} — Rameelo`,
+    description,
     keywords: article.tags,
     authors: [{ name: article.author }],
-    alternates: { canonical: `https://rameelo.com/blog/${article.slug}` },
-    robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-snippet": -1, "max-image-preview": "large" } },
+    category: article.category,
+    alternates: { canonical: url },
+    robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-snippet": -1, "max-image-preview": "large", "max-video-preview": -1 } },
     openGraph: {
       title: article.title,
-      description: article.excerpt,
+      description,
       type: "article",
       publishedTime: article.publishedAt,
+      modifiedTime: article.publishedAt,
       authors: [article.author],
+      section: article.category,
       tags: article.tags,
-      url: `https://rameelo.com/blog/${article.slug}`,
+      url,
       siteName: "Rameelo",
-      images: [ogImage],
+      locale: "en_US",
     },
     twitter: {
       card: "summary_large_image",
       site: "@rameelo",
+      creator: "@rameelo",
       title: article.title,
-      description: article.excerpt,
-      images: [ogImage.url],
+      description,
     },
   };
 }
