@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import DailySummaryCard from "./DailySummaryCard";
-import { TicketSalesChart, SignupsChart } from "./DashboardCharts";
+import { TicketSalesChart, SignupsChart, LoginsChart } from "./DashboardCharts";
 import { effectiveProfit } from "@/lib/fees";
 
 type DashboardData = {
@@ -20,6 +20,12 @@ type DashboardData = {
   profitThisMonth: number;
   totalOrders: number;
   totalTicketsSold: number;
+  // Today (since midnight PT)
+  usersToday: number;
+  eventsToday: number;
+  profitToday: number;
+  ticketsToday: number;
+  ordersToday: number;
   eventSales: Array<{ id: string; title: string; city: string | null; tickets: number }>;
   recentUsers: Array<{ id: string; first_name: string; last_name: string; email: string; city: string | null; state: string | null; role: string; created_at: string }>;
   pendingEventList: Array<{ id: string; title: string; city: string | null; created_at: string }>;
@@ -44,15 +50,30 @@ function timeAgo(iso: string) {
   return `${Math.floor(hrs / 24)}d ago`;
 }
 
+// The UTC instant of midnight today in Pacific time — so "today" matches the rest
+// of the platform (daily summary, charts all bucket on America/Los_Angeles).
+function startOfTodayPT(): number {
+  const now = new Date();
+  const ymd = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Los_Angeles" }).format(now); // YYYY-MM-DD
+  const off = new Intl.DateTimeFormat("en-US", { timeZone: "America/Los_Angeles", timeZoneName: "longOffset" })
+    .formatToParts(now).find((p) => p.type === "timeZoneName")?.value ?? "GMT-08:00"; // e.g. "GMT-07:00"
+  return new Date(`${ymd}T00:00:00${off.replace("GMT", "")}`).getTime();
+}
+
 const ROLE_STYLES: Record<string, string> = {
   user:      "bg-[#F5F3F0] text-ink/50",
   organizer: "bg-peacock/10 text-peacock",
   admin:     "bg-red-50 text-red-600",
 };
 
-type KpiProps = { label: string; value: string; sub?: string; delta?: { value: string; positive: boolean }; accent?: string };
+type KpiProps = {
+  label: string; value: string; sub?: string;
+  delta?: { value: string; positive: boolean };
+  today?: { value: string; note?: string };
+  accent?: string;
+};
 
-function KpiCard({ label, value, sub, delta, accent = "#F5A623" }: KpiProps) {
+function KpiCard({ label, value, sub, delta, today, accent = "#F5A623" }: KpiProps) {
   return (
     <div className="bg-white rounded-2xl border border-black/[0.06] p-5 flex flex-col gap-3 shadow-sm">
       <div className="flex items-start justify-between">
@@ -69,6 +90,19 @@ function KpiCard({ label, value, sub, delta, accent = "#F5A623" }: KpiProps) {
         </p>
         {sub && <p className="font-ui text-xs text-ink/40 mt-0.5">{sub}</p>}
       </div>
+      {/* Today (since midnight PT) — a quiet footer strip; no extra cards/scroll. */}
+      {today && (
+        <div className="mt-auto pt-2.5 border-t border-black/[0.05] flex items-center justify-between gap-2">
+          <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-ink/35 flex items-center gap-1.5">
+            <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: accent }} />
+            Today
+          </span>
+          <span className="font-ui text-xs leading-none">
+            <span className="font-bold" style={{ color: accent }}>{today.value}</span>
+            {today.note && <span className="text-ink/35 font-medium"> · {today.note}</span>}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -103,6 +137,16 @@ export default function AdminDashboardPage() {
       const totalTicketsSold = ord.reduce((s, o) => s + (o.qty ?? 0), 0);
       const newUsersThisWeek = p.filter((u) => u.created_at >= weekAgo).length;
 
+      // ── Today (since midnight Pacific) ──────────────────────────────────────
+      const todayStart = startOfTodayPT();
+      const isToday = (iso: string) => new Date(iso).getTime() >= todayStart;
+      const ordersTodayList = ord.filter((o) => isToday(o.created_at));
+      const usersToday   = p.filter((u) => isToday(u.created_at)).length;
+      const eventsToday  = ev.filter((e) => isToday(e.created_at)).length;
+      const ordersToday  = ordersTodayList.length;
+      const ticketsToday = ordersTodayList.reduce((s, o) => s + (o.qty ?? 0), 0);
+      const profitToday  = ordersTodayList.reduce((s, o) => s + profitOf(o), 0);
+
       // Tickets sold per event (same confirmed/live/non-manual basis as the
       // Tickets Sold KPI, so the widget's total tallies with it). Only events
       // with at least one ticket sold, highest first.
@@ -130,6 +174,11 @@ export default function AdminDashboardPage() {
         profitThisMonth,
         totalOrders: ord.length,
         totalTicketsSold,
+        usersToday,
+        eventsToday,
+        profitToday,
+        ticketsToday,
+        ordersToday,
         eventSales,
         recentUsers: p.slice(0, 3),
         pendingEventList: ev.filter((x) => x.status === "pending_review").slice(0, 5),
@@ -169,12 +218,14 @@ export default function AdminDashboardPage() {
           value={loading ? "—" : fmt(data.totalUsers)}
           sub={loading ? undefined : `+${data.newUsersThisWeek} this week`}
           delta={loading || data.newUsersThisWeek === 0 ? undefined : { value: `${data.newUsersThisWeek}`, positive: true }}
+          today={loading ? undefined : { value: `+${data.usersToday}`, note: data.usersToday === 1 ? "signup" : "signups" }}
           accent="#2E1B30"
         />
         <KpiCard
           label="Rameelo Profit"
           value={loading ? "—" : fmtMoney(data.rameeloProfit)}
           sub={loading ? undefined : `${fmtMoney(data.profitThisMonth)} this month · net of Stripe`}
+          today={loading ? undefined : { value: fmtMoney(data.profitToday), note: "net" }}
           accent="#F5A623"
         />
         <KpiCard
@@ -182,12 +233,14 @@ export default function AdminDashboardPage() {
           value={loading ? "—" : String(data.totalEvents)}
           sub={loading ? undefined : `${data.sellingEvents} selling on Rameelo · ${data.publishedEvents} published`}
           delta={loading || data.sellingEvents === 0 ? undefined : { value: `${data.sellingEvents} selling`, positive: true }}
+          today={loading ? undefined : { value: `+${data.eventsToday}`, note: "created" }}
           accent="#1A6B7C"
         />
         <KpiCard
           label="Tickets Sold"
           value={loading ? "—" : fmt(data.totalTicketsSold)}
           sub={loading ? undefined : `${data.totalOrders} live order${data.totalOrders !== 1 ? "s" : ""} · test excluded`}
+          today={loading ? undefined : { value: `${data.ticketsToday} tix`, note: `${data.ordersToday} txn` }}
           accent="#8B2252"
         />
       </div>
@@ -257,8 +310,11 @@ export default function AdminDashboardPage() {
       {/* ── Daily summary email ───────────────────────────────────── */}
       <DailySummaryCard />
 
-      {/* ── User growth ───────────────────────────────────────────── */}
-      <SignupsChart />
+      {/* ── User growth + logins ──────────────────────────────────── */}
+      <div className="grid lg:grid-cols-2 gap-4">
+        <SignupsChart />
+        <LoginsChart />
+      </div>
 
       {/* ── Two-col row ───────────────────────────────────────────── */}
       <div className="grid lg:grid-cols-5 gap-4">

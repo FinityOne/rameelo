@@ -89,6 +89,17 @@ export async function POST(request: Request) {
   const { data: profile } = await supabase.from("profiles").select("role, first_name, last_name").eq("id", userId).maybeSingle();
   const role = profile?.role ?? "user";
 
+  // Record the login for activity tracking (append-only; powers future analytics
+  // like logins-per-user over the last 30 days, and gates the organizer alert).
+  // Only true sign-ins — a signup is logged separately as a new-user event.
+  if (purpose === "login") {
+    const ip = (request.headers.get("x-forwarded-for") ?? "").split(",")[0].trim() || null;
+    const userAgent = request.headers.get("user-agent");
+    try {
+      await supabase.rpc("record_login_event", { p_method: "otp", p_ip: ip, p_user_agent: userAgent });
+    } catch { /* tracking is best-effort — never block sign-in */ }
+  }
+
   return NextResponse.json({
     ok: true,
     userId,
