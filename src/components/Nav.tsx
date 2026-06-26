@@ -120,6 +120,7 @@ export default function Nav() {
       : null;
 
   const CATEGORIES = [
+    { href: "/",           label: "Home",        live: true, exact: true },
     { href: "/events",     label: "Events",      live: true, badge: "NEW" },
     { href: "/artists",    label: "Artists",     live: true  },
     { href: "/collegiate", label: "Collegiate",  live: true },
@@ -283,7 +284,7 @@ export default function Nav() {
                 href={cat.href}
                 label={cat.label}
                 badge={cat.badge}
-                active={pathname.startsWith(cat.href) && cat.href !== "/"}
+                active={cat.exact ? pathname === cat.href : pathname.startsWith(cat.href) && cat.href !== "/"}
                 comingSoon={!cat.live}
               />
             ))}
@@ -306,7 +307,7 @@ export default function Nav() {
           )}
 
           {CATEGORIES.map((cat) => {
-            const active = pathname.startsWith(cat.href) && cat.href !== "/";
+            const active = cat.exact ? pathname === cat.href : pathname.startsWith(cat.href) && cat.href !== "/";
             return (
               <div key={cat.href}>
                 {cat.live ? (

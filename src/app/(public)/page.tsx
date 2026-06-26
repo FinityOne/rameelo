@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Eyebrow } from "@/components/ui";
 import { HomeCityProvider, HeroCityBar, CityEventsSection, type HomeEvent } from "@/components/home/HomeCity";
 import HeroFeatured from "@/components/home/HeroFeatured";
+import PromoBanner from "@/components/PromoBanner";
 import TrendingArtists, { type TrendingArtist } from "@/components/home/TrendingArtists";
 import PopularCities from "@/components/home/PopularCities";
 import { createClient } from "@/lib/supabase/server";
@@ -175,6 +176,11 @@ export default async function HomePage() {
           </div>
         </div>
       </section>
+
+      {/* ══════════════════════════════════════════
+          PROMO BANNER — minimal ad-style strip for the active giveaway
+      ══════════════════════════════════════════ */}
+      <PromoBanner />
 
       {/* ══════════════════════════════════════════
           TRENDING ARTISTS — recognizable names → tour pages
