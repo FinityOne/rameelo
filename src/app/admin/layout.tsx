@@ -263,6 +263,23 @@ const SECTIONS: NavSection[] = [
     ],
   },
   {
+    id: "content",
+    label: "Content",
+    items: [
+      {
+        href: "/admin/blog",
+        label: "Blog",
+        match: (p) => p.startsWith("/admin/blog"),
+        icon: (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l6 6v8a2 2 0 01-2 2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M9 13h6M9 17h3" />
+          </svg>
+        ),
+      },
+    ],
+  },
+  {
     id: "community",
     label: "Community",
     items: [
@@ -310,6 +327,8 @@ const PAGE_TITLES: Array<{ test: (p: string) => boolean; title: string }> = [
   { test: (p) => p === "/admin/events/create",                    title: "Create Event" },
   { test: (p) => /^\/admin\/events\/[^/]+\/edit$/.test(p),       title: "Edit Event" },
   { test: (p) => /^\/admin\/events\/[^/]+$/.test(p),             title: "Event Details" },
+  { test: (p) => p === "/admin/blog",                             title: "Blog Articles" },
+  { test: (p) => /^\/admin\/blog\/[^/]+$/.test(p),               title: "Edit Article" },
   { test: (p) => p === "/admin/community",                        title: "Moderation" },
   { test: (p) => p === "/admin/community/groups",                 title: "Community Groups" },
   { test: (p) => p === "/admin/orders",                           title: "Orders" },

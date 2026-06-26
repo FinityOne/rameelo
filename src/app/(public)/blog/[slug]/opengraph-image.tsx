@@ -1,12 +1,15 @@
 import { ImageResponse } from "next/og";
 import { getArticle } from "@/lib/blog";
+import { getBlogOverride } from "@/lib/blog-overrides";
 
 // Branded, per-article social share card (Open Graph + Twitter fallback).
-// Generated at build time per slug so every shared link has a unique, on-brand
-// preview with the headline, category and a dek that entices the click.
+// Uses the admin override title + cover image when set, so renamed articles
+// and uploaded covers flow straight into the share preview.
 export const alt = "Rameelo — Garba & Navratri, covered.";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+// Refresh so admin renames / cover uploads reach the share card.
+export const revalidate = 60;
 
 // Resolve a Tailwind gradient string (e.g. "from-[#7C1F2C] via-[#a23a2b] to-marigold")
 // into concrete hex stops so the card mirrors the article's cover.
@@ -34,8 +37,10 @@ function gradientStops(cover: string): string[] {
 export default async function Image({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
   const article = getArticle(slug);
+  const override = await getBlogOverride(slug);
 
-  const title = article?.title ?? "Garba & Navratri, covered.";
+  const title = override.title || article?.title || "Garba & Navratri, covered.";
+  const coverImageUrl = override.coverImageUrl;
   const category = article?.category ?? "Rameelo Review";
   const emoji = article?.coverEmoji ?? "🪔";
   const dek = (article?.excerpt ?? "America's authoritative source for raas garba culture, city guides, artists & events.").slice(0, 140);
@@ -62,7 +67,19 @@ export default async function Image({ params }: { params: Promise<{ slug: string
           fontFamily: "Geist",
         }}
       >
-        {/* Dark scrim so text stays readable on bright gradients */}
+        {/* Uploaded cover image (if any) sits behind the scrim */}
+        {coverImageUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={coverImageUrl}
+            alt=""
+            width={size.width}
+            height={size.height}
+            style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        ) : null}
+
+        {/* Dark scrim so text stays readable on bright gradients / photos */}
         <div
           style={{
             position: "absolute",

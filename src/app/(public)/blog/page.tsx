@@ -7,7 +7,11 @@ import {
   getArticlesByCategory,
   type BlogArticle,
 } from "@/lib/blog";
+import { getBlogOverrides } from "@/lib/blog-overrides";
 import { breadcrumbSchema, itemListSchema, ld } from "@/lib/jsonld";
+
+// Revalidate so admin renames (blog_article_overrides) surface on the index.
+export const revalidate = 60;
 
 export const metadata: Metadata = {
   title: "Rameelo Blog — Raas Garba News, Guides & Community",
@@ -62,12 +66,18 @@ function Kicker({ article, withEmoji = false }: { article: BlogArticle; withEmoj
 
 // Editorial card — hairline border, a colored top rule, mono kicker, serif-feel
 // headline, two-line dek and a byline. No big emoji panels.
-function StoryCard({ article }: { article: BlogArticle }) {
+function StoryCard({ article, title, image }: { article: BlogArticle; title?: string; image?: string | null }) {
   return (
     <Link
       href={`/blog/${article.slug}`}
       className="group flex flex-col bg-white border border-ink/10 rounded-[4px] overflow-hidden hover:border-ink/25 hover:shadow-sm transition-all"
     >
+      {image && (
+        <div className="aspect-[16/9] overflow-hidden bg-ivory-200">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={image} alt="" className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-500" />
+        </div>
+      )}
       <div className="h-1" style={{ backgroundColor: accentFor(article.category) }} />
       <div className="p-5 flex-1 flex flex-col">
         <div className="flex items-center gap-2 mb-2.5">
@@ -76,7 +86,7 @@ function StoryCard({ article }: { article: BlogArticle }) {
           <span className="font-mono text-[9px] text-ink-muted/70">{article.readMinutes} min</span>
         </div>
         <h3 className="font-editorial font-bold text-ink text-lg leading-[1.2] group-hover:text-aubergine transition-colors mb-2" style={{ letterSpacing: "-0.01em" }}>
-          {article.title}
+          {title ?? article.title}
         </h3>
         <p className="font-ui text-[13px] text-ink-muted leading-relaxed line-clamp-2 mb-4 flex-1">{article.excerpt}</p>
         <p className="font-mono text-[9px] text-ink-muted/70 pt-3 border-t border-ink/8">
@@ -88,7 +98,7 @@ function StoryCard({ article }: { article: BlogArticle }) {
 }
 
 // Compact one-line headline row for rails and list sections.
-function HeadlineRow({ article, index }: { article: BlogArticle; index?: number }) {
+function HeadlineRow({ article, index, title, image }: { article: BlogArticle; index?: number; title?: string; image?: string | null }) {
   return (
     <Link
       href={`/blog/${article.slug}`}
@@ -99,19 +109,29 @@ function HeadlineRow({ article, index }: { article: BlogArticle; index?: number 
           {index}
         </span>
       )}
-      <div className="min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="mb-1">
           <Kicker article={article} />
         </div>
         <h3 className="font-editorial font-bold text-ink text-[15px] leading-snug group-hover:text-aubergine transition-colors" style={{ letterSpacing: "-0.005em" }}>
-          {article.title}
+          {title ?? article.title}
         </h3>
       </div>
+      {image && (
+        <div className="w-16 h-16 shrink-0 rounded-md overflow-hidden border border-ink/10 bg-ivory-200">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={image} alt="" className="w-full h-full object-cover" />
+        </div>
+      )}
     </Link>
   );
 }
 
-export default function BlogPage() {
+export default async function BlogPage() {
+  const overrides = await getBlogOverrides();
+  const titleOf = (a: BlogArticle) => overrides[a.slug]?.title || a.title;
+  const imageOf = (a: BlogArticle) => overrides[a.slug]?.coverImageUrl || null;
+
   const lead = getFeaturedArticle() ?? getArticlesByPriority()[0];
 
   // Front-page rail: the highest-intent stories after the lead.
@@ -129,7 +149,7 @@ export default function BlogPage() {
 
   const blogList = itemListSchema(
     "Rameelo Blog Articles",
-    BLOG_ARTICLES.map(a => ({ name: a.title, url: `https://rameelo.com/blog/${a.slug}` }))
+    BLOG_ARTICLES.map(a => ({ name: titleOf(a), url: `https://rameelo.com/blog/${a.slug}` }))
   );
   const crumbs = breadcrumbSchema([
     { name: "Home", url: "https://rameelo.com" },
@@ -171,13 +191,19 @@ export default function BlogPage() {
           {/* Lead story */}
           <div className="lg:col-span-2">
             <Link href={`/blog/${lead.slug}`} className="group block">
+              {imageOf(lead) && (
+                <div className="aspect-[16/9] w-full overflow-hidden rounded-lg border border-ink/10 mb-5">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={imageOf(lead)!} alt="" className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-500" />
+                </div>
+              )}
               <div className="flex items-center gap-2 mb-3">
                 <Kicker article={lead} withEmoji />
                 <span className="font-mono text-[9px] text-ink-muted/70">·</span>
                 <span className="font-mono text-[9px] text-ink-muted/70">{lead.readMinutes} min read</span>
               </div>
               <h2 className="font-editorial font-bold text-ink text-3xl sm:text-[2.75rem] leading-[1.05] group-hover:text-aubergine transition-colors mb-4" style={{ letterSpacing: "-0.025em" }}>
-                {lead.title}
+                {titleOf(lead)}
               </h2>
               <p className="font-ui text-ink-muted text-base sm:text-lg leading-relaxed mb-5 max-w-2xl">{lead.excerpt}</p>
               <div className="flex items-center gap-3">
@@ -204,7 +230,7 @@ export default function BlogPage() {
             </div>
             <div>
               {rail.map((a, i) => (
-                <HeadlineRow key={a.slug} article={a} index={i + 1} />
+                <HeadlineRow key={a.slug} article={a} index={i + 1} title={titleOf(a)} image={imageOf(a)} />
               ))}
             </div>
           </aside>
@@ -227,7 +253,7 @@ export default function BlogPage() {
             </div>
             <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {cityGuides.map(a => (
-                <StoryCard key={a.slug} article={a} />
+                <StoryCard key={a.slug} article={a} title={titleOf(a)} image={imageOf(a)} />
               ))}
             </div>
           </section>
@@ -245,7 +271,7 @@ export default function BlogPage() {
               </div>
               <div className="space-y-4">
                 {artists.map(a => (
-                  <StoryCard key={a.slug} article={a} />
+                  <StoryCard key={a.slug} article={a} title={titleOf(a)} image={imageOf(a)} />
                 ))}
               </div>
             </div>
@@ -261,7 +287,7 @@ export default function BlogPage() {
               </div>
               <div>
                 {knowBefore.map(a => (
-                  <HeadlineRow key={a.slug} article={a} />
+                  <HeadlineRow key={a.slug} article={a} title={titleOf(a)} image={imageOf(a)} />
                 ))}
               </div>
             </div>
@@ -274,7 +300,7 @@ export default function BlogPage() {
             <div className="md:col-span-2">
               <p className="font-mono text-[10px] uppercase tracking-widest text-marigold/60 mb-2">For Organizers</p>
               <h2 className="font-editorial font-bold text-white text-xl sm:text-2xl mb-2" style={{ letterSpacing: "-0.02em" }}>
-                {organizerPosts[0]?.title ?? "Sell out your Navratri event"}
+                {organizerPosts[0] ? titleOf(organizerPosts[0]) : "Sell out your Navratri event"}
               </h2>
               <p className="font-ui text-white/55 text-sm leading-relaxed max-w-xl">
                 {organizerPosts[0]?.excerpt ?? "Tiered pricing, group orders, combo tickets and fast payouts — on the only platform built for raas garba."}

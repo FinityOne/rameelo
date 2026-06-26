@@ -67,6 +67,54 @@ export const BLOG_ARTICLES: BlogArticle[] = [
   },
 
   {
+    slug: "rameelo-mahadev-entertainment-boston-geeta-rabari-kinjal-dave-2026",
+    title: "Rameelo Partners with Mahadev Entertainment for a Boston Navratri Doubleheader: Geeta Rabari & Kinjal Dave",
+    excerpt: "Rameelo is proud to partner with Boston's Mahadev Entertainment to bring two Gujarati folk superstars to Massachusetts — Geeta Rabari on Sept 26 and Kinjal Dave on Sept 27, 2026, both at Shriners Auditorium. Tickets are on sale now.",
+    category: "News",
+    author: "Rameelo Newsroom",
+    authorTitle: "Partnerships Desk",
+    publishedAt: "2026-06-22",
+    readMinutes: 4,
+    featured: false,
+    coverGradient: "from-[#0E8C7A] via-aubergine to-[#7C1F2C]",
+    coverEmoji: "🤝",
+    tags: ["mahadev entertainment", "geeta rabari boston", "kinjal dave boston", "boston garba 2026", "navratri massachusetts"],
+    body: `
+<p class="lead"><strong>BOSTON, Mass. — June 22, 2026.</strong> Rameelo is proud to announce a partnership with <strong>Mahadev Entertainment</strong>, one of New England's premier Gujarati event organizers, to power ticketing for a back-to-back Navratri doubleheader this fall: <strong>Geeta Rabari on Friday, September 26</strong> and <strong>Kinjal Dave on Saturday, September 27, 2026</strong>, both at the <strong>Shriners Auditorium</strong> in Wilmington, just outside Boston.</p>
+
+<p>It's a marquee weekend for Massachusetts garba — two of Gujarat's biggest folk-music superstars on consecutive nights, in one venue — and we couldn't be prouder to be the platform behind it. <a href="/org/mahadeventertainment">Mahadev Entertainment</a> brings the vision and the artists; Rameelo brings the seamless ticketing, group orders, and door-scanning built specifically for raas garba.</p>
+
+<h2>Fast facts</h2>
+<ul>
+  <li><strong>Presented by:</strong> <a href="/org/mahadeventertainment">Mahadev Entertainment</a>, Boston, Massachusetts</li>
+  <li><strong>Venue:</strong> Shriners Auditorium, Wilmington, MA (Greater Boston)</li>
+  <li><strong>Night 1 — Garba Ramzat with Geeta Rabari:</strong> Friday, September 26, 2026</li>
+  <li><strong>Night 2 — Killol with Kinjal Dave:</strong> Saturday, September 27, 2026</li>
+  <li><strong>Tickets:</strong> from $30 per night, on sale now on Rameelo</li>
+  <li><strong>Get tickets:</strong> <a href="/events/9e6a890d-c3dd-4de6-a577-31489be1abeb">Geeta Rabari (Sep 26) →</a> · <a href="/events/58f70530-4e8d-439e-9737-dad3a84e3ef6">Kinjal Dave (Sep 27) →</a></li>
+</ul>
+
+<h2>Night 1: Geeta Rabari — Friday, September 26</h2>
+<p>Known as the "Koyal of Kutch," <strong>Geeta Rabari</strong> is one of the most electrifying voices in Gujarati folk music, with a stage energy that turns a hall into a sea of spinning chaniya cholis. Her Boston night, <strong>Garba Ramzat</strong>, opens the weekend on September 26. <a href="/events/9e6a890d-c3dd-4de6-a577-31489be1abeb">Get Geeta Rabari tickets on Rameelo →</a></p>
+
+<h2>Night 2: Kinjal Dave — Saturday, September 27</h2>
+<p>A chart-topping superstar to a whole generation of young Gujaratis, <strong>Kinjal Dave</strong> brings the high-octane hits for night two, <strong>Killol</strong>, on September 27. If you're coming for one, stay for both — back-to-back nights with two different headliners is a rare treat. <a href="/events/58f70530-4e8d-439e-9737-dad3a84e3ef6">Get Kinjal Dave tickets on Rameelo →</a></p>
+
+<h2>Why this partnership matters</h2>
+<p>Rameelo exists to put the rhythm of raas garba on a platform that finally understands it — group discounts for the friends and family who always come together, combo-friendly ticketing, fast and fair payouts for organizers, and a door scanner that just works. Partnering with an organizer of Mahadev Entertainment's caliber is exactly the kind of moment we're built for, and a sign of where the New England garba scene is headed.</p>
+
+<h2>How to get your tickets</h2>
+<ol>
+  <li><strong>Pick your night — or both.</strong> Tickets to <a href="/events/9e6a890d-c3dd-4de6-a577-31489be1abeb">Geeta Rabari (Sep 26)</a> and <a href="/events/58f70530-4e8d-439e-9737-dad3a84e3ef6">Kinjal Dave (Sep 27)</a> start at $30.</li>
+  <li><strong>Bring a group.</strong> Coordinating a crew unlocks Rameelo's automatic group discount — garba is always better together.</li>
+  <li><strong>Create a free account.</strong> Your tickets and QR codes live in your portal, ready to scan at the Shriners Auditorium door.</li>
+</ol>
+
+<p>Two nights, two superstars, one unforgettable Boston Navratri weekend. <a href="/org/mahadeventertainment">See both Mahadev Entertainment events on Rameelo →</a></p>
+    `,
+  },
+
+  {
     slug: "navratri-2026-usa-ultimate-guide",
     title: "Navratri 2026: The Ultimate Guide to Garba & Raas Events Across the USA",
     excerpt: "Nine nights. Thousands of dancers. Hundreds of events coast to coast. Here's everything you need to know to experience Navratri 2026 in America — from the best cities to the insider tips that make the difference.",
@@ -1703,6 +1751,16 @@ const CTA_BY_SLUG: Record<string, BlogCta> = {
     secondaryLabel: "Browse all garba events",
     secondaryHref: "/events",
   },
+  "rameelo-mahadev-entertainment-boston-geeta-rabari-kinjal-dave-2026": {
+    variant: "event",
+    eyebrow: "Boston · Sep 26–27, 2026",
+    heading: "Two nights, two superstars — get your tickets",
+    body: "Geeta Rabari on Sep 26 and Kinjal Dave on Sep 27 at Shriners Auditorium, presented by Mahadev Entertainment. Tickets from $30 — pick a night or do both.",
+    buttonLabel: "Geeta Rabari (Sep 26) →",
+    href: "/events/9e6a890d-c3dd-4de6-a577-31489be1abeb",
+    secondaryLabel: "Kinjal Dave (Sep 27) →",
+    secondaryHref: "/events/58f70530-4e8d-439e-9737-dad3a84e3ef6",
+  },
   "navratri-2026-usa-ultimate-guide": eventsCta(
     "Browse Navratri 2026 events near you",
     "The best nights in Edison, Houston, Chicago, Atlanta and the Bay Area sell out months ahead. Find your city's events and lock in tickets while the early prices last.",
@@ -1835,6 +1893,7 @@ export type BlogCityFilter = { label: string; states?: string[]; places?: string
 
 const CITY_FILTER_BY_SLUG: Record<string, BlogCityFilter> = {
   "atul-purohit-garba-south-carolina-early-bird-sold-out-2026": { label: "South Carolina", states: ["SC"], places: ["Greenville", "Upstate"] },
+  "rameelo-mahadev-entertainment-boston-geeta-rabari-kinjal-dave-2026": { label: "Boston", states: ["MA"], places: ["Boston", "Wilmington"] },
   "best-garba-events-new-jersey-2026": { label: "New Jersey", states: ["NJ"], places: ["Edison", "Iselin", "Secaucus", "New Jersey"] },
   "garba-events-new-jersey-guide": { label: "New Jersey", states: ["NJ"], places: ["Edison", "Iselin", "Secaucus", "New Jersey"] },
   "houston-garba-scene-is-booming": { label: "Houston", places: ["Houston"] },
@@ -1860,6 +1919,7 @@ export function getArticleCityFilter(slug: string): BlogCityFilter | null {
 // rather than purely by date. Lower number = shown earlier. Anything not listed
 // falls back to a mid weight and is then ordered by recency.
 const ARTICLE_PRIORITY: Record<string, number> = {
+  "rameelo-mahadev-entertainment-boston-geeta-rabari-kinjal-dave-2026": 2,
   "best-garba-events-new-jersey-2026": 1,
   "garba-events-new-jersey-guide": 2,
   "navratri-2026-usa-ultimate-guide": 3,
