@@ -212,6 +212,16 @@ export const EMAIL_REGISTRY: EmailDef[] = [
     fires: "Automatically each midnight (Pacific) via cron · Manual send for any date from the admin Dashboard",
   },
   {
+    key: "organizer-weekly-summary",
+    name: "Weekly sales summary",
+    description: "A clean, 50,000-ft weekly sales pulse to an organization's owners & admins: face-value revenue (with week-over-week change), tickets, orders, average order, a tickets-sold-by-day chart, per-event sales for the week, and how upcoming on-sale events are tracking (sell-through + countdown). Only sent to orgs actively selling (a published, upcoming, on-sale event).",
+    audience: "Organizers",
+    category: "Organizer",
+    status: "live",
+    trigger: "automatic",
+    fires: "Automatically every Saturday at midnight (Pacific) via cron, covering the prior 7 days",
+  },
+  {
     key: "payout-status",
     name: "Payout status",
     description: "Updates an organizer when a payout request is approved, paid, or declined.",
