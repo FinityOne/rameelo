@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { getArticle, BLOG_ARTICLES, type BlogArticle } from "@/lib/blog";
+import { getArticle, getArticleCta, getArticleCityFilter, BLOG_ARTICLES, type BlogArticle } from "@/lib/blog";
 import { breadcrumbSchema, faqSchema, ld } from "@/lib/jsonld";
+import BlogCityEvents from "./BlogCityEvents";
 
 type Props = { params: Promise<{ slug: string }> };
 
@@ -53,6 +54,9 @@ const CATEGORY_COLORS: Record<string, string> = {
   "Tips & Tricks":  "bg-[#5a1e7a]/10 text-[#5a1e7a]",
   "For Organizers": "bg-peacock/10 text-peacock",
   "Platform":       "bg-aubergine/10 text-aubergine",
+  "News":           "bg-[#7C1F2C]/10 text-[#7C1F2C]",
+  "Artist Spotlight": "bg-[#B06A00]/10 text-[#B06A00]",
+  "First-Timer":    "bg-peacock/10 text-peacock",
 };
 
 function fmtDate(d: string) {
@@ -92,6 +96,9 @@ export default async function BlogArticlePage({ params }: Props) {
     })
     .slice(0, 3);
 
+  const cta = getArticleCta(slug);
+  const cityFilter = getArticleCityFilter(slug);
+
   const crumbs = breadcrumbSchema([
     { name: "Home", url: "https://rameelo.com" },
     { name: "Blog", url: "https://rameelo.com/blog" },
@@ -102,7 +109,9 @@ export default async function BlogArticlePage({ params }: Props) {
 
   const jsonLd = {
     "@context": "https://schema.org",
-    "@type": "BlogPosting",
+    // News pieces emit NewsArticle so Google can surface them in Top stories /
+    // Google News; evergreen pieces stay BlogPosting.
+    "@type": article.category === "News" ? "NewsArticle" : "BlogPosting",
     "@id": articleUrl,
     "headline": article.title,
     "description": article.excerpt,
@@ -284,6 +293,33 @@ export default async function BlogArticlePage({ params }: Props) {
               </div>
             </div>
           </aside>
+        </div>
+
+        {/* ── City-matched live events (city guides) — buy straight from the article ── */}
+        {cityFilter && <BlogCityEvents filter={cityFilter} />}
+
+        {/* ── Conversion CTA — one clear next step, tailored per article ── */}
+        <div className="mt-12 rounded-3xl overflow-hidden border border-marigold/25 relative" style={{ backgroundColor: "#2E1B30" }}>
+          <div className="absolute inset-0 pointer-events-none opacity-[0.5]" style={{ background: "radial-gradient(ellipse at 85% 0%, rgba(245,166,35,0.22) 0%, transparent 55%)" }} />
+          <div className="relative px-6 sm:px-10 py-9 text-center">
+            <p className="font-mono text-[10px] uppercase tracking-widest text-marigold/70 mb-2">{cta.eyebrow}</p>
+            <h2 className="font-display font-bold text-white text-2xl sm:text-3xl mb-3" style={{ letterSpacing: "-0.025em" }}>
+              {cta.heading}
+            </h2>
+            <p className="font-ui text-white/60 text-sm sm:text-base leading-relaxed max-w-2xl mx-auto mb-6">
+              {cta.body}
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-3">
+              <Link href={cta.href} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-marigold text-aubergine font-display font-bold text-sm sm:text-base hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-lg">
+                {cta.buttonLabel}
+              </Link>
+              {cta.secondaryLabel && cta.secondaryHref && (
+                <Link href={cta.secondaryHref} className="inline-flex items-center gap-2 px-6 py-3 rounded-xl border border-white/20 text-white font-ui font-semibold text-sm hover:bg-white/10 transition-all">
+                  {cta.secondaryLabel}
+                </Link>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* ── Related articles ── */}
