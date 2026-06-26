@@ -5,7 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
 import QRCode from "@/components/QRCode";
-import { loadMyOrders, type PortalOrderRow, type GroupMember } from "@/lib/group-orders";
+import { loadMyOrders, type PortalOrderRow, type GroupMember, type ComboEventDetail } from "@/lib/group-orders";
 import {
   lookupUserByEmail,
   initiateTransfer,
@@ -20,9 +20,11 @@ import {
 
 // ── QR Code ───────────────────────────────────────────────────────────────────
 // Real scannable QR lives in @/components/QRCode (imported above). The scanner +
-// Apple Wallet pass both read the `RAMEELO:<orderId>` payload.
-function ticketQrValue(orderId: string) {
-  return `RAMEELO:${orderId}`;
+// Apple Wallet pass read the `RAMEELO:<orderId>` payload. Combo tickets get one
+// QR per event, encoded `RAMEELO:<orderId>:<eventId>`, so a door scanner only
+// admits the holder for the event whose code they present.
+function ticketQrValue(orderId: string, eventId?: string | null) {
+  return eventId ? `RAMEELO:${orderId}:${eventId}` : `RAMEELO:${orderId}`;
 }
 
 function fmtDate(d: string) {
@@ -516,8 +518,8 @@ function AppleWalletButton({ full = false }: { orderId: string; seat: number; fu
 }
 
 // ── Fullscreen QR (enlarge + brighten for scanning) ─────────────────────────────
-function QREnlargeModal({ ticketId, eventTitle, tierName, onClose }: {
-  ticketId: string; eventTitle: string; tierName: string; onClose: () => void;
+function QREnlargeModal({ qrValue, eventTitle, tierName, refLabel, onClose }: {
+  qrValue: string; eventTitle: string; tierName: string; refLabel: string; onClose: () => void;
 }) {
   useEffect(() => {
     const prev = document.body.style.overflow;
@@ -543,9 +545,9 @@ function QREnlargeModal({ ticketId, eventTitle, tierName, onClose }: {
           <p className="font-ui text-sm text-ink-muted">{tierName}</p>
         </div>
         <div className="p-5 rounded-3xl bg-white shadow-[0_8px_40px_rgba(0,0,0,0.12)] border border-ivory-200">
-          <QRCode value={ticketQrValue(ticketId.replace(/-T\d+$/, ""))} size={Math.min(320, typeof window !== "undefined" ? window.innerWidth - 96 : 320)} />
+          <QRCode value={qrValue} size={Math.min(320, typeof window !== "undefined" ? window.innerWidth - 96 : 320)} />
         </div>
-        <p className="font-mono text-[11px] text-ink/40">{ticketRef(ticketId.split("-T")[0], Number(ticketId.split("-T")[1] || 1))}</p>
+        <p className="font-mono text-[11px] text-ink/40">{refLabel}</p>
         <div className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-peacock/10 border border-peacock/20">
           <span className="w-1.5 h-1.5 rounded-full bg-peacock animate-pulse" />
           <p className="font-mono text-[11px] text-peacock font-bold uppercase tracking-widest">Screen brightened · show at entry</p>
@@ -556,29 +558,40 @@ function QREnlargeModal({ ticketId, eventTitle, tierName, onClose }: {
 }
 
 // ── A single ticket slide (one seat) ────────────────────────────────────────────
-type Slide = { order: PortalOrderRow; seat: number; transfer?: SeatTransfer; globalIndex: number };
+type Slide = { order: PortalOrderRow; seat: number; transfer?: SeatTransfer; globalIndex: number; comboEvent?: ComboEventDetail };
 
-function seasonLabel(order: PortalOrderRow) {
-  const cat = (order.category || "Garba").trim();
+function seasonLabelFor(category: string, eventDate: string) {
+  const cat = (category || "Garba").trim();
   const catUpper = cat.charAt(0).toUpperCase() + cat.slice(1);
-  const yr = order.eventDate ? `'${order.eventDate.slice(2, 4)}` : "";
+  const yr = eventDate ? `'${eventDate.slice(2, 4)}` : "";
   return `${catUpper} · Navratri ${yr}`.trim();
 }
 
 function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: {
   slide: Slide;
   total: number;
-  onEnlarge: (ticketId: string, eventTitle: string, tierName: string) => void;
+  onEnlarge: (qrValue: string, eventTitle: string, tierName: string, refLabel: string) => void;
   onTransfer: (order: PortalOrderRow, seat: number) => void;
   onCancelTransfer: () => void;
 }) {
-  const { order, seat, transfer, globalIndex } = slide;
-  const ticketId = `${order.orderId}-T${seat}`;
+  const { order, seat, transfer, globalIndex, comboEvent } = slide;
+  const isComboSlide = !!comboEvent;
+  // For a combo slide, the panel + QR reflect THAT event; otherwise the order's event.
+  const ev = comboEvent ?? {
+    id: order.eventId, title: order.eventTitle, start_date: order.eventDate, start_time: order.eventTime,
+    venue: order.venue, city: order.city, state: order.state,
+    coverGradient: order.coverGradient, coverImageUrl: order.coverImageUrl, artistName: order.artistName,
+  };
+  const refLabel = ticketRef(order.orderId, seat);
+  // Combo → one distinct QR per event (RAMEELO:<orderId>:<eventId>); else order QR.
+  const qrValue = ticketQrValue(order.orderId, comboEvent?.id);
   const paymentPending = order.paymentPending; // ACH order awaiting clearance — no valid QR yet
-  const isPending = transfer?.status === "pending";
-  const isTransferred = transfer?.status === "accepted";
+  // Combo per-event slides aren't individually transferable (transfer moves the
+  // whole order), so they never carry a per-seat transfer.
+  const isPending = !isComboSlide && transfer?.status === "pending";
+  const isTransferred = !isComboSlide && transfer?.status === "accepted";
   const isGroup = !!order.groupId; // group allocations use "claim" wording
-  const isUpcoming = order.eventDate >= new Date().toISOString().slice(0, 10);
+  const isUpcoming = ev.start_date >= new Date().toISOString().slice(0, 10);
   const [cancelling, setCancelling] = useState(false);
 
   async function handleCancel() {
@@ -606,14 +619,14 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
       {/* ── Gradient event panel ── */}
       <div
         className="relative lg:w-[42%] shrink-0 p-6 sm:p-7 flex flex-col text-white min-h-[230px] lg:min-h-[420px]"
-        style={{ background: coverBackground(order.coverImageUrl, order.coverGradient) }}
+        style={{ background: coverBackground(ev.coverImageUrl, ev.coverGradient) }}
       >
         {/* texture */}
         <div className="absolute inset-0 pointer-events-none opacity-[0.18]" style={{ backgroundImage: "radial-gradient(circle at 75% 15%, rgba(255,255,255,0.5) 0%, transparent 45%), radial-gradient(circle at 10% 90%, rgba(0,0,0,0.25) 0%, transparent 50%)" }} />
         <div className="relative flex-1 flex flex-col">
           <div className="flex items-center justify-between gap-2">
             <span className="inline-flex items-center font-mono text-[10px] uppercase tracking-[0.18em] text-white/90 bg-black/25 backdrop-blur-sm px-3 py-1.5 rounded-full">
-              {seasonLabel(order)}
+              {seasonLabelFor(order.category, ev.start_date)}
             </span>
             <div className="flex items-center gap-1.5">
               {order.isCombo && (
@@ -627,28 +640,28 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
 
           <div className="mt-auto pt-8">
             <h3 className="font-editorial italic leading-[0.98] mb-1.5" style={{ fontSize: "clamp(2rem, 4vw, 2.9rem)", letterSpacing: "-0.01em" }}>
-              {order.eventTitle}
+              {ev.title}
             </h3>
-            {order.artistName && (
+            {ev.artistName && (
               <p className="font-ui text-white/75 text-sm mb-4">
-                {order.artistName}{isUpcoming ? " · live" : ""}
+                {ev.artistName}{isUpcoming ? " · live" : ""}
               </p>
             )}
             <div className="space-y-1.5">
               <div className="flex items-center gap-2 text-white/85">
                 <svg className="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-                <span className="font-ui text-[13px]">{fmtDate(order.eventDate)}</span>
+                <span className="font-ui text-[13px]">{fmtDate(ev.start_date)}</span>
               </div>
-              {order.eventTime && (
+              {ev.start_time && (
                 <div className="flex items-center gap-2 text-white/85">
                   <svg className="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                  <span className="font-ui text-[13px]">Doors {fmtTime(order.eventTime)}</span>
+                  <span className="font-ui text-[13px]">Doors {fmtTime(ev.start_time)}</span>
                 </div>
               )}
-              {(order.venue || order.city) && (
+              {(ev.venue || ev.city) && (
                 <div className="flex items-center gap-2 text-white/85">
                   <svg className="w-3.5 h-3.5 shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                  <span className="font-ui text-[13px] truncate">{[order.venue, [order.city, order.state].filter(Boolean).join(", ")].filter(Boolean).join("  ·  ")}</span>
+                  <span className="font-ui text-[13px] truncate">{[ev.venue, [ev.city, ev.state].filter(Boolean).join(", ")].filter(Boolean).join("  ·  ")}</span>
                 </div>
               )}
             </div>
@@ -690,11 +703,11 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
           ) : (
             <>
               <button
-                onClick={() => onEnlarge(ticketId, order.eventTitle, order.tierName)}
+                onClick={() => onEnlarge(qrValue, ev.title, order.tierName, refLabel)}
                 className="relative group p-3.5 rounded-2xl bg-white border border-ivory-200 hover:border-aubergine/30 transition-colors"
                 aria-label="Enlarge QR code"
               >
-                <QRCode value={ticketQrValue(order.orderId)} size={150} />
+                <QRCode value={qrValue} size={150} />
                 <span className="absolute bottom-2 right-2 w-6 h-6 rounded-lg bg-aubergine/90 text-white flex items-center justify-center opacity-80 group-hover:opacity-100 transition-opacity">
                   <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" /></svg>
                 </span>
@@ -722,12 +735,12 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
           </h4>
           <p className={`font-mono text-[11px] text-ink-muted ${order.receivedFrom ? "mb-2" : "mb-5"}`}>{ticketRef(order.orderId, seat)}</p>
 
-          {/* Combo — one ticket, multiple events */}
-          {order.isCombo && (order.comboEvents?.length ?? 0) > 0 && (
+          {/* Combo — each event gets its own QR. This slide is for ONE event. */}
+          {isComboSlide && (
             <div className="mb-5 inline-flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-marigold/10 border border-marigold/30 self-start">
               <span className="text-sm leading-none mt-0.5">✨</span>
               <span className="font-ui text-[11px] text-[#a06b00] font-semibold">
-                Combo ticket · valid for {order.comboEvents!.map(e => e.title).join(" · ")}
+                Combo · this QR admits you to {ev.title} only. Your other event{(order.comboEvents?.length ?? 0) > 2 ? "s have" : " has"} a separate QR.
               </span>
             </div>
           )}
@@ -745,15 +758,16 @@ function TicketSlide({ slide, total, onEnlarge, onTransfer, onCancelTransfer }: 
           {!paymentPending && !isPending && !isTransferred && (
             <div className="space-y-2.5">
               <button
-                onClick={() => onEnlarge(ticketId, order.eventTitle, order.tierName)}
+                onClick={() => onEnlarge(qrValue, ev.title, order.tierName, refLabel)}
                 className="w-full flex items-center justify-center gap-2 py-3.5 rounded-xl bg-aubergine text-white font-display font-bold text-sm hover:bg-aubergine-light active:scale-[0.98] transition-all"
                 style={{ minHeight: 48 }}
               >
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7V5a2 2 0 012-2h2M4 17v2a2 2 0 002 2h2m8-18h2a2 2 0 012 2v2m-4 14h2a2 2 0 002-2v-2M9 12h6" /></svg>
                 Show at entry
               </button>
-              {order.receivedFrom ? (
-                /* Received tickets can be shown/added to wallet, but not re-transferred here. */
+              {order.receivedFrom || isComboSlide ? (
+                /* Received tickets + combo per-event tickets: show / add to wallet,
+                   but not re-transferred from this slide. */
                 <AppleWalletButton orderId={order.orderId} seat={seat} />
               ) : (
                 <div className="grid grid-cols-2 gap-2.5">
@@ -786,18 +800,30 @@ function TicketsCarousel({ eventTitle, orders, userId, userEmail, onRefresh }: {
   userEmail: string;
   onRefresh: () => void;
 }) {
-  // Flatten every order into per-seat slides
+  // Flatten every order into slides. A combo order yields one slide per (event ×
+  // seat) — each with its own per-event QR — so the holder sees a distinct,
+  // separately-scannable code for every event in the combo. Non-combo orders are
+  // one slide per seat as before.
   const slides: Slide[] = [];
   orders.forEach(order => {
     const transfers = order.transfers ?? [];
-    for (let seat = 1; seat <= order.qty; seat++) {
-      slides.push({ order, seat, transfer: getTransferForSeat(seat, transfers), globalIndex: slides.length });
+    const comboEvents = order.isCombo ? (order.comboEvents ?? []) : [];
+    if (comboEvents.length > 0) {
+      comboEvents.forEach(cev => {
+        for (let seat = 1; seat <= order.qty; seat++) {
+          slides.push({ order, seat, comboEvent: cev, globalIndex: slides.length });
+        }
+      });
+    } else {
+      for (let seat = 1; seat <= order.qty; seat++) {
+        slides.push({ order, seat, transfer: getTransferForSeat(seat, transfers), globalIndex: slides.length });
+      }
     }
   });
   const total = slides.length;
 
   const [current, setCurrent] = useState(0);
-  const [enlarge, setEnlarge] = useState<{ ticketId: string; eventTitle: string; tierName: string } | null>(null);
+  const [enlarge, setEnlarge] = useState<{ qrValue: string; eventTitle: string; tierName: string; refLabel: string } | null>(null);
   const [transferModal, setTransferModal] = useState<{ order: PortalOrderRow; seats: number[] } | null>(null);
   const touchX = useRef<number | null>(null);
 
@@ -855,7 +881,7 @@ function TicketsCarousel({ eventTitle, orders, userId, userEmail, onRefresh }: {
         <TicketSlide
           slide={slide}
           total={total}
-          onEnlarge={(ticketId, eventTitle, tierName) => setEnlarge({ ticketId, eventTitle, tierName })}
+          onEnlarge={(qrValue, eventTitle, tierName, refLabel) => setEnlarge({ qrValue, eventTitle, tierName, refLabel })}
           onTransfer={(order, seat) => setTransferModal({ order, seats: [seat] })}
           onCancelTransfer={onRefresh}
         />

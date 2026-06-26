@@ -143,6 +143,17 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
   } | undefined;
   if (!order || !order.buyer_email) return; // already fulfilled, or unknown intent
 
+  // Combo orders: materialize a per-event ticket/QR segment for every event in
+  // the bundle (idempotent), and gather the event names for the email's combo note.
+  let comboEventNames: string[] = [];
+  if (order.combo_ticket_id) {
+    try {
+      await admin.rpc("ensure_combo_event_tickets", { p_order_id: order.id });
+      const { data: names } = await admin.rpc("get_order_combo_event_names", { p_order_id: order.id });
+      if (Array.isArray(names)) comboEventNames = names as string[];
+    } catch (e) { console.error("combo segment/email-names error:", e instanceof Error ? e.message : e); }
+  }
+
   const ev = order.events;
   const artist = one(ev?.artists)?.name ?? null;
   const tierName = order.ticket_tiers?.name ?? order.combo_tickets?.name ?? "Ticket";
@@ -180,6 +191,7 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
       eventWhen, eventWhere: where,
       directionsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(where)}`,
       ticketsUrl: `${EMAIL.site}/portal/tickets`, buyMoreUrl: `${EMAIL.site}/events`,
+      comboEventNames,
     });
     const r1 = await sendEmail({ to: order.buyer_email, subject: conf.subject, html: conf.html, text: conf.text, type: "order_confirmation" });
     await recordEmailLog(admin as SupabaseClient, { userId: order.user_id, toEmail: order.buyer_email, type: "order_confirmation", subject: conf.subject, status: r1.error ? "failed" : "sent", trigger: "automatic", providerId: r1.id, error: r1.error, orderId: order.id });

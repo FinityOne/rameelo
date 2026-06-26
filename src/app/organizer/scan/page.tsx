@@ -32,12 +32,22 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 function receiptNum(id: string) { return "RM-" + id.replace(/-/g, "").slice(0, 10).toUpperCase(); }
 
-/** Extract an order UUID from a scanned/typed value (RAMEELO:<id>, <id>-T2, raw <id>). */
-function parseOrderId(text: string): string | null {
+/** Parse a scanned/typed value into an order id + optional event id.
+ *  Forms: RAMEELO:<orderId>, RAMEELO:<orderId>:<eventId> (combo per-event QR),
+ *  <id>-T2, raw <id>. The event id, when present, scopes a combo ticket to one event. */
+function parseScan(text: string): { orderId: string | null; eventId: string | null } {
   let t = text.trim();
   if (t.toUpperCase().startsWith("RAMEELO:")) t = t.slice(8);
   t = t.replace(/-T\d+$/i, "");
-  return UUID_RE.test(t) ? t.toLowerCase() : null;
+  const [orderPart, eventPart] = t.split(":");
+  const orderId = orderPart && UUID_RE.test(orderPart) ? orderPart.toLowerCase() : null;
+  const eventId = eventPart && UUID_RE.test(eventPart) ? eventPart.toLowerCase() : null;
+  return { orderId, eventId };
+}
+
+/** Order UUID only — used by the manual box / name search. */
+function parseOrderId(text: string): string | null {
+  return parseScan(text).orderId;
 }
 
 function fmtTime(iso: string) {
@@ -49,7 +59,6 @@ function fmtTime(iso: string) {
 export default function ScannerPage() {
   const { activeOrg } = useOrg();
 
-  const [userId, setUserId] = useState("");
   const [events, setEvents] = useState<EventOpt[]>([]);
   const [eventId, setEventId] = useState("");
   const [orders, setOrders] = useState<ScanOrder[]>([]);
@@ -97,7 +106,6 @@ export default function ScannerPage() {
   useEffect(() => {
     if (!activeOrg) return;
     const supabase = createClient();
-    supabase.auth.getUser().then(({ data: { user } }) => setUserId(user?.id ?? ""));
     supabase
       .from("events")
       .select("id, title, start_date")
@@ -132,11 +140,16 @@ export default function ScannerPage() {
 
   // Resolve a scanned/typed code against the loaded orders for this event
   const resolve = useCallback((text: string): Resolved => {
-    const oid = parseOrderId(text);
+    const { orderId: oid, eventId: scannedEventId } = parseScan(text);
     let order = oid ? ordersById.get(oid) : undefined;
     if (!order) {
       const code = text.trim().toUpperCase();
       if (code.startsWith("RM-")) order = orders.find(o => receiptNum(o.id) === code);
+    }
+    // Combo QRs encode their event. A combo code scanned at a DIFFERENT event in
+    // the bundle is rejected — the guest must show the QR for THIS event.
+    if (order?.is_combo && scannedEventId && scannedEventId !== eventId) {
+      return { kind: "error", message: "This combo QR is for another event. Ask the guest for the QR that matches this event." };
     }
     if (oid && !order && pendingIds.has(oid)) {
       // Real ticket, but the bank/ACH payment hasn't cleared yet — not valid.
@@ -148,7 +161,7 @@ export default function ScannerPage() {
     }
     if (!order) return { kind: "error", message: "Unrecognized code. Try the QR or the RM- number." };
     return { kind: "ok", order };
-  }, [ordersById, orders, pendingIds]);
+  }, [ordersById, orders, pendingIds, eventId]);
 
   function handleCode(text: string) {
     const now = Date.now();
@@ -205,13 +218,14 @@ export default function ScannerPage() {
     const next = Math.min(order.qty, order.checked_in_count + n);
     const added = next - order.checked_in_count;
     const supabase = createClient();
-    const at = new Date().toISOString();
-    const { error } = await supabase
-      .from("orders")
-      .update({ checked_in_count: next, checked_in_at: at, checked_in_by: userId || null })
-      .eq("id", order.id);
+    // scan_admit writes per-event check-in for combos (so admitting at one event
+    // never marks the others), and order-level for everything else.
+    const { data, error } = await supabase.rpc("scan_admit", { p_order_id: order.id, p_event_id: eventId, p_count: next });
     if (!error) {
-      const updated = { ...order, checked_in_count: next, checked_in_at: at };
+      const row = (Array.isArray(data) ? data[0] : data) as { checked_in_count: number; checked_in_at: string } | null;
+      const at = row?.checked_in_at ?? new Date().toISOString();
+      const newCount = row?.checked_in_count ?? next;
+      const updated = { ...order, checked_in_count: newCount, checked_in_at: at };
       setOrders(prev => prev.map(o => o.id === order.id ? updated : o));
       setResult({ kind: "ok", order: updated });
       if (added > 0) {

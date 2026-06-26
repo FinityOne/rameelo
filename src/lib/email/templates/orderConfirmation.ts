@@ -23,11 +23,24 @@ export function orderConfirmationEmail(p: {
   directionsUrl: string;
   ticketsUrl: string;
   buyMoreUrl: string;
+  // For combo tickets: the events the combo covers. When 2+, the buyer is told
+  // they'll receive one unique QR code per event.
+  comboEventNames?: string[];
 }): { subject: string; html: string; text: string } {
   const name = (p.buyerName ?? "").trim().split(" ")[0] || "there";
   const artist = (p.artistName ?? "").trim();
   const ticketWord = p.qty === 1 ? "ticket" : "tickets";
   const subject = `You're in! ${p.qty} ${ticketWord} to ${p.eventTitle} 🎟️`;
+  const comboNames = (p.comboEventNames ?? []).filter(Boolean);
+  const isCombo = comboNames.length >= 2;
+
+  // Combo callout — make it unmistakable that this one order yields a separate
+  // QR per event, so a buyer knows to show the matching code at each door.
+  const comboNote = isCombo ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px;background:#FCF3DF;border:1px solid #F0D69A;border-radius:14px;">
+    <tr><td style="padding:14px 18px;">
+      <p style="margin:0 0 4px;font-family:${FONT_BODY};font-size:14px;font-weight:700;color:#8A5A00;">✨ Combo ticket — ${comboNames.length} QR codes, one per event</p>
+      <p style="margin:0;font-family:${FONT_BODY};font-size:13px;color:${C.inkMuted};line-height:1.5;">You'll get a <strong>separate, unique QR code for each event</strong> (${comboNames.join(" · ")}). Open your tickets in the app and show the QR that matches the event you're attending — each door only scans its own code.</p>
+    </td></tr></table>` : "";
 
   // Event summary panel with a directions link.
   const eventPanel = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px;background:${C.ivory};border:1px solid ${C.ivory200};border-radius:14px;">
@@ -63,6 +76,7 @@ export function orderConfirmationEmail(p: {
     h1("Your order is confirmed 🎉"),
     lead(`Hi ${name}, you&rsquo;re all set with <strong>${p.qty} ${ticketWord}</strong>. Here&rsquo;s your receipt and everything you need for the night.`),
     eventPanel,
+    comboNote,
     sectionTitle("Order summary"),
     pricing,
     button(p.ticketsUrl, "View my tickets"),
@@ -82,6 +96,7 @@ export function orderConfirmationEmail(p: {
     `Hi ${name},`,
     "",
     `Your order ${p.receiptNum} is confirmed — ${p.qty} ${ticketWord} to ${p.eventTitle}.`,
+    isCombo ? `Combo ticket: you'll get ${comboNames.length} unique QR codes, one per event (${comboNames.join(", ")}). Show the QR that matches each event at its door.` : "",
     artist ? `Artist: ${artist}` : "",
     p.eventWhen ? `When: ${p.eventWhen}` : "",
     p.eventWhere ? `Where: ${p.eventWhere}` : "",
