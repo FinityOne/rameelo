@@ -194,7 +194,10 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     const supabase = createClient();
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
     supabase.auth.getUser().then(async ({ data: { user: authUser } }) => {
+      if (cancelled) return;
       if (!authUser) {
         router.replace("/auth/signin");
         return;
@@ -224,18 +227,22 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       setTicketCount(ownedTickets);
       setFriendRequestCount(friendCount ?? 0);
 
-      // Realtime: keep friend request badge in sync
-      supabase
-        .channel(`layout:friendships:${authUser.id}`)
-        .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, async () => {
-          const { count: fresh } = await supabase
-            .from("friendships")
-            .select("id", { count: "exact", head: true })
-            .eq("addressee_id", authUser.id)
-            .eq("status", "pending");
-          setFriendRequestCount(fresh ?? 0);
-        })
-        .subscribe();
+      // Realtime: keep friend request badge in sync. Only subscribe if this effect
+      // hasn't been torn down (StrictMode / remount) — re-`.on()`-ing a channel that
+      // was already subscribed throws. The effect cleanup removes the channel.
+      if (!cancelled) {
+        channel = supabase
+          .channel(`layout:friendships:${authUser.id}`)
+          .on("postgres_changes", { event: "*", schema: "public", table: "friendships" }, async () => {
+            const { count: fresh } = await supabase
+              .from("friendships")
+              .select("id", { count: "exact", head: true })
+              .eq("addressee_id", authUser.id)
+              .eq("status", "pending");
+            setFriendRequestCount(fresh ?? 0);
+          })
+          .subscribe();
+      }
 
       const meta = authUser.user_metadata ?? {};
       const firstName = profile?.first_name || meta.firstName || authUser.email?.split("@")[0] || "Member";
@@ -255,6 +262,11 @@ export default function PortalLayout({ children }: { children: React.ReactNode }
       saveUser(rameeloUser);
       setUser(rameeloUser);
     });
+
+    return () => {
+      cancelled = true;
+      if (channel) { channel.unsubscribe(); supabase.removeChannel(channel); }
+    };
   }, [router]);
 
   async function handleSignOut() {
