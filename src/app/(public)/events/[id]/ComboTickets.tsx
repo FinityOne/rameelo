@@ -50,43 +50,67 @@ function locOf(e: ComboEvent): string {
   return [e.venue_name, [e.city, e.state].filter(Boolean).join(", ")].filter(Boolean).join(" · ");
 }
 
-// ── Top banner ──────────────────────────────────────────────────────────────
-export function ComboBanner({ combo, onGet }: { combo: ComboTicket; onGet: () => void }) {
+// ── Top quick-picker ──────────────────────────────────────────────────────────
+// A slim, side-by-side pair of jump links shown above the fold: "Single event"
+// (cheapest single-event ticket for THIS event) and "{N}-event combo". Both prices
+// are visible on load — critical on mobile so a price-sensitive buyer is never
+// misled into thinking the combo is the only (pricier) option. Tapping either
+// scrolls to its purchase block. The single button is omitted when this event
+// isn't selling singles here, in which case the combo button spans full width.
+export function TicketQuickPicker({
+  combo, comboCount, singleFromPrice, onSingle, onCombo,
+}: {
+  combo: ComboTicket; comboCount: number; singleFromPrice: number | null;
+  onSingle: () => void; onCombo: () => void;
+}) {
   const savings = comboSavings(combo);
-  // Lead with the artists when we have them — it's the most persuasive hook.
-  const headliners = combo.events.map(e => e.artist_name || e.title).filter(Boolean);
+  const nEvents = combo.events.length;
+  const comboLabel = comboCount > 1 ? "Combo tickets" : `${nEvents}-event combo`;
+  const hasSingle = singleFromPrice != null;
+  const ChevDown = ({ className }: { className: string }) => (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+    </svg>
+  );
   return (
-    <button
-      onClick={onGet}
-      className="group relative w-full overflow-hidden rounded-3xl text-left mb-6 shadow-lg transition-transform active:scale-[0.995]"
-      style={{ background: "linear-gradient(110deg, #2E1B30 0%, #5B2333 48%, #B8780F 105%)" }}
-    >
-      <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(circle at 16% 25%, #fff 0, transparent 38%), radial-gradient(circle at 84% 75%, #F5A623 0, transparent 42%)" }} />
-      <div className="relative px-5 sm:px-7 py-5 flex items-center gap-4">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-marigold">✨ Combo Deal</span>
-            {savings && (
-              <span className="font-mono text-[9px] font-bold uppercase tracking-widest text-aubergine bg-marigold px-2 py-0.5 rounded-full">Save {money(savings.save)}</span>
-            )}
+    <div className="mb-6 grid grid-cols-2 gap-2 sm:gap-3">
+      {/* Single-event tickets — this event only */}
+      {hasSingle && (
+        <button
+          onClick={onSingle}
+          className="group rounded-2xl border border-ivory-200 bg-white px-3.5 sm:px-4 py-3 text-left transition-all hover:border-aubergine/45 hover:shadow-sm active:scale-[0.99]"
+        >
+          <div className="flex items-center justify-between gap-2">
+            <span className="font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-ink-muted">Single event</span>
+            <ChevDown className="w-3.5 h-3.5 text-ink-muted/60 group-hover:translate-y-0.5 transition-transform" />
           </div>
-          <p className="font-display font-bold text-white text-lg sm:text-2xl leading-tight" style={{ letterSpacing: "-0.02em" }}>
-            {headliners.join("  +  ")}
+          <p className="font-ui text-[12px] text-ink-muted mt-1.5 leading-tight">This event only</p>
+          <p className="font-display font-bold text-ink text-xl leading-none mt-1" style={{ letterSpacing: "-0.02em" }}>
+            <span className="font-ui text-[11px] font-medium text-ink-muted align-baseline">from </span>{money(singleFromPrice)}
           </p>
-          <p className="font-ui text-[13px] text-white/70 mt-1 truncate">
-            {combo.events.length} events · one ticket · {combo.name}
-          </p>
+        </button>
+      )}
+
+      {/* Combo — multiple events, one ticket */}
+      <button
+        onClick={onCombo}
+        className={`group relative overflow-hidden rounded-2xl border-2 border-marigold/45 px-3.5 sm:px-4 py-3 text-left shadow-sm transition-all active:scale-[0.99] ${hasSingle ? "" : "col-span-2"}`}
+        style={{ background: "linear-gradient(120deg, #2E1B30 0%, #5B2333 72%, #B8780F 135%)" }}
+      >
+        <div className="flex items-center justify-between gap-2">
+          <span className="font-mono text-[9px] font-bold uppercase tracking-[0.18em] text-marigold">✨ {comboLabel}</span>
+          <ChevDown className="w-3.5 h-3.5 text-white/70 group-hover:translate-y-0.5 transition-transform" />
         </div>
-        <div className="shrink-0 text-right">
-          {savings && <p className="font-ui text-[11px] text-white/50 line-through leading-none mb-0.5">{money(savings.regular)}</p>}
-          <p className="font-display font-bold text-white text-2xl sm:text-3xl leading-none" style={{ letterSpacing: "-0.03em" }}>{money(combo.price)}</p>
-          <span className="mt-2.5 inline-flex items-center gap-1 font-ui font-bold text-xs text-aubergine bg-white px-3.5 py-1.5 rounded-full group-hover:bg-marigold group-hover:text-white transition-colors">
-            See the combo
-            <svg className="w-3.5 h-3.5 group-hover:translate-x-0.5 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
-          </span>
+        <p className="font-ui text-[12px] text-white/65 mt-1.5 leading-tight truncate">{nEvents} events · one ticket</p>
+        <div className="flex items-baseline gap-1.5 mt-1 flex-wrap">
+          {savings && <span className="font-ui text-[11px] text-white/45 line-through leading-none">{money(savings.regular)}</span>}
+          <p className="font-display font-bold text-white text-xl leading-none" style={{ letterSpacing: "-0.02em" }}>{money(combo.price)}</p>
+          {savings && (
+            <span className="font-mono text-[8px] font-bold uppercase tracking-widest text-aubergine bg-marigold px-1.5 py-0.5 rounded-full leading-none">Save {savings.pct}%</span>
+          )}
         </div>
-      </div>
-    </button>
+      </button>
+    </div>
   );
 }
 

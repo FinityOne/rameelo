@@ -10,7 +10,7 @@ import { money } from "@/lib/money";
 import { groupDiscountPct, groupDiscountAmount, groupScalingLevels } from "@/lib/group-orders";
 import { computeFees } from "@/lib/fees";
 import EventInterestView from "./EventInterestView";
-import { ComboBanner, ComboTicketCard, comboBuyable, type ComboTicket } from "./ComboTickets";
+import { TicketQuickPicker, ComboTicketCard, comboBuyable, type ComboTicket } from "./ComboTickets";
 import MetroSticker from "./MetroSticker";
 import MoreFromOrganizer from "./MoreFromOrganizer";
 import EventWhenWhere from "./EventWhenWhere";
@@ -1033,6 +1033,14 @@ export default function EventDetailClient({ id }: { id: string }) {
   // Active, in-window combo tickets that include this event.
   const buyableCombos = combos.filter(comboBuyable);
 
+  // Cheapest single-event ticket actually buyable right now — drives the "from $X"
+  // shown on the top quick-picker so the single-ticket price is visible on load.
+  const singleAvailTiers = event.ticket_tiers.filter(t =>
+    !isTierNotStarted(t) && !isTierExpired(t, event) && tierRemaining(t) > 0 && !t.sold_out);
+  const singleFromPrice = !salesClosed && singleAvailTiers.length
+    ? Math.min(...singleAvailTiers.map(t => t.price))
+    : null;
+
   // ── PAST EVENT ── rich, indexable recap — keeps artist/org/details for SEO &
   // context, but drops every CTA, form, and urgency mechanic. ───────────────────
   if (isEventPast(event)) {
@@ -1302,11 +1310,15 @@ export default function EventDetailClient({ id }: { id: string }) {
 
       {/* ── Content ── */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Combo ticket promo banner — clicks scroll to the combo card */}
+        {/* Slim dual quick-picker — single-event price + combo price, both visible
+            on load; each taps down to its purchase block (mobile-first). */}
         {buyableCombos.length > 0 && (
-          <ComboBanner
+          <TicketQuickPicker
             combo={buyableCombos[0]}
-            onGet={() => document.getElementById("combo-tickets")?.scrollIntoView({ behavior: "smooth", block: "center" })}
+            comboCount={buyableCombos.length}
+            singleFromPrice={singleFromPrice}
+            onSingle={() => document.getElementById("single-tickets")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            onCombo={() => document.getElementById("combo-tickets")?.scrollIntoView({ behavior: "smooth", block: "center" })}
           />
         )}
         <div className="flex flex-col lg:flex-row gap-6 lg:gap-10 items-start">
@@ -1618,7 +1630,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                 </div>
               ) : (
               /* Ticket purchase widget */
-              <div className="rounded-2xl bg-white border border-ivory-200 overflow-hidden shadow-sm">
+              <div id="single-tickets" className="scroll-mt-5 rounded-2xl bg-white border border-ivory-200 overflow-hidden shadow-sm">
 
                 {/* Tier selector */}
                 <div className="p-4 sm:p-5 border-b border-ivory-200 space-y-2">
