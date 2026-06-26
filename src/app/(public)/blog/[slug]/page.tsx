@@ -2,10 +2,15 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getArticle, getArticleCta, getArticleCityFilter, BLOG_ARTICLES, type BlogArticle } from "@/lib/blog";
+import { getBlogOverride } from "@/lib/blog-overrides";
 import { breadcrumbSchema, faqSchema, ld } from "@/lib/jsonld";
 import BlogCityEvents from "./BlogCityEvents";
 
 type Props = { params: Promise<{ slug: string }> };
+
+// Revalidate so admin renames / cover-image uploads (blog_article_overrides)
+// surface on the public article within a minute without a redeploy.
+export const revalidate = 60;
 
 export async function generateStaticParams() {
   return BLOG_ARTICLES.map(a => ({ slug: a.slug }));
@@ -26,12 +31,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     return { title: "Article not found — Rameelo", robots: { index: false, follow: true } };
   }
 
+  const override = await getBlogOverride(slug);
+  const displayTitle = override.title || article.title;
   const description = metaDescription(article.excerpt);
   const url = `https://rameelo.com/blog/${article.slug}`;
   // og:image / twitter:image are supplied by the sibling opengraph-image.tsx
   // (one branded card per article) — so we don't set images here.
   return {
-    title: `${article.title} — Rameelo`,
+    title: `${displayTitle} — Rameelo`,
     description,
     keywords: article.tags,
     authors: [{ name: article.author }],
@@ -39,7 +46,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     alternates: { canonical: url },
     robots: { index: true, follow: true, googleBot: { index: true, follow: true, "max-snippet": -1, "max-image-preview": "large", "max-video-preview": -1 } },
     openGraph: {
-      title: article.title,
+      title: displayTitle,
       description,
       type: "article",
       publishedTime: article.publishedAt,
@@ -102,6 +109,10 @@ export default async function BlogArticlePage({ params }: Props) {
   const article = getArticle(slug);
   if (!article) notFound();
 
+  const override = await getBlogOverride(slug);
+  const displayTitle = override.title || article.title;
+  const coverImageUrl = override.coverImageUrl;
+
   const related = BLOG_ARTICLES
     .filter(a => a.slug !== slug)
     .sort((a, b) => {
@@ -117,7 +128,7 @@ export default async function BlogArticlePage({ params }: Props) {
   const crumbs = breadcrumbSchema([
     { name: "Home", url: "https://rameelo.com" },
     { name: "Blog", url: "https://rameelo.com/blog" },
-    { name: article.title, url: `https://rameelo.com/blog/${article.slug}` },
+    { name: displayTitle, url: `https://rameelo.com/blog/${article.slug}` },
   ]);
 
   const articleUrl = `https://rameelo.com/blog/${article.slug}`;
@@ -128,9 +139,9 @@ export default async function BlogArticlePage({ params }: Props) {
     // Google News; evergreen pieces stay BlogPosting.
     "@type": article.category === "News" ? "NewsArticle" : "BlogPosting",
     "@id": articleUrl,
-    "headline": article.title,
+    "headline": displayTitle,
     "description": article.excerpt,
-    "image": "https://rameelo.com/og-default.jpg",
+    "image": coverImageUrl || "https://rameelo.com/og-default.jpg",
     "author": {
       "@type": "Person",
       "name": article.author,
@@ -191,7 +202,7 @@ export default async function BlogArticlePage({ params }: Props) {
             {article.category}
           </span>
           <h1 className="font-display font-bold text-white text-3xl sm:text-4xl lg:text-5xl leading-tight max-w-3xl mx-auto mb-6" style={{ letterSpacing: "-0.03em" }}>
-            {article.title}
+            {displayTitle}
           </h1>
           <p className="font-ui text-white/60 text-base sm:text-lg leading-relaxed max-w-2xl mx-auto mb-8">
             {article.excerpt}
@@ -226,6 +237,18 @@ export default async function BlogArticlePage({ params }: Props) {
               <div className="h-px flex-1 bg-marigold/40" />
             </div>
 
+            {/* Cover image (admin-uploaded) — inline, full image, never cropped */}
+            {coverImageUrl && (
+              <figure className="mb-8 max-w-sm">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={coverImageUrl}
+                  alt={displayTitle}
+                  className="w-full h-auto rounded-xl border border-ivory-200 shadow-sm bg-white"
+                />
+              </figure>
+            )}
+
             <div
               className="prose prose-ink max-w-none"
               style={{
@@ -251,7 +274,7 @@ export default async function BlogArticlePage({ params }: Props) {
             <div className="mt-6 pt-6 border-t border-ivory-200 flex items-center gap-3 flex-wrap">
               <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Share this story</p>
               <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(article.title)}&url=${encodeURIComponent(`https://rameelo.com/blog/${article.slug}`)}`}
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(displayTitle)}&url=${encodeURIComponent(`https://rameelo.com/blog/${article.slug}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-ivory-200 font-ui text-xs text-ink-muted hover:text-ink hover:border-ink/20 transition-colors"
