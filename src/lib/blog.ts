@@ -16,6 +16,57 @@ export interface BlogArticle {
 
 export const BLOG_ARTICLES: BlogArticle[] = [
   {
+    slug: "atul-purohit-garba-south-carolina-early-bird-sold-out-2026",
+    title: "Atul Purohit Garba in South Carolina: Early Bird Sold Out, General Admission Opens July 1",
+    excerpt: "Dada Atul Purohit's 2026 Greenville garba just hit its first sell-out — Early Bird passes are gone. General Admission ($50) goes on sale July 1, 2026. Here's how to lock in your spot before the price climbs again.",
+    category: "News",
+    author: "Rameelo Newsroom",
+    authorTitle: "Events Desk",
+    publishedAt: "2026-06-25",
+    readMinutes: 4,
+    featured: true,
+    coverGradient: "from-[#7C1F2C] via-[#a23a2b] to-marigold",
+    coverEmoji: "🔥",
+    tags: ["atul purohit garba", "south carolina garba", "greenville garba 2026", "navratri south carolina", "dada atul purohit tickets"],
+    body: `
+<p class="lead"><strong>GREENVILLE, S.C. — June 25, 2026.</strong> The first tier is gone. <strong>Early Bird passes</strong> to <a href="/events/d40d2228-e1d9-4f5f-9d81-646321eab9c8">Dada Atul Purohit's 2026 Garba at the Greenville Convention Center</a> have officially <strong>sold out</strong> — and the next wave, <strong>General Admission at $50</strong>, opens to the public on <strong>Tuesday, July 1, 2026</strong>.</p>
+
+<p>If you've been waiting to grab tickets to one of the South's biggest garba nights, this is your window. Demand for the legendary garba maestro <strong>Atul Purohit</strong> — known to fans simply as "Dada" — cleared out Early Bird inventory ahead of schedule. History says General Admission won't sit around for long either.</p>
+
+<h2>Fast facts</h2>
+<ul>
+  <li><strong>Event:</strong> Dada Atul Purohit Garba — Navratri 2026</li>
+  <li><strong>Venue:</strong> Greenville Convention Center, Greenville, South Carolina</li>
+  <li><strong>Date:</strong> Sunday, September 20, 2026 · Doors 6:30 PM</li>
+  <li><strong>Headliner:</strong> Atul Purohit, live with full orchestra</li>
+  <li><strong>Early Bird ($40):</strong> <strong>SOLD OUT</strong></li>
+  <li><strong>General Admission ($50):</strong> On sale <strong>July 1, 2026</strong></li>
+  <li><strong>Last-Minute GA ($60):</strong> Opens August 21, 2026</li>
+  <li><strong>Get tickets:</strong> <a href="/events/d40d2228-e1d9-4f5f-9d81-646321eab9c8">Greenville Atul Purohit Garba on Rameelo →</a></li>
+</ul>
+
+<h2>The Early Bird is sold out</h2>
+<p>Early Bird tickets — the lowest price of the run at <strong>$40</strong> — are no longer available. They were the cheapest way into the night, and they're now closed. Every ticket from here forward is priced higher, and prices only move in one direction as September 20 approaches.</p>
+
+<h2>When do General Admission tickets go on sale?</h2>
+<p><strong>General Admission tickets go on sale Tuesday, July 1, 2026, at $50 per person.</strong> This is the main public release and the next-best price after the sold-out Early Bird. GA is the tier most attendees will buy, and for a headliner of Atul Purohit's draw in a region with limited large-scale garba nights, it is the one to watch.</p>
+
+<h2>Will General Admission sell out too?</h2>
+<p>Very likely. Greenville sits at the heart of an Upstate South Carolina, western North Carolina, and north Georgia corridor with thousands of garba fans and few events of this scale. Once GA is gone, the only tier left is <strong>Last-Minute General Admission at $60</strong>, which opens August 21. In short: the longer you wait, the more you pay — if seats remain at all.</p>
+
+<h2>How to get your tickets</h2>
+<ol>
+  <li><strong>Open the event page now.</strong> Bookmark <a href="/events/d40d2228-e1d9-4f5f-9d81-646321eab9c8">the Greenville Atul Purohit Garba listing</a> so you're ready the moment GA opens.</li>
+  <li><strong>Create a free Rameelo account.</strong> Checkout is faster, your tickets and QR codes live in your portal, and you can transfer them to friends if plans change.</li>
+  <li><strong>Bring a group.</strong> Coordinating 10+ friends unlocks Rameelo's automatic group discount — more fun on the floor, less spent per person.</li>
+  <li><strong>Set a reminder for July 1.</strong> General Admission is the best remaining price. After it sells through, only the $60 last-minute tier remains.</li>
+</ol>
+
+<p>Don't get shut out twice. <a href="/events/d40d2228-e1d9-4f5f-9d81-646321eab9c8">View the Greenville Atul Purohit Garba event and get your tickets →</a></p>
+    `,
+  },
+
+  {
     slug: "navratri-2026-usa-ultimate-guide",
     title: "Navratri 2026: The Ultimate Guide to Garba & Raas Events Across the USA",
     excerpt: "Nine nights. Thousands of dancers. Hundreds of events coast to coast. Here's everything you need to know to experience Navratri 2026 in America — from the best cities to the insider tips that make the difference.",
@@ -24,7 +75,7 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     authorTitle: "Culture Desk",
     publishedAt: "2026-05-10",
     readMinutes: 8,
-    featured: true,
+    featured: false,
     coverGradient: "from-aubergine via-aubergine/80 to-[#7C1F2C]",
     coverEmoji: "🎶",
     tags: ["navratri 2026", "garba usa", "dandiya events", "navratri guide"],
@@ -1253,6 +1304,344 @@ export const BLOG_ARTICLES: BlogArticle[] = [
     `,
   },
 
+  {
+    slug: "garba-events-detroit-michigan-guide",
+    title: "Garba Events in Detroit & Michigan: Navratri in the Motor City",
+    excerpt: "Michigan's Gujarati community turns out in force every Navratri — from Detroit's suburbs to Troy, Novi and Canton. Here's where to dance, what to expect, and how to get tickets before they're gone.",
+    category: "City Guide",
+    author: "Rameelo Editorial",
+    authorTitle: "Culture Desk",
+    publishedAt: "2026-06-20",
+    readMinutes: 5,
+    featured: false,
+    coverGradient: "from-aubergine via-[#5a1e7a] to-[#7C1F2C]",
+    coverEmoji: "🏙️",
+    tags: ["garba detroit", "navratri michigan", "dandiya troy novi", "garba events michigan 2026"],
+    body: `
+<p class="lead">Metro Detroit is home to one of the Midwest's most established Gujarati communities, and every Navratri the suburbs of Troy, Novi, Canton, and Farmington Hills light up with garba. Michigan's scene blends devotional folk garba with high-energy artist nights — and it's growing every year.</p>
+
+<h2>Where garba happens in Michigan</h2>
+<p>The action centers in Detroit's northern and western suburbs, where the South Asian population is densest. Expect large community hall and convention-center events, temple-organized devotional nights, and ticketed artist productions that bring performers in from Gujarat.</p>
+<ul>
+  <li><strong>Troy & Novi</strong> — the heart of metro Detroit garba; the biggest ticketed nights.</li>
+  <li><strong>Canton & Farmington Hills</strong> — strong temple-based and community garba.</li>
+  <li><strong>Ann Arbor</strong> — university-driven events with a younger crowd.</li>
+</ul>
+
+<h2>When is Navratri 2026 in Michigan?</h2>
+<p>Navratri 2026 runs October 21–30. Michigan's marquee events cluster on the weekends, with the biggest artist nights selling out first. Cold-weather season means most events are fully indoors — dress festive, not for the parking lot.</p>
+
+<h2>How to get tickets</h2>
+<p>Michigan's best nights sell out in advance, and prices rise in tiers as the date nears. Buy early, go as a group to unlock discounts, and keep an eye on the listings below — new Detroit and Michigan events are added throughout the season.</p>
+<p><a href="/events">Browse upcoming Michigan garba events on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "garba-events-dc-maryland-virginia-dmv-guide",
+    title: "Garba Events in the DMV: Washington D.C., Maryland & Virginia Navratri",
+    excerpt: "The DMV's South Asian community is one of the country's largest — and its Navratri scene spans Northern Virginia, the Maryland suburbs, and the District itself. Your guide to garba in the capital region.",
+    category: "City Guide",
+    author: "Rameelo Editorial",
+    authorTitle: "Culture Desk",
+    publishedAt: "2026-06-18",
+    readMinutes: 5,
+    featured: false,
+    coverGradient: "from-[#0E8C7A] via-aubergine to-[#7C1F2C]",
+    coverEmoji: "🏛️",
+    tags: ["garba washington dc", "navratri virginia", "dandiya maryland", "dmv garba events 2026"],
+    body: `
+<p class="lead">The Washington, D.C. metro — the DMV — has quietly become one of the most important garba regions on the East Coast. With huge Gujarati and broader South Asian communities across Northern Virginia and the Maryland suburbs, Navratri here is a major production.</p>
+
+<h2>The DMV's garba hot spots</h2>
+<ul>
+  <li><strong>Northern Virginia</strong> (Fairfax, Loudoun, Chantilly) — the densest concentration of events and the biggest ticketed nights.</li>
+  <li><strong>Maryland suburbs</strong> (Montgomery County, Germantown, Rockville) — strong community and temple garba.</li>
+  <li><strong>Greater D.C.</strong> — university and young-professional events draw a vibrant crowd.</li>
+</ul>
+
+<h2>What makes DMV garba special</h2>
+<p>The region's diversity shows on the dance floor: traditional folk garba sits alongside Bollywood-fusion raas, and the crowd is among the most welcoming for first-timers in the country. Production quality has climbed fast, with imported artists and serious sound and lighting at the flagship events.</p>
+
+<h2>Getting tickets</h2>
+<p>DMV events span Virginia, Maryland, and D.C. — so search by your specific suburb, buy early before tiered prices climb, and bring a group to save. New capital-region events are listed throughout the season.</p>
+<p><a href="/events">Find DMV-area garba events on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "garba-events-phoenix-arizona-guide",
+    title: "Garba Events in Phoenix & Arizona: Desert Navratri Nights",
+    excerpt: "Phoenix's fast-growing Gujarati community has built a vibrant Navratri scene across the Valley — from Chandler to Tempe to Scottsdale. Here's where to find garba in Arizona and how to grab tickets.",
+    category: "City Guide",
+    author: "Rameelo Editorial",
+    authorTitle: "Culture Desk",
+    publishedAt: "2026-06-16",
+    readMinutes: 4,
+    featured: false,
+    coverGradient: "from-marigold via-[#a23a2b] to-[#7C1F2C]",
+    coverEmoji: "🌵",
+    tags: ["garba phoenix", "navratri arizona", "dandiya chandler tempe", "arizona garba events 2026"],
+    body: `
+<p class="lead">Arizona's South Asian population has boomed over the past decade, and Phoenix's garba scene has grown right along with it. The Valley of the Sun now hosts energetic Navratri nights from Chandler and Gilbert to Tempe and Scottsdale.</p>
+
+<h2>Where to dance in the Valley</h2>
+<ul>
+  <li><strong>Chandler & Gilbert</strong> — the East Valley is the center of Gujarati Phoenix and its garba.</li>
+  <li><strong>Tempe</strong> — university energy and younger crowds.</li>
+  <li><strong>Scottsdale & North Phoenix</strong> — newer, polished ticketed events.</li>
+</ul>
+
+<h2>Desert-season tips</h2>
+<p>October in Phoenix is glorious — warm days, perfect evenings — so the season is comfortable for festive wear. Events range from temple-organized devotional garba to ticketed artist nights, and the community is tight-knit and welcoming.</p>
+
+<h2>Get your tickets early</h2>
+<p>As Phoenix's scene grows, the best nights sell out faster each year. Browse current Arizona listings below, buy in advance, and gather a group to unlock discounts.</p>
+<p><a href="/events">Browse Phoenix &amp; Arizona garba events on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "atul-purohit-voice-of-american-garba",
+    title: "Atul Purohit: The Voice That Defined American Garba",
+    excerpt: "For decades, 'Dada' Atul Purohit has been the heartbeat of garba in America — the artist whose all-night raas marathons set the standard. A look at the legend, and where to catch him in 2026.",
+    category: "Artist Spotlight",
+    author: "Priya Mehta",
+    authorTitle: "Cultural Correspondent",
+    publishedAt: "2026-06-14",
+    readMinutes: 6,
+    featured: false,
+    coverGradient: "from-[#7C1F2C] via-[#a23a2b] to-marigold",
+    coverEmoji: "🎙️",
+    tags: ["atul purohit", "garba artist", "dada garba", "atul purohit usa tour 2026"],
+    body: `
+<p class="lead">Ask anyone who came up dancing garba in America and one name comes back again and again: <strong>Atul Purohit</strong>. To the community he is simply "Dada" — the elder, the institution, the voice that has powered all-night raas garba marathons across the United States for decades.</p>
+
+<h2>The artist who set the standard</h2>
+<p>Atul Purohit's live garba is a feat of endurance and artistry: hours of continuous raas, a tight live orchestra, and a crowd that moves as one. Where some artists chase trends, Dada built a reputation on the real thing — traditional Gujarati garba and raas performed with stamina and soul. For a generation of Gujarati-Americans, his events are where Navratri memories are made.</p>
+
+<h2>Why his nights sell out</h2>
+<p>Demand follows Dada wherever he tours. His events routinely fill the largest halls, and the best tiers sell out early — fans know that an Atul Purohit night is a guaranteed experience, not a gamble.</p>
+
+<h2>Where to see Atul Purohit in 2026</h2>
+<p>Dada's 2026 run includes major garba nights across the country. One of the most anticipated is in <strong>Greenville, South Carolina on September 20</strong> — where the Early Bird tier has already sold out and General Admission opens July 1. If you want to experience the artist who defined American garba, this is your chance.</p>
+<p><a href="/events/d40d2228-e1d9-4f5f-9d81-646321eab9c8">See the Greenville Atul Purohit Garba event →</a></p>
+    `,
+  },
+
+  {
+    slug: "top-garba-artists-2026-american-navratri",
+    title: "The Garba Artists Lighting Up American Navratri in 2026",
+    excerpt: "From all-night raas legends to chart-topping folk stars, these are the artists drawing the biggest crowds at U.S. Navratri events this year — and how to catch them live.",
+    category: "Artist Spotlight",
+    author: "Rameelo Editorial",
+    authorTitle: "Culture Desk",
+    publishedAt: "2026-06-12",
+    readMinutes: 6,
+    featured: false,
+    coverGradient: "from-marigold via-[#a23a2b] to-aubergine",
+    coverEmoji: "🌟",
+    tags: ["garba artists 2026", "navratri performers", "kinjal dave", "geeta rabari", "atul purohit"],
+    body: `
+<p class="lead">The artist makes the night. A great garba production lives or dies on who's on the mic — and in 2026, the lineup touring the United States is the strongest it's ever been. Here are the names drawing the biggest crowds, and what to know before you book.</p>
+
+<h2>The all-night raas legends</h2>
+<p>Veterans like <strong>Atul Purohit</strong> — "Dada" to the community — anchor the traditional end of the spectrum, with marathon live raas that fill the largest halls. These are the events purists circle on the calendar, and they sell out first.</p>
+
+<h2>The folk-pop superstars</h2>
+<p>Gujarati folk stars such as Kinjal Dave and Geeta Rabari bring chart-topping energy and a younger, high-octane crowd. Expect remixed hits, big production, and Instagram-ready nights.</p>
+
+<h2>How to catch them live</h2>
+<ul>
+  <li><strong>Book early.</strong> Artist nights sell the fastest and the cheapest tiers vanish first.</li>
+  <li><strong>Search by artist.</strong> Many performers tour multiple cities — find the date nearest you.</li>
+  <li><strong>Go as a group.</strong> The marquee nights are best experienced with a crew, and group tickets save money.</li>
+</ul>
+<p><a href="/events">Browse upcoming artist-led garba events on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "what-to-wear-garba-chaniya-choli-kediyu-style-guide",
+    title: "What to Wear to Garba: The 2026 Chaniya Choli & Kediyu Style Guide",
+    excerpt: "From show-stopping chaniya cholis to sharp kediyu sets, here's how to dress for garba in 2026 — what's trending, what's comfortable, and what first-timers actually need.",
+    category: "Tips & Tricks",
+    author: "Priya Mehta",
+    authorTitle: "Cultural Correspondent",
+    publishedAt: "2026-06-10",
+    readMinutes: 5,
+    featured: false,
+    coverGradient: "from-marigold via-[#d4891b] to-[#7C1F2C]",
+    coverEmoji: "👗",
+    tags: ["what to wear garba", "chaniya choli 2026", "kediyu", "garba outfit guide", "navratri fashion"],
+    body: `
+<p class="lead">Half the joy of garba is the getting-ready. The dance floor at any American Navratri event is a riot of mirror-work, embroidery, and color — and dressing the part is part of the fun. Here's your 2026 garba style guide, whether it's your first night or your fiftieth.</p>
+
+<h2>For women: the chaniya choli</h2>
+<p>The classic three-piece — a flared embroidered skirt (chaniya), a fitted blouse (choli), and a dupatta — remains the heart of garba style. In 2026, expect bold contrast color-blocking, heavy mirror-work, and statement dupatta draping. Lehengas and festive sarees work for the more formal artist nights.</p>
+
+<h2>For men: the kediyu & kurta</h2>
+<p>The kediyu (a flared, gathered Gujarati top) with dhoti or churidar is the traditional move, often in contrasting jewel tones with mirror detailing. For lower-key nights, a clean kurta or a Nehru jacket over a kurta reads festive without fuss.</p>
+
+<h2>Jewelry & accessories</h2>
+<ul>
+  <li><strong>Women:</strong> oxidized silver, jhumkas, maang tikka, kamarband, and stacks of bangles.</li>
+  <li><strong>Men:</strong> a simple chain, a kada, and a colorful pagdi or safa for the bold.</li>
+</ul>
+
+<h2>The practical stuff first-timers forget</h2>
+<ul>
+  <li><strong>Footwear:</strong> flats or low heels — you'll dance for hours.</li>
+  <li><strong>Comfort:</strong> breathable fabrics; this is cardio.</li>
+  <li><strong>First time?</strong> Any Indian festive wear works. The community is welcoming; no one's judging.</li>
+</ul>
+<p>Got the outfit? Now find the night. <a href="/events">Browse upcoming garba events on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "first-time-garba-beginners-guide",
+    title: "Your First Garba: A Beginner's Guide to Navratri Night",
+    excerpt: "Never been to garba? You're going to love it. Here's everything a first-timer needs — the steps, the etiquette, what to wear, and how to walk in feeling like you belong.",
+    category: "First-Timer",
+    author: "Rameelo Editorial",
+    authorTitle: "Community Desk",
+    publishedAt: "2026-06-08",
+    readMinutes: 5,
+    featured: false,
+    coverGradient: "from-[#0E8C7A] via-[#0a7066] to-aubergine",
+    coverEmoji: "✨",
+    tags: ["first time garba", "garba for beginners", "how to do garba", "navratri beginners guide"],
+    body: `
+<p class="lead">Walking into your first garba can feel intimidating — a sea of color, music you don't quite know, and everyone moving like they've done this their whole lives. Here's the secret: they're thrilled you came, and you'll pick it up faster than you think.</p>
+
+<h2>The basic steps</h2>
+<p>Garba is built on simple, repeating patterns danced in a circle. The most common is a three-step-and-clap that you'll catch within a few minutes of watching. Dandiya raas adds a pair of sticks and a partner. Start at the edge of the circle, follow the person in front of you, and let the rhythm carry you.</p>
+
+<h2>What to expect on the night</h2>
+<ul>
+  <li><strong>Folk garba opens</strong> the evening — slower, devotional, around a central shrine. Don't skip it; it's beautiful.</li>
+  <li><strong>The energy builds</strong> as the night goes on, peaking with fast raas and the artist's set.</li>
+  <li><strong>It runs late.</strong> Many events go past midnight. Pace yourself and hydrate.</li>
+</ul>
+
+<h2>Etiquette for newcomers</h2>
+<ul>
+  <li>Join the circle and move in the same direction as everyone else.</li>
+  <li>It's fine to step out and watch — no pressure to dance every song.</li>
+  <li>Ask someone to show you the step. People love to teach.</li>
+</ul>
+
+<h2>What to wear & bring</h2>
+<p>Any Indian festive wear is perfect — a chaniya choli or kurta if you have one, simple festive clothes if you don't. Wear comfortable flat shoes, bring water, and come ready to sweat.</p>
+<p>Ready for night one? <a href="/events">Find a beginner-friendly garba event near you →</a></p>
+    `,
+  },
+
+  {
+    slug: "history-of-garba-gujarat-to-american-arenas",
+    title: "The History of Garba: From Gujarat's Villages to American Arenas",
+    excerpt: "Garba is older than you think — a devotional folk dance with roots stretching back centuries. Here's how it traveled from Gujarat's villages to sold-out arenas across America.",
+    category: "Culture",
+    author: "Priya Mehta",
+    authorTitle: "Cultural Correspondent",
+    publishedAt: "2026-06-06",
+    readMinutes: 7,
+    featured: false,
+    coverGradient: "from-aubergine via-[#5a1e7a] to-[#0E8C7A]",
+    coverEmoji: "📜",
+    tags: ["history of garba", "garba origins", "navratri history", "gujarati culture", "garba meaning"],
+    body: `
+<p class="lead">Before the LED walls and imported artists, before the convention centers and the group tickets, there was a clay lamp and a circle of dancers. Garba is one of the oldest living folk traditions in the world — and its journey to American arenas is a story worth knowing.</p>
+
+<h2>Devotional roots</h2>
+<p>Garba originates in Gujarat as a devotional dance performed during Navratri, the nine nights honoring the goddess Durga (Mata). The word "garba" traces to the Sanskrit <em>garbha</em> (womb) — dancers traditionally circle a central lamp or earthen pot, the <strong>garbo</strong>, symbolizing the divine feminine and the cycle of life. The circular movement itself is the prayer.</p>
+
+<h2>Garba and dandiya raas</h2>
+<p>Alongside garba grew dandiya raas — the stick dance reenacting a playful battle between the goddess and the demon Mahishasura. Together they form the backbone of every Navratri night: garba's devotional circle, raas's rhythmic clash of sticks.</p>
+
+<h2>Crossing the ocean</h2>
+<p>As Gujaratis emigrated through the 20th century, they carried Navratri with them. In America, community halls and temples became the first floors. Over the decades, those modest gatherings grew into the productions we know today — ticketed events, professional artists, and crowds in the thousands.</p>
+
+<h2>Garba today: bigger, but still the same</h2>
+<p>The scale has changed; the heart hasn't. Strip away the production and you'll still find the same circle, the same devotion, the same joy that started in Gujarat's villages generations ago. That continuity is exactly what makes American garba special.</p>
+<p>Be part of the next chapter. <a href="/events">Find a Navratri event near you →</a></p>
+    `,
+  },
+
+  {
+    slug: "garba-etiquette-dance-floor-rules",
+    title: "Garba Etiquette 101: The Unwritten Rules of the Floor",
+    excerpt: "Every garba floor runs on a set of unwritten rules. Learn them and you'll dance smoother, make friends faster, and never be 'that person' in the circle.",
+    category: "Tips & Tricks",
+    author: "Rameelo Editorial",
+    authorTitle: "Community Desk",
+    publishedAt: "2026-06-04",
+    readMinutes: 4,
+    featured: false,
+    coverGradient: "from-[#5a1e7a] via-aubergine to-[#7C1F2C]",
+    coverEmoji: "🪔",
+    tags: ["garba etiquette", "dandiya rules", "garba dance floor", "navratri tips"],
+    body: `
+<p class="lead">Garba has a flow to it — a shared rhythm that keeps hundreds of people moving in harmony. Most of it is never spelled out, but everyone follows it. Here are the unwritten rules that'll make you look like a regular.</p>
+
+<h2>Move with the circle</h2>
+<p>Everyone dances in the same direction. Pick it up and stay in the lane — cutting across the circle or reversing is the fastest way to cause a pileup. Keep your spacing and match the pace of the dancers around you.</p>
+
+<h2>Respect the devotional opening</h2>
+<p>The slower folk garba that opens the night is devotional. Keep phones down, keep it respectful, and join the circle rather than treating it as a warm-up act.</p>
+
+<h2>Dandiya safety</h2>
+<ul>
+  <li>Tap sticks, don't swing them like swords — it's a rhythm, not a duel.</li>
+  <li>Mind your radius so you don't catch a neighbor.</li>
+  <li>If you drop a stick, step out to grab it rather than stopping the flow.</li>
+</ul>
+
+<h2>Floor courtesy</h2>
+<ul>
+  <li>Welcome newcomers — show them the step if they're lost.</li>
+  <li>Step to the edge if you need a break or want to film.</li>
+  <li>Hydrate and pace yourself; the best dancers are still standing at 1 a.m.</li>
+</ul>
+<p>Know the rules? Put them to work. <a href="/events">Find your next garba night on Rameelo →</a></p>
+    `,
+  },
+
+  {
+    slug: "sell-out-navratri-event-organizer-playbook",
+    title: "How to Sell Out Your Navratri Event: A 2026 Playbook for Organizers",
+    excerpt: "Selling out a garba event isn't luck — it's a system. Here's the playbook the best organizers use to fill the floor: tiered pricing, group orders, early-bird urgency, and the right ticketing platform.",
+    category: "For Organizers",
+    author: "Rameelo Editorial",
+    authorTitle: "Partnerships",
+    publishedAt: "2026-06-02",
+    readMinutes: 7,
+    featured: false,
+    coverGradient: "from-[#0E8C7A] via-[#0a7066] to-aubergine",
+    coverEmoji: "📈",
+    tags: ["garba organizer tips", "sell out navratri event", "event ticketing", "garba event marketing"],
+    body: `
+<p class="lead">A packed floor doesn't happen by accident. The organizers who sell out year after year run a tight playbook — and most of it comes down to how they price, market, and sell their tickets. Here's how to fill your 2026 Navratri event.</p>
+
+<h2>1. Price in tiers and create urgency</h2>
+<p>Early Bird → General Admission → Last-Minute. Tiered pricing rewards early buyers and builds momentum: every time a tier sells out, it signals scarcity and pushes the next wave to act. When a tier is gone, say so loudly — a visible "Sold Out" badge is one of the most powerful conversion tools you have.</p>
+
+<h2>2. Turn buyers into recruiters with group orders</h2>
+<p>Garba is social — people come in friend groups and families. Group ordering with an automatic discount turns one buyer into ten: they invite their crew, everyone saves, and you fill seats faster than any ad could.</p>
+
+<h2>3. Make buying frictionless</h2>
+<p>Every extra tap costs you sales. A clean mobile checkout, instant e-tickets with QR codes, and easy ticket transfers mean fewer abandoned carts and fewer day-of headaches at the door.</p>
+
+<h2>4. Use a platform built for garba</h2>
+<p>Generic ticketing tools don't understand your audience. Rameelo is built specifically for raas garba and Navratri — group discounts, combo tickets across multiple nights, a door scanner that just works, fast payouts, and listings that reach a community already searching for garba near them.</p>
+
+<h2>5. Promote where the community already is</h2>
+<p>List early so your event is indexed and discoverable, lean on your group buyers to spread the link, and keep your event page rich with artist, date, and venue details that build trust.</p>
+<p>Ready to run your best Navratri yet? <a href="/organizers">See how Rameelo helps garba organizers sell out →</a></p>
+    `,
+  },
+
 ];
 
 export function getArticle(slug: string): BlogArticle | undefined {
@@ -1260,7 +1649,7 @@ export function getArticle(slug: string): BlogArticle | undefined {
 }
 
 export function getArticlesByCategory(category: string): BlogArticle[] {
-  return BLOG_ARTICLES.filter(a => a.category === category);
+  return getArticlesByPriority().filter(a => a.category === category);
 }
 
 export function getFeaturedArticle(): BlogArticle | undefined {
@@ -1271,4 +1660,253 @@ export function getRecentArticles(limit = 6): BlogArticle[] {
   return [...BLOG_ARTICLES]
     .sort((a, b) => b.publishedAt.localeCompare(a.publishedAt))
     .slice(0, limit);
+}
+
+// ── Conversion CTAs ─────────────────────────────────────────────────────────
+// Every article ends with one clear, tailored call-to-action: explore events,
+// create an account, become an organizer, or jump straight to a specific event.
+export type BlogCta = {
+  variant: "events" | "account" | "organizer" | "event";
+  eyebrow: string;
+  heading: string;
+  body: string;
+  buttonLabel: string;
+  href: string;
+  secondaryLabel?: string;
+  secondaryHref?: string;
+};
+
+const DEFAULT_CTA: BlogCta = {
+  variant: "events",
+  eyebrow: "Your next garba awaits",
+  heading: "Find your next garba night",
+  body: "Browse every verified raas garba, dandiya & Navratri event in the USA — search by city, date and artist, and lock in tickets before they sell out.",
+  buttonLabel: "Explore events",
+  href: "/events",
+  secondaryLabel: "Create a free account",
+  secondaryHref: "/auth/signup",
+};
+
+const eventsCta = (heading: string, body: string, buttonLabel = "Explore events"): BlogCta => ({
+  variant: "events", eyebrow: "Get tickets on Rameelo", heading, body, buttonLabel, href: "/events",
+  secondaryLabel: "Create a free account", secondaryHref: "/auth/signup",
+});
+
+const CTA_BY_SLUG: Record<string, BlogCta> = {
+  "atul-purohit-garba-south-carolina-early-bird-sold-out-2026": {
+    variant: "event",
+    eyebrow: "Greenville · Sep 20, 2026",
+    heading: "Don't miss the next tier — General Admission opens July 1",
+    body: "Early Bird is sold out. Open the Greenville Atul Purohit Garba event now so you're ready the moment $50 General Admission goes live — before it climbs to $60.",
+    buttonLabel: "Get tickets →",
+    href: "/events/d40d2228-e1d9-4f5f-9d81-646321eab9c8",
+    secondaryLabel: "Browse all garba events",
+    secondaryHref: "/events",
+  },
+  "navratri-2026-usa-ultimate-guide": eventsCta(
+    "Browse Navratri 2026 events near you",
+    "The best nights in Edison, Houston, Chicago, Atlanta and the Bay Area sell out months ahead. Find your city's events and lock in tickets while the early prices last.",
+    "Browse Navratri 2026 events",
+  ),
+  "garba-vs-dandiya-raas-difference-guide": eventsCta(
+    "Ready to hit the floor?",
+    "Now that you know your garba from your dandiya raas, find a night near you and put it into practice — every event on Rameelo is a verified garba, dandiya or Navratri celebration.",
+  ),
+  "group-garba-tickets-save-money-rameelo": {
+    variant: "events",
+    eyebrow: "Save 15% as a group",
+    heading: "Round up your crew and save",
+    body: "Bring 10+ friends and Rameelo's automatic group discount kicks in — no promo code needed. Pick your event, start a group order, and split the savings.",
+    buttonLabel: "Start a group order",
+    href: "/events",
+    secondaryLabel: "Create a free account",
+    secondaryHref: "/auth/signup",
+  },
+  "why-rameelo-is-best-for-garba-organizers": {
+    variant: "organizer",
+    eyebrow: "For garba organizers",
+    heading: "List your garba event on Rameelo",
+    body: "Sell tickets, run group orders, scan at the door, and get paid out fast — on the only platform built specifically for raas garba and Navratri events. See why organizers are switching.",
+    buttonLabel: "Explore Rameelo for organizers",
+    href: "/organizers",
+    secondaryLabel: "See organizer pricing",
+    secondaryHref: "/pricing",
+  },
+  "rameelo-group-orders-changing-navratri": {
+    variant: "events",
+    eyebrow: "Go together, save together",
+    heading: "Plan your garba night with friends",
+    body: "Start a group order, invite your crew with one link, and unlock automatic group pricing. Find your event and bring everyone along.",
+    buttonLabel: "Explore events",
+    href: "/events",
+    secondaryLabel: "Create a free account",
+    secondaryHref: "/auth/signup",
+  },
+  "garba-events-near-me-find-navratri-usa-rameelo": eventsCta(
+    "Find garba events near you",
+    "Every verified raas garba, dandiya and Navratri event in the USA — searchable by city, date and artist. Find tonight's floor and grab your tickets in seconds.",
+    "Find events near me",
+  ),
+  "atul-purohit-voice-of-american-garba": {
+    variant: "event",
+    eyebrow: "Greenville · Sep 20, 2026",
+    heading: "See Dada live in 2026",
+    body: "The Greenville Atul Purohit Garba is one of his most anticipated nights — Early Bird is already sold out and General Admission opens July 1. Don't watch from the sidelines.",
+    buttonLabel: "Get tickets →",
+    href: "/events/d40d2228-e1d9-4f5f-9d81-646321eab9c8",
+    secondaryLabel: "Browse all garba events",
+    secondaryHref: "/events",
+  },
+  "top-garba-artists-2026-american-navratri": eventsCta(
+    "Catch your favorite artist live",
+    "The biggest artist nights sell the fastest. Find the performers touring near you this Navratri and lock in your tickets before the best tiers vanish.",
+    "Browse artist events",
+  ),
+  "what-to-wear-garba-chaniya-choli-kediyu-style-guide": eventsCta(
+    "Got the outfit? Now find the night.",
+    "Your chaniya choli or kediyu deserves a dance floor. Find a verified garba, dandiya or Navratri event near you and make your entrance.",
+  ),
+  "first-time-garba-beginners-guide": {
+    variant: "events",
+    eyebrow: "Your first garba awaits",
+    heading: "Find a beginner-friendly garba near you",
+    body: "Every event on Rameelo is a verified, welcoming garba, dandiya or Navratri night. Pick your city, grab a ticket, and come dance — we'll see you in the circle.",
+    buttonLabel: "Find an event near me",
+    href: "/events",
+    secondaryLabel: "Create a free account",
+    secondaryHref: "/auth/signup",
+  },
+  "history-of-garba-gujarat-to-american-arenas": eventsCta(
+    "Be part of the next chapter",
+    "Garba's story is still being written — on dance floors across America every Navratri. Find a night near you and add your own circle to the tradition.",
+  ),
+  "garba-etiquette-dance-floor-rules": eventsCta(
+    "Put it into practice",
+    "Now that you know the unwritten rules, find a garba near you and own the floor. Every event on Rameelo is a verified raas garba, dandiya or Navratri night.",
+  ),
+  "sell-out-navratri-event-organizer-playbook": {
+    variant: "organizer",
+    eyebrow: "For garba organizers",
+    heading: "Run your best Navratri yet",
+    body: "Tiered pricing, group orders, combo tickets, a door scanner that works, and fast payouts — on the only platform built for raas garba and Navratri. See how Rameelo helps you sell out.",
+    buttonLabel: "Explore Rameelo for organizers",
+    href: "/organizers",
+    secondaryLabel: "See organizer pricing",
+    secondaryHref: "/pricing",
+  },
+};
+
+// City-guide CTAs are generated from the city label so they stay tailored.
+const CITY_GUIDE_CTA: Record<string, string> = {
+  "best-garba-events-new-jersey-2026": "New Jersey",
+  "garba-events-new-jersey-guide": "New Jersey",
+  "houston-garba-scene-is-booming": "Houston",
+  "garba-events-houston-texas-guide": "Houston",
+  "garba-events-atlanta-georgia-guide": "Atlanta",
+  "garba-events-florida-tampa-orlando-miami": "Florida",
+  "garba-events-los-angeles-california": "Los Angeles",
+  "garba-events-bay-area-san-jose-california": "the Bay Area",
+  "garba-events-seattle-washington-pacific-northwest": "the Pacific Northwest",
+  "garba-events-dallas-texas-guide": "Dallas–Fort Worth",
+  "garba-events-chicago-illinois-midwest-guide": "Chicago",
+  "garba-events-detroit-michigan-guide": "Michigan",
+  "garba-events-dc-maryland-virginia-dmv-guide": "the DMV",
+  "garba-events-phoenix-arizona-guide": "Arizona",
+};
+
+export function getArticleCta(slug: string): BlogCta {
+  if (CTA_BY_SLUG[slug]) return CTA_BY_SLUG[slug];
+  const city = CITY_GUIDE_CTA[slug];
+  if (city) {
+    return eventsCta(
+      `See upcoming ${city} garba events`,
+      `Don't just read about it — find the next ${city} raas garba, dandiya or Navratri night and grab your tickets before they're gone.`,
+      `Browse ${city} events`,
+    );
+  }
+  return DEFAULT_CTA;
+}
+
+// ── City-matched event lists ────────────────────────────────────────────────
+// City-guide articles surface live, upcoming events matching the metro/state so
+// readers can click straight into a listing and buy. Matching is by state OR by
+// a place term appearing in the event's metro_city / city (case-insensitive).
+export type BlogCityFilter = { label: string; states?: string[]; places?: string[] };
+
+const CITY_FILTER_BY_SLUG: Record<string, BlogCityFilter> = {
+  "atul-purohit-garba-south-carolina-early-bird-sold-out-2026": { label: "South Carolina", states: ["SC"], places: ["Greenville", "Upstate"] },
+  "best-garba-events-new-jersey-2026": { label: "New Jersey", states: ["NJ"], places: ["Edison", "Iselin", "Secaucus", "New Jersey"] },
+  "garba-events-new-jersey-guide": { label: "New Jersey", states: ["NJ"], places: ["Edison", "Iselin", "Secaucus", "New Jersey"] },
+  "houston-garba-scene-is-booming": { label: "Houston", places: ["Houston"] },
+  "garba-events-houston-texas-guide": { label: "Houston", places: ["Houston"] },
+  "garba-events-atlanta-georgia-guide": { label: "Atlanta", states: ["GA"], places: ["Atlanta"] },
+  "garba-events-florida-tampa-orlando-miami": { label: "Florida", states: ["FL"], places: ["Tampa", "Orlando", "Miami", "Florida"] },
+  "garba-events-los-angeles-california": { label: "Los Angeles", places: ["Los Angeles", "Pomona", "Anaheim", "Irvine", "Artesia", "Cerritos", "SoCal"] },
+  "garba-events-bay-area-san-jose-california": { label: "the Bay Area", places: ["Bay Area", "San Jose", "San Josa", "San Francisco", "Santa Clara", "Fremont", "Sunnyvale", "Milpitas"] },
+  "garba-events-seattle-washington-pacific-northwest": { label: "the Pacific Northwest", states: ["WA", "OR"], places: ["Seattle", "Bellevue", "Redmond", "Portland"] },
+  "garba-events-dallas-texas-guide": { label: "Dallas–Fort Worth", places: ["Dallas", "Frisco", "Plano", "Irving", "Fort Worth", "DFW"] },
+  "garba-events-chicago-illinois-midwest-guide": { label: "Chicago", states: ["IL"], places: ["Chicago", "Naperville", "Schaumburg", "Lisle", "Aurora"] },
+  "garba-events-detroit-michigan-guide": { label: "Michigan", states: ["MI"], places: ["Detroit", "Troy", "Novi", "Canton", "Farmington", "Ann Arbor", "Michigan"] },
+  "garba-events-dc-maryland-virginia-dmv-guide": { label: "the DMV", states: ["DC", "MD", "VA"], places: ["Washington", "Fairfax", "Loudoun", "Chantilly", "Ashburn", "Rockville", "Germantown", "Montgomery", "DMV"] },
+  "garba-events-phoenix-arizona-guide": { label: "Arizona", states: ["AZ"], places: ["Phoenix", "Chandler", "Gilbert", "Tempe", "Scottsdale", "Mesa", "Arizona"] },
+};
+
+export function getArticleCityFilter(slug: string): BlogCityFilter | null {
+  return CITY_FILTER_BY_SLUG[slug] ?? null;
+}
+
+// ── Editorial ordering ──────────────────────────────────────────────────────
+// The index page surfaces the highest-intent / highest-traffic articles first
+// rather than purely by date. Lower number = shown earlier. Anything not listed
+// falls back to a mid weight and is then ordered by recency.
+const ARTICLE_PRIORITY: Record<string, number> = {
+  "best-garba-events-new-jersey-2026": 1,
+  "garba-events-new-jersey-guide": 2,
+  "navratri-2026-usa-ultimate-guide": 3,
+  "garba-events-near-me-find-navratri-usa-rameelo": 4,
+  "garba-events-houston-texas-guide": 5,
+  "houston-garba-scene-is-booming": 6,
+  "garba-events-bay-area-san-jose-california": 7,
+  "garba-events-los-angeles-california": 8,
+  "garba-events-chicago-illinois-midwest-guide": 9,
+  "garba-events-atlanta-georgia-guide": 10,
+  "garba-events-dallas-texas-guide": 11,
+  "garba-events-dc-maryland-virginia-dmv-guide": 12,
+  "garba-events-florida-tampa-orlando-miami": 13,
+  "garba-events-seattle-washington-pacific-northwest": 14,
+  "garba-events-detroit-michigan-guide": 15,
+  "garba-events-phoenix-arizona-guide": 16,
+};
+
+const DEFAULT_PRIORITY = 50;
+
+export function getArticlePriority(slug: string): number {
+  return ARTICLE_PRIORITY[slug] ?? DEFAULT_PRIORITY;
+}
+
+// Articles sorted for the index: priority first, then most-recent within a tier.
+export function getArticlesByPriority(): BlogArticle[] {
+  return [...BLOG_ARTICLES].sort(
+    (a, b) =>
+      getArticlePriority(a.slug) - getArticlePriority(b.slug) ||
+      b.publishedAt.localeCompare(a.publishedAt),
+  );
+}
+
+// All distinct categories present, in a curated display order for filters/sections.
+const CATEGORY_ORDER = [
+  "News",
+  "City Guide",
+  "Artist Spotlight",
+  "Tips & Tricks",
+  "First-Timer",
+  "Culture",
+  "For Organizers",
+];
+
+export function getCategoriesInOrder(): string[] {
+  const present = new Set(BLOG_ARTICLES.map(a => a.category));
+  const ordered = CATEGORY_ORDER.filter(c => present.has(c));
+  const extras = [...present].filter(c => !CATEGORY_ORDER.includes(c));
+  return [...ordered, ...extras];
 }

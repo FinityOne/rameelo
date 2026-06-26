@@ -1,6 +1,12 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BLOG_ARTICLES, getFeaturedArticle, type BlogArticle } from "@/lib/blog";
+import {
+  BLOG_ARTICLES,
+  getFeaturedArticle,
+  getArticlesByPriority,
+  getArticlesByCategory,
+  type BlogArticle,
+} from "@/lib/blog";
 import { breadcrumbSchema, itemListSchema, ld } from "@/lib/jsonld";
 
 export const metadata: Metadata = {
@@ -24,78 +30,102 @@ export const metadata: Metadata = {
   },
 };
 
-const CATEGORY_COLORS: Record<string, string> = {
-  "Event Guide":    "bg-aubergine/10 text-aubergine border-aubergine/20",
-  "Culture":        "bg-peacock/10 text-peacock border-peacock/20",
-  "City Guide":     "bg-[#7C1F2C]/10 text-[#7C1F2C] border-[#7C1F2C]/20",
-  "Community":      "bg-marigold/10 text-marigold-dark border-marigold/20",
-  "Tips & Tricks":  "bg-[#5a1e7a]/10 text-[#5a1e7a] border-[#5a1e7a]/20",
-  "For Organizers": "bg-peacock/10 text-peacock border-peacock/20",
-  "Platform":       "bg-aubergine/10 text-aubergine border-aubergine/20",
+// Category accent color (hex) — drives the kicker text + the hairline top-rule
+// on cards. Distinct per category so a reader scans the page by color.
+const CAT_ACCENT: Record<string, string> = {
+  "News": "#7C1F2C",
+  "City Guide": "#2E1B30",
+  "Artist Spotlight": "#B06A00",
+  "Tips & Tricks": "#5A1E7A",
+  "First-Timer": "#0E8C7A",
+  "Culture": "#A23A2B",
+  "For Organizers": "#0A6B5E",
+  // legacy categories still present on older posts
+  "Event Guide": "#2E1B30",
+  "Community": "#B06A00",
+  "Platform": "#2E1B30",
 };
+const accentFor = (c: string) => CAT_ACCENT[c] ?? "#2E1B30";
 
 function fmtDate(d: string) {
-  return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" });
+  return new Date(d + "T00:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
 }
 
-function CategoryBadge({ category }: { category: string }) {
-  const cls = CATEGORY_COLORS[category] ?? "bg-ivory-200 text-ink-muted border-ivory-200";
+function Kicker({ article, withEmoji = false }: { article: BlogArticle; withEmoji?: boolean }) {
   return (
-    <span className={`inline-block font-mono text-[9px] uppercase tracking-widest font-bold px-2.5 py-1 rounded-full border ${cls}`}>
-      {category}
+    <span className="font-mono text-[10px] uppercase tracking-[0.18em] font-bold" style={{ color: accentFor(article.category) }}>
+      {withEmoji && <span className="mr-1.5 not-italic">{article.coverEmoji}</span>}
+      {article.category}
     </span>
   );
 }
 
-function ArticleCard({ article, layout = "grid" }: { article: BlogArticle; layout?: "grid" | "list" }) {
-  if (layout === "list") {
-    return (
-      <Link href={`/blog/${article.slug}`} className="group flex gap-5 py-5 border-b border-ivory-200 last:border-0 hover:bg-ivory/30 -mx-3 px-3 rounded-xl transition-colors">
-        <div className={`w-16 h-16 rounded-xl bg-gradient-to-br ${article.coverGradient} flex items-center justify-center text-2xl shrink-0`}>
-          {article.coverEmoji}
-        </div>
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-            <CategoryBadge category={article.category} />
-            <span className="font-mono text-[9px] text-ink-muted">{article.readMinutes} min read</span>
-          </div>
-          <h3 className="font-display font-bold text-ink text-sm leading-snug group-hover:text-aubergine transition-colors mb-1" style={{ letterSpacing: "-0.01em" }}>
-            {article.title}
-          </h3>
-          <p className="font-ui text-xs text-ink-muted leading-relaxed line-clamp-2">{article.excerpt}</p>
-          <p className="font-mono text-[9px] text-ink-muted/60 mt-1.5">{fmtDate(article.publishedAt)} · {article.author}</p>
-        </div>
-      </Link>
-    );
-  }
-
+// Editorial card — hairline border, a colored top rule, mono kicker, serif-feel
+// headline, two-line dek and a byline. No big emoji panels.
+function StoryCard({ article }: { article: BlogArticle }) {
   return (
-    <Link href={`/blog/${article.slug}`} className="group flex flex-col rounded-2xl border border-ivory-200 bg-white overflow-hidden hover:border-aubergine/30 hover:shadow-md transition-all">
-      <div className={`h-40 bg-gradient-to-br ${article.coverGradient} flex items-center justify-center text-5xl`}>
-        {article.coverEmoji}
-      </div>
+    <Link
+      href={`/blog/${article.slug}`}
+      className="group flex flex-col bg-white border border-ink/10 rounded-[4px] overflow-hidden hover:border-ink/25 hover:shadow-sm transition-all"
+    >
+      <div className="h-1" style={{ backgroundColor: accentFor(article.category) }} />
       <div className="p-5 flex-1 flex flex-col">
-        <div className="flex items-center gap-2 mb-3 flex-wrap">
-          <CategoryBadge category={article.category} />
-          <span className="font-mono text-[9px] text-ink-muted">{article.readMinutes} min read</span>
+        <div className="flex items-center gap-2 mb-2.5">
+          <Kicker article={article} withEmoji />
+          <span className="font-mono text-[9px] text-ink-muted/70">·</span>
+          <span className="font-mono text-[9px] text-ink-muted/70">{article.readMinutes} min</span>
         </div>
-        <h3 className="font-display font-bold text-ink text-base leading-snug group-hover:text-aubergine transition-colors mb-2 flex-1" style={{ letterSpacing: "-0.015em" }}>
+        <h3 className="font-editorial font-bold text-ink text-lg leading-[1.2] group-hover:text-aubergine transition-colors mb-2" style={{ letterSpacing: "-0.01em" }}>
           {article.title}
         </h3>
-        <p className="font-ui text-xs text-ink-muted leading-relaxed line-clamp-3 mb-3">{article.excerpt}</p>
-        <div className="flex items-center justify-between pt-3 border-t border-ivory-200">
-          <p className="font-mono text-[9px] text-ink-muted">{article.author}</p>
-          <p className="font-mono text-[9px] text-ink-muted">{fmtDate(article.publishedAt)}</p>
+        <p className="font-ui text-[13px] text-ink-muted leading-relaxed line-clamp-2 mb-4 flex-1">{article.excerpt}</p>
+        <p className="font-mono text-[9px] text-ink-muted/70 pt-3 border-t border-ink/8">
+          {article.author} · {fmtDate(article.publishedAt)}
+        </p>
+      </div>
+    </Link>
+  );
+}
+
+// Compact one-line headline row for rails and list sections.
+function HeadlineRow({ article, index }: { article: BlogArticle; index?: number }) {
+  return (
+    <Link
+      href={`/blog/${article.slug}`}
+      className="group flex gap-3 py-3.5 border-b border-ink/8 last:border-0 items-start"
+    >
+      {index !== undefined && (
+        <span className="font-editorial font-bold text-2xl leading-none text-ink/15 w-7 shrink-0 group-hover:text-aubergine/40 transition-colors">
+          {index}
+        </span>
+      )}
+      <div className="min-w-0">
+        <div className="mb-1">
+          <Kicker article={article} />
         </div>
+        <h3 className="font-editorial font-bold text-ink text-[15px] leading-snug group-hover:text-aubergine transition-colors" style={{ letterSpacing: "-0.005em" }}>
+          {article.title}
+        </h3>
       </div>
     </Link>
   );
 }
 
 export default function BlogPage() {
-  const featured = getFeaturedArticle();
-  const rest = BLOG_ARTICLES.filter(a => !a.featured).sort((a, b) => b.publishedAt.localeCompare(a.publishedAt));
-  const allCategories = [...new Set(BLOG_ARTICLES.map(a => a.category))];
+  const lead = getFeaturedArticle() ?? getArticlesByPriority()[0];
+
+  // Front-page rail: the highest-intent stories after the lead.
+  const railPool = getArticlesByPriority().filter(a => a.slug !== lead.slug);
+  const rail = railPool.slice(0, 5);
+
+  const cityGuides = getArticlesByCategory("City Guide").filter(a => a.slug !== lead.slug);
+  const artists = getArticlesByCategory("Artist Spotlight").filter(a => a.slug !== lead.slug);
+  const knowBefore = getArticlesByPriority().filter(
+    a => ["Culture", "First-Timer", "Tips & Tricks"].includes(a.category) && a.slug !== lead.slug,
+  );
+  const organizerPosts = getArticlesByCategory("For Organizers");
+
+  const todayLine = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" });
 
   const blogList = itemListSchema(
     "Rameelo Blog Articles",
@@ -110,156 +140,185 @@ export default function BlogPage() {
     <div className="bg-ivory min-h-screen">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(blogList) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(crumbs) }} />
+
       {/* ── Masthead ── */}
-      <div style={{ backgroundColor: "#2E1B30" }} className="border-b-4 border-marigold">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-3 mb-2">
-              <div className="h-px flex-1 bg-marigold/30 max-w-16" />
-              <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-marigold/60">Est. 2024</span>
-              <div className="h-px flex-1 bg-marigold/30 max-w-16" />
-            </div>
-            <h1 className="font-display font-bold text-white text-4xl sm:text-5xl mb-1" style={{ letterSpacing: "-0.03em" }}>
-              The Rameelo Review
-            </h1>
-            <p className="font-ui text-white/40 text-sm tracking-wider">
-              America&rsquo;s Premier Source for Raas Garba Culture &amp; Events
-            </p>
-            <div className="flex items-center justify-center gap-2 mt-4 flex-wrap">
-              {allCategories.map(cat => (
-                <span key={cat} className="font-mono text-[9px] uppercase tracking-widest text-marigold/50 hover:text-marigold transition-colors cursor-pointer">
-                  {cat}
-                </span>
-              ))}
-            </div>
+      <header style={{ backgroundColor: "#2E1B30" }} className="border-b-2 border-marigold">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center justify-center gap-3 pt-6 pb-1">
+            <div className="h-px flex-1 bg-marigold/25 max-w-20" />
+            <span className="font-mono text-[9px] uppercase tracking-[0.3em] text-marigold/60">The Rameelo Review · Est. 2024</span>
+            <div className="h-px flex-1 bg-marigold/25 max-w-20" />
+          </div>
+          <h1 className="text-center font-editorial font-bold text-white text-4xl sm:text-6xl pb-2" style={{ letterSpacing: "-0.03em" }}>
+            Garba &amp; Navratri, Covered.
+          </h1>
+          <p className="text-center font-ui text-white/45 text-[13px] sm:text-sm tracking-wide pb-4">
+            America&rsquo;s authoritative source for raas garba culture, city guides, artists &amp; events.
+          </p>
+        </div>
+        <div className="border-t border-white/10">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2.5 flex items-center justify-between">
+            <p className="font-mono text-[9px] text-white/35">{todayLine}</p>
+            <p className="font-mono text-[9px] text-white/35">{BLOG_ARTICLES.length} articles · updated weekly</p>
           </div>
         </div>
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-2 flex items-center justify-between border-t border-white/10">
-          <p className="font-mono text-[9px] text-white/30">
-            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric", year: "numeric" })}
-          </p>
-          <p className="font-mono text-[9px] text-white/30">{BLOG_ARTICLES.length} Articles</p>
-        </div>
-      </div>
+      </header>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 sm:py-10">
 
-        {/* ── Featured article ── */}
-        {featured && (
-          <div className="mb-10">
-            <div className="flex items-center gap-3 mb-5">
-              <div className="h-px flex-1 bg-ink/10" />
-              <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Featured Story</span>
-              <div className="h-px flex-1 bg-ink/10" />
-            </div>
-            <Link href={`/blog/${featured.slug}`} className="group block rounded-3xl overflow-hidden border border-ivory-200 bg-white hover:shadow-xl hover:border-aubergine/30 transition-all">
-              <div className={`relative h-64 sm:h-80 bg-gradient-to-br ${featured.coverGradient} flex items-center justify-center`}>
-                <div className="absolute inset-0 opacity-20" style={{ backgroundImage: "radial-gradient(circle at 30% 50%, rgba(245,166,35,0.4) 0%, transparent 60%)" }} />
-                <span className="text-8xl relative z-10">{featured.coverEmoji}</span>
-                <div className="absolute bottom-0 left-0 right-0 p-6">
-                  <CategoryBadge category={featured.category} />
-                </div>
+        {/* ── Front page: lead + rail ── */}
+        <section className="grid lg:grid-cols-3 gap-8 lg:gap-10 pb-8 border-b-2 border-ink/10">
+          {/* Lead story */}
+          <div className="lg:col-span-2">
+            <Link href={`/blog/${lead.slug}`} className="group block">
+              <div className="flex items-center gap-2 mb-3">
+                <Kicker article={lead} withEmoji />
+                <span className="font-mono text-[9px] text-ink-muted/70">·</span>
+                <span className="font-mono text-[9px] text-ink-muted/70">{lead.readMinutes} min read</span>
               </div>
-              <div className="p-6 sm:p-8">
-                <h2 className="font-display font-bold text-ink text-2xl sm:text-3xl leading-tight group-hover:text-aubergine transition-colors mb-3" style={{ letterSpacing: "-0.025em" }}>
-                  {featured.title}
-                </h2>
-                <p className="font-ui text-ink-muted leading-relaxed mb-5 text-base max-w-3xl">{featured.excerpt}</p>
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                  <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-aubergine flex items-center justify-center text-white text-xs font-bold">
-                      {featured.author.charAt(0)}
-                    </div>
-                    <div>
-                      <p className="font-ui text-sm font-semibold text-ink">{featured.author}</p>
-                      <p className="font-mono text-[9px] text-ink-muted">{featured.authorTitle} · {fmtDate(featured.publishedAt)}</p>
-                    </div>
-                  </div>
-                  <span className="flex items-center gap-1.5 font-ui font-semibold text-aubergine text-sm group-hover:gap-2.5 transition-all">
-                    Read story
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-                  </span>
+              <h2 className="font-editorial font-bold text-ink text-3xl sm:text-[2.75rem] leading-[1.05] group-hover:text-aubergine transition-colors mb-4" style={{ letterSpacing: "-0.025em" }}>
+                {lead.title}
+              </h2>
+              <p className="font-ui text-ink-muted text-base sm:text-lg leading-relaxed mb-5 max-w-2xl">{lead.excerpt}</p>
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-full bg-aubergine flex items-center justify-center text-white text-xs font-bold shrink-0">
+                  {lead.author.charAt(0)}
                 </div>
+                <div>
+                  <p className="font-ui text-sm font-semibold text-ink">{lead.author}</p>
+                  <p className="font-mono text-[9px] text-ink-muted">{lead.authorTitle} · {fmtDate(lead.publishedAt)}</p>
+                </div>
+                <span className="ml-auto hidden sm:flex items-center gap-1.5 font-ui font-semibold text-aubergine text-sm group-hover:gap-2.5 transition-all">
+                  Read story
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                </span>
               </div>
             </Link>
           </div>
-        )}
 
-        {/* ── Divider ── */}
-        <div className="flex items-center gap-4 mb-8">
-          <div className="h-px flex-1 bg-ink/10" />
-          <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">More Stories</span>
-          <div className="h-px flex-1 bg-ink/10" />
-        </div>
-
-        {/* ── Two-column layout ── */}
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main column — article cards */}
-          <div className="lg:col-span-2">
-            <div className="grid sm:grid-cols-2 gap-5">
-              {rest.slice(0, 4).map(article => (
-                <ArticleCard key={article.slug} article={article} layout="grid" />
+          {/* Right rail — the front page */}
+          <aside className="lg:border-l lg:border-ink/10 lg:pl-8">
+            <div className="flex items-center gap-2 mb-1">
+              <div className="w-1.5 h-4 bg-marigold rounded-full" />
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink font-bold">Most read</p>
+            </div>
+            <div>
+              {rail.map((a, i) => (
+                <HeadlineRow key={a.slug} article={a} index={i + 1} />
               ))}
             </div>
-          </div>
+          </aside>
+        </section>
 
-          {/* Sidebar — list format + CTA */}
-          <div className="space-y-6">
-            {/* Recent list */}
-            <div className="bg-white rounded-2xl border border-ivory-200 p-5">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-1.5 h-5 bg-marigold rounded-full" />
-                <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted font-bold">Also Reading</p>
+        {/* ── City Guides — highest intent, surfaced first ── */}
+        {cityGuides.length > 0 && (
+          <section className="pt-9">
+            <div className="flex items-end justify-between gap-4 mb-5">
+              <div>
+                <h2 className="font-editorial font-bold text-ink text-2xl sm:text-3xl" style={{ letterSpacing: "-0.02em" }}>
+                  Garba by City
+                </h2>
+                <p className="font-ui text-sm text-ink-muted mt-0.5">Where to dance this Navratri — metro-by-metro guides with live events.</p>
               </div>
-              <div className="divide-y divide-ivory-200">
-                {rest.slice(4).map(article => (
-                  <ArticleCard key={article.slug} article={article} layout="list" />
+              <Link href="/events" className="hidden sm:inline-flex items-center gap-1.5 font-ui font-semibold text-aubergine text-sm hover:gap-2.5 transition-all shrink-0">
+                Browse all events
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+              </Link>
+            </div>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {cityGuides.map(a => (
+                <StoryCard key={a.slug} article={a} />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {/* ── Two-up: Artists + Know before you go ── */}
+        <section className="pt-10 grid lg:grid-cols-2 gap-8 lg:gap-12">
+          {/* Artists */}
+          {artists.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-4 pb-2 border-b-2 border-ink/10">
+                <h2 className="font-editorial font-bold text-ink text-xl sm:text-2xl" style={{ letterSpacing: "-0.02em" }}>
+                  The Artists
+                </h2>
+              </div>
+              <div className="space-y-4">
+                {artists.map(a => (
+                  <StoryCard key={a.slug} article={a} />
                 ))}
               </div>
             </div>
+          )}
 
-            {/* Find events CTA */}
-            <div className="rounded-2xl overflow-hidden border border-marigold/25" style={{ backgroundColor: "#2E1B30" }}>
-              <div className="p-5">
-                <p className="font-mono text-[9px] uppercase tracking-widest text-marigold/60 mb-2">On Rameelo</p>
-                <h3 className="font-display font-bold text-white text-lg mb-2" style={{ letterSpacing: "-0.02em" }}>
-                  Find Garba Events Near You
-                </h3>
-                <p className="font-ui text-white/50 text-sm mb-4 leading-relaxed">
-                  Every verified raas garba and Navratri event in the USA — searchable by city, date, and style.
-                </p>
-                <Link href="/events" className="flex items-center justify-center gap-2 w-full py-3 rounded-xl bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark transition-all">
-                  Browse events →
-                </Link>
+          {/* Know before you go */}
+          {knowBefore.length > 0 && (
+            <div>
+              <div className="flex items-center gap-2 mb-2 pb-2 border-b-2 border-ink/10">
+                <h2 className="font-editorial font-bold text-ink text-xl sm:text-2xl" style={{ letterSpacing: "-0.02em" }}>
+                  Know Before You Go
+                </h2>
+              </div>
+              <div>
+                {knowBefore.map(a => (
+                  <HeadlineRow key={a.slug} article={a} />
+                ))}
               </div>
             </div>
+          )}
+        </section>
 
-            {/* Group discount CTA */}
-            <div className="rounded-2xl border border-peacock/20 bg-peacock/5 p-5">
-              <p className="font-mono text-[9px] uppercase tracking-widest text-peacock font-bold mb-2">Group Discounts</p>
-              <p className="font-display font-bold text-ink text-base mb-1" style={{ letterSpacing: "-0.015em" }}>
-                Save up to 15% on group tickets
+        {/* ── For Organizers band ── */}
+        <section className="mt-12 rounded-[6px] overflow-hidden border border-marigold/25" style={{ backgroundColor: "#2E1B30" }}>
+          <div className="p-6 sm:p-8 grid md:grid-cols-3 gap-6 items-center">
+            <div className="md:col-span-2">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-marigold/60 mb-2">For Organizers</p>
+              <h2 className="font-editorial font-bold text-white text-xl sm:text-2xl mb-2" style={{ letterSpacing: "-0.02em" }}>
+                {organizerPosts[0]?.title ?? "Sell out your Navratri event"}
+              </h2>
+              <p className="font-ui text-white/55 text-sm leading-relaxed max-w-xl">
+                {organizerPosts[0]?.excerpt ?? "Tiered pricing, group orders, combo tickets and fast payouts — on the only platform built for raas garba."}
               </p>
-              <p className="font-ui text-sm text-ink-muted mb-3 leading-relaxed">
-                Bring 5+ friends and unlock automatic discounts. No coupon codes needed.
-              </p>
-              <Link href="/events" className="font-ui font-semibold text-peacock text-sm hover:text-peacock/70 transition-colors">
-                Learn how it works →
+            </div>
+            <div className="flex flex-col gap-2.5">
+              {organizerPosts[0] && (
+                <Link href={`/blog/${organizerPosts[0].slug}`} className="flex items-center justify-center gap-2 w-full py-3 rounded-[4px] bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark transition-all">
+                  Read the playbook →
+                </Link>
+              )}
+              <Link href="/organizers" className="flex items-center justify-center gap-2 w-full py-3 rounded-[4px] border border-white/25 text-white font-display font-bold text-sm hover:bg-white/10 transition-all">
+                Rameelo for organizers
               </Link>
             </div>
           </div>
-        </div>
+        </section>
+
+        {/* ── Find events CTA ── */}
+        <section className="mt-8 rounded-[6px] border border-ink/10 bg-white p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-5 justify-between">
+          <div>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-marigold-dark font-bold mb-1.5">On Rameelo</p>
+            <h2 className="font-editorial font-bold text-ink text-xl sm:text-2xl mb-1" style={{ letterSpacing: "-0.02em" }}>
+              Find garba events near you
+            </h2>
+            <p className="font-ui text-sm text-ink-muted max-w-xl leading-relaxed">
+              Every verified raas garba, dandiya and Navratri event in the USA — searchable by city, date and artist. Bring a group and save automatically.
+            </p>
+          </div>
+          <Link href="/events" className="shrink-0 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-[4px] bg-marigold text-aubergine font-display font-bold text-sm hover:bg-marigold-dark transition-all">
+            Explore events →
+          </Link>
+        </section>
 
         {/* ── About the publication ── */}
-        <div className="mt-12 border-t-2 border-ink/8 pt-8">
+        <div className="mt-12 border-t-2 border-ink/10 pt-7">
           <div className="max-w-2xl">
             <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted mb-3">About The Rameelo Review</p>
             <p className="font-ui text-ink-muted text-sm leading-relaxed">
-              The Rameelo Review is the editorial voice of the Rameelo platform — America&rsquo;s dedicated home for raas garba ticketing and community. Our writers are garba enthusiasts, cultural insiders, and community members who cover Navratri events, culture, artists, and the South Asian diaspora across the United States. We believe garba deserves serious, authoritative, joyful coverage.
+              The Rameelo Review is the editorial voice of Rameelo — America&rsquo;s dedicated home for raas garba ticketing and community. Our writers are garba enthusiasts, cultural insiders and community members who cover Navratri events, culture, artists and the South Asian diaspora across the United States. We believe garba deserves serious, authoritative, joyful coverage.
             </p>
           </div>
         </div>
-      </div>
+      </main>
 
       {/* ── Structured data ── */}
       <script
