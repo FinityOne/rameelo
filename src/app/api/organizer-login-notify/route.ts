@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { organizerLoginEmail } from "@/lib/email/templates/organizerLogin";
 import { sendEmail } from "@/lib/email/send";
 import { recordEmailLog } from "@/lib/email/log";
+import { getAdminRecipients } from "@/lib/email/recipients";
 
 export const runtime = "nodejs";
 
@@ -28,7 +29,7 @@ export async function POST(request: Request) {
   // Not an organizer, no recent login, or not found → nothing to do.
   if (!row) return NextResponse.json({ ok: true, skipped: "not-eligible" });
 
-  const admins = (row.admin_emails ?? []).filter(Boolean);
+  const admins = await getAdminRecipients(supabase, "organizer-login", row.admin_emails ?? []);
   if (admins.length === 0) return NextResponse.json({ ok: true, sent: 0, note: "no admins" });
 
   const { subject, html, text } = organizerLoginEmail({

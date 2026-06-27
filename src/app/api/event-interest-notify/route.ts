@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { eventInterestNotificationEmail } from "@/lib/email/templates/eventInterestNotification";
 import { sendEmail } from "@/lib/email/send";
 import { recordEmailLog } from "@/lib/email/log";
+import { getAdminRecipients } from "@/lib/email/recipients";
 
 export const runtime = "nodejs";
 
@@ -36,7 +37,7 @@ export async function POST(request: Request) {
 
   if (!row) return NextResponse.json({ ok: true, skipped: "not-found" });
 
-  const admins = (row.admin_emails ?? []).filter(Boolean);
+  const admins = await getAdminRecipients(supabase, "event-interest", row.admin_emails ?? []);
   if (admins.length === 0) return NextResponse.json({ ok: true, sent: 0, note: "no admins" });
 
   const eventWhere = [row.event_venue, row.event_city, row.event_state].filter(Boolean).join(", ");

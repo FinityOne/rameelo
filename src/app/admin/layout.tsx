@@ -225,6 +225,7 @@ const SECTIONS: NavSection[] = [
       {
         href: "/admin/emails",
         label: "Emails",
+        match: (p) => p.startsWith("/admin/emails"),
         icon: (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
@@ -338,6 +339,7 @@ const PAGE_TITLES: Array<{ test: (p: string) => boolean; title: string }> = [
   { test: (p) => p === "/admin/financials",                       title: "Revenue" },
   { test: (p) => p === "/admin/status",                           title: "System Status" },
   { test: (p) => p === "/admin/notifications",                    title: "Notifications" },
+  { test: (p) => p === "/admin/emails/routing",                   title: "Admin Email Recipients" },
   { test: (p) => p === "/admin/emails",                           title: "Platform Emails" },
   { test: (p) => p === "/admin/marketing",                        title: "Email Blast" },
   { test: (p) => p === "/admin/promotions",                       title: "Promotions" },
