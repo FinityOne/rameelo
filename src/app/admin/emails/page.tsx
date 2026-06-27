@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import { EMAIL_REGISTRY, type EmailDef, type EmailTrigger, type EmailStatus } from "@/lib/email/registry";
 
 const TRIGGER_META: Record<EmailTrigger, { label: string; cls: string; icon: React.ReactNode }> = {
@@ -105,9 +106,16 @@ export default function AdminEmailsPage() {
   return (
     <div className="space-y-6 max-w-5xl">
       {/* Header */}
-      <div>
-        <h1 className="font-display font-bold text-ink text-2xl" style={{ letterSpacing: "-0.02em" }}>Platform Emails</h1>
-        <p className="font-ui text-ink-muted text-sm mt-1">Every email Rameelo sends — what it is, who it's for, and how it fires (automatic vs manual).</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="font-display font-bold text-ink text-2xl" style={{ letterSpacing: "-0.02em" }}>Platform Emails</h1>
+          <p className="font-ui text-ink-muted text-sm mt-1">Every email Rameelo sends — what it is, who it's for, and how it fires (automatic vs manual).</p>
+        </div>
+        <Link href="/admin/emails/routing"
+          className="shrink-0 inline-flex items-center gap-2 rounded-xl border border-ivory-200 bg-white px-4 py-2.5 font-display font-bold text-sm text-ink hover:border-aubergine/40 hover:text-aubergine transition-all">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
+          Admin recipients
+        </Link>
       </div>
 
       {/* Summary */}
