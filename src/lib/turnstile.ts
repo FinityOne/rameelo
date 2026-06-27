@@ -6,10 +6,22 @@
 // When either is missing the check is DISABLED (verifyTurnstile returns true and
 // the widget renders nothing), so auth keeps working until the keys are added.
 
-export const TURNSTILE_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "";
+// Local-dev escape hatch: set NEXT_PUBLIC_DISABLE_TURNSTILE=true in .env.local to
+// skip the human check while developing. HARD-gated to non-production, so it can
+// never disable the check on a real (Vercel) build — `next build` sets
+// NODE_ENV=production, while `next dev` sets it to development. Bypassing simply
+// blanks the site key, which cascades: the widget renders nothing, the client
+// stops requiring a token, and turnstileEnabled goes false so the server skips it.
+export const turnstileBypassed =
+  process.env.NODE_ENV !== "production" &&
+  process.env.NEXT_PUBLIC_DISABLE_TURNSTILE === "true";
 
-/** True only when BOTH keys are configured — i.e. the human check is enforced. */
-export const turnstileEnabled = !!(process.env.TURNSTILE_SECRET_KEY && TURNSTILE_SITE_KEY);
+export const TURNSTILE_SITE_KEY = turnstileBypassed
+  ? ""
+  : (process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY || "");
+
+/** True only when BOTH keys are configured AND not bypassed — i.e. the human check is enforced. */
+export const turnstileEnabled = !turnstileBypassed && !!(process.env.TURNSTILE_SECRET_KEY && TURNSTILE_SITE_KEY);
 
 const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 
@@ -22,6 +34,7 @@ const VERIFY_URL = "https://challenges.cloudflare.com/turnstile/v0/siteverify";
  * can't lock every real user out of signing in.
  */
 export async function verifyTurnstile(token: string | null | undefined, ip?: string | null): Promise<boolean> {
+  if (turnstileBypassed) return true;  // local-dev escape hatch (non-production only)
   const secret = process.env.TURNSTILE_SECRET_KEY;
   if (!secret) return true;            // not configured → skip
   if (!token) return false;            // configured but no token → reject
