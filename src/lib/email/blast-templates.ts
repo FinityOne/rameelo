@@ -4,7 +4,7 @@
 // is client-safe metadata only (no rendering) — the actual HTML builders live in
 // build-blast.ts (server). Add a template here + a branch in build-blast.ts.
 
-export type BlastTemplateKey = "tickets-live" | "selling-fast" | "final-call" | "we-miss-you" | "custom";
+export type BlastTemplateKey = "tickets-live" | "selling-fast" | "final-call" | "we-miss-you" | "nearby-events" | "custom";
 
 export type BlastTemplateMeta = {
   key: BlastTemplateKey;
@@ -15,6 +15,11 @@ export type BlastTemplateMeta = {
   requiresEvent: boolean;
   /** Does the admin supply the subject/body (free compose) rather than the template generating it? */
   custom: boolean;
+  /**
+   * Location-aware: instead of one shared event, the send route resolves the
+   * soonest upcoming events in EACH recipient's own state/metro. No event pick.
+   */
+  perRecipientGeo?: boolean;
 };
 
 export const BLAST_TEMPLATES: BlastTemplateMeta[] = [
@@ -49,6 +54,15 @@ export const BLAST_TEMPLATES: BlastTemplateMeta[] = [
     description: "Warm re-engagement / win-back. Pair with the “Attended event” filter to invite past dancers back for a new event. Nostalgic tone, soft urgency, one CTA.",
     requiresEvent: true,
     custom: false,
+  },
+  {
+    key: "nearby-events",
+    name: "Events near each recipient",
+    emoji: "📍",
+    description: "Location-aware. Each person gets the soonest upcoming events in their OWN state/metro — no event to pick. Perfect for blasting giveaway leads everywhere at once and pushing them to the garba closest to home.",
+    requiresEvent: false,
+    custom: false,
+    perRecipientGeo: true,
   },
   {
     key: "custom",

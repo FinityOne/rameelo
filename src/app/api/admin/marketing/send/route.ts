@@ -5,9 +5,11 @@ import { sendEmail } from "@/lib/email/send";
 import { recordEmailLog } from "@/lib/email/log";
 import { makeUnsubToken } from "@/lib/marketing-token";
 import { EMAIL } from "@/lib/email/theme";
-import { loadBlastEvent, buildBlastEmail } from "@/lib/email/build-blast";
+import { loadBlastEvent, buildBlastEmail, loadUpcomingGeoEvents, pickNearbyEvents, buildNearbyEmail, type GeoEvent } from "@/lib/email/build-blast";
 import { blastTemplate } from "@/lib/email/blast-templates";
 import type { SupabaseClient } from "@supabase/supabase-js";
+
+type Built = { subject: string; html: string; text: string };
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -32,7 +34,7 @@ export async function POST(request: Request) {
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { data: me } = await supabase.from("profiles").select("role, first_name").eq("id", user.id).maybeSingle();
+  const { data: me } = await supabase.from("profiles").select("role, first_name, state").eq("id", user.id).maybeSingle();
   if (me?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   if (!serviceRoleConfigured) return NextResponse.json({ error: "Email isn't configured on the server." }, { status: 503 });
 
@@ -54,20 +56,41 @@ export async function POST(request: Request) {
     if (!body && !eventId) return NextResponse.json({ error: "Add a message or pick an event to feature." }, { status: 400 });
   }
 
+  const isGeo = !!tmpl.perRecipientGeo;
+
   // Load the event once (shared by every recipient + the history record).
   const event = eventId ? await loadBlastEvent(supabase as SupabaseClient, eventId) : null;
   if (eventId && !event) return NextResponse.json({ error: "That event isn't published or wasn't found." }, { status: 404 });
 
+  // For the location-aware template, load the on-sale upcoming events once and
+  // pick each recipient's nearest set from this shared list.
+  let geoEvents: GeoEvent[] = [];
+  if (isGeo) {
+    geoEvents = await loadUpcomingGeoEvents(supabase as SupabaseClient);
+    if (geoEvents.length === 0) return NextResponse.json({ error: "No upcoming on-sale events to feature right now." }, { status: 422 });
+  }
+
   const custom = { subject, headline, body };
+
+  // Builds the final email for one recipient — branches between the location-aware
+  // template (per-recipient event set) and the shared-event / custom templates.
+  const buildFor = (firstName: string | null, state: string | null, unsubscribeUrl: string): Built => {
+    if (isGeo) {
+      const { items, locationLabel } = pickNearbyEvents(geoEvents, state);
+      return buildNearbyEmail({ recipientFirstName: firstName, items, locationLabel, unsubscribeUrl });
+    }
+    return buildBlastEmail({ templateKey, recipientFirstName: firstName, event, unsubscribeUrl, custom });
+  };
+
   // Representative subject for history / the test prefix (template subjects don't
-  // depend on the recipient's name).
-  const repSubject = buildBlastEmail({ templateKey, recipientFirstName: null, event, unsubscribeUrl: `${EMAIL.site}/api/unsubscribe/preview`, custom }).subject;
+  // depend on the recipient's name; for geo we use the admin's own state).
+  const repSubject = buildFor(null, me.state ?? null, `${EMAIL.site}/api/unsubscribe/preview`).subject;
 
   // ── Test send ────────────────────────────────────────────────────────────
   if (testEmail) {
     if (!EMAIL_RE.test(testEmail)) return NextResponse.json({ error: "Enter a valid test email." }, { status: 400 });
     const unsubscribeUrl = `${EMAIL.site}/api/unsubscribe/${makeUnsubToken(testEmail)}`;
-    const { subject: subj, html, text } = buildBlastEmail({ templateKey, recipientFirstName: me.first_name ?? "there", event, unsubscribeUrl, custom });
+    const { subject: subj, html, text } = buildFor(me.first_name ?? "there", me.state ?? null, unsubscribeUrl);
     const { error: sendErr } = await sendEmail({ to: testEmail, subject: `[TEST] ${subj}`, html, text, type: "marketing_blast" });
     if (sendErr) return NextResponse.json({ error: sendErr }, { status: 500 });
     return NextResponse.json({ ok: true, test: true });
@@ -86,14 +109,14 @@ export async function POST(request: Request) {
 
   const { data: audienceData, error: aErr } = await supabase.rpc("resolve_marketing_audience", filters);
   if (aErr) return NextResponse.json({ error: aErr.message }, { status: 400 });
-  const recipients = (audienceData ?? []) as { email: string; first_name: string | null }[];
+  const recipients = (audienceData ?? []) as { email: string; first_name: string | null; state: string | null }[];
   if (recipients.length === 0) return NextResponse.json({ error: "No recipients match those filters." }, { status: 422 });
   if (recipients.length > MAX_RECIPIENTS) return NextResponse.json({ error: `Audience too large (${recipients.length}). Narrow it to ${MAX_RECIPIENTS} or fewer.` }, { status: 413 });
 
   let sent = 0, failed = 0;
   await pool(recipients, CONCURRENCY, async (r) => {
     const unsubscribeUrl = `${EMAIL.site}/api/unsubscribe/${makeUnsubToken(r.email)}`;
-    const { subject: subj, html, text } = buildBlastEmail({ templateKey, recipientFirstName: r.first_name, event, unsubscribeUrl, custom });
+    const { subject: subj, html, text } = buildFor(r.first_name, r.state, unsubscribeUrl);
     const { id: providerId, error: sendErr } = await sendEmail({
       to: r.email, subject: subj, html, text, type: "marketing_blast",
       headers: { "List-Unsubscribe": `<${unsubscribeUrl}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
