@@ -4,6 +4,8 @@ import { promotionEntryEmail } from "@/lib/email/templates/promotionEntry";
 import { sendEmail } from "@/lib/email/send";
 import { recordEmailLog } from "@/lib/email/log";
 import { getAdminRecipients } from "@/lib/email/recipients";
+import { createAdminClient, serviceRoleConfigured } from "@/lib/supabase/admin";
+import { provisionPromoAccounts } from "@/lib/promo-accounts";
 
 export const runtime = "nodejs";
 
@@ -17,6 +19,15 @@ export async function POST(request: Request) {
   if (!entryId) return NextResponse.json({ error: "Missing entryId" }, { status: 400 });
 
   const supabase = await createClient();
+
+  // Provision a platform account for this fresh lead (unique email only) so they
+  // become reachable from the Campaigns audience engine. Best-effort: never
+  // blocks the admin notification or the entrant's confirmation.
+  if (serviceRoleConfigured) {
+    try { await provisionPromoAccounts(createAdminClient(), { onlyEntryId: entryId }); }
+    catch { /* non-fatal */ }
+  }
+
   const { data, error } = await supabase.rpc("get_promotion_entry_for_notify", { p_entry_id: entryId });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 

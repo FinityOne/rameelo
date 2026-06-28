@@ -233,8 +233,9 @@ const SECTIONS: NavSection[] = [
         ),
       },
       {
-        href: "/admin/marketing",
-        label: "Email Blast",
+        href: "/admin/campaigns",
+        label: "Campaigns",
+        match: (p) => p.startsWith("/admin/campaigns") || p.startsWith("/admin/marketing"),
         icon: (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
@@ -341,7 +342,7 @@ const PAGE_TITLES: Array<{ test: (p: string) => boolean; title: string }> = [
   { test: (p) => p === "/admin/notifications",                    title: "Notifications" },
   { test: (p) => p === "/admin/emails/routing",                   title: "Admin Email Recipients" },
   { test: (p) => p === "/admin/emails",                           title: "Platform Emails" },
-  { test: (p) => p === "/admin/marketing",                        title: "Email Blast" },
+  { test: (p) => p === "/admin/campaigns" || p === "/admin/marketing", title: "Campaigns" },
   { test: (p) => p === "/admin/promotions",                       title: "Promotions" },
   { test: (p) => /^\/admin\/promotions\/[^/]+$/.test(p),         title: "Promotion Entries" },
   { test: (p) => p === "/admin/platform",                         title: "Platform Settings" },

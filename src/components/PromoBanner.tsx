@@ -5,12 +5,16 @@ import { createClient } from "@/lib/supabase/client";
 import { PROMO_LS, type Promotion } from "@/lib/promotions";
 import PromoEntryModal from "./PromoEntryModal";
 
-// Minimal, ad-style promo strip (sits just below the hero). Shows the most
-// recent active promotion; clicking opens the same entry form as the site-wide
-// modal. Renders nothing when there's no active promo or the visitor already
-// entered/dismissed it.
+// Minimal, ad-style promo strip. Shows the most recent active promotion;
+// clicking opens the same entry form as the site-wide modal. Renders nothing
+// when there's no active promo or the visitor already entered/dismissed it.
+//
+//   • default  — the roomy card used below the homepage hero.
+//   • compact  — a slim one-line strip used at the top of event detail pages
+//     (below the nav). On a ticket page the auto-modal is suppressed, so this
+//     is how the giveaway stays present without hijacking checkout.
 
-export default function PromoBanner() {
+export default function PromoBanner({ compact = false }: { compact?: boolean }) {
   const [promo, setPromo] = useState<Promotion | null>(null);
   const [open, setOpen] = useState(false);
   const [hidden, setHidden] = useState(false);
@@ -36,6 +40,33 @@ export default function PromoBanner() {
   }
 
   if (!promo || hidden) return null;
+
+  if (compact) {
+    // Slim one-line strip for the top of event detail pages — present but
+    // unobtrusive, so it never competes with the ticket purchase flow.
+    return (
+      <section className="bg-aubergine">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <button
+            onClick={() => setOpen(true)}
+            className="group w-full flex items-center gap-2.5 py-2 text-left"
+          >
+            <span className="shrink-0 text-base leading-none">🎁</span>
+            <p className="flex-1 min-w-0 truncate font-ui text-xs sm:text-sm text-white/90">
+              <span className="font-mono text-[8px] font-bold uppercase tracking-widest text-marigold mr-2 align-middle">Giveaway</span>
+              <span className="font-semibold text-white">{promo.headline}</span>
+              {promo.prize_value > 0 && <span className="text-white/60 hidden sm:inline"> · ${promo.prize_value} value</span>}
+            </p>
+            <span className="shrink-0 inline-flex items-center gap-1 font-display font-bold text-xs text-marigold group-hover:text-marigold-dark transition-colors">
+              {promo.cta_label}
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+            </span>
+          </button>
+        </div>
+        {open && <PromoEntryModal promo={promo} onClose={() => setOpen(false)} onEntered={handleEntered} />}
+      </section>
+    );
+  }
 
   return (
     <section className="bg-ivory border-b border-ivory-200">

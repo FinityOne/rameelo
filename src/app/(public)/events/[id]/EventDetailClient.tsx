@@ -15,6 +15,7 @@ import MetroSticker from "./MetroSticker";
 import MoreFromOrganizer from "./MoreFromOrganizer";
 import EventWhenWhere from "./EventWhenWhere";
 import EventPresenter from "./EventPresenter";
+import PromoBanner from "@/components/PromoBanner";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -1057,6 +1058,9 @@ export default function EventDetailClient({ id }: { id: string }) {
 
     return (
       <div className="min-h-screen" style={{ backgroundColor: "#FCF9F2" }}>
+        {/* Slim giveaway strip — same click-to-open promo as the ticketed page. */}
+        <PromoBanner compact />
+
         {/* Hero — full-color, no live/urgency badges */}
         <div
           className="relative overflow-hidden"
@@ -1210,6 +1214,10 @@ export default function EventDetailClient({ id }: { id: string }) {
 
   return (
     <div className="min-h-screen" style={{ backgroundColor: "#FCF9F2" }}>
+      {/* Slim giveaway strip — the auto-popup is suppressed on ticket pages, so
+          the promo lives here as a click-to-open banner below the nav. */}
+      <PromoBanner compact />
+
       {/* ── Hero ── */}
       <div
         className="relative overflow-hidden"

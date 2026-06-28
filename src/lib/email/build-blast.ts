@@ -1,7 +1,25 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { marketingBlastEmail } from "./templates/marketingBlast";
 import { eventBlastEmail, type BlastTier, type BlastEventData, type EventBlastVariant } from "./templates/eventBlast";
+import { nearbyEventsEmail, type NearbyEventItem } from "./templates/nearbyEvents";
 import { EMAIL } from "./theme";
+
+// US state code → display name, for the "events near you in {state}" copy.
+const STATE_NAMES: Record<string, string> = {
+  AL: "Alabama", AK: "Alaska", AZ: "Arizona", AR: "Arkansas", CA: "California", CO: "Colorado",
+  CT: "Connecticut", DE: "Delaware", FL: "Florida", GA: "Georgia", HI: "Hawaii", ID: "Idaho",
+  IL: "Illinois", IN: "Indiana", IA: "Iowa", KS: "Kansas", KY: "Kentucky", LA: "Louisiana",
+  ME: "Maine", MD: "Maryland", MA: "Massachusetts", MI: "Michigan", MN: "Minnesota", MS: "Mississippi",
+  MO: "Missouri", MT: "Montana", NE: "Nebraska", NV: "Nevada", NH: "New Hampshire", NJ: "New Jersey",
+  NM: "New Mexico", NY: "New York", NC: "North Carolina", ND: "North Dakota", OH: "Ohio", OK: "Oklahoma",
+  OR: "Oregon", PA: "Pennsylvania", RI: "Rhode Island", SC: "South Carolina", SD: "South Dakota",
+  TN: "Tennessee", TX: "Texas", UT: "Utah", VT: "Vermont", VA: "Virginia", WA: "Washington",
+  WV: "West Virginia", WI: "Wisconsin", WY: "Wyoming", DC: "Washington, DC",
+};
+export const stateName = (code: string | null | undefined): string | null => {
+  const c = (code ?? "").trim().toUpperCase();
+  return c ? (STATE_NAMES[c] ?? c) : null;
+};
 
 // Template keys that map to the shared event-blast renderer (event required).
 const EVENT_BLAST_VARIANTS = new Set<string>(["tickets-live", "selling-fast", "final-call", "we-miss-you"]);
@@ -117,6 +135,12 @@ export function buildBlastEmail(opts: {
     return eventBlastEmail({ variant: templateKey as EventBlastVariant, recipientFirstName, event, unsubscribeUrl });
   }
 
+  if (templateKey === "nearby-events") {
+    // The send route resolves the per-recipient event set and calls
+    // buildNearbyEmail directly, so this path shouldn't normally hit. Fall back
+    // to the custom renderer defensively (e.g. a misconfigured preview).
+  }
+
   // Custom / fallback: free compose wrapped around an optional event card.
   return marketingBlastEmail({
     recipientFirstName,
@@ -131,5 +155,93 @@ export function buildBlastEmail(opts: {
         }
       : null,
     unsubscribeUrl,
+  });
+}
+
+// ── Location-aware ("events near each recipient") helpers ─────────────────────
+
+// A buyable upcoming event, distilled for per-recipient geo matching + the
+// nearby-events email card.
+export type GeoEvent = NearbyEventItem & { id: string; stateCode: string | null; startDate: string };
+
+// Loads every published, upcoming, on-sale event with at least one available
+// ticket tier (so we never promote a sold-out or coming-soon event), soonest
+// first. Used once per nearby-events blast and shared across all recipients.
+export async function loadUpcomingGeoEvents(supabase: SupabaseClient): Promise<GeoEvent[]> {
+  const today = new Date().toISOString().slice(0, 10);
+  const { data } = await supabase
+    .from("events")
+    .select("id, title, start_date, start_time, city, state, venue_name, metro_city, cover_image_url, selling_on_rameelo, ticket_tiers(price, quantity, quantity_sold, quantity_comped, sale_end_date, is_visible)")
+    .eq("status", "published")
+    .eq("selling_on_rameelo", true)
+    .gte("start_date", today)
+    .order("start_date", { ascending: true })
+    .limit(300);
+
+  const rows = (data ?? []) as unknown as {
+    id: string; title: string; start_date: string; start_time: string | null; city: string | null;
+    state: string | null; venue_name: string | null; metro_city: string | null; cover_image_url: string | null;
+    ticket_tiers: { price: number; quantity: number | null; quantity_sold: number | null; quantity_comped: number | null; sale_end_date: string | null; is_visible: boolean }[];
+  }[];
+
+  const out: GeoEvent[] = [];
+  for (const e of rows) {
+    const available = (e.ticket_tiers ?? [])
+      .filter(t => t.is_visible)
+      .map(t => {
+        const cap = t.quantity ?? null;
+        const used = (t.quantity_sold ?? 0) + (t.quantity_comped ?? 0);
+        return { price: Number(t.price), soldOut: cap != null && used >= cap, end: t.sale_end_date ?? e.start_date };
+      })
+      .filter(t => !t.soldOut && t.end >= today);
+    if (available.length === 0) continue; // nothing buyable → don't promote it
+
+    out.push({
+      id: e.id,
+      title: e.title,
+      metroCity: e.metro_city,
+      eventWhen: `${fmtDate(e.start_date)}${fmtTime(e.start_time) ? ` · ${fmtTime(e.start_time)}` : ""}`,
+      eventWhere: [e.venue_name, e.city, e.state].filter(Boolean).join(", "),
+      fromPrice: Math.min(...available.map(t => t.price)),
+      bannerUrl: e.cover_image_url,
+      url: `${EMAIL.site}/events/${e.id}`,
+      stateCode: (e.state ?? "").trim().toUpperCase() || null,
+      startDate: e.start_date,
+    });
+  }
+  return out;
+}
+
+// Picks the events to feature for one recipient: the soonest in their own state,
+// else the soonest nationally as a fallback so everyone still gets a relevant
+// nudge. Returns the items + the location label for the copy ("New Jersey" /
+// null → "near you").
+export function pickNearbyEvents(
+  events: GeoEvent[],
+  recipientState: string | null,
+  limit = 3
+): { items: NearbyEventItem[]; locationLabel: string | null } {
+  const st = (recipientState ?? "").trim().toUpperCase();
+  const inState = st ? events.filter(e => e.stateCode === st) : [];
+  const chosen = (inState.length ? inState : events).slice(0, limit);
+  return {
+    items: chosen.map(({ id: _id, stateCode: _s, startDate: _d, ...item }) => item),
+    locationLabel: inState.length ? stateName(st) : null,
+  };
+}
+
+// Builds the nearby-events email for a recipient given their featured events.
+export function buildNearbyEmail(opts: {
+  recipientFirstName: string | null;
+  items: NearbyEventItem[];
+  locationLabel: string | null;
+  unsubscribeUrl: string;
+}): { subject: string; html: string; text: string } {
+  return nearbyEventsEmail({
+    recipientFirstName: opts.recipientFirstName,
+    locationLabel: opts.locationLabel,
+    events: opts.items,
+    browseUrl: `${EMAIL.site}/events`,
+    unsubscribeUrl: opts.unsubscribeUrl,
   });
 }
