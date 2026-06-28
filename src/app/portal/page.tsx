@@ -8,6 +8,7 @@ import { getUser, type RameeloUser } from "@/lib/auth";
 import { loadMyOrders, loadMyPendingGroups, type PortalOrderRow, type PendingGroup } from "@/lib/group-orders";
 import { loadIncomingTransfers, type IncomingTransfer } from "@/lib/transfers";
 import OrganizerAccessBanner from "./OrganizerAccessBanner";
+import PortalPromoCard from "./PortalPromoCard";
 
 // Resolve an event's saved cover into a CSS background (image preferred, else gradient).
 function coverBg(coverImageUrl: string | null, coverGradient: string): string {
@@ -484,6 +485,9 @@ export default function PortalDashboard() {
           )}
         </div>
       </div>
+
+      {/* ── Giveaway (entered confirmation or one-tap join) ── */}
+      <PortalPromoCard />
 
       {/* ── Quick actions ── */}
       <QuickActions orderCount={orders.length} />
