@@ -32,7 +32,9 @@ export type BlastEventData = {
   metroCity?: string | null;
   bannerUrl?: string | null;
   url: string;
-  tiers: BlastTier[];
+  tiers: BlastTier[];                  // ACTIVE (available) tiers to list — sold-out
+                                       // tiers are summarized in soldOutTierNames
+  soldOutTierNames?: string[] | null;  // names of sold-out tiers, for a FOMO note
   fromPrice?: number | null;
   closeLabel?: string | null;       // date ALL ticket sales close (latest tier / event)
   closeDays?: number | null;        // whole days until that
@@ -167,7 +169,22 @@ export function eventBlastEmail(p: {
       <td align="right" style="padding:11px 16px;${i ? `border-top:1px solid ${C.ivory200};` : ""}font-family:${FONT_HEAD};font-size:14px;font-weight:800;color:${t.soldOut ? C.inkFaint : C.peacock};white-space:nowrap;">${t.soldOut ? "—" : money(t.price)}</td>
     </tr>`).join("");
   const tierTable = ev.tiers.length
-    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;background:${C.ivory};border:1px solid ${C.ivory200};border-radius:14px;overflow:hidden;">${tierRows}</table>`
+    ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 ${(ev.soldOutTierNames?.length && ev.tiers.some(t => !t.soldOut)) ? 8 : 14}px;background:${C.ivory};border:1px solid ${C.ivory200};border-radius:14px;overflow:hidden;">${tierRows}</table>`
+    : "";
+
+  // FOMO proof: when earlier tiers have sold out but active ones remain, name the
+  // sold-out tier(s) instead of listing their (no-longer-buyable) prices.
+  const soldOutNames = (ev.soldOutTierNames ?? []).filter(Boolean);
+  const hasActiveListed = ev.tiers.some(t => !t.soldOut);
+  const soldOutLabel = soldOutNames.length === 1
+    ? `${soldOutNames[0]} is sold out`
+    : soldOutNames.length === 2
+      ? `${soldOutNames[0]} & ${soldOutNames[1]} are sold out`
+      : soldOutNames.length > 2
+        ? `${soldOutNames.slice(0, -1).join(", ")} & ${soldOutNames[soldOutNames.length - 1]} are sold out`
+        : "";
+  const soldOutNote = soldOutNames.length && hasActiveListed
+    ? `<p style="margin:0 0 16px;font-family:${FONT_BODY};font-size:12.5px;font-weight:700;color:${C.durga};">🔥 ${soldOutLabel} — grab one of the tiers still available above before they're gone.</p>`
     : "";
 
   // Urgency callout — prefer the specific tier deadline (honest), else an overall
@@ -195,6 +212,7 @@ export function eventBlastEmail(p: {
     eventCard,
     ev.tiers.length ? sectionTitle("Ticket options") : "",
     tierTable,
+    soldOutNote,
     urgencyBlock,
     button(ev.url, v.cta),
     `<p style="margin:18px 0 0;font-family:${FONT_BODY};font-size:14px;line-height:1.6;color:${C.inkMuted};">${v.closing}</p>`,
@@ -223,6 +241,7 @@ export function eventBlastEmail(p: {
     "",
     ev.tiers.length ? "TICKET OPTIONS" : "",
     ...ev.tiers.map(t => `  ${t.name}: ${t.soldOut ? "Sold out" : money(t.price)}`),
+    soldOutNames.length && hasActiveListed ? `(${soldOutLabel} — grab one of the tiers still available.)` : "",
     "",
     urgencyText,
     "",
