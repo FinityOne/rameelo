@@ -13,22 +13,22 @@ export const metadata: Metadata = {
     "garba ticket missing",
     "update email on order",
   ],
-  alternates: { canonical: "https://rameelo.com/help/wrong-email" },
+  alternates: { canonical: "https://www.rameelo.com/help/wrong-email" },
   robots: { index: true, follow: true },
   openGraph: {
     title: "Can't find your tickets or used the wrong email?",
     description:
       "Find your garba tickets, or request an email correction if you mistyped your address at guest checkout.",
     type: "article",
-    url: "https://rameelo.com/help/wrong-email",
+    url: "https://www.rameelo.com/help/wrong-email",
     siteName: "Rameelo",
-    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo Help Center" }],
+    images: [{ url: "https://www.rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo Help Center" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Can't find your tickets or used the wrong email?",
     description: "Find your tickets, or request an email correction from Rameelo support.",
-    images: ["https://rameelo.com/og-default.jpg"],
+    images: ["https://www.rameelo.com/og-default.jpg"],
   },
 };
 
@@ -52,9 +52,9 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 
 export default function WrongEmailArticle() {
   const crumbs = breadcrumbSchema([
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "Help Center", url: "https://rameelo.com/help" },
-    { name: "Can't find your tickets / wrong email", url: "https://rameelo.com/help/wrong-email" },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "Help Center", url: "https://www.rameelo.com/help" },
+    { name: "Can't find your tickets / wrong email", url: "https://www.rameelo.com/help/wrong-email" },
   ]);
 
   const faq = faqSchema([

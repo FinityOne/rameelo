@@ -1,6 +1,12 @@
 import Link from "next/link";
 import { navLinks } from "@/lib/data";
 import Logo from "@/components/Logo";
+import { METROS, metroSlug } from "@/lib/metros";
+
+// Cities surfaced in the footer for internal linking / local SEO discovery.
+const FOOTER_CITIES = ["Edison", "New York", "Dallas", "Houston", "Atlanta", "Chicago", "San Jose", "Los Angeles", "Boston", "Seattle"]
+  .map((c) => METROS.find((m) => m.city === c))
+  .filter((m): m is (typeof METROS)[number] => !!m);
 
 export default function Footer() {
   const socials = [
@@ -42,6 +48,23 @@ export default function Footer() {
                   </svg>
                 </a>
               ))}
+            </div>
+
+            {/* Garba by city — local-SEO internal links */}
+            <div className="mt-8">
+              <h4 className="font-mono text-[10px] text-white/30 tracking-[0.12em] uppercase mb-3">
+                Garba events by city
+              </h4>
+              <div className="flex flex-wrap gap-x-3 gap-y-2 font-ui text-[13px]">
+                {FOOTER_CITIES.map((m) => (
+                  <Link key={m.city} href={`/garba-events/${metroSlug(m)}`} className="text-white/45 hover:text-white transition-colors">
+                    {m.city}
+                  </Link>
+                ))}
+                <Link href="/garba-events" className="text-marigold/80 hover:text-marigold font-semibold transition-colors">
+                  All cities →
+                </Link>
+              </div>
             </div>
           </div>
 

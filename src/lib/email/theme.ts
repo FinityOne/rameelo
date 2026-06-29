@@ -4,7 +4,7 @@
 // inline styles + table layouts are applied in layout.ts using these tokens.
 
 export const EMAIL = {
-  site: "https://rameelo.com",
+  site: "https://www.rameelo.com",
   // Sent from the verified Resend subdomain (mail.rameelo.com) so SPF/DKIM/DMARC
   // pass; replies route to support. Two From identities on the SAME verified domain:
   //  • from        — general/account mail (welcome, invites, password reset, …)
@@ -16,8 +16,8 @@ export const EMAIL = {
   replyTo: "support@rameelo.com",
   support: "support@rameelo.com",
   // Absolute, production-hosted assets (email clients can't use relative paths).
-  logoWhite: "https://rameelo.com/logo/rameelo-horizontal-white-transparent.png",
-  logoRed: "https://rameelo.com/logo/rameelo-horizontal-red-transparent.png",
+  logoWhite: "https://www.rameelo.com/logo/rameelo-horizontal-white-transparent.png",
+  logoRed: "https://www.rameelo.com/logo/rameelo-horizontal-red-transparent.png",
 } as const;
 
 // Brand palette (mirrors the app's design tokens in globals.css).

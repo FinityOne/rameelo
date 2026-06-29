@@ -266,7 +266,7 @@ export default function GroupLandingPage() {
 
   const shareUrl = typeof window !== "undefined"
     ? `${window.location.origin}/group/${groupId}`
-    : `https://rameelo.com/group/${groupId}`;
+    : `https://www.rameelo.com/group/${groupId}`;
 
   function copyLink() {
     navigator.clipboard.writeText(shareUrl).catch(() => {});

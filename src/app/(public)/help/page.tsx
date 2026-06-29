@@ -14,18 +14,18 @@ export const metadata: Metadata = {
     "rameelo support",
     "group order discount",
   ],
-  alternates: { canonical: "https://rameelo.com/help" },
+  alternates: { canonical: "https://www.rameelo.com/help" },
   robots: { index: true, follow: true },
   openGraph: {
     title: "Help Center — Rameelo",
     description:
       "Answers to common questions about garba tickets, group orders, refunds, and your Rameelo account.",
     type: "website",
-    url: "https://rameelo.com/help",
+    url: "https://www.rameelo.com/help",
     siteName: "Rameelo",
     images: [
       {
-        url: "https://rameelo.com/og-default.jpg",
+        url: "https://www.rameelo.com/og-default.jpg",
         width: 1200,
         height: 630,
         alt: "Rameelo Help Center",
@@ -36,7 +36,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Help Center — Rameelo",
     description: "Answers to common questions about garba tickets, group orders, and your account.",
-    images: ["https://rameelo.com/og-default.jpg"],
+    images: ["https://www.rameelo.com/og-default.jpg"],
   },
 };
 
@@ -322,8 +322,8 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 export default function HelpPage() {
   const crumbs = breadcrumbSchema([
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "Help Center", url: "https://rameelo.com/help" },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "Help Center", url: "https://www.rameelo.com/help" },
   ]);
 
   return (

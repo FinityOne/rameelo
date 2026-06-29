@@ -80,16 +80,16 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${data.team_name} | ${data.university_name} — Rameelo Collegiate`,
     description: desc,
     keywords: [data.team_name, data.university_name, "collegiate raas garba", "raas garba team", data.region, data.state],
-    alternates: { canonical: `https://rameelo.com/collegiate/${slug}` },
+    alternates: { canonical: `https://www.rameelo.com/collegiate/${slug}` },
     openGraph: {
       title: `${data.team_name} — ${data.university_name}`,
       description: desc,
       type: "profile",
-      url: `https://rameelo.com/collegiate/${slug}`,
+      url: `https://www.rameelo.com/collegiate/${slug}`,
       siteName: "Rameelo",
       images: data.cover_image_url
         ? [{ url: data.cover_image_url, width: 1200, height: 630, alt: data.team_name }]
-        : [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: data.team_name }],
+        : [{ url: "https://www.rameelo.com/og-default.jpg", width: 1200, height: 630, alt: data.team_name }],
     },
   };
 }
@@ -143,9 +143,9 @@ export default async function CollegiateTeamPage({ params }: Props) {
   ].filter(Boolean) as { label: string; url: string; icon: string }[];
 
   const crumbs = breadcrumbSchema([
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "Collegiate", url: "https://rameelo.com/collegiate" },
-    { name: team.team_name, url: `https://rameelo.com/collegiate/${slug}` },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "Collegiate", url: "https://www.rameelo.com/collegiate" },
+    { name: team.team_name, url: `https://www.rameelo.com/collegiate/${slug}` },
   ]);
 
   return (

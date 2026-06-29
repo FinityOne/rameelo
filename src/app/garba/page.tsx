@@ -6,21 +6,21 @@ export const metadata: Metadata = {
   title: "Rameelo — Garba & Navratri Events Across America",
   description:
     "One link to every garba night. Browse featured Raas Garba, Dandiya & Navratri events by city and grab your tickets in a tap.",
-  alternates: { canonical: "https://rameelo.com/garba" },
+  alternates: { canonical: "https://www.rameelo.com/garba" },
   robots: { index: true, follow: true },
   openGraph: {
     title: "Find your garba night — Rameelo",
     description: "Featured Raas Garba, Dandiya & Navratri events across the USA. Pick your city, grab tickets in a tap.",
     type: "website",
-    url: "https://rameelo.com/garba",
+    url: "https://www.rameelo.com/garba",
     siteName: "Rameelo",
-    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo — garba events across America" }],
+    images: [{ url: "https://www.rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo — garba events across America" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Find your garba night — Rameelo",
     description: "Featured garba & Navratri events across the USA. Pick your city, grab tickets in a tap.",
-    images: ["https://rameelo.com/og-default.jpg"],
+    images: ["https://www.rameelo.com/og-default.jpg"],
   },
 };
 

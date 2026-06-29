@@ -5,7 +5,7 @@ import { RELEASES, TAG_META, type AudienceTag } from "@/lib/changelog";
 export const metadata: Metadata = {
   title: "Changelog — What's New on Rameelo",
   description: "Every feature, improvement, and platform update released on Rameelo — organized by what matters to you: attendees, members, and organizers.",
-  alternates: { canonical: "https://rameelo.com/changelog" },
+  alternates: { canonical: "https://www.rameelo.com/changelog" },
 };
 
 function fmtDate(iso: string) {

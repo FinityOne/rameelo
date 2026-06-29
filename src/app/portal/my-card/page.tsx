@@ -561,7 +561,7 @@ export default function GarbaPassportPage() {
   const code        = memberCode(profile.id, profile.first_name, profile.last_name);
   const initials    = `${(profile.first_name[0] ?? "").toUpperCase()}${(profile.last_name[0] ?? "").toUpperCase()}`;
   const location    = [profile.city, profile.state].filter(Boolean).join(", ");
-  const referralUrl = `https://rameelo.com/join?ref=${code}`;
+  const referralUrl = `https://www.rameelo.com/join?ref=${code}`;
   const fullName    = `${profile.first_name} ${profile.last_name}`;
 
   const MIN_SLOTS  = 6;

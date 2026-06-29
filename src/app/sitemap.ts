@@ -1,9 +1,10 @@
 import type { MetadataRoute } from "next";
 import { BLOG_ARTICLES } from "@/lib/blog";
 import { RELEASES } from "@/lib/changelog";
+import { METROS, metroSlug } from "@/lib/metros";
 import { createClient } from "@/lib/supabase/server";
 
-const BASE = "https://rameelo.com";
+const BASE = "https://www.rameelo.com";
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const now = new Date().toISOString();
@@ -11,6 +12,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const staticPages: MetadataRoute.Sitemap = [
     { url: BASE,                    lastModified: now, changeFrequency: "daily",   priority: 1.0 },
     { url: `${BASE}/events`,        lastModified: now, changeFrequency: "daily",   priority: 0.95 },
+    { url: `${BASE}/garba-events`,  lastModified: now, changeFrequency: "daily",   priority: 0.92 },
     { url: `${BASE}/artists`,       lastModified: now, changeFrequency: "weekly",  priority: 0.9 },
     { url: `${BASE}/blog`,          lastModified: now, changeFrequency: "weekly",  priority: 0.85 },
     { url: `${BASE}/collegiate`,    lastModified: now, changeFrequency: "weekly",  priority: 0.85 },
@@ -35,6 +37,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     lastModified: new Date(r.date).toISOString(),
     changeFrequency: "monthly" as const,
     priority: 0.65,
+  }));
+
+  // City Garba landing pages — one per metro ("garba events near {city}").
+  const cityPages: MetadataRoute.Sitemap = METROS.map((m) => ({
+    url: `${BASE}/garba-events/${metroSlug(m)}`,
+    lastModified: now,
+    changeFrequency: "daily" as const,
+    priority: 0.85,
   }));
 
   let eventPages: MetadataRoute.Sitemap = [];
@@ -106,5 +116,5 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Silently skip DB pages if connection fails at build time
   }
 
-  return [...staticPages, ...blogPages, ...changelogPages, ...eventPages, ...artistPages, ...teamPages];
+  return [...staticPages, ...cityPages, ...blogPages, ...changelogPages, ...eventPages, ...artistPages, ...teamPages];
 }

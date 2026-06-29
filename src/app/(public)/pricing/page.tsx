@@ -7,20 +7,20 @@ export const metadata: Metadata = {
   title: "Pricing — Rameelo | Free for Organizers",
   description: "Rameelo is completely free for organizers — keep 100% of your ticket revenue. Buyers pay a 3% platform fee plus 5% card processing (8% by card); pay by bank transfer (ACH) to skip the card fee and pay just 3%.",
   keywords: ["garba ticketing pricing", "navratri event platform free", "organizer fees garba", "rameelo pricing", "free garba ticketing"],
-  alternates: { canonical: "https://rameelo.com/pricing" },
+  alternates: { canonical: "https://www.rameelo.com/pricing" },
   openGraph: {
     title: "Pricing — Rameelo | Free for Organizers",
     description: "Free for organizers. 3% platform fee + 5% card processing. Pay by bank transfer to skip the card fee.",
     type: "website",
-    url: "https://rameelo.com/pricing",
+    url: "https://www.rameelo.com/pricing",
     siteName: "Rameelo",
-    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo Organizer Pricing" }],
+    images: [{ url: "https://www.rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo Organizer Pricing" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Free for organizers — Rameelo Garba Platform",
     description: "No monthly fee. 3% platform fee + 5% card processing. Lower fees when buyers pay by bank transfer.",
-    images: ["https://rameelo.com/og-default.jpg"],
+    images: ["https://www.rameelo.com/og-default.jpg"],
   },
 };
 
@@ -72,11 +72,11 @@ const FAQS = [
 
 const pricingPage = webPageSchema({
   name: "Pricing — Rameelo | Free for Organizers",
-  url: "https://rameelo.com/pricing",
+  url: "https://www.rameelo.com/pricing",
   description: "Free for organizers. 3% flat platform fee. Zero buyer fees on bank transfers.",
   breadcrumbs: [
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "Pricing", url: "https://rameelo.com/pricing" },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "Pricing", url: "https://www.rameelo.com/pricing" },
   ],
 });
 const pricingFaq = faqSchema(FAQS.map(f => ({ question: f.q, answer: f.a })));

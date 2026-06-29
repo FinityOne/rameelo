@@ -8,20 +8,20 @@ export const metadata: Metadata = {
   title: "Garba Event Organizers — List Your Navratri Event on Rameelo",
   description: "Rameelo is the dedicated ticketing platform for raas garba and Navratri events in the USA. Group discounts, real-time analytics, ticket transfers, and a community that actually shows up. Built for garba organizers.",
   keywords: ["garba event organizer", "navratri ticketing platform", "sell garba tickets online", "raas garba events usa", "navratri event management", "garba ticket platform", "list garba event"],
-  alternates: { canonical: "https://rameelo.com/organizers" },
+  alternates: { canonical: "https://www.rameelo.com/organizers" },
   openGraph: {
     title: "Garba Event Organizers — List Your Navratri Event on Rameelo",
     description: "The dedicated ticketing platform for raas garba and Navratri events. Group discounts, analytics, and a community built for garba.",
     type: "website",
-    url: "https://rameelo.com/organizers",
+    url: "https://www.rameelo.com/organizers",
     siteName: "Rameelo",
-    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "List your Garba Event on Rameelo" }],
+    images: [{ url: "https://www.rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "List your Garba Event on Rameelo" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Garba Event Organizers — List on Rameelo",
     description: "The dedicated ticketing platform for garba and Navratri events. Group discounts, analytics, and community.",
-    images: ["https://rameelo.com/og-default.jpg"],
+    images: ["https://www.rameelo.com/og-default.jpg"],
   },
 };
 
@@ -225,11 +225,11 @@ function XCircle({ className }: { className?: string }) {
 
 const organizerPage = webPageSchema({
   name: "Garba Event Organizers — List Your Navratri Event on Rameelo",
-  url: "https://rameelo.com/organizers",
+  url: "https://www.rameelo.com/organizers",
   description: "Rameelo is the dedicated ticketing platform for raas garba and Navratri events in the USA.",
   breadcrumbs: [
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "For Organizers", url: "https://rameelo.com/organizers" },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "For Organizers", url: "https://www.rameelo.com/organizers" },
   ],
 });
 

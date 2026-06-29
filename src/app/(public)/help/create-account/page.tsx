@@ -13,22 +13,22 @@ export const metadata: Metadata = {
     "garba ticket account",
     "passwordless sign in rameelo",
   ],
-  alternates: { canonical: "https://rameelo.com/help/create-account" },
+  alternates: { canonical: "https://www.rameelo.com/help/create-account" },
   robots: { index: true, follow: true },
   openGraph: {
     title: "How to create a Rameelo account",
     description:
       "Create your free Rameelo account in under two minutes — no password, just your email and a 6-digit code.",
     type: "article",
-    url: "https://rameelo.com/help/create-account",
+    url: "https://www.rameelo.com/help/create-account",
     siteName: "Rameelo",
-    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo Help Center" }],
+    images: [{ url: "https://www.rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo Help Center" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "How to create a Rameelo account",
     description: "Create your free Rameelo account in under two minutes — no password required.",
-    images: ["https://rameelo.com/og-default.jpg"],
+    images: ["https://www.rameelo.com/og-default.jpg"],
   },
 };
 
@@ -52,9 +52,9 @@ function Step({ n, title, children }: { n: number; title: string; children: Reac
 
 export default function CreateAccountArticle() {
   const crumbs = breadcrumbSchema([
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "Help Center", url: "https://rameelo.com/help" },
-    { name: "How to create an account", url: "https://rameelo.com/help/create-account" },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "Help Center", url: "https://www.rameelo.com/help" },
+    { name: "How to create an account", url: "https://www.rameelo.com/help/create-account" },
   ]);
 
   const faq = faqSchema([

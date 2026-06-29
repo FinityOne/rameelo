@@ -1,4 +1,4 @@
-const BASE = "https://rameelo.com";
+const BASE = "https://www.rameelo.com";
 
 export function breadcrumbSchema(items: { name: string; url: string }[]) {
   return {

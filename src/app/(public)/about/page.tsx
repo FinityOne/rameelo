@@ -7,20 +7,20 @@ export const metadata: Metadata = {
   title: "About Rameelo — Built for Raas Garba in America",
   description: "Rameelo was built by and for the Gujarati diaspora — a ticketing platform that finally understands garba, dandiya raas, and Navratri. Learn about our mission and team.",
   keywords: ["rameelo about", "garba ticketing company", "gujarati diaspora platform", "navratri app usa", "garba event platform founders"],
-  alternates: { canonical: "https://rameelo.com/about" },
+  alternates: { canonical: "https://www.rameelo.com/about" },
   openGraph: {
     title: "About Rameelo — Built for Raas Garba in America",
     description: "A ticketing platform built by the garba community, for the garba community. Learn about our mission.",
     type: "website",
-    url: "https://rameelo.com/about",
+    url: "https://www.rameelo.com/about",
     siteName: "Rameelo",
-    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "About Rameelo" }],
+    images: [{ url: "https://www.rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "About Rameelo" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "About Rameelo — Built for Raas Garba in America",
     description: "A ticketing platform built by the garba community, for the garba community.",
-    images: ["https://rameelo.com/og-default.jpg"],
+    images: ["https://www.rameelo.com/og-default.jpg"],
   },
 };
 
@@ -73,11 +73,11 @@ const values = [
 
 const aboutPage = webPageSchema({
   name: "About Rameelo — Built for Raas Garba in America",
-  url: "https://rameelo.com/about",
+  url: "https://www.rameelo.com/about",
   description: "Rameelo was built by and for the Gujarati diaspora — a ticketing platform for garba, dandiya, and Navratri events.",
   breadcrumbs: [
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "About", url: "https://rameelo.com/about" },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "About", url: "https://www.rameelo.com/about" },
   ],
 });
 

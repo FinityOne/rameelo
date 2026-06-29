@@ -53,6 +53,27 @@ async function resolveArtistSlug(host: string): Promise<string | null> {
 }
 
 export async function proxy(request: NextRequest) {
+  // ── Artist page crawl-trap cleanup ──
+  // Search Console found thousands of /artists/<slug>?month=&year=... permutations
+  // (years 1990–2045) — leftover calendar links from the artists' old sites on
+  // now-redirected vanity domains. They're duplicate URLs of the clean artist
+  // page and bloat crawl budget. Permanently redirect any artist URL carrying a
+  // query param other than our own `via` (the official-site banner flag) — and
+  // any trailing slash — to the single clean canonical path, so Google indexes
+  // one URL per artist.
+  if (request.nextUrl.pathname.startsWith('/artists/')) {
+    const sp = request.nextUrl.searchParams
+    const hasForeignParam = [...sp.keys()].some((k) => k !== 'via')
+    const hasTrailingSlash = request.nextUrl.pathname.length > 1 && request.nextUrl.pathname.endsWith('/')
+    if (hasForeignParam || hasTrailingSlash) {
+      const url = request.nextUrl.clone()
+      url.pathname = url.pathname.replace(/\/+$/, '') || '/'
+      const via = sp.get('via')
+      url.search = via ? `?via=${encodeURIComponent(via)}` : ''
+      return NextResponse.redirect(url, 308)
+    }
+  }
+
   // ── Artist vanity-domain routing ──
   // When a custom artist domain points at this app, land its homepage on that
   // artist's page (deeper paths still work as the normal app).

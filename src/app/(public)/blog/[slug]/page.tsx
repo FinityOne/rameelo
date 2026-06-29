@@ -34,7 +34,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const override = await getBlogOverride(slug);
   const displayTitle = override.title || article.title;
   const description = metaDescription(article.excerpt);
-  const url = `https://rameelo.com/blog/${article.slug}`;
+  const url = `https://www.rameelo.com/blog/${article.slug}`;
   // og:image / twitter:image are supplied by the sibling opengraph-image.tsx
   // (one branded card per article) — so we don't set images here.
   return {
@@ -126,12 +126,12 @@ export default async function BlogArticlePage({ params }: Props) {
   const cityFilter = getArticleCityFilter(slug);
 
   const crumbs = breadcrumbSchema([
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "Blog", url: "https://rameelo.com/blog" },
-    { name: displayTitle, url: `https://rameelo.com/blog/${article.slug}` },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "Blog", url: "https://www.rameelo.com/blog" },
+    { name: displayTitle, url: `https://www.rameelo.com/blog/${article.slug}` },
   ]);
 
-  const articleUrl = `https://rameelo.com/blog/${article.slug}`;
+  const articleUrl = `https://www.rameelo.com/blog/${article.slug}`;
 
   const jsonLd = {
     "@context": "https://schema.org",
@@ -141,7 +141,7 @@ export default async function BlogArticlePage({ params }: Props) {
     "@id": articleUrl,
     "headline": displayTitle,
     "description": article.excerpt,
-    "image": coverImageUrl || "https://rameelo.com/og-default.jpg",
+    "image": coverImageUrl || "https://www.rameelo.com/og-default.jpg",
     "author": {
       "@type": "Person",
       "name": article.author,
@@ -150,8 +150,8 @@ export default async function BlogArticlePage({ params }: Props) {
     "publisher": {
       "@type": "Organization",
       "name": "Rameelo",
-      "url": "https://rameelo.com",
-      "logo": { "@type": "ImageObject", "url": "https://rameelo.com/logo/rameelo-icon-goldred.png" },
+      "url": "https://www.rameelo.com",
+      "logo": { "@type": "ImageObject", "url": "https://www.rameelo.com/logo/rameelo-icon-goldred.png" },
     },
     "datePublished": article.publishedAt,
     "dateModified": article.publishedAt,
@@ -160,7 +160,7 @@ export default async function BlogArticlePage({ params }: Props) {
     "articleSection": article.category,
     "wordCount": Math.round(article.body.replace(/<[^>]+>/g, " ").split(/\s+/).filter(Boolean).length),
     "inLanguage": "en-US",
-    "isPartOf": { "@type": "Blog", "name": "The Rameelo Review", "url": "https://rameelo.com/blog" },
+    "isPartOf": { "@type": "Blog", "name": "The Rameelo Review", "url": "https://www.rameelo.com/blog" },
     "mainEntityOfPage": { "@type": "WebPage", "@id": articleUrl },
   };
 
@@ -274,7 +274,7 @@ export default async function BlogArticlePage({ params }: Props) {
             <div className="mt-6 pt-6 border-t border-ivory-200 flex items-center gap-3 flex-wrap">
               <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Share this story</p>
               <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(displayTitle)}&url=${encodeURIComponent(`https://rameelo.com/blog/${article.slug}`)}`}
+                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(displayTitle)}&url=${encodeURIComponent(`https://www.rameelo.com/blog/${article.slug}`)}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full border border-ivory-200 font-ui text-xs text-ink-muted hover:text-ink hover:border-ink/20 transition-colors"
