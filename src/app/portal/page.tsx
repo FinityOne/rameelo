@@ -373,6 +373,16 @@ export default function PortalDashboard() {
   const hasTickets = orders.length > 0;
   const distinctGroups = new Set(orders.filter(o => o.groupId).map(o => o.groupId)).size;
 
+  // Dashboard "Your tickets" only surfaces events that haven't already happened:
+  // anything more than 24h past its start is hidden here (still available under
+  // "See all" / /portal/tickets). Soonest first so the next night is on top.
+  const PAST_GRACE_MS = 24 * 60 * 60 * 1000;
+  const eventStartMs = (o: PortalOrderRow) => new Date(`${o.eventDate}T${o.eventTime || "00:00"}`).getTime();
+  const activeOrders = orders
+    .filter(o => o.eventDate && eventStartMs(o) >= Date.now() - PAST_GRACE_MS)
+    .sort((a, b) => a.eventDate.localeCompare(b.eventDate) || (a.eventTime || "").localeCompare(b.eventTime || ""));
+  const hasActiveOrders = activeOrders.length > 0;
+
   return (
     <div className="max-w-5xl mx-auto space-y-6">
 
@@ -529,15 +539,24 @@ export default function PortalDashboard() {
                   </Link>
                 )}
               </div>
-              {!hasTickets ? (
+              {!hasActiveOrders ? (
                 <div className="rounded-2xl border border-ivory-200 bg-white p-6 text-center">
-                  <p className="font-display font-bold text-ink text-base mb-1">No tickets yet</p>
-                  <p className="font-ui text-xs text-ink-muted mb-4">Browse live events across the US — group discounts up to 15% off.</p>
-                  <Link href="/events" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-marigold text-aubergine font-semibold text-sm hover:bg-marigold-dark transition-all">Browse events →</Link>
+                  <p className="font-display font-bold text-ink text-base mb-1">{hasTickets ? "No upcoming events" : "No tickets yet"}</p>
+                  <p className="font-ui text-xs text-ink-muted mb-4">
+                    {hasTickets
+                      ? "Your past tickets are saved in your account. Find your next garba night below."
+                      : "Browse live events across the US — group discounts up to 15% off."}
+                  </p>
+                  <div className="flex items-center justify-center gap-2 flex-wrap">
+                    <Link href="/events" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-marigold text-aubergine font-semibold text-sm hover:bg-marigold-dark transition-all">Browse events →</Link>
+                    {hasTickets && (
+                      <Link href="/portal/tickets" className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-ivory-200 text-ink font-semibold text-sm hover:border-marigold/40 transition-all">View all tickets</Link>
+                    )}
+                  </div>
                 </div>
               ) : (
                 <div className="space-y-2.5">
-                  {orders.slice(0, 3).map(o => <TicketRow key={o.orderId} order={o} />)}
+                  {activeOrders.slice(0, 3).map(o => <TicketRow key={o.orderId} order={o} />)}
                 </div>
               )}
             </div>
