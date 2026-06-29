@@ -9,6 +9,7 @@ import PopularCities from "@/components/home/PopularCities";
 import { createClient } from "@/lib/supabase/server";
 import { getPlatformStats, compactNumber } from "@/lib/platform-stats";
 import { breadcrumbSchema, faqSchema, itemListSchema, ld } from "@/lib/jsonld";
+import { METROS, metroSlug } from "@/lib/metros";
 
 export const metadata: Metadata = {
   title: "Rameelo — America's Home for Raas Garba & Navratri Events",
@@ -297,6 +298,31 @@ export default async function HomePage() {
           POPULAR CITIES — skyline tiles (footer-level city directory)
       ══════════════════════════════════════════ */}
       <PopularCities />
+
+      {/* ══════════════════════════════════════════
+          GARBA BY CITY — crawlable internal links to local SEO landing pages
+      ══════════════════════════════════════════ */}
+      <section className="bg-white border-t border-ivory-200 py-14">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-end justify-between gap-4 mb-6 flex-wrap">
+            <div>
+              <Eyebrow>Find garba near you</Eyebrow>
+              <h2 className="font-display font-semibold text-ink mt-2" style={{ fontSize: "clamp(22px, 4vw, 32px)", letterSpacing: "-0.022em", lineHeight: 1.1 }}>
+                Garba &amp; Dandiya events by city
+              </h2>
+            </div>
+            <Link href="/garba-events" className="font-ui text-sm font-semibold text-aubergine hover:text-aubergine-light transition-colors">All cities →</Link>
+          </div>
+          <div className="flex flex-wrap gap-2.5">
+            {METROS.map((m) => (
+              <Link key={m.city} href={`/garba-events/${metroSlug(m)}`}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-ivory-200 bg-ivory/40 font-ui text-sm font-semibold text-ink hover:border-aubergine/30 hover:text-aubergine hover:bg-white transition-all">
+                Garba in {m.city}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
 
       </HomeCityProvider>
     </div>

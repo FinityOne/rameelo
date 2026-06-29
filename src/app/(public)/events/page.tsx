@@ -5,6 +5,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
 import { regionForState } from "@/lib/us-regions";
+import { METROS, metroSlug } from "@/lib/metros";
 
 type DBEvent = {
   id: string;
@@ -1026,6 +1027,27 @@ export default function EventsPage() {
           </div>
         </div>
       )}
+
+      {/* Browse Garba by city — internal links to local SEO landing pages */}
+      <section className="border-t border-ivory-200 bg-ivory/50 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex items-end justify-between gap-4 mb-5 flex-wrap">
+            <div>
+              <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1">Find garba near you</p>
+              <h2 className="font-display font-bold text-ink text-xl sm:text-2xl" style={{ letterSpacing: '-0.02em' }}>Browse Garba events by city</h2>
+            </div>
+            <Link href="/garba-events" className="font-ui text-sm font-semibold text-aubergine hover:text-aubergine-light transition-colors">All cities →</Link>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {METROS.map(m => (
+              <Link key={m.city} href={`/garba-events/${metroSlug(m)}`}
+                className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl border border-ivory-200 bg-white font-ui text-sm font-semibold text-ink hover:border-aubergine/30 hover:text-aubergine transition-all">
+                Garba in {m.city}
+              </Link>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* Gradient color key */}
       <section className="border-t border-ivory-200 py-12" style={{ backgroundColor: '#2E1B30' }}>
