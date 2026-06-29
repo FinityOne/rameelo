@@ -31,6 +31,27 @@ type Order = {
   combo_tickets: { name: string } | null;
 };
 
+// Aggregate totals over ALL of an event's orders (from get_organizer_event_order_stats),
+// so the header/tiles stay accurate while the row list is paginated.
+type OrderStats = {
+  total_orders: number;
+  confirmed_count: number;
+  refunded_count: number;
+  cancelled_count: number;
+  online_revenue: number;
+  online_tickets: number;
+  manual_revenue: number;
+  manual_tickets: number;
+  cancelled_revenue: number;
+};
+
+const EMPTY_STATS: OrderStats = {
+  total_orders: 0, confirmed_count: 0, refunded_count: 0, cancelled_count: 0,
+  online_revenue: 0, online_tickets: 0, manual_revenue: 0, manual_tickets: 0, cancelled_revenue: 0,
+};
+
+const PAGE_SIZE = 50;
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmtDate(d: string) {
@@ -207,41 +228,64 @@ export default function EventOrdersPage() {
   const { orgs } = useOrg();
 
   const [orders, setOrders]         = useState<Order[]>([]);
+  const [stats, setStats]           = useState<OrderStats>(EMPTY_STATS);
   const [accountEmails, setAccountEmails] = useState<Set<string>>(new Set());
   const [eventTitle, setEventTitle] = useState("");
-  const [loading, setLoading]       = useState(true);
+  const [loading, setLoading]       = useState(true);    // first paint
+  const [pageLoading, setPageLoading] = useState(false); // page / filter swaps
   const [filter, setFilter]         = useState<string>("all");
+  const [page, setPage]             = useState(0);
+  const [matchCount, setMatchCount] = useState(0);        // rows matching the active filter
   const [cancelTarget, setCancelTarget] = useState<Order | null>(null);
   const [cancelSaving, setCancelSaving] = useState(false);
 
-  const load = useCallback(async () => {
+  // Event title + aggregate stats + buyer-account emails. Loaded once, independent
+  // of the page, so the header totals/tiles reflect ALL orders — not just the page
+  // on screen. Aggregates come from a DB function so we never pull every row.
+  const loadMeta = useCallback(async () => {
     const supabase = createClient();
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
-
-    const [evRes, ordRes] = await Promise.all([
+    const [evRes, statsRes, acctRes] = await Promise.all([
       supabase.from("events").select("title").eq("id", id).or(eventAccessOrFilter(user.id, orgs.map(o => o.id))).maybeSingle(),
-      supabase.from("orders")
-        .select("id, user_id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_amount, service_fee, grand_total, status, order_type, created_at, group_id, cancellation_reason, cancelled_at, ticket_tiers(name), combo_tickets(name)")
-        .eq("event_id", id)
-        .eq("is_test", false)
-        // Only paid orders — exclude `pending` (unpaid checkout attempts awaiting
-        // the payment webhook) so organizers aren't confused by unpaid orders.
-        .neq("status", "pending")
-        .order("created_at", { ascending: false }),
+      supabase.rpc("get_organizer_event_order_stats", { p_event_id: id }),
+      // Flag which buyers have a Rameelo account (incl. guests who signed up later).
+      supabase.rpc("get_event_buyer_account_emails", { p_event_id: id }),
     ]);
-
     if (!evRes.data) { router.replace("/organizer/events"); return; }
     setEventTitle(evRes.data.title);
-    setOrders((ordRes.data ?? []) as unknown as Order[]);
-    setLoading(false);
-
-    // Flag which buyers have a Rameelo account (incl. guests who signed up later).
-    const { data: acctEmails } = await supabase.rpc("get_event_buyer_account_emails", { p_event_id: id });
-    setAccountEmails(new Set(((acctEmails ?? []) as string[]).map(e => e.toLowerCase())));
+    setStats({ ...EMPTY_STATS, ...((statsRes.data as Partial<OrderStats> | null) ?? {}) });
+    setAccountEmails(new Set(((acctRes.data ?? []) as string[]).map(e => e.toLowerCase())));
   }, [id, router, orgs]);
 
-  useEffect(() => { load(); }, [load]);
+  // One page of detailed orders for the active filter. Paginated server-side so a
+  // sold-out event with thousands of orders stays fast to load and render.
+  const loadPage = useCallback(async () => {
+    setPageLoading(true);
+    const supabase = createClient();
+    const from = page * PAGE_SIZE;
+    let q = supabase.from("orders")
+      .select("id, user_id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_amount, service_fee, grand_total, status, order_type, created_at, group_id, cancellation_reason, cancelled_at, ticket_tiers(name), combo_tickets(name)", { count: "exact" })
+      .eq("event_id", id)
+      .eq("is_test", false)
+      // Only paid orders — exclude `pending` (unpaid checkout attempts awaiting
+      // the payment webhook) so organizers aren't confused by unpaid orders.
+      .neq("status", "pending")
+      .order("created_at", { ascending: false })
+      .range(from, from + PAGE_SIZE - 1);
+    if (filter !== "all") q = q.eq("status", filter);
+    const { data, count } = await q;
+    setOrders((data ?? []) as unknown as Order[]);
+    setMatchCount(count ?? 0);
+    setPageLoading(false);
+    setLoading(false);
+  }, [id, filter, page]);
+
+  useEffect(() => { loadMeta(); }, [loadMeta]);
+  useEffect(() => { loadPage(); }, [loadPage]);
+
+  // Switching filter always resets to the first page.
+  function changeFilter(f: string) { setFilter(f); setPage(0); }
 
   async function handleCancel(reason: string) {
     if (!cancelTarget) return;
@@ -256,29 +300,28 @@ export default function EventOrdersPage() {
       cancelled_by: user?.id ?? null,
     }).eq("id", cancelTarget.id);
 
-    // Optimistically update local state
-    setOrders(prev => prev.map(o =>
-      o.id === cancelTarget.id
-        ? { ...o, status: "cancelled", cancellation_reason: reason, cancelled_at: new Date().toISOString() }
-        : o
-    ));
-
     setCancelSaving(false);
     setCancelTarget(null);
+    // Refresh the aggregate totals and the current page (the order may leave the
+    // active filter, and revenue/counts shift).
+    await Promise.all([loadMeta(), loadPage()]);
   }
 
-  const filtered = filter === "all" ? orders : orders.filter(o => o.status === filter);
+  // Header/tile figures come from the server-side aggregate (all orders); the row
+  // list below is just the current page.
+  const totalRevenue = stats.online_revenue;
+  const totalTickets = stats.online_tickets;
+  const manualRevenue = stats.manual_revenue;
+  const manualTickets = stats.manual_tickets;
+  const cancelledCount = stats.cancelled_count;
+  const cancelledRevenue = stats.cancelled_revenue;
+  const hasManual = stats.manual_tickets > 0;
 
-  const confirmedOrders = orders.filter(o => o.status === "confirmed");
-  // Online (Rameelo-collected) totals exclude manual/offline orders, which are shown separately.
-  const onlineConfirmed = confirmedOrders.filter(o => o.order_type !== "manual");
-  const manualConfirmed = confirmedOrders.filter(o => o.order_type === "manual");
-  const totalRevenue = onlineConfirmed.reduce((s, o) => s + o.grand_total, 0);
-  const totalTickets = onlineConfirmed.reduce((s, o) => s + o.qty, 0);
-  const manualRevenue = manualConfirmed.reduce((s, o) => s + o.grand_total, 0);
-  const manualTickets = manualConfirmed.reduce((s, o) => s + o.qty, 0);
-  const cancelledCount = orders.filter(o => o.status === "cancelled").length;
-  const cancelledRevenue = orders.filter(o => o.status === "cancelled").reduce((s, o) => s + o.grand_total, 0);
+  // Pagination window for the active filter.
+  const pageStart = matchCount === 0 ? 0 : page * PAGE_SIZE + 1;
+  const pageEnd = Math.min(matchCount, (page + 1) * PAGE_SIZE);
+  const hasPrev = page > 0;
+  const hasNext = pageEnd < matchCount;
 
   if (loading) {
     return (
@@ -321,9 +364,9 @@ export default function EventOrdersPage() {
             <div>
               <h1 className="font-display font-bold text-ink text-xl" style={{ letterSpacing: "-0.02em" }}>All Orders</h1>
               <p className="font-ui text-sm text-ink-muted mt-0.5">
-                {orders.length} order{orders.length !== 1 ? "s" : ""} · {totalTickets} tickets · ${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} online revenue
+                {stats.total_orders} order{stats.total_orders !== 1 ? "s" : ""} · {totalTickets} tickets · ${totalRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} online revenue
               </p>
-              {manualConfirmed.length > 0 && (
+              {hasManual && (
                 <p className="font-ui text-xs text-marigold-dark mt-0.5">
                   + {manualTickets} ticket{manualTickets !== 1 ? "s" : ""} · ${manualRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} manual / offline (settled by you)
                 </p>
@@ -361,7 +404,7 @@ export default function EventOrdersPage() {
             <p className="font-ui text-sm text-ink-muted">
               <span className="font-semibold text-ink">{cancelledCount} cancelled order{cancelledCount !== 1 ? "s" : ""}</span>
               {" "}(${cancelledRevenue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} removed from revenue) ·{" "}
-              <button onClick={() => setFilter("cancelled")} className="text-aubergine font-semibold hover:underline">
+              <button onClick={() => changeFilter("cancelled")} className="text-aubergine font-semibold hover:underline">
                 View
               </button>
             </p>
@@ -369,16 +412,16 @@ export default function EventOrdersPage() {
         )}
 
         {/* Summary tiles */}
-        {orders.length > 0 && (
+        {stats.total_orders > 0 && (
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: "Confirmed", count: orders.filter(o => o.status === "confirmed").length, cls: "text-peacock" },
-              { label: "Refunded",  count: orders.filter(o => o.status === "refunded").length,  cls: "text-durga" },
-              { label: "Cancelled", count: cancelledCount,                                       cls: "text-ink-muted" },
+              { label: "Confirmed", count: stats.confirmed_count, cls: "text-peacock" },
+              { label: "Refunded",  count: stats.refunded_count,  cls: "text-durga" },
+              { label: "Cancelled", count: cancelledCount,        cls: "text-ink-muted" },
             ].map(tile => (
               <button
                 key={tile.label}
-                onClick={() => setFilter(filter === tile.label.toLowerCase() ? "all" : tile.label.toLowerCase())}
+                onClick={() => changeFilter(filter === tile.label.toLowerCase() ? "all" : tile.label.toLowerCase())}
                 className={`bg-white rounded-2xl border px-4 py-3.5 text-left transition-all ${
                   filter === tile.label.toLowerCase() ? "border-aubergine shadow-sm" : "border-ivory-200 hover:border-aubergine/25"
                 }`}
@@ -391,32 +434,32 @@ export default function EventOrdersPage() {
         )}
 
         {/* Filter bar */}
-        {orders.length > 0 && (
+        {stats.total_orders > 0 && (
           <div className="flex items-center gap-1 bg-ivory-200 rounded-xl p-1 w-fit">
             {["all", "confirmed", "refunded", "cancelled"].map(f => (
-              <button key={f} onClick={() => setFilter(f)}
+              <button key={f} onClick={() => changeFilter(f)}
                 className={`px-3 py-1.5 rounded-lg font-ui text-xs font-semibold capitalize transition-all ${
                   filter === f ? "bg-white text-ink shadow-sm" : "text-ink-muted hover:text-ink"
                 }`}>
-                {f === "all" ? `All (${orders.length})` : f}
+                {f === "all" ? `All (${stats.total_orders})` : f}
               </button>
             ))}
           </div>
         )}
 
         {/* Table */}
-        {filtered.length === 0 ? (
+        {orders.length === 0 ? (
           <div className="bg-white rounded-2xl border-2 border-dashed border-ivory-200 p-16 text-center">
             <p className="text-4xl mb-3">🧾</p>
             <p className="font-display font-semibold text-ink text-lg mb-1" style={{ letterSpacing: "-0.015em" }}>
-              {orders.length === 0 ? "No orders yet" : `No ${filter} orders`}
+              {stats.total_orders === 0 ? "No orders yet" : `No ${filter} orders`}
             </p>
             <p className="font-ui text-sm text-ink-muted">
-              {orders.length === 0 ? "Orders will appear here as attendees purchase tickets." : "Try a different filter."}
+              {stats.total_orders === 0 ? "Orders will appear here as attendees purchase tickets." : "Try a different filter."}
             </p>
           </div>
         ) : (
-          <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+          <div className={`bg-white rounded-2xl border border-ivory-200 overflow-hidden transition-opacity ${pageLoading ? "opacity-50" : ""}`}>
 
             {/* Desktop table */}
             <div className="hidden sm:block overflow-x-auto">
@@ -434,7 +477,7 @@ export default function EventOrdersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-ivory-200">
-                  {filtered.map(order => {
+                  {orders.map(order => {
                     const s = ORDER_STATUS[order.status] ?? ORDER_STATUS.confirmed;
                     const isCancelled = order.status === "cancelled";
                     return (
@@ -530,7 +573,7 @@ export default function EventOrdersPage() {
 
             {/* Mobile cards */}
             <div className="sm:hidden divide-y divide-ivory-200">
-              {filtered.map(order => {
+              {orders.map(order => {
                 const s = ORDER_STATUS[order.status] ?? ORDER_STATUS.confirmed;
                 const isCancelled = order.status === "cancelled";
                 return (
@@ -567,6 +610,33 @@ export default function EventOrdersPage() {
                 );
               })}
             </div>
+
+            {/* Pagination */}
+            {matchCount > PAGE_SIZE && (
+              <div className="flex items-center justify-between gap-3 px-5 py-3 border-t border-ivory-200 bg-ivory">
+                <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">
+                  {pageStart}–{pageEnd} of {matchCount}
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setPage(p => Math.max(0, p - 1))}
+                    disabled={!hasPrev || pageLoading}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-ivory-200 bg-white font-ui text-xs font-semibold text-ink hover:border-aubergine/30 transition-all disabled:opacity-40 disabled:hover:border-ivory-200"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+                    Prev
+                  </button>
+                  <button
+                    onClick={() => { if (hasNext) setPage(p => p + 1); }}
+                    disabled={!hasNext || pageLoading}
+                    className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-ivory-200 bg-white font-ui text-xs font-semibold text-ink hover:border-aubergine/30 transition-all disabled:opacity-40 disabled:hover:border-ivory-200"
+                  >
+                    Next
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         )}
       </div>

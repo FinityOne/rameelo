@@ -31,8 +31,10 @@ export function orderTeamNotificationEmail(p: {
   const buyer = (p.buyerFirstName ?? "").trim() || "Someone";
   const artist = (p.artistName ?? "").trim();
   const ticketWord = p.qty === 1 ? "ticket" : "tickets";
-  const isAch = (p.paymentMethod ?? "").toLowerCase() === "ach";
-  const payLabel = isAch ? "Bank transfer (ACH)" : "Credit / Debit card";
+  const method = (p.paymentMethod ?? "").toLowerCase();
+  const isAch = method === "ach";
+  const isManual = method === "manual";
+  const payLabel = isManual ? "Manual / offline" : isAch ? "Bank transfer (ACH)" : "Credit / Debit card";
   const discount = Math.max(0, Number(p.discountAmount) || 0);
   // Consistent, scannable subject: who · how many · which event.
   const subject = `🎟️ ${buyer} ordered ${p.qty} ${ticketWord} — ${p.eventTitle}`;
@@ -65,7 +67,7 @@ export function orderTeamNotificationEmail(p: {
         <tr><td colspan="2" style="border-top:1px solid ${C.ivory200};padding-top:2px;"></td></tr>
         ${row("Ticket revenue", `$${money(p.faceValue)}`, { strong: true })}
       </table>
-      <p style="margin:8px 0 0;font-family:${FONT_BODY};font-size:11px;line-height:1.5;color:${C.inkMuted};">Ticket face value — your revenue. Rameelo &amp; card fees are paid by the buyer and aren&rsquo;t deducted from this.</p>
+      <p style="margin:8px 0 0;font-family:${FONT_BODY};font-size:11px;line-height:1.5;color:${C.inkMuted};">${isManual ? "Manual / offline order — you collected this payment directly. It isn&rsquo;t processed through Rameelo, and there are no Rameelo or card fees." : "Ticket face value — your revenue. Rameelo &amp; card fees are paid by the buyer and aren&rsquo;t deducted from this."}</p>
     </td></tr></table>`;
 
   // ACH orders settle over a few days — make clear the tickets aren't valid yet.
@@ -117,7 +119,9 @@ export function orderTeamNotificationEmail(p: {
     discount > 0 ? `  Discount: -$${money(discount)}` : "",
     `  Payment: ${payLabel}`,
     `  Ticket revenue (face value): $${money(p.faceValue)}`,
-    "  (Rameelo & card fees are paid by the buyer — not deducted from your revenue.)",
+    isManual
+      ? "  (Manual / offline order — collected directly by you, not processed through Rameelo.)"
+      : "  (Rameelo & card fees are paid by the buyer — not deducted from your revenue.)",
     "",
     isAch
       ? "NOTE: Paid by bank transfer (ACH). Payments take 2-5 business days to clear, and QR codes are NOT issued until the payment settles — the tickets stay reserved and won't scan at the door until the funds clear.\n"
