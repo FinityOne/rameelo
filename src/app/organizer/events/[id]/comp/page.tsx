@@ -6,6 +6,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { lookupUserByEmail, type UserLookup } from "@/lib/transfers";
 import { compEventTickets } from "@/lib/comps";
+import { useOrg } from "../../../org-context";
+import { eventAccessOrFilter } from "@/lib/organizer-access";
 import EventSubnav from "../EventSubnav";
 
 type Tier = { id: string; name: string; price: number; quantity: number; quantity_sold: number };
@@ -25,6 +27,7 @@ const EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 export default function CompTicketsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { orgs } = useOrg();
 
   const [ev, setEv] = useState<EventData | null>(null);
   const [comps, setComps] = useState<CompOrder[]>([]);
@@ -56,8 +59,8 @@ export default function CompTicketsPage() {
         .from("events")
         .select("id, title, status, cover_image_url, ticket_tiers(id, name, price, quantity, quantity_sold)")
         .eq("id", id)
-        .eq("organizer_id", user.id)
-        .single(),
+        .or(eventAccessOrFilter(user.id, orgs.map(o => o.id)))
+        .maybeSingle(),
       supabase
         .from("orders")
         .select("id, buyer_name, buyer_email, buyer_phone, qty, user_id, comp_note, created_at, ticket_tiers(name)")
@@ -75,7 +78,7 @@ export default function CompTicketsPage() {
     const firstAvail = e.ticket_tiers.find(t => t.quantity - t.quantity_sold > 0) ?? e.ticket_tiers[0];
     setTierId(prev => prev || firstAvail?.id || "");
     setLoading(false);
-  }, [id, router]);
+  }, [id, router, orgs]);
 
   useEffect(() => { load(); }, [load]);
 

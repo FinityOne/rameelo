@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "../create/types";
+import { useOrg } from "../../org-context";
+import { eventAccessOrFilter } from "@/lib/organizer-access";
 import EventSubnav from "./EventSubnav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -172,6 +174,7 @@ function RadialRing({ pct, size = 48, stroke = 4.5, color = "#0E8C7A" }: {
 export default function EventDashboardPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { orgs } = useOrg();
 
   const [ev, setEv]                   = useState<EventData | null>(null);
   const [recentOrders, setRecentOrders] = useState<Order[]>([]);
@@ -193,8 +196,8 @@ export default function EventDashboardPage() {
           .from("events")
           .select("id, title, category, artist, description, start_date, end_date, start_time, end_time, doors_open_time, is_multi_day, venue_name, address_line1, address_line2, city, state, zip, status, selling_on_rameelo, review_note, cover_image_url, cover_gradient, capacity, ticket_tiers(id, name, price, quantity, quantity_sold, quantity_comped)")
           .eq("id", id)
-          .eq("organizer_id", user.id)
-          .single(),
+          .or(eventAccessOrFilter(user.id, orgs.map(o => o.id)))
+          .maybeSingle(),
 
         supabase
           .from("orders")
@@ -253,7 +256,7 @@ export default function EventDashboardPage() {
       setLoading(false);
     }
     load();
-  }, [id, router]);
+  }, [id, router, orgs]);
 
   if (loading) {
     return (

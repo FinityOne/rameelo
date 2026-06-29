@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "../../../org-context";
+import { eventAccessOrFilter } from "@/lib/organizer-access";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type Row = {
@@ -41,6 +43,7 @@ function fmtEventDate(d: string, t: string | null) {
 export default function CheckinSheetPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { orgs } = useOrg();
 
   const [event, setEvent] = useState<EventInfo | null>(null);
   const [rows, setRows] = useState<Array<Row & { first: string; last: string }>>([]);
@@ -52,7 +55,7 @@ export default function CheckinSheetPage() {
     if (!user) return;
 
     const [evRes, ordRes] = await Promise.all([
-      supabase.from("events").select("title, start_date, start_time, venue_name, city, state").eq("id", id).eq("organizer_id", user.id).single(),
+      supabase.from("events").select("title, start_date, start_time, venue_name, city, state").eq("id", id).or(eventAccessOrFilter(user.id, orgs.map(o => o.id))).maybeSingle(),
       supabase.from("orders")
         .select("id, buyer_name, qty, created_at, order_type, ticket_tiers(name), combo_tickets(name)")
         .eq("event_id", id)
@@ -74,7 +77,7 @@ export default function CheckinSheetPage() {
     );
     setRows(list);
     setLoading(false);
-  }, [id, router]);
+  }, [id, router, orgs]);
 
   useEffect(() => { load(); }, [load]);
 

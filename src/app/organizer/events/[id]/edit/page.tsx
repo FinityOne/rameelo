@@ -5,6 +5,8 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "../../create/types";
+import { useOrg } from "../../../org-context";
+import { eventAccessOrFilter } from "@/lib/organizer-access";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -330,6 +332,7 @@ function TierCard({ tier, idx, onChange }: {
 export default function OrganizerEventEditPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { orgs } = useOrg();
   const coverInputRef = useRef<HTMLInputElement>(null);
 
   const [ev, setEv]               = useState<EventData | null>(null);
@@ -363,8 +366,8 @@ export default function OrganizerEventEditPage() {
             capacity, status, review_note, org_id
           `)
           .eq("id", id)
-          .eq("organizer_id", user.id)
-          .single(),
+          .or(eventAccessOrFilter(user.id, orgs.map(o => o.id)))
+          .maybeSingle(),
         supabase
           .from("organization_members")
           .select("organizations (id, name)")
@@ -412,7 +415,7 @@ export default function OrganizerEventEditPage() {
       setLoading(false);
     }
     load();
-  }, [id, router]);
+  }, [id, router, orgs]);
 
   function patchEv(patch: Partial<EventData>) {
     setEv(prev => prev ? { ...prev, ...patch } : prev);

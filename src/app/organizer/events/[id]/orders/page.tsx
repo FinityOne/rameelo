@@ -4,6 +4,8 @@ import { useEffect, useState, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "../../../org-context";
+import { eventAccessOrFilter } from "@/lib/organizer-access";
 import EventSubnav from "../EventSubnav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -202,6 +204,7 @@ function CancelOrderModal({
 export default function EventOrdersPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { orgs } = useOrg();
 
   const [orders, setOrders]         = useState<Order[]>([]);
   const [accountEmails, setAccountEmails] = useState<Set<string>>(new Set());
@@ -217,7 +220,7 @@ export default function EventOrdersPage() {
     if (!user) return;
 
     const [evRes, ordRes] = await Promise.all([
-      supabase.from("events").select("title").eq("id", id).eq("organizer_id", user.id).single(),
+      supabase.from("events").select("title").eq("id", id).or(eventAccessOrFilter(user.id, orgs.map(o => o.id))).maybeSingle(),
       supabase.from("orders")
         .select("id, user_id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_amount, service_fee, grand_total, status, order_type, created_at, group_id, cancellation_reason, cancelled_at, ticket_tiers(name), combo_tickets(name)")
         .eq("event_id", id)
@@ -236,7 +239,7 @@ export default function EventOrdersPage() {
     // Flag which buyers have a Rameelo account (incl. guests who signed up later).
     const { data: acctEmails } = await supabase.rpc("get_event_buyer_account_emails", { p_event_id: id });
     setAccountEmails(new Set(((acctEmails ?? []) as string[]).map(e => e.toLowerCase())));
-  }, [id, router]);
+  }, [id, router, orgs]);
 
   useEffect(() => { load(); }, [load]);
 

@@ -6,6 +6,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { lookupUserByEmail, type UserLookup } from "@/lib/transfers";
 import { createManualOrder } from "@/lib/manual-orders";
+import { useOrg } from "../../../org-context";
+import { eventAccessOrFilter } from "@/lib/organizer-access";
 import EventSubnav from "../EventSubnav";
 
 type Tier = { id: string; name: string; price: number };
@@ -17,6 +19,7 @@ function money(n: number) { return Number(n).toLocaleString(undefined, { minimum
 export default function ManualOrderPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { orgs } = useOrg();
 
   const [ev, setEv] = useState<EventData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,14 +51,14 @@ export default function ManualOrderPage() {
       .from("events")
       .select("id, title, status, ticket_tiers(id, name, price)")
       .eq("id", id)
-      .eq("organizer_id", user.id)
-      .single();
+      .or(eventAccessOrFilter(user.id, orgs.map(o => o.id)))
+      .maybeSingle();
     if (!data) { router.replace("/organizer/events"); return; }
     const e = data as unknown as EventData;
     setEv(e);
     setTierId(prev => prev || e.ticket_tiers[0]?.id || "");
     setLoading(false);
-  }, [id, router]);
+  }, [id, router, orgs]);
 
   useEffect(() => { load(); }, [load]);
 
