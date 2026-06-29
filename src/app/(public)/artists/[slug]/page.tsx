@@ -267,74 +267,80 @@ function EventRow({ event, heroColor, past = false }: { event: EventRow; heroCol
   return (
     <Link
       href={`/events/${event.id}`}
-      className={`group flex items-stretch gap-4 sm:gap-5 py-4 transition-colors ${past ? "opacity-70 hover:opacity-100" : ""}`}
+      className={`group flex flex-col sm:flex-row sm:items-stretch gap-3 sm:gap-5 py-4 transition-colors ${past ? "opacity-70 hover:opacity-100" : ""}`}
     >
-      {/* Date tile + event image (gradient fallback) */}
-      <div className="relative h-16 sm:h-[72px] w-[88px] sm:w-36 rounded-lg overflow-hidden shrink-0 self-center flex">
-        <div
-          className="w-12 sm:w-14 h-full flex flex-col items-center justify-center shrink-0 text-white z-10"
-          style={{ backgroundColor: past ? "#9ca3af" : heroColor }}
-        >
-          <p className="font-mono text-[9px] uppercase tracking-widest opacity-75">{date.month}</p>
-          <p className="font-display font-bold text-xl sm:text-2xl leading-none">{date.day}</p>
-          <p className="font-mono text-[8px] uppercase tracking-widest opacity-60 mt-0.5">{date.weekday}</p>
+      {/* Top: date tile + event image + details (always a row) */}
+      <div className="flex items-center gap-4 min-w-0 sm:flex-1">
+        {/* Date tile + event image (gradient fallback) */}
+        <div className="relative h-16 sm:h-[72px] w-[84px] sm:w-36 rounded-lg overflow-hidden shrink-0 flex">
+          <div
+            className="w-12 sm:w-14 h-full flex flex-col items-center justify-center shrink-0 text-white z-10"
+            style={{ backgroundColor: past ? "#9ca3af" : heroColor }}
+          >
+            <p className="font-mono text-[9px] uppercase tracking-widest opacity-75">{date.month}</p>
+            <p className="font-display font-bold text-xl sm:text-2xl leading-none">{date.day}</p>
+            <p className="font-mono text-[8px] uppercase tracking-widest opacity-60 mt-0.5">{date.weekday}</p>
+          </div>
+          <div className="flex-1 h-full relative">
+            {event.cover_image_url ? (
+              <img src={event.cover_image_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
+            ) : (
+              <div className="absolute inset-0" style={{ background: eventGradient }} />
+            )}
+          </div>
         </div>
-        <div className="flex-1 h-full relative">
-          {event.cover_image_url ? (
-            <img src={event.cover_image_url} alt={event.title} className="absolute inset-0 w-full h-full object-cover" />
-          ) : (
-            <div className="absolute inset-0" style={{ background: eventGradient }} />
+
+        {/* Details */}
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          {featured && (
+            <span className="inline-flex items-center w-fit mb-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-marigold-dark bg-marigold/15 border border-marigold/30 px-2 py-0.5 rounded-md">
+              Featured Event
+            </span>
           )}
+          <h3 className="font-display font-bold text-ink text-base sm:text-lg leading-tight group-hover:text-aubergine transition-colors truncate">
+            {event.title}
+          </h3>
+          <div className="mt-1.5 space-y-1">
+            {event.venue_name && (
+              <p className="flex items-center gap-1.5 font-ui text-xs sm:text-sm font-medium text-ink truncate">
+                {/* fa-location-dot */}
+                <svg className="w-3.5 h-3.5 text-aubergine shrink-0" fill="currentColor" viewBox="0 0 384 512"><path d="M215.7 499.2C267 435 384 279.4 384 192 384 86 298 0 192 0S0 86 0 192c0 87.4 117 243 168.3 307.2 12.3 15.3 35.1 15.3 47.4 0zM192 128a64 64 0 110 128 64 64 0 110-128z" /></svg>
+                <span className="truncate">{event.venue_name}</span>
+              </p>
+            )}
+            {cityState && (
+              <p className="flex items-center gap-1.5 font-ui text-xs sm:text-sm font-medium text-ink-muted min-w-0">
+                {/* fa-map-pin */}
+                <svg className="w-3.5 h-3.5 text-durga shrink-0" fill="currentColor" viewBox="0 0 320 512"><path d="M112 316.9V456c0 30.9 21.5 56 48 56s48-25.1 48-56V316.9c54.7-15.6 96-69.3 96-132.9C352 82.5 273.5 0 176 0S0 82.5 0 184c0 63.6 41.3 117.3 96 132.9zM176 96a88 88 0 110 176 88 88 0 110-176z" /></svg>
+                <span className="truncate">{cityState}</span>
+                {showMetro && (
+                  <span className="shrink-0 inline-flex items-center font-mono text-[9px] font-semibold uppercase tracking-wider text-marigold-dark bg-marigold/10 border border-marigold/25 px-1.5 py-0.5 rounded-full leading-none">
+                    {metroLabel}
+                  </span>
+                )}
+              </p>
+            )}
+          </div>
         </div>
       </div>
 
-      {/* Details */}
-      <div className="flex-1 min-w-0 flex flex-col justify-center">
-        {featured && (
-          <span className="inline-flex items-center w-fit mb-1.5 font-mono text-[9px] font-bold uppercase tracking-widest text-marigold-dark bg-marigold/15 border border-marigold/30 px-2 py-0.5 rounded-md">
-            Featured Event
-          </span>
-        )}
-        <h3 className="font-display font-bold text-ink text-base sm:text-lg leading-tight group-hover:text-aubergine transition-colors truncate">
-          {event.title}
-        </h3>
-        <div className="mt-1.5 space-y-1">
-          {event.venue_name && (
-            <p className="flex items-center gap-1.5 font-ui text-xs sm:text-sm font-medium text-ink truncate">
-              {/* fa-location-dot */}
-              <svg className="w-3.5 h-3.5 text-aubergine shrink-0" fill="currentColor" viewBox="0 0 384 512"><path d="M215.7 499.2C267 435 384 279.4 384 192 384 86 298 0 192 0S0 86 0 192c0 87.4 117 243 168.3 307.2 12.3 15.3 35.1 15.3 47.4 0zM192 128a64 64 0 110 128 64 64 0 110-128z" /></svg>
-              <span className="truncate">{event.venue_name}</span>
-            </p>
-          )}
-          {cityState && (
-            <p className="flex items-center gap-1.5 font-ui text-xs sm:text-sm font-medium text-ink-muted min-w-0">
-              {/* fa-map-pin */}
-              <svg className="w-3.5 h-3.5 text-durga shrink-0" fill="currentColor" viewBox="0 0 320 512"><path d="M112 316.9V456c0 30.9 21.5 56 48 56s48-25.1 48-56V316.9c54.7-15.6 96-69.3 96-132.9C352 82.5 273.5 0 176 0S0 82.5 0 184c0 63.6 41.3 117.3 96 132.9zM176 96a88 88 0 110 176 88 88 0 110-176z" /></svg>
-              <span className="truncate">{cityState}</span>
-              {showMetro && (
-                <span className="shrink-0 inline-flex items-center font-mono text-[9px] font-semibold uppercase tracking-wider text-marigold-dark bg-marigold/10 border border-marigold/25 px-1.5 py-0.5 rounded-full leading-none">
-                  {metroLabel}
-                </span>
-              )}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* Price (top) + CTA pinned bottom-right */}
+      {/* Price + CTA — full-width bar on mobile (price left, button fills the rest),
+          compact right-aligned column on desktop. Never clipped. */}
       {past ? (
-        <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted shrink-0 self-center">Ended</span>
+        <div className="shrink-0 flex sm:items-center sm:justify-center">
+          <span className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Ended</span>
+        </div>
       ) : (
-        <div className="flex flex-col items-end shrink-0 self-stretch">
+        <div className="shrink-0 flex items-center gap-3 sm:flex-col sm:items-end sm:justify-center">
           {/* Price text only when a price exists and tickets sell on Rameelo */}
           {selling && minPrice !== null && (
-            <div className="text-right leading-none">
-              <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted/70 mb-1">From</p>
-              <p className="font-display font-bold text-ink text-xl sm:text-2xl leading-none">${minPrice}</p>
+            <div className="leading-none shrink-0 sm:text-right">
+              <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted/70 mb-0.5 sm:mb-1">From</p>
+              <p className="font-display font-bold text-ink text-lg sm:text-2xl leading-none">${minPrice}</p>
             </div>
           )}
           <span
-            className={`mt-auto inline-flex items-center justify-center px-4 sm:px-5 py-2 rounded-lg font-display font-bold text-xs sm:text-sm text-white transition-all ${isSoldOut ? "opacity-60" : "group-hover:opacity-90"}`}
+            className={`flex-1 sm:flex-none inline-flex items-center justify-center px-5 py-2.5 sm:py-2 rounded-lg font-display font-bold text-sm text-white whitespace-nowrap transition-all ${isSoldOut ? "opacity-60" : "group-hover:opacity-90"}`}
             style={{ backgroundColor: isSoldOut ? "#9ca3af" : heroColor }}
           >
             {isSoldOut ? "Sold Out" : "Get Tickets"}
