@@ -2,6 +2,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { marketingBlastEmail } from "./templates/marketingBlast";
 import { eventBlastEmail, type BlastTier, type BlastEventData, type EventBlastVariant } from "./templates/eventBlast";
 import { nearbyEventsEmail, type NearbyEventItem } from "./templates/nearbyEvents";
+import { inviteFriendsEmail } from "./templates/inviteFriends";
 import { EMAIL } from "./theme";
 
 // US state code → display name, for the "events near you in {state}" copy.
@@ -133,6 +134,10 @@ export function buildBlastEmail(opts: {
 
   if (EVENT_BLAST_VARIANTS.has(templateKey) && event) {
     return eventBlastEmail({ variant: templateKey as EventBlastVariant, recipientFirstName, event, unsubscribeUrl });
+  }
+
+  if (templateKey === "invite-friends" && event) {
+    return inviteFriendsEmail({ recipientFirstName, event, unsubscribeUrl });
   }
 
   if (templateKey === "nearby-events") {

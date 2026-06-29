@@ -97,17 +97,25 @@ export async function POST(request: Request) {
   }
 
   // ── Real blast ───────────────────────────────────────────────────────────
-  const filters = {
-    p_tags: arr(b.tags),
-    p_batch_ids: arr(b.batchIds),
-    p_cities: arr(b.cities).map(c => c.toLowerCase()),
-    p_states: arr(b.states).map(s => s.toUpperCase()),
-    p_attended_event_ids: arr(b.attendedEventIds),
-    p_source: typeof b.source === "string" && b.source ? b.source : null,
-    p_match_any: b.matchAny === true,
-  };
+  // Purchaser mode: "Bought tickets to" events resolve the audience straight from
+  // orders (everyone who bought, incl. guests); profile filters don't apply.
+  const purchasedEventIds = arr(b.purchasedEventIds);
+  const purchaserMode = purchasedEventIds.length > 0;
+  const filters = purchaserMode
+    ? { p_purchased_event_ids: purchasedEventIds }
+    : {
+        p_tags: arr(b.tags),
+        p_batch_ids: arr(b.batchIds),
+        p_cities: arr(b.cities).map(c => c.toLowerCase()),
+        p_states: arr(b.states).map(s => s.toUpperCase()),
+        p_attended_event_ids: arr(b.attendedEventIds),
+        p_source: typeof b.source === "string" && b.source ? b.source : null,
+        p_match_any: b.matchAny === true,
+      };
 
-  const { data: audienceData, error: aErr } = await supabase.rpc("resolve_marketing_audience", filters);
+  const { data: audienceData, error: aErr } = purchaserMode
+    ? await supabase.rpc("resolve_event_purchasers", { p_event_ids: purchasedEventIds })
+    : await supabase.rpc("resolve_marketing_audience", filters);
   if (aErr) return NextResponse.json({ error: aErr.message }, { status: 400 });
   const recipients = (audienceData ?? []) as { email: string; first_name: string | null; state: string | null }[];
   if (recipients.length === 0) return NextResponse.json({ error: "No recipients match those filters." }, { status: 422 });

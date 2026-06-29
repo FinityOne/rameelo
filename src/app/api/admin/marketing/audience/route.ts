@@ -15,15 +15,22 @@ export async function POST(request: Request) {
   if (me?.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const b = await request.json().catch(() => ({}));
-  const { data, error } = await supabase.rpc("resolve_marketing_audience", {
-    p_tags: arr(b.tags),
-    p_batch_ids: arr(b.batchIds),
-    p_cities: arr(b.cities).map(c => c.toLowerCase()),
-    p_states: arr(b.states).map(s => s.toUpperCase()),
-    p_attended_event_ids: arr(b.attendedEventIds),
-    p_source: typeof b.source === "string" && b.source ? b.source : null,
-    p_match_any: b.matchAny === true,
-  });
+
+  // Purchaser mode: when "Bought tickets to" events are selected, the audience is
+  // resolved directly from orders (everyone who bought, incl. guests) and the
+  // profile-based filters don't apply.
+  const purchasedEventIds = arr(b.purchasedEventIds);
+  const { data, error } = purchasedEventIds.length
+    ? await supabase.rpc("resolve_event_purchasers", { p_event_ids: purchasedEventIds })
+    : await supabase.rpc("resolve_marketing_audience", {
+        p_tags: arr(b.tags),
+        p_batch_ids: arr(b.batchIds),
+        p_cities: arr(b.cities).map(c => c.toLowerCase()),
+        p_states: arr(b.states).map(s => s.toUpperCase()),
+        p_attended_event_ids: arr(b.attendedEventIds),
+        p_source: typeof b.source === "string" && b.source ? b.source : null,
+        p_match_any: b.matchAny === true,
+      });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
 
   const rows = (data ?? []) as { email: string; first_name: string | null }[];

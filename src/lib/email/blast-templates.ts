@@ -4,7 +4,7 @@
 // is client-safe metadata only (no rendering) — the actual HTML builders live in
 // build-blast.ts (server). Add a template here + a branch in build-blast.ts.
 
-export type BlastTemplateKey = "tickets-live" | "selling-fast" | "final-call" | "we-miss-you" | "nearby-events" | "custom";
+export type BlastTemplateKey = "tickets-live" | "selling-fast" | "final-call" | "we-miss-you" | "invite-friends" | "nearby-events" | "custom";
 
 export type BlastTemplateMeta = {
   key: BlastTemplateKey;
@@ -52,6 +52,14 @@ export const BLAST_TEMPLATES: BlastTemplateMeta[] = [
     name: "We saved you a spot",
     emoji: "💛",
     description: "Warm re-engagement / win-back. Pair with the “Attended event” filter to invite past dancers back for a new event. Nostalgic tone, soft urgency, one CTA.",
+    requiresEvent: true,
+    custom: false,
+  },
+  {
+    key: "invite-friends",
+    name: "Invite your friends",
+    emoji: "💃",
+    description: "For people who already bought tickets. Confirms the date, time & location, tells them how excited we are to do garba with them, and nudges them to bring their crew with one “Invite your friends” button. Pair with the “Bought tickets to” audience to reach an event’s buyers.",
     requiresEvent: true,
     custom: false,
   },
