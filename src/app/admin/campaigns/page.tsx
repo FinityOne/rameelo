@@ -7,7 +7,7 @@ import { BLAST_TEMPLATES, blastTemplate } from "@/lib/email/blast-templates";
 type Batch = { id: string; label: string; created_count: number };
 type EventOpt = { id: string; title: string; start_date: string; status: string };
 type Blast = { id: string; subject: string; event_id: string | null; recipient_count: number; sent_count: number; failed_count: number; created_at: string };
-type AudienceFilters = { tags: string[]; batchIds: string[]; cities: string[]; states: string[]; attendedEventIds: string[]; source: string | null; matchAny: boolean };
+type AudienceFilters = { tags: string[]; batchIds: string[]; cities: string[]; states: string[]; attendedEventIds: string[]; purchasedEventIds: string[]; source: string | null; matchAny: boolean };
 type SavedList = { id: string; name: string; description: string | null; filters: AudienceFilters; last_used_at: string | null; created_at: string };
 
 const labelCls = "font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-1.5 block";
@@ -99,6 +99,7 @@ export default function CampaignsPage() {
   const [selCities, setSelCities] = useState<string[]>([]);
   const [selStates, setSelStates] = useState<string[]>([]);
   const [selAttended, setSelAttended] = useState<string[]>([]);
+  const [selPurchased, setSelPurchased] = useState<string[]>([]);
   const [source, setSource] = useState("");
   const [matchAny, setMatchAny] = useState(false);
 
@@ -172,10 +173,13 @@ export default function CampaignsPage() {
 
   const filters = useMemo<AudienceFilters>(() => ({
     tags: selTags, batchIds: selBatches, cities: selCities, states: selStates,
-    attendedEventIds: selAttended, source: source || null, matchAny,
-  }), [selTags, selBatches, selCities, selStates, selAttended, source, matchAny]);
+    attendedEventIds: selAttended, purchasedEventIds: selPurchased, source: source || null, matchAny,
+  }), [selTags, selBatches, selCities, selStates, selAttended, selPurchased, source, matchAny]);
 
-  const hasFilters = selTags.length || selBatches.length || selCities.length || selStates.length || selAttended.length || source;
+  // Purchaser mode: targeting an event's buyers resolves the audience straight
+  // from orders, so the profile-based filters below are bypassed for the send.
+  const purchaserMode = selPurchased.length > 0;
+  const hasFilters = purchaserMode || selTags.length || selBatches.length || selCities.length || selStates.length || selAttended.length || source;
 
   // Debounced live recipient count.
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -211,7 +215,7 @@ export default function CampaignsPage() {
   function applyList(l: SavedList) {
     const f = l.filters || {} as AudienceFilters;
     setSelTags(f.tags ?? []); setSelBatches(f.batchIds ?? []); setSelCities(f.cities ?? []);
-    setSelStates(f.states ?? []); setSelAttended(f.attendedEventIds ?? []);
+    setSelStates(f.states ?? []); setSelAttended(f.attendedEventIds ?? []); setSelPurchased(f.purchasedEventIds ?? []);
     setSource(f.source ?? ""); setMatchAny(!!f.matchAny);
     setActiveListId(l.id);
     supabase.from("marketing_lists").update({ last_used_at: new Date().toISOString() }).eq("id", l.id).then(() => {});
@@ -230,7 +234,7 @@ export default function CampaignsPage() {
     setConfirmDeleteList(null);
   }
   function clearAudience() {
-    setSelTags([]); setSelBatches([]); setSelCities([]); setSelStates([]); setSelAttended([]); setSource(""); setMatchAny(false); setActiveListId(null);
+    setSelTags([]); setSelBatches([]); setSelCities([]); setSelStates([]); setSelAttended([]); setSelPurchased([]); setSource(""); setMatchAny(false); setActiveListId(null);
   }
 
   function contentPayload() {
@@ -325,6 +329,17 @@ export default function CampaignsPage() {
           <div className="bg-white rounded-2xl border border-ivory-200 p-5">
             <StepHead n={1} title="Who to reach" sub="Pick a saved list or build one with filters" done={!!hasFilters} />
 
+            {/* Event purchasers — a dedicated audience source straight from orders */}
+            <div className={`mb-4 rounded-xl border px-3.5 py-3 transition-colors ${purchaserMode ? "border-peacock/40 bg-peacock/[0.05]" : "border-ivory-200 bg-ivory/40"}`}>
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">🎟️ Bought tickets to</span>
+                {purchaserMode && <button onClick={() => setSelPurchased([])} className="font-mono text-[9px] text-ink-muted hover:text-durga">clear ({selPurchased.length})</button>}
+              </div>
+              <p className="font-ui text-xs text-ink-muted mb-2">Email everyone who <strong>purchased</strong> these events — including guest checkouts. Pair with the “Invite your friends” template to remind buyers and rally their crew.</p>
+              <MultiPick title="Events" options={allEvents.map(e => ({ value: e.id, label: e.title, sub: fmtDay(e.start_date) }))} selected={selPurchased} onChange={setSelPurchased} labelOf={eventTitleOf} />
+              {purchaserMode && <p className="font-mono text-[10px] text-peacock mt-2">Targeting buyers directly — the filters below are bypassed.</p>}
+            </div>
+
             {/* Saved lists */}
             <div className="mb-4">
               <div className="flex items-center justify-between mb-1.5">
@@ -363,7 +378,7 @@ export default function CampaignsPage() {
               )}
             </div>
 
-            <div className="flex items-center justify-between mb-3 pt-3 border-t border-ivory-200">
+            <div className={`flex items-center justify-between mb-3 pt-3 border-t border-ivory-200 ${purchaserMode ? "opacity-40" : ""}`}>
               <span className="font-mono text-[10px] uppercase tracking-widest text-ink-muted">Filters</span>
               <div className="flex items-center gap-2">
                 {hasFilters && <button onClick={clearAudience} className="font-mono text-[9px] text-ink-muted hover:text-durga">clear all</button>}
@@ -374,7 +389,7 @@ export default function CampaignsPage() {
                 </div>
               </div>
             </div>
-            <div className="space-y-4">
+            <div className={`space-y-4 ${purchaserMode ? "opacity-40 pointer-events-none" : ""}`}>
               <MultiPick title="Tags" options={tags.map(t => ({ value: t, label: t }))} selected={selTags} onChange={setSelTags} />
               <MultiPick title="Uploads" options={batches.map(b => ({ value: b.id, label: b.label, sub: `${b.created_count} added` }))} selected={selBatches} onChange={setSelBatches} labelOf={id => batches.find(b => b.id === id)?.label ?? id} />
               <div className="grid grid-cols-2 gap-4">
@@ -449,7 +464,21 @@ export default function CampaignsPage() {
             )}
 
             {/* Template-specific helper / compose */}
-            {tmpl && !tmpl.custom && !isGeo && (
+            {tmpl && !tmpl.custom && !isGeo && templateKey === "invite-friends" && (
+              <div className="mt-3 rounded-xl border border-peacock/30 bg-peacock/[0.05] px-3.5 py-3 space-y-2">
+                <p className="font-ui text-xs text-ink">
+                  {needsEvent
+                    ? "Pick the event above — the email confirms the date, time & location, says how excited we are, and invites buyers to bring their friends. No copywriting needed."
+                    : "Subject and copy are written for you — date, time & location plus an “Invite your friends” button. This is for people who already bought; send it to the event's purchasers."}
+                </p>
+                {eventId && !selPurchased.includes(eventId) && (
+                  <button onClick={() => setSelPurchased([eventId])} className="font-mono text-[10px] uppercase tracking-widest text-peacock hover:text-peacock/80">
+                    → Target this event's buyers
+                  </button>
+                )}
+              </div>
+            )}
+            {tmpl && !tmpl.custom && !isGeo && templateKey !== "invite-friends" && (
               <div className="mt-3 rounded-xl border border-marigold/30 bg-marigold/[0.06] px-3.5 py-3">
                 <p className="font-ui text-xs text-ink">
                   {needsEvent
