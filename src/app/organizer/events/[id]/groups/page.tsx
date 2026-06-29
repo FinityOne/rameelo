@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { useOrg } from "../../../org-context";
+import { eventAccessOrFilter } from "@/lib/organizer-access";
 import EventSubnav from "../EventSubnav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -48,6 +50,7 @@ const GROUP_STATUS: Record<string, { label: string; cls: string }> = {
 export default function EventGroupsPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
+  const { orgs } = useOrg();
 
   const [groups, setGroups]         = useState<GroupOrder[]>([]);
   const [eventTitle, setEventTitle] = useState("");
@@ -62,7 +65,7 @@ export default function EventGroupsPage() {
       if (!user) return;
 
       const [evRes, grpRes] = await Promise.all([
-        supabase.from("events").select("title").eq("id", id).eq("organizer_id", user.id).single(),
+        supabase.from("events").select("title").eq("id", id).or(eventAccessOrFilter(user.id, orgs.map(o => o.id))).maybeSingle(),
         supabase.from("group_orders")
           .select("id, organizer_name, organizer_email, organizer_phone, target_size, discount_pct, status, created_at, ticket_tiers(name, price), group_order_members(id, name, email, is_organizer, paid)")
           .eq("event_id", id)
@@ -75,7 +78,7 @@ export default function EventGroupsPage() {
       setLoading(false);
     }
     load();
-  }, [id, router]);
+  }, [id, router, orgs]);
 
   const filtered = filter === "all" ? groups : groups.filter(g => g.status === filter);
   const totalMembers = groups.reduce((s, g) => s + (g.group_order_members?.length ?? 0), 0);
