@@ -421,7 +421,7 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
   ]);
 
   return (
-    <div className="min-h-screen" style={{ backgroundColor: "#FCF9F2" }}>
+    <div className="min-h-screen overflow-x-clip" style={{ backgroundColor: "#FCF9F2" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(artistLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(crumbs) }} />
 
@@ -495,8 +495,8 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
                 </div>
               )}
 
-              <h1 className="font-display font-bold text-white leading-[0.98] mb-3"
-                style={{ fontSize: "clamp(2.5rem, 6.5vw, 4.5rem)", letterSpacing: "-0.04em" }}>
+              <h1 className="font-display font-bold text-white leading-[0.98] mb-3 break-words hyphens-auto"
+                style={{ fontSize: "clamp(2.25rem, 6.5vw, 4.5rem)", letterSpacing: "-0.04em" }}>
                 {artist.name}
               </h1>
 
@@ -715,7 +715,7 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
                     <img src={artist.profile_image_url} alt={artist.name} className="w-20 h-20 rounded-2xl object-cover shrink-0" />
                   )}
                   {(artist.bio_long || artist.bio) && (
-                    <p className="font-ui text-sm text-ink/75 leading-relaxed line-clamp-6">{artist.bio_long || artist.bio}</p>
+                    <p className="min-w-0 font-ui text-sm text-ink/75 leading-relaxed line-clamp-6 break-words">{artist.bio_long || artist.bio}</p>
                   )}
                 </div>
               )}
@@ -794,9 +794,9 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
         {artist.notable_events && (
           <section className="rounded-3xl p-6 sm:p-8 flex gap-5 items-start border bg-white border-ivory-200">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-white text-xl shrink-0" style={{ backgroundColor: heroColor }}>★</div>
-            <div>
+            <div className="min-w-0">
               <p className="font-mono text-[10px] uppercase tracking-widest text-aubergine mb-2">Notable Appearances</p>
-              <p className="font-ui text-ink text-sm sm:text-base leading-relaxed whitespace-pre-line">{artist.notable_events}</p>
+              <p className="font-ui text-ink text-sm sm:text-base leading-relaxed whitespace-pre-line break-words">{artist.notable_events}</p>
             </div>
           </section>
         )}
@@ -814,7 +814,7 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
                   <div className="w-9 h-9 rounded-xl flex items-center justify-center text-white font-display font-bold text-sm shrink-0" style={{ backgroundColor: heroColor }}>
                     {i + 1}
                   </div>
-                  <p className="font-ui text-sm text-ink leading-snug pt-1">{award}</p>
+                  <p className="min-w-0 font-ui text-sm text-ink leading-snug pt-1 break-words">{award}</p>
                 </div>
               ))}
             </div>
@@ -824,9 +824,9 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
         {/* ── ORGANIZER CTA ────────────────────────────────────────────────── */}
         <section className="rounded-3xl bg-white border border-ivory-200 p-8 sm:p-10">
           <div className="flex flex-col sm:flex-row gap-8 items-start">
-            <div className="flex-1">
+            <div className="flex-1 min-w-0">
               <p className="font-mono text-[10px] uppercase tracking-widest text-ink-muted mb-2">For Event Organizers</p>
-              <h2 className="font-display font-bold text-ink text-2xl mb-3" style={{ letterSpacing: "-0.02em" }}>
+              <h2 className="font-display font-bold text-ink text-2xl mb-3 break-words" style={{ letterSpacing: "-0.02em" }}>
                 Booking {artist.name} for your event?
               </h2>
               <p className="font-ui text-ink-muted text-base leading-relaxed mb-6">
@@ -889,8 +889,8 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
                         {initials}
                       </div>
                     )}
-                    <div>
-                      <p className="font-display font-bold text-ink text-sm leading-tight group-hover:text-aubergine transition-colors">{a.name}</p>
+                    <div className="min-w-0 w-full">
+                      <p className="font-display font-bold text-ink text-sm leading-tight group-hover:text-aubergine transition-colors break-words">{a.name}</p>
                       {a.tagline && <p className="font-mono text-[9px] uppercase tracking-wide text-ink-muted mt-0.5 truncate">{a.tagline}</p>}
                     </div>
                   </Link>
