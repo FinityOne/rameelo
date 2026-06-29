@@ -69,21 +69,22 @@ export async function loadBlastEvent(supabase: SupabaseClient, eventId: string):
   const visible = (e.ticket_tiers ?? []).filter(t => t.is_visible)
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.price - b.price);
 
-  const tiers: BlastTier[] = visible.map(t => {
+  // Each visible tier's sold-out state + effective sale-close (its own end, else
+  // the event date). "Available" = still buyable: not sold out and window open.
+  const graded = visible.map(t => {
     const cap = t.quantity ?? null;
     const used = (t.quantity_sold ?? 0) + (t.quantity_comped ?? 0);
-    return { name: t.name, price: Number(t.price), soldOut: cap != null && used >= cap };
+    return { name: t.name, price: Number(t.price), soldOut: cap != null && used >= cap, end: t.sale_end_date ?? e.start_date };
   });
+  const available = graded.filter(t => !t.soldOut && t.end >= today);
+  const soldOutTierNames = graded.filter(t => t.soldOut).map(t => t.name);
 
-  // "Available" = still buyable: not sold out and its sale window hasn't passed.
-  // Each tier's effective close = its sale_end_date, else the event date.
-  const available = visible
-    .map(t => {
-      const cap = t.quantity ?? null;
-      const used = (t.quantity_sold ?? 0) + (t.quantity_comped ?? 0);
-      return { name: t.name, price: Number(t.price), soldOut: cap != null && used >= cap, end: t.sale_end_date ?? e.start_date };
-    })
-    .filter(t => !t.soldOut && t.end >= today);
+  // List the ACTIVE tiers in the email so a sold-out first/early-bird tier is
+  // never presented as if it's for sale. If everything's sold out, fall back to
+  // the full (struck-through) list so the email still shows the lineup.
+  const tiers: BlastTier[] = available.length
+    ? available.map(t => ({ name: t.name, price: t.price, soldOut: false }))
+    : graded.map(t => ({ name: t.name, price: t.price, soldOut: t.soldOut }));
 
   const availablePrices = available.map(t => t.price);
   const fromPrice = availablePrices.length ? Math.min(...availablePrices) : null;
@@ -114,6 +115,7 @@ export async function loadBlastEvent(supabase: SupabaseClient, eventId: string):
     url: `${EMAIL.site}/events/${eventId}`,
     fromPrice,
     tiers,
+    soldOutTierNames,
     closeLabel: fmtDateShort(closeDate),
     closeDays: daysUntil(closeDate),
     deadlineTier,
