@@ -49,7 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   // is genuinely 1200×630.
   const ogImages = event.cover_image_url
     ? [{ url: event.cover_image_url, alt: event.title }]
-    : [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: `${event.title} — Rameelo` }];
+    : [{ url: "https://www.rameelo.com/og-default.jpg", width: 1200, height: 630, alt: `${event.title} — Rameelo` }];
 
   return {
     title,
@@ -64,14 +64,14 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
       ...(event.metro_city ? [`garba ${event.metro_city}`, `navratri ${event.metro_city}`, `${event.category} ${event.metro_city}`, `garba near ${event.metro_city}`] : []),
       "garba tickets", "navratri tickets", "raas garba usa",
     ],
-    alternates: { canonical: `https://rameelo.com/events/${id}` },
+    alternates: { canonical: `https://www.rameelo.com/events/${id}` },
     openGraph: {
       title: event.title,
       description,
       images: ogImages,
       type: "article",
       siteName: "Rameelo",
-      url: `https://rameelo.com/events/${id}`,
+      url: `https://www.rameelo.com/events/${id}`,
     },
     twitter: {
       card: "summary_large_image",
@@ -132,9 +132,9 @@ export default async function EventDetailPage({ params }: Props) {
     : null;
 
   const crumbs = breadcrumbSchema([
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "Events", url: "https://rameelo.com/events" },
-    { name: event?.title ?? "Event", url: `https://rameelo.com/events/${id}` },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "Events", url: "https://www.rameelo.com/events" },
+    { name: event?.title ?? "Event", url: `https://www.rameelo.com/events/${id}` },
   ]);
 
   return (

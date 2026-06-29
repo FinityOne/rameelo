@@ -8,13 +8,13 @@ export const metadata: Metadata = {
   title: "Privacy Policy — Rameelo",
   description:
     "How Rameelo collects, uses, shares, and protects your information when you use the platform to discover events and buy tickets.",
-  alternates: { canonical: "https://rameelo.com/privacy" },
+  alternates: { canonical: "https://www.rameelo.com/privacy" },
   robots: { index: true, follow: true },
   openGraph: {
     title: "Privacy Policy — Rameelo",
     description: "How Rameelo handles your data — what we collect, how we use it, and your choices.",
     type: "website",
-    url: "https://rameelo.com/privacy",
+    url: "https://www.rameelo.com/privacy",
     siteName: "Rameelo",
   },
 };
@@ -42,8 +42,8 @@ function Bullet({ children }: { children: React.ReactNode }) {
 
 export default function PrivacyPage() {
   const crumbs = breadcrumbSchema([
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "Privacy Policy", url: "https://rameelo.com/privacy" },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "Privacy Policy", url: "https://www.rameelo.com/privacy" },
   ]);
 
   return (

@@ -7,20 +7,20 @@ export const metadata: Metadata = {
   title: "Garba & Navratri Artists — Performers on Rameelo",
   description: "Discover garba, dandiya, and Navratri performers across the USA. Browse artist profiles, see upcoming events, and buy tickets to see your favourite raas garba artists live on Rameelo.",
   keywords: ["garba artists usa", "navratri performers", "raas garba singer", "dandiya artist", "garba musician america", "navratri entertainment"],
-  alternates: { canonical: "https://rameelo.com/artists" },
+  alternates: { canonical: "https://www.rameelo.com/artists" },
   openGraph: {
     title: "Garba & Navratri Artists — Rameelo",
     description: "Discover garba, dandiya, and Navratri performers across the USA. Browse profiles and buy tickets.",
     type: "website",
-    url: "https://rameelo.com/artists",
+    url: "https://www.rameelo.com/artists",
     siteName: "Rameelo",
-    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Garba Artists on Rameelo" }],
+    images: [{ url: "https://www.rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Garba Artists on Rameelo" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Garba & Navratri Artists — Rameelo",
     description: "Discover garba, dandiya, and Navratri performers across the USA.",
-    images: ["https://rameelo.com/og-default.jpg"],
+    images: ["https://www.rameelo.com/og-default.jpg"],
   },
 };
 
@@ -84,15 +84,15 @@ export default async function ArtistsPage() {
   const featuredCount = artists.filter((a) => a.is_featured).length;
 
   const crumbs = breadcrumbSchema([
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "Artists", url: "https://rameelo.com/artists" },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "Artists", url: "https://www.rameelo.com/artists" },
   ]);
 
   const artistList = itemListSchema(
     "Garba & Navratri Artists on Rameelo",
     artists.map((a, i) => ({
       name: a.name,
-      url: `https://rameelo.com/artists/${a.slug}`,
+      url: `https://www.rameelo.com/artists/${a.slug}`,
       position: i + 1,
     }))
   );

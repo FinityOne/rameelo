@@ -58,7 +58,7 @@ export async function POST(request: Request) {
   }
 
   const inviterName = [inviter?.first_name, inviter?.last_name].filter(Boolean).join(" ") || "Your team";
-  const acceptUrl = `https://rameelo.com/auth/signup?email=${encodeURIComponent(cleanEmail)}&invite=${token}`;
+  const acceptUrl = `https://www.rameelo.com/auth/signup?email=${encodeURIComponent(cleanEmail)}&invite=${token}`;
 
   const { subject, html, text } = orgInviteEmail({
     orgName: org.name,

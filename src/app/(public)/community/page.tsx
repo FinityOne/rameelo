@@ -6,30 +6,30 @@ export const metadata: Metadata = {
   title: "Garba Community — Coming Soon | Rameelo",
   description: "The Rameelo garba community is coming soon. Connect with raas garba dancers, find city-based groups, and celebrate Navratri together across the USA — launching shortly.",
   keywords: ["garba community usa", "navratri community", "raas garba dancers", "garba groups near me", "gujarati community usa", "dandiya community"],
-  alternates: { canonical: "https://rameelo.com/community" },
+  alternates: { canonical: "https://www.rameelo.com/community" },
   openGraph: {
     title: "Garba Community — Coming Soon | Rameelo",
     description: "Connect with raas garba and dandiya dancers across America. Communities are launching soon on Rameelo.",
     type: "website",
-    url: "https://rameelo.com/community",
+    url: "https://www.rameelo.com/community",
     siteName: "Rameelo",
-    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo Garba Community" }],
+    images: [{ url: "https://www.rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo Garba Community" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Garba Community — Coming Soon | Rameelo",
     description: "Communities are launching soon on Rameelo.",
-    images: ["https://rameelo.com/og-default.jpg"],
+    images: ["https://www.rameelo.com/og-default.jpg"],
   },
 };
 
 const communityPage = webPageSchema({
   name: "Garba Community — Coming Soon | Rameelo",
-  url: "https://rameelo.com/community",
+  url: "https://www.rameelo.com/community",
   description: "The Rameelo garba community is launching soon — connect with raas garba dancers and city-based groups across the USA.",
   breadcrumbs: [
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "Community", url: "https://rameelo.com/community" },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "Community", url: "https://www.rameelo.com/community" },
   ],
 });
 

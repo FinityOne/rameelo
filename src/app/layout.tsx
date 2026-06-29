@@ -39,7 +39,7 @@ const jetbrainsMono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://rameelo.com"),
+  metadataBase: new URL("https://www.rameelo.com"),
   title: {
     default: "Rameelo — The Home for Raas Garba & Navratri Events in America",
     template: "%s | Rameelo",
@@ -51,7 +51,7 @@ export const metadata: Metadata = {
     "navratri near me", "garba new jersey", "garba houston", "garba chicago",
     "gujarati events usa", "navratri tickets online", "group garba tickets", "rameelo",
   ],
-  authors: [{ name: "Rameelo", url: "https://rameelo.com" }],
+  authors: [{ name: "Rameelo", url: "https://www.rameelo.com" }],
   creator: "Rameelo",
   publisher: "Rameelo",
   icons: {
@@ -71,7 +71,7 @@ export const metadata: Metadata = {
     description:
       "America's dedicated platform for raas garba, dandiya, and Navratri events. Group tickets with up to 15% off.",
     images: [{ url: "/og-default.jpg", width: 1200, height: 630, alt: "Rameelo — America's home for Raas Garba" }],
-    url: "https://rameelo.com",
+    url: "https://www.rameelo.com",
   },
   twitter: {
     card: "summary_large_image",
@@ -85,7 +85,7 @@ export const metadata: Metadata = {
     follow: true,
     googleBot: { index: true, follow: true, "max-video-preview": -1, "max-image-preview": "large", "max-snippet": -1 },
   },
-  alternates: { canonical: "https://rameelo.com" },
+  alternates: { canonical: "https://www.rameelo.com" },
 };
 
 const JSON_LD_ORG = {
@@ -93,12 +93,12 @@ const JSON_LD_ORG = {
   "@graph": [
     {
       "@type": "Organization",
-      "@id": "https://rameelo.com/#organization",
+      "@id": "https://www.rameelo.com/#organization",
       name: "Rameelo",
-      url: "https://rameelo.com",
+      url: "https://www.rameelo.com",
       logo: {
         "@type": "ImageObject",
-        url: "https://rameelo.com/og-default.jpg",
+        url: "https://www.rameelo.com/og-default.jpg",
         width: 1200,
         height: 630,
       },
@@ -109,7 +109,7 @@ const JSON_LD_ORG = {
       contactPoint: {
         "@type": "ContactPoint",
         contactType: "customer support",
-        url: "https://rameelo.com/about",
+        url: "https://www.rameelo.com/about",
         availableLanguage: "English",
       },
       sameAs: [
@@ -119,17 +119,17 @@ const JSON_LD_ORG = {
     },
     {
       "@type": "WebSite",
-      "@id": "https://rameelo.com/#website",
-      url: "https://rameelo.com",
+      "@id": "https://www.rameelo.com/#website",
+      url: "https://www.rameelo.com",
       name: "Rameelo",
       description: "America's home for raas garba, dandiya, and Navratri events — find tickets, organize events, and join the community.",
-      publisher: { "@id": "https://rameelo.com/#organization" },
+      publisher: { "@id": "https://www.rameelo.com/#organization" },
       potentialAction: [
         {
           "@type": "SearchAction",
           target: {
             "@type": "EntryPoint",
-            urlTemplate: "https://rameelo.com/events?q={search_term_string}",
+            urlTemplate: "https://www.rameelo.com/events?q={search_term_string}",
           },
           "query-input": "required name=search_term_string",
         },
@@ -137,12 +137,12 @@ const JSON_LD_ORG = {
     },
     {
       "@type": "SiteLinksSearchBox",
-      url: "https://rameelo.com",
+      url: "https://www.rameelo.com",
       potentialAction: {
         "@type": "SearchAction",
         target: {
           "@type": "EntryPoint",
-          urlTemplate: "https://rameelo.com/events?q={search_term_string}",
+          urlTemplate: "https://www.rameelo.com/events?q={search_term_string}",
         },
         "query-input": "required name=search_term_string",
       },

@@ -17,20 +17,20 @@ export const metadata: Metadata = {
   title: "Rameelo Blog — Raas Garba News, Guides & Community",
   description: "The authoritative source for Raas Garba in America. Event guides, culture explainers, city-by-city breakdowns, and Navratri tips — all in one place.",
   keywords: ["garba blog", "navratri news 2026", "raas garba usa", "dandiya events guide", "navratri 2026", "garba culture", "navratri guide"],
-  alternates: { canonical: "https://rameelo.com/blog" },
+  alternates: { canonical: "https://www.rameelo.com/blog" },
   openGraph: {
     title: "Rameelo Blog — Raas Garba News, Guides & Community",
     description: "The authoritative source for Raas Garba in America. Event guides, culture explainers, city-by-city breakdowns, and Navratri tips.",
     type: "website",
-    url: "https://rameelo.com/blog",
+    url: "https://www.rameelo.com/blog",
     siteName: "Rameelo",
-    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo Blog" }],
+    images: [{ url: "https://www.rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo Blog" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Rameelo Blog — Raas Garba News, Guides & Community",
     description: "Event guides, culture explainers, and Navratri tips for the garba community.",
-    images: ["https://rameelo.com/og-default.jpg"],
+    images: ["https://www.rameelo.com/og-default.jpg"],
   },
 };
 
@@ -149,11 +149,11 @@ export default async function BlogPage() {
 
   const blogList = itemListSchema(
     "Rameelo Blog Articles",
-    BLOG_ARTICLES.map(a => ({ name: titleOf(a), url: `https://rameelo.com/blog/${a.slug}` }))
+    BLOG_ARTICLES.map(a => ({ name: titleOf(a), url: `https://www.rameelo.com/blog/${a.slug}` }))
   );
   const crumbs = breadcrumbSchema([
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "Blog", url: "https://rameelo.com/blog" },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "Blog", url: "https://www.rameelo.com/blog" },
   ]);
 
   return (
@@ -355,12 +355,12 @@ export default async function BlogPage() {
             "@type": "Blog",
             "name": "The Rameelo Review",
             "description": "America's premier source for raas garba culture, events, and Navratri news",
-            "url": "https://rameelo.com/blog",
+            "url": "https://www.rameelo.com/blog",
             "publisher": {
               "@type": "Organization",
               "name": "Rameelo",
-              "url": "https://rameelo.com",
-              "logo": { "@type": "ImageObject", "url": "https://rameelo.com/og-default.jpg" },
+              "url": "https://www.rameelo.com",
+              "logo": { "@type": "ImageObject", "url": "https://www.rameelo.com/og-default.jpg" },
             },
           }),
         }}

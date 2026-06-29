@@ -20,20 +20,20 @@ export const metadata: Metadata = {
     "garba san jose", "garba atlanta", "gujarati events usa", "navratri tickets online",
     "group garba tickets", "rameelo", "garba event platform",
   ],
-  alternates: { canonical: "https://rameelo.com" },
+  alternates: { canonical: "https://www.rameelo.com" },
   openGraph: {
     type: "website",
-    url: "https://rameelo.com",
+    url: "https://www.rameelo.com",
     title: "Rameelo — America's Home for Raas Garba & Navratri Events",
     description: "Every verified raas garba, dandiya, and Navratri event in America — searchable by city. Group discounts up to 15% off.",
     siteName: "Rameelo",
-    images: [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo — America's home for Raas Garba" }],
+    images: [{ url: "https://www.rameelo.com/og-default.jpg", width: 1200, height: 630, alt: "Rameelo — America's home for Raas Garba" }],
   },
   twitter: {
     card: "summary_large_image",
     title: "Rameelo — Raas Garba & Navratri Events in America",
     description: "Find garba, dandiya, and Navratri events near you. Group discounts up to 15% off.",
-    images: ["https://rameelo.com/og-default.jpg"],
+    images: ["https://www.rameelo.com/og-default.jpg"],
   },
 };
 
@@ -109,15 +109,15 @@ export default async function HomePage() {
   ]);
 
   const siteNavList = itemListSchema("Rameelo Site Navigation", [
-    { name: "Find Events", url: "https://rameelo.com/events" },
-    { name: "List Your Event", url: "https://rameelo.com/organizers" },
-    { name: "Pricing", url: "https://rameelo.com/pricing" },
-    { name: "Blog", url: "https://rameelo.com/blog" },
-    { name: "About Rameelo", url: "https://rameelo.com/about" },
-    { name: "Sign Up Free", url: "https://rameelo.com/auth/signup" },
+    { name: "Find Events", url: "https://www.rameelo.com/events" },
+    { name: "List Your Event", url: "https://www.rameelo.com/organizers" },
+    { name: "Pricing", url: "https://www.rameelo.com/pricing" },
+    { name: "Blog", url: "https://www.rameelo.com/blog" },
+    { name: "About Rameelo", url: "https://www.rameelo.com/about" },
+    { name: "Sign Up Free", url: "https://www.rameelo.com/auth/signup" },
   ]);
 
-  const breadcrumbs = breadcrumbSchema([{ name: "Home", url: "https://rameelo.com" }]);
+  const breadcrumbs = breadcrumbSchema([{ name: "Home", url: "https://www.rameelo.com" }]);
 
   return (
     <div className="bg-ivory">

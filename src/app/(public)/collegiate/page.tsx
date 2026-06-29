@@ -7,11 +7,11 @@ export const metadata: Metadata = {
   title: "Collegiate Raas Garba Teams | Rameelo",
   description: "Discover collegiate raas garba teams competing across the United States. Explore rosters, trophies, mixes, and support your favorite team.",
   keywords: ["collegiate raas", "college garba", "raas garba competition", "NCRC", "collegiate garba teams", "university raas"],
-  alternates: { canonical: "https://rameelo.com/collegiate" },
+  alternates: { canonical: "https://www.rameelo.com/collegiate" },
   openGraph: {
     title: "Collegiate Raas Garba | Rameelo",
     description: "The home of competitive collegiate raas garba in America. Explore teams, trophies, and mixes.",
-    url: "https://rameelo.com/collegiate",
+    url: "https://www.rameelo.com/collegiate",
     siteName: "Rameelo",
     type: "website",
   },
@@ -68,13 +68,13 @@ export default async function CollegiatePage() {
   const totalUniversities = new Set(allTeams.map(t => t.university_name)).size;
 
   const crumbs = breadcrumbSchema([
-    { name: "Home", url: "https://rameelo.com/" },
-    { name: "Collegiate", url: "https://rameelo.com/collegiate" },
+    { name: "Home", url: "https://www.rameelo.com/" },
+    { name: "Collegiate", url: "https://www.rameelo.com/collegiate" },
   ]);
 
   const teamList = itemListSchema(
     "Collegiate Raas Garba Teams",
-    allTeams.map((t, i) => ({ position: i + 1, name: t.team_name, url: `https://rameelo.com/collegiate/${t.slug}` }))
+    allTeams.map((t, i) => ({ position: i + 1, name: t.team_name, url: `https://www.rameelo.com/collegiate/${t.slug}` }))
   );
 
   return (

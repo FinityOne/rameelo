@@ -19,7 +19,7 @@ function GroupCard({ g, myEmail }: { g: MyGroupSummary; myEmail: string }) {
   const gradient = GRADIENTS.find(x => x.id === g.coverGradient) ?? GRADIENTS[0];
 
   function copyLink() {
-    const url = `${typeof window !== "undefined" ? window.location.origin : "https://rameelo.com"}/group/${g.groupId}`;
+    const url = `${typeof window !== "undefined" ? window.location.origin : "https://www.rameelo.com"}/group/${g.groupId}`;
     navigator.clipboard.writeText(url).catch(() => {});
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);

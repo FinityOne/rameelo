@@ -20,6 +20,26 @@ export const METROS: Metro[] = [
   { city: "Detroit",      state: "MI", lat: 42.3314,  lng: -83.0458  },
 ];
 
+// URL slug for a metro's city ("San Jose" → "san-jose"). Powers the SEO city
+// landing pages at /garba-events/[city].
+export function metroSlug(m: { city: string }): string {
+  return m.city.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+export function findMetroBySlug(slug: string): Metro | undefined {
+  const s = (slug ?? "").toLowerCase();
+  return METROS.find((m) => metroSlug(m) === s);
+}
+
+// Metros nearest a given one (excluding itself), for "nearby cities" cross-links.
+export function metrosNear(origin: { lat: number; lng: number; city: string }, limit = 6): Metro[] {
+  return METROS.filter((m) => m.city !== origin.city)
+    .map((m) => ({ m, d: haversine(origin.lat, origin.lng, m.lat, m.lng) }))
+    .sort((a, b) => a.d - b.d)
+    .slice(0, limit)
+    .map((x) => x.m);
+}
+
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 3959;
   const toRad = (d: number) => (d * Math.PI) / 180;

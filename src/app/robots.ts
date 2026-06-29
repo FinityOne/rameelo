@@ -4,6 +4,7 @@ export default function robots(): MetadataRoute.Robots {
   const PUBLIC = [
     "/",
     "/events",
+    "/garba-events",
     "/artists",
     "/artists/",
     "/organizers",
@@ -51,7 +52,7 @@ export default function robots(): MetadataRoute.Robots {
       { userAgent: "cohere-ai",        allow: PUBLIC, disallow: DISALLOW },
       { userAgent: "YouBot",           allow: PUBLIC, disallow: DISALLOW },
     ],
-    sitemap: "https://rameelo.com/sitemap.xml",
-    host: "https://rameelo.com",
+    sitemap: "https://www.rameelo.com/sitemap.xml",
+    host: "https://www.rameelo.com",
   };
 }

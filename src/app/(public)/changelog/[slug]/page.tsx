@@ -16,7 +16,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   return {
     title: `v${release.version} ${release.name} — Rameelo Changelog`,
     description: release.summary,
-    alternates: { canonical: `https://rameelo.com/changelog/${slug}` },
+    alternates: { canonical: `https://www.rameelo.com/changelog/${slug}` },
   };
 }
 

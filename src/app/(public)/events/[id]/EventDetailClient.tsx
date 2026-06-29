@@ -699,7 +699,7 @@ export default function EventDetailClient({ id }: { id: string }) {
   const [linkCopied, setLinkCopied] = useState(false);
 
   function copyEventLink() {
-    const url = `https://rameelo.com/events/${id}`;
+    const url = `https://www.rameelo.com/events/${id}`;
     navigator.clipboard.writeText(url).catch(() => {});
     setLinkCopied(true);
     setTimeout(() => setLinkCopied(false), 2000);
@@ -2010,7 +2010,7 @@ export default function EventDetailClient({ id }: { id: string }) {
               {/* Social buttons */}
               <div className="grid grid-cols-2 gap-2">
                 <a
-                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`${event.title} — ${event.city}, ${event.state} 🪈`)}&url=${encodeURIComponent(`https://rameelo.com/events/${id}`)}`}
+                  href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(`${event.title} — ${event.city}, ${event.state} 🪈`)}&url=${encodeURIComponent(`https://www.rameelo.com/events/${id}`)}`}
                   target="_blank" rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-ivory-200 bg-white hover:border-black/20 transition-all font-ui text-sm font-semibold text-ink"
                 >
@@ -2018,7 +2018,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                   X / Twitter
                 </a>
                 <a
-                  href={`https://wa.me/?text=${encodeURIComponent(`${event.title} 🪈 — ${event.city}, ${event.state}\nhttps://rameelo.com/events/${id}`)}`}
+                  href={`https://wa.me/?text=${encodeURIComponent(`${event.title} 🪈 — ${event.city}, ${event.state}\nhttps://www.rameelo.com/events/${id}`)}`}
                   target="_blank" rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-ivory-200 bg-white hover:border-[#25D366]/40 transition-all font-ui text-sm font-semibold text-ink"
                 >
@@ -2026,7 +2026,7 @@ export default function EventDetailClient({ id }: { id: string }) {
                   WhatsApp
                 </a>
                 <a
-                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`https://rameelo.com/events/${id}`)}`}
+                  href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(`https://www.rameelo.com/events/${id}`)}`}
                   target="_blank" rel="noopener noreferrer"
                   className="flex items-center justify-center gap-2 py-2.5 rounded-xl border border-ivory-200 bg-white hover:border-[#1877F2]/40 transition-all font-ui text-sm font-semibold text-ink"
                 >

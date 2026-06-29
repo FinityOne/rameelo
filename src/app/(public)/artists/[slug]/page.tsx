@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { personSchema, breadcrumbSchema, ld } from "@/lib/jsonld";
+import { personSchema, breadcrumbSchema, itemListSchema, ld } from "@/lib/jsonld";
 import FollowButton, { ShareButton } from "./FollowButton";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
 
@@ -24,22 +24,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const location = data.based_in || [data.hometown_city, data.hometown_state].filter(Boolean).join(", ");
   const genres: string[] = data.genres ?? [];
   const description = data.bio?.slice(0, 155) ??
-    `${data.name} — ${genres.length ? genres.slice(0,2).join(" & ") + " " : ""}garba artist${location ? ` based in ${location}` : ""}. See upcoming events and buy tickets on Rameelo.`;
+    `${data.name} ${genres.length ? genres.slice(0,2).join(" & ") + " " : ""}garba artist${location ? ` based in ${location}` : ""}. See ${data.name}'s USA tour dates, upcoming Garba & Navratri shows, and buy tickets on Rameelo.`;
 
   // When served from the artist's own vanity domain, point canonical/og:url at it
   // so shares resolve cleanly to the artist's domain (not rameelo.com).
   const reqHost = (await headers()).get("host")?.split(":")[0].toLowerCase().replace(/^www\./, "") ?? "";
   const vanity = (data.custom_domain ?? "").toLowerCase().replace(/^https?:\/\//, "").replace(/\/.*$/, "").replace(/^www\./, "");
   const onVanity = !!vanity && reqHost === vanity;
-  const pageUrl = onVanity ? `https://${vanity}` : `https://rameelo.com/artists/${slug}`;
+  const pageUrl = onVanity ? `https://${vanity}` : `https://www.rameelo.com/artists/${slug}`;
 
   // Prefer the artist photo for the share card; fall back to cover, then default.
   const shareImg = data.profile_image_url || data.cover_image_url;
   const ogImage = shareImg
     ? [{ url: shareImg, width: 800, height: 800, alt: `${data.name} — Garba Artist` }]
-    : [{ url: "https://rameelo.com/og-default.jpg", width: 1200, height: 630, alt: `${data.name} on Rameelo` }];
+    : [{ url: "https://www.rameelo.com/og-default.jpg", width: 1200, height: 630, alt: `${data.name} on Rameelo` }];
 
-  const title = `${data.name} — ${genres[0] ?? "Garba"} Artist`;
+  const title = `${data.name} — ${genres[0] ?? "Garba"} Artist | Tour Dates & Tickets`;
 
   return {
     metadataBase: new URL(pageUrl),
@@ -47,9 +47,15 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     description,
     keywords: [
       data.name,
+      `${data.name} tour`,
+      `${data.name} tour usa`,
+      `${data.name} usa tour`,
+      `${data.name} tour dates`,
+      `${data.name} tickets`,
+      `${data.name} concert`,
+      `${data.name} live`,
       `${data.name} garba`,
       `${data.name} navratri`,
-      `${data.name} tickets`,
       "garba artist usa",
       "raas garba performer",
       "navratri artist usa",
@@ -421,15 +427,25 @@ export default async function ArtistDetailPage({ params, searchParams }: Props) 
     genres: artist.genres?.length ? artist.genres : undefined,
   });
   const crumbs = breadcrumbSchema([
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "Artists", url: "https://rameelo.com/artists" },
-    { name: artist.name, url: `https://rameelo.com/artists/${slug}` },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "Artists", url: "https://www.rameelo.com/artists" },
+    { name: artist.name, url: `https://www.rameelo.com/artists/${slug}` },
   ]);
+  // Upcoming-shows ItemList — the "tour dates" signal for "{artist} tour USA".
+  // Each item links to the event's own page (which carries full Event schema), so
+  // we don't duplicate Event entities here.
+  const tourLd = events.length > 0
+    ? itemListSchema(
+        `${artist.name} — Upcoming Tour Dates`,
+        events.map((e) => ({ name: `${artist.name} — ${e.title}`, url: `https://www.rameelo.com/events/${e.id}` })),
+      )
+    : null;
 
   return (
     <div className="min-h-screen overflow-x-clip" style={{ backgroundColor: "#FCF9F2" }}>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(artistLd) }} />
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(crumbs) }} />
+      {tourLd && <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: ld(tourLd) }} />}
 
       {/* ── CUSTOM DOMAIN OFFICIAL BANNER ──────────────────────────────── */}
       {via && (

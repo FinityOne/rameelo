@@ -324,7 +324,7 @@ export default function MarketingPage() {
           dateStr: e.start_date, timeStr: e.start_time, city: e.city, state: e.state, venue: e.venue_name,
           gradientCss: gradient.css, status: e.status,
           priceFrom: prices.length ? Math.min(...prices) : null,
-          url: `https://rameelo.com/events/${e.id}`,
+          url: `https://www.rameelo.com/events/${e.id}`,
         };
       });
       setEvents(vms);

@@ -7,13 +7,13 @@ export const metadata: Metadata = {
   title: "Terms of Service — Rameelo",
   description:
     "Rameelo's Terms of Service: how the platform works, all sales are final (no refunds unless the organizer cancels), event fulfillment is the organizer's responsibility, and Rameelo's role as a ticketing & payment facilitator.",
-  alternates: { canonical: "https://rameelo.com/terms" },
+  alternates: { canonical: "https://www.rameelo.com/terms" },
   robots: { index: true, follow: true },
   openGraph: {
     title: "Terms of Service — Rameelo",
     description: "How Rameelo works, ticket purchase terms, refunds, and platform rules.",
     type: "website",
-    url: "https://rameelo.com/terms",
+    url: "https://www.rameelo.com/terms",
     siteName: "Rameelo",
   },
 };
@@ -32,8 +32,8 @@ function Section({ n, title, children }: { n: string; title: string; children: R
 
 export default function TermsPage() {
   const crumbs = breadcrumbSchema([
-    { name: "Home", url: "https://rameelo.com" },
-    { name: "Terms of Service", url: "https://rameelo.com/terms" },
+    { name: "Home", url: "https://www.rameelo.com" },
+    { name: "Terms of Service", url: "https://www.rameelo.com/terms" },
   ]);
 
   return (
