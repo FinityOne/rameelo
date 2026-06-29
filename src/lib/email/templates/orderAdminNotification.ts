@@ -33,9 +33,11 @@ export function orderAdminNotificationEmail(p: {
   const firstName = parts[0] || "Unknown";
   const lastName = parts.slice(1).join(" ") || "—";
   const ticketWord = p.qty === 1 ? "ticket" : "tickets";
-  const method = ((p.paymentMethod ?? "").toLowerCase() === "ach" ? "ach" : "card") as PayMethod;
+  const rawMethod = (p.paymentMethod ?? "").toLowerCase();
+  const isManual = rawMethod === "manual";
+  const method = (rawMethod === "ach" ? "ach" : "card") as PayMethod;
   const isAch = method === "ach";
-  const payLabel = isAch ? "Bank transfer (ACH)" : "Credit / Debit card";
+  const payLabel = isManual ? "Manual / offline" : isAch ? "Bank transfer (ACH)" : "Credit / Debit card";
 
   const unitPrice = Number(p.unitPrice) || 0;
   const discount = Math.max(0, Number(p.discountAmount) || 0);
@@ -44,10 +46,14 @@ export function orderAdminNotificationEmail(p: {
   const processingFee = Number(p.processingFee) || 0;
   const grandTotal = Number(p.grandTotal) || 0;
 
-  const { platformRevenue, stripeCost, netProfit } = effectiveProfit(rameeloFee, processingFee, grandTotal, method);
+  // Manual / offline orders are settled directly by the organizer — Rameelo
+  // processes nothing, so there's no Stripe cost and no platform-fee profit.
+  const { platformRevenue, stripeCost, netProfit } = isManual
+    ? { platformRevenue: 0, stripeCost: 0, netProfit: 0 }
+    : effectiveProfit(rameeloFee, processingFee, grandTotal, method);
   const profitPositive = netProfit >= 0;
 
-  const subject = `💰 Order ${p.receiptNum} · ${firstName} ${lastName} · ${p.qty} ${ticketWord} — ${p.eventTitle}`;
+  const subject = `${isManual ? "📝 Manual order" : "💰 Order"} ${p.receiptNum} · ${firstName} ${lastName} · ${p.qty} ${ticketWord} — ${p.eventTitle}`;
 
   // ── Buyer contact ──────────────────────────────────────────────────────────
   const contactRow = (label: string, value: string) =>
@@ -99,9 +105,9 @@ export function orderAdminNotificationEmail(p: {
         ${moneyRow("Ticket face value (organizer)", `$${money(faceValue)}`, { strong: true })}
         <tr><td colspan="2" style="border-top:1px solid ${C.ivory200};padding-top:2px;"></td></tr>
         ${moneyRow("Rameelo platform fee (3%)", `$${money(rameeloFee)}`, { muted: true })}
-        ${processingFee > 0 ? moneyRow("Card processing fee (5%)", `$${money(processingFee)}`, { muted: true }) : moneyRow("Processing fee", "$0.00 (ACH — none)", { muted: true })}
+        ${processingFee > 0 ? moneyRow("Card processing fee (5%)", `$${money(processingFee)}`, { muted: true }) : moneyRow("Processing fee", isManual ? "$0.00 (manual — none)" : "$0.00 (ACH — none)", { muted: true })}
         <tr><td colspan="2" style="border-top:1px solid ${C.ivory200};padding-top:2px;"></td></tr>
-        ${moneyRow("Total paid by buyer", `$${money(grandTotal)}`, { strong: true })}
+        ${moneyRow(isManual ? "Total collected (offline)" : "Total paid by buyer", `$${money(grandTotal)}`, { strong: true })}
       </table>
     </td></tr></table>`;
 
@@ -122,6 +128,13 @@ export function orderAdminNotificationEmail(p: {
       <p style="margin:8px 0 0;font-family:${FONT_BODY};font-size:11px;line-height:1.5;color:${C.inkMuted};">Effective profit = Rameelo platform fee${processingFee > 0 ? " + card processing fee" : ""} − Stripe&rsquo;s processing cost on the $${money(grandTotal)} charged.</p>
     </td></tr></table>`;
 
+  // Manual / offline orders: Rameelo earns nothing — replace the profit panel.
+  const manualEconPanel = `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 6px;background:${C.marigold}14;border:1px solid ${C.marigold}40;border-radius:14px;">
+    <tr><td style="padding:14px 18px;">
+      <p style="margin:0 0 5px;font-family:${FONT_HEAD};font-size:15px;font-weight:800;color:${C.ink};">📝 Manual / offline order</p>
+      <p style="margin:0;font-family:${FONT_BODY};font-size:13px;line-height:1.6;color:${C.inkMuted};">Settled directly by the organizer. Rameelo processed <strong>$0.00</strong> and earns no platform or processing fee on this order — the $${money(grandTotal)} face value was collected offline by the organizer.</p>
+    </td></tr></table>`;
+
   const content = [
     eyebrow("New order · admin"),
     h1("New order received 💰"),
@@ -133,13 +146,13 @@ export function orderAdminNotificationEmail(p: {
     sectionTitle("Price breakdown"),
     pricePanel,
     sectionTitle("Rameelo economics"),
-    profitPanel,
+    isManual ? manualEconPanel : profitPanel,
     button(p.orderUrl, "Open in admin"),
     divider(),
   ].join("");
 
   const html = renderEmail({
-    preheader: `${firstName} ${lastName} · ${p.qty} ${ticketWord} · $${money(grandTotal)} · profit $${money(netProfit)} — ${p.eventTitle}`,
+    preheader: `${firstName} ${lastName} · ${p.qty} ${ticketWord} · $${money(grandTotal)} · ${isManual ? "manual / offline" : `profit $${money(netProfit)}`} — ${p.eventTitle}`,
     contentHtml: content,
   });
 
@@ -167,13 +180,16 @@ export function orderAdminNotificationEmail(p: {
     discount > 0 ? `  Group discount: -$${money(discount)}` : "",
     `  Ticket face value (organizer): $${money(faceValue)}`,
     `  Rameelo platform fee (3%): $${money(rameeloFee)}`,
-    processingFee > 0 ? `  Card processing fee (5%): $${money(processingFee)}` : "  Processing fee: $0.00 (ACH)",
-    `  Total paid by buyer: $${money(grandTotal)}`,
+    processingFee > 0 ? `  Card processing fee (5%): $${money(processingFee)}` : `  Processing fee: $0.00 (${isManual ? "manual" : "ACH"})`,
+    `  ${isManual ? "Total collected (offline)" : "Total paid by buyer"}: $${money(grandTotal)}`,
     "",
     "RAMEELO ECONOMICS",
-    `  Platform fee revenue: $${money(platformRevenue)}`,
-    `  ${stripeLabel}: -$${money(stripeCost)}`,
-    `  Effective profit: ${profitPositive ? "" : "-"}$${money(Math.abs(netProfit))}`,
+    ...(isManual
+      ? ["  Manual / offline order — settled directly by the organizer.",
+         `  Rameelo processed $0.00 and earns no fee. $${money(grandTotal)} collected offline.`]
+      : [`  Platform fee revenue: $${money(platformRevenue)}`,
+         `  ${stripeLabel}: -$${money(stripeCost)}`,
+         `  Effective profit: ${profitPositive ? "" : "-"}$${money(Math.abs(netProfit))}`]),
     "",
     `Open in admin: ${p.orderUrl}`,
     "",

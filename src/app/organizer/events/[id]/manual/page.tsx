@@ -105,7 +105,15 @@ export default function ManualOrderPage() {
       setSubmitting(false);
       return;
     }
-    fetch("/api/manual-order-send", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId: result.orderId }) }).catch(() => {});
+    // Fire-and-forget notifications (same as checkout): the buyer's confirmation,
+    // the organizing team's new-order alert, and the platform-admin order record.
+    // The team/admin templates render manual/offline orders correctly (no fees,
+    // no Stripe profit). None of these block the success screen.
+    const notify = (path: string) =>
+      fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ orderId: result.orderId }) }).catch(() => {});
+    notify("/api/manual-order-send");
+    notify("/api/order-team-notify");
+    notify("/api/order-admin-notify");
     setDone({ name: `${firstName.trim()} ${lastName.trim()}`.trim() || email.trim(), qty: result.qty, total: result.total, hasAccount: result.recipientExists });
     setSubmitting(false);
   }
