@@ -729,6 +729,50 @@ export default function EventDetailClient({ id }: { id: string }) {
     buyPanelRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 
+  // ── Promo code advertising ───────────────────────────────────────────────
+  // The best currently-active code for this event (public, via RPC). Shown as a
+  // popup on load and as a persistent strip at the top of the ticket panel.
+  const [promo, setPromo] = useState<{ code: string; amount: number } | null>(null);
+  const [showPromoPopup, setShowPromoPopup] = useState(false);
+  const [promoPopupIn, setPromoPopupIn]     = useState(false);
+  const [promoCopied, setPromoCopied]       = useState(false);
+  const promoPopupShownRef = useRef(false);
+
+  // Auto-open the popup once, shortly after load, for a live + sellable event.
+  useEffect(() => {
+    if (!promo || !event || promoPopupShownRef.current || inviteGroup) return;
+    if (!event.selling_on_rameelo) return;
+    const soldOut = event.ticket_tiers.length > 0 && event.ticket_tiers.every(tierIsSoldOut);
+    if (soldOut || salesClosedForEvent(event)) return;
+    promoPopupShownRef.current = true;
+    const t = setTimeout(() => setShowPromoPopup(true), 700);
+    return () => clearTimeout(t);
+  }, [promo, event, inviteGroup]);
+
+  // Entrance transition (mount → animate in).
+  useEffect(() => {
+    if (!showPromoPopup) { setPromoPopupIn(false); return; }
+    const t = setTimeout(() => setPromoPopupIn(true), 10);
+    return () => clearTimeout(t);
+  }, [showPromoPopup]);
+
+  // Closing the popup (X, backdrop, or CTA) always sends the buyer straight to
+  // ticket selection — key on mobile, where the tickets are far down the page.
+  function dismissPromoToTickets() {
+    setPromoPopupIn(false);
+    setTimeout(() => setShowPromoPopup(false), 200);
+    setTimeout(() => scrollToBuyPanel(), 180);
+  }
+
+  async function copyPromo() {
+    if (!promo) return;
+    try {
+      await navigator.clipboard.writeText(promo.code);
+      setPromoCopied(true);
+      setTimeout(() => setPromoCopied(false), 1800);
+    } catch { /* clipboard unavailable — the code is shown, buyer can type it */ }
+  }
+
   // Interest form (for non-Rameelo events)
   const [interestName, setInterestName]           = useState("");
   const [interestEmail, setInterestEmail]         = useState("");
@@ -795,6 +839,11 @@ export default function EventDetailClient({ id }: { id: string }) {
         // Combo tickets that include this event (org-spanning bundles).
         supabase.rpc("get_event_combo_tickets", { p_event_id: id }).then(({ data: comboRows }) => {
           if (!cancelled) setCombos((comboRows ?? []) as ComboTicket[]);
+        });
+        // Best active promo code for this event (public advertising).
+        supabase.rpc("get_event_promo", { p_event_id: id }).then(({ data: promoRows }) => {
+          const p = Array.isArray(promoRows) ? promoRows[0] : promoRows;
+          if (p && !cancelled) setPromo({ code: p.code as string, amount: Number(p.amount_per_ticket) });
         });
       }
     }
@@ -1512,6 +1561,27 @@ export default function EventDetailClient({ id }: { id: string }) {
           <div ref={buyPanelRef} className="w-full lg:w-96 shrink-0">
             <div className="lg:sticky lg:top-5 space-y-4">
 
+              {/* Promo code strip — persists at the top of the ticket area so the
+                  code stays in view while the buyer selects tickets */}
+              {promo && event.selling_on_rameelo && !salesClosed && !totalSoldOut && (
+                <div className="rounded-2xl border border-dashed border-peacock/40 bg-peacock/5 px-4 py-3 flex items-center gap-3">
+                  <span className="text-xl shrink-0">🏷️</span>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-ui text-sm font-semibold text-ink leading-tight">Save ${money(promo.amount)} on every ticket</p>
+                    <p className="font-mono text-[11px] text-ink-muted mt-0.5">
+                      Use code <span className="font-bold text-peacock tracking-wider">{promo.code}</span> at checkout
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={copyPromo}
+                    className="shrink-0 font-mono text-[10px] uppercase tracking-widest px-2.5 py-1.5 rounded-lg border border-peacock/30 text-peacock hover:bg-peacock/10 transition-colors"
+                  >
+                    {promoCopied ? "Copied" : "Copy"}
+                  </button>
+                </div>
+              )}
+
               {/* Combo tickets (org-spanning bundles) — shown above the regular tickets */}
               {buyableCombos.length > 0 && (
                 <div id="combo-tickets" className="space-y-3 scroll-mt-5">
@@ -2096,6 +2166,65 @@ export default function EventDetailClient({ id }: { id: string }) {
               Join group →
             </span>
           </Link>
+        </div>
+      )}
+
+      {/* ── Promo code popup — advertises the active code, then drops the buyer
+          onto ticket selection (esp. mobile) on any dismissal ── */}
+      {showPromoPopup && promo && (
+        <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center sm:p-4" role="dialog" aria-modal="true" aria-label="Ticket discount offer">
+          <div
+            className={`absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity duration-300 ${promoPopupIn ? "opacity-100" : "opacity-0"}`}
+            onClick={dismissPromoToTickets}
+          />
+          <div className={`relative w-full sm:max-w-sm bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl overflow-hidden transition-all duration-300 ${promoPopupIn ? "translate-y-0 opacity-100" : "translate-y-8 opacity-0"}`}>
+            {/* Header */}
+            <div className="relative px-6 pt-8 pb-6 text-center overflow-hidden" style={{ background: "linear-gradient(150deg, #2E1B30 0%, #3d2540 55%, #2E1B30 100%)" }}>
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-56 h-56 rounded-full opacity-25 blur-3xl pointer-events-none" style={{ background: "radial-gradient(circle, #F5A623 0%, transparent 70%)" }} />
+              <button
+                onClick={dismissPromoToTickets}
+                aria-label="Close and see tickets"
+                className="absolute top-3 right-3 z-10 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white/80 flex items-center justify-center transition-colors"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+              <div className="relative">
+                <span className="inline-block font-mono text-[10px] font-bold uppercase tracking-[0.2em] text-marigold mb-3">Limited-time offer</span>
+                <p className="text-4xl mb-2 leading-none">🎟️</p>
+                <h3 className="font-display font-black text-white text-2xl leading-tight" style={{ letterSpacing: "-0.02em" }}>
+                  Save ${money(promo.amount)} on<br />every ticket
+                </h3>
+                <p className="font-ui text-white/60 text-sm mt-2 max-w-[16rem] mx-auto leading-relaxed">
+                  Grab your spot before this deal&rsquo;s gone — the discount applies to <span className="text-white/90 font-semibold">each ticket</span> in your order.
+                </p>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="px-6 pt-5 pb-[calc(1.5rem+env(safe-area-inset-bottom))] sm:pb-6">
+              <div className="flex items-center justify-between gap-3 rounded-2xl border-2 border-dashed border-aubergine/25 bg-ivory/60 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted mb-0.5">Your code</p>
+                  <p className="font-mono font-black text-xl tracking-[0.15em] text-aubergine truncate">{promo.code}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={copyPromo}
+                  className="shrink-0 font-mono text-[10px] uppercase tracking-widest px-3 py-2 rounded-xl bg-aubergine text-white hover:bg-aubergine-light transition-colors"
+                >
+                  {promoCopied ? "Copied ✓" : "Copy"}
+                </button>
+              </div>
+
+              <button
+                onClick={dismissPromoToTickets}
+                className="mt-4 w-full py-4 rounded-2xl bg-marigold text-aubergine font-display font-bold text-base hover:bg-marigold-dark active:scale-[0.98] transition-all shadow-sm"
+              >
+                Get my tickets →
+              </button>
+              <p className="font-mono text-[10px] text-ink-muted text-center mt-3">Enter the code at checkout to apply your discount</p>
+            </div>
+          </div>
         </div>
       )}
     </div>

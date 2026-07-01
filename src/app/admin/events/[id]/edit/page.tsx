@@ -6,6 +6,7 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "@/app/organizer/events/create/types";
 import ComboTicketsManager from "./ComboTicketsManager";
+import PromoCodesManager from "./PromoCodesManager";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -352,9 +353,9 @@ function ToggleRow({ title, desc, checked, onChange }: {
 
 // ─── Main page ────────────────────────────────────────────────────────────────
 
-type ActiveTab = "details" | "schedule" | "venue" | "cover" | "tickets";
+type ActiveTab = "details" | "schedule" | "venue" | "cover" | "tickets" | "promos";
 
-const VALID_TABS: ActiveTab[] = ["details", "schedule", "venue", "cover", "tickets"];
+const VALID_TABS: ActiveTab[] = ["details", "schedule", "venue", "cover", "tickets", "promos"];
 
 export default function AdminEventEditPage() {
   const { id } = useParams<{ id: string }>();
@@ -612,6 +613,7 @@ export default function AdminEventEditPage() {
     { id: "venue",    label: "Venue",          icon: "📍" },
     { id: "cover",    label: "Cover & Style",  icon: "🎨" },
     { id: "tickets",  label: "Tickets",        icon: "🎟️" },
+    { id: "promos",   label: "Promo Codes",    icon: "🏷️" },
   ];
 
   const tabHasDot: Record<ActiveTab, boolean> = {
@@ -620,6 +622,7 @@ export default function AdminEventEditPage() {
     venue:    evDirty,
     cover:    evDirty,
     tickets:  tiers.some(t => t._dirty),
+    promos:   false,
   };
 
   return (
@@ -1290,6 +1293,15 @@ export default function AdminEventEditPage() {
 
           {/* Combo tickets — org-spanning bundles (saved independently of the tiers above) */}
           <ComboTicketsManager eventId={id} orgId={ev.org_id} />
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════
+          PROMO CODES TAB (admin-only, saved independently)
+      ══════════════════════════════════════════ */}
+      {activeTab === "promos" && (
+        <div className="rounded-2xl border border-ivory-200 bg-white p-5 sm:p-6">
+          <PromoCodesManager eventId={id} />
         </div>
       )}
 

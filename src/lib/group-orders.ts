@@ -375,6 +375,12 @@ export async function saveOrder(params: {
   termsAcceptedIp?: string | null;
   stripePaymentIntentId?: string | null;
   paymentPending?: boolean;
+  // Promo code applied at checkout (single-buyer flow only). The promo dollars
+  // are already folded into `discountAmount` for revenue/payout math; these
+  // columns record which code was used and its share of the discount.
+  promoCodeId?: string | null;
+  promoCode?: string | null;
+  promoDiscountAmount?: number;
 }): Promise<{ orderId: string | null; error: string | null }> {
   const supabase = createClient();
 
@@ -407,6 +413,9 @@ export async function saveOrder(params: {
       unit_price: params.unitPrice,
       discount_pct: params.discountPct,
       discount_amount: params.discountAmount,
+      promo_code_id: params.promoCodeId ?? null,
+      promo_code: params.promoCode ?? null,
+      promo_discount_amount: params.promoDiscountAmount ?? 0,
       service_fee: params.serviceFee,
       rameelo_fee: params.rameeloFee,
       processing_fee: params.processingFee,
