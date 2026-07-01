@@ -5,6 +5,9 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOrg } from "../org-context";
 import { orderRevenue, money, type BalanceOrder } from "@/lib/payouts";
+import { promoSummary } from "@/lib/promo-report";
+
+type PromoFields = { promo_code: string | null; promo_discount_amount: number | null };
 
 const RAMEELO_FEE_PCT = 0.03; // charged to the buyer
 const CARD_FEE_PCT = 0.05;    // charged to the buyer (free with ACH)
@@ -15,7 +18,7 @@ function fmtMonth(d: string) { return new Date(d).toLocaleDateString("en-US", { 
 
 export default function EarningsPage() {
   const { activeOrg } = useOrg();
-  const [orders, setOrders] = useState<(BalanceOrder & { event_id: string })[]>([]);
+  const [orders, setOrders] = useState<(BalanceOrder & { event_id: string } & PromoFields)[]>([]);
   const [eventTitles, setEventTitles] = useState<Map<string, string>>(new Map());
   const [loading, setLoading] = useState(true);
 
@@ -32,10 +35,10 @@ export default function EarningsPage() {
       if (events.length === 0) { setOrders([]); setLoading(false); return; }
       const { data } = await supabase
         .from("orders")
-        .select("event_id, created_at, qty, unit_price, discount_amount, status, dispute_status, order_type")
+        .select("event_id, created_at, qty, unit_price, discount_amount, promo_code, promo_discount_amount, status, dispute_status, order_type")
         .in("event_id", events.map(e => e.id))
         .eq("is_test", false);
-      setOrders((data ?? []) as (BalanceOrder & { event_id: string })[]);
+      setOrders((data ?? []) as (BalanceOrder & { event_id: string } & PromoFields)[]);
       setLoading(false);
     }
     load();
@@ -49,6 +52,8 @@ export default function EarningsPage() {
   const tickets = confirmed.reduce((s, o) => s + o.qty, 0);
   const manualRevenue = manualOrders.reduce((s, o) => s + orderRevenue(o), 0);
   const manualTickets = manualOrders.reduce((s, o) => s + o.qty, 0);
+  // Promo-code orders (online, confirmed) — revenue net of the promo discount.
+  const promo = useMemo(() => promoSummary(confirmed), [confirmed]);
 
   const byEvent = useMemo(() => {
     const m = new Map<string, EventAgg>();
@@ -116,6 +121,31 @@ export default function EarningsPage() {
               </div>
             </div>
           </div>
+
+          {/* Promo code orders — revenue net of the discount given */}
+          {promo.orders > 0 && (
+            <div className="bg-white rounded-2xl border border-ivory-200 overflow-hidden">
+              <div className="px-5 py-3 bg-peacock/5 border-b border-peacock/15 flex items-center gap-2">
+                <span className="text-sm">🏷️</span>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-peacock font-bold">Promo code orders</p>
+              </div>
+              <div className="p-5 flex items-end justify-between gap-4 flex-wrap">
+                <div>
+                  <p className="font-display font-bold text-peacock" style={{ fontSize: 32, letterSpacing: "-0.03em", lineHeight: 1.05 }}>${money(promo.netRevenue)}</p>
+                  <p className="font-mono text-[10px] text-ink-muted mt-1">Revenue from promo-code orders — <strong>net of the discount</strong> (ticket face value minus the code amount)</p>
+                </div>
+                <div className="grid grid-cols-3 gap-4 text-right">
+                  {[
+                    { label: "Orders", value: promo.orders.toLocaleString() },
+                    { label: "Tickets", value: promo.tickets.toLocaleString() },
+                    { label: "Discount given", value: "−$" + money(promo.discountGiven) },
+                  ].map(s => (
+                    <div key={s.label}><p className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>{s.value}</p><p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">{s.label}</p></div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Revenue by month */}
           {byMonth.length > 1 && (

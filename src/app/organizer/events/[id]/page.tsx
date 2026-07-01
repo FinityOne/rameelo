@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { GRADIENTS } from "../create/types";
 import { useOrg } from "../../org-context";
 import { eventAccessOrFilter } from "@/lib/organizer-access";
+import { promoSummary, type PromoSummary } from "@/lib/promo-report";
 import EventSubnav from "./EventSubnav";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -183,6 +184,7 @@ export default function EventDashboardPage() {
   const [groupCount, setGroupCount]   = useState(0);
   const [comboStats, setComboStats]   = useState<{ tickets: number; revenue: number; orders: number }>({ tickets: 0, revenue: 0, orders: 0 });
   const [manualStats, setManualStats] = useState<{ tickets: number; revenue: number; orders: number }>({ tickets: 0, revenue: 0, orders: 0 });
+  const [promoStats, setPromoStats]   = useState<PromoSummary | null>(null);
   const [loading, setLoading]         = useState(true);
 
   useEffect(() => {
@@ -191,7 +193,7 @@ export default function EventDashboardPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const [evRes, ordRes, grpRes, comboRes, manualRes] = await Promise.all([
+      const [evRes, ordRes, grpRes, comboRes, manualRes, promoRes] = await Promise.all([
         supabase
           .from("events")
           .select("id, title, category, artist, description, start_date, end_date, start_time, end_time, doors_open_time, is_multi_day, venue_name, address_line1, address_line2, city, state, zip, status, selling_on_rameelo, review_note, cover_image_url, cover_gradient, capacity, ticket_tiers(id, name, price, quantity, quantity_sold, quantity_comped)")
@@ -232,6 +234,15 @@ export default function EventDashboardPage() {
           .eq("order_type", "manual")
           .eq("is_test", false)
           .eq("status", "confirmed"),
+
+        // Promo-code orders anchored to this event (revenue net of the discount).
+        supabase
+          .from("orders")
+          .select("qty, unit_price, discount_amount, promo_code, promo_discount_amount")
+          .eq("event_id", id)
+          .eq("is_test", false)
+          .eq("status", "confirmed")
+          .not("promo_code", "is", null),
       ]);
 
       if (!evRes.data) { router.replace("/organizer/events"); return; }
@@ -253,6 +264,7 @@ export default function EventDashboardPage() {
         revenue: manualRows.reduce((s, o) => s + (Number(o.grand_total) || 0), 0),
         orders: manualRows.length,
       });
+      setPromoStats(promoSummary((promoRes.data ?? []) as { qty: number; unit_price: number | null; discount_amount: number | null; promo_code: string | null; promo_discount_amount: number | null }[]));
       setLoading(false);
     }
     load();
@@ -477,6 +489,31 @@ export default function EventDashboardPage() {
           </div>
         ))}
       </div>
+
+      {/* ── Promo code orders — revenue net of the discount given ── */}
+      {promoStats && promoStats.orders > 0 && (
+        <div className="bg-white rounded-2xl border border-peacock/20 overflow-hidden">
+          <div className="px-5 py-2.5 bg-peacock/5 border-b border-peacock/15 flex items-center gap-2">
+            <span className="text-sm">🏷️</span>
+            <p className="font-mono text-[10px] uppercase tracking-widest text-peacock font-bold">Promo code orders</p>
+          </div>
+          <div className="p-5 flex items-end justify-between gap-4 flex-wrap">
+            <div>
+              <p className="font-display font-bold text-peacock" style={{ fontSize: 26, letterSpacing: "-0.03em", lineHeight: 1.05 }}>{fmtCurrency(promoStats.netRevenue)}</p>
+              <p className="font-mono text-[10px] text-ink-muted mt-1">Revenue from promo-code orders — <strong>net of the discount</strong> (face value minus the code amount)</p>
+            </div>
+            <div className="grid grid-cols-3 gap-4 text-right">
+              {[
+                { label: "Orders", value: promoStats.orders.toLocaleString() },
+                { label: "Tickets", value: promoStats.tickets.toLocaleString() },
+                { label: "Discount given", value: "−" + fmtCurrency(promoStats.discountGiven) },
+              ].map(s => (
+                <div key={s.label}><p className="font-display font-bold text-ink text-base" style={{ letterSpacing: "-0.02em" }}>{s.value}</p><p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">{s.label}</p></div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Revenue progress bar ── */}
       {maxRev > 0 && (

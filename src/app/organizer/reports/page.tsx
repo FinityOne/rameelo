@@ -4,12 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOrg } from "../org-context";
+import { promoSummary } from "@/lib/promo-report";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 type Order = {
   id: string; buyer_email: string; buyer_name: string;
   qty: number; unit_price: number; discount_amount: number; grand_total: number;
+  promo_code: string | null; promo_discount_amount: number;
   status: string; created_at: string; event_id: string; tier_id: string;
   order_type: string;
   eventTitle: string; eventState: string; tierName: string;
@@ -123,7 +125,7 @@ export default function ReportsPage() {
 
       const { data: rawOrders } = await supabase
         .from("orders")
-        .select("id, buyer_email, buyer_name, qty, unit_price, discount_amount, grand_total, status, created_at, event_id, tier_id, order_type")
+        .select("id, buyer_email, buyer_name, qty, unit_price, discount_amount, grand_total, promo_code, promo_discount_amount, status, created_at, event_id, tier_id, order_type")
         .in("event_id", events.map(e => e.id))
         .eq("is_test", false)
         .neq("status", "pending")   // organizers only see paid orders, never pending ones
@@ -172,6 +174,8 @@ export default function ReportsPage() {
   const revenue = confirmed.reduce((s, o) => s + Number(o.grand_total), 0);
   const tickets = confirmed.reduce((s, o) => s + o.qty, 0);
   const aov = confirmed.length ? revenue / confirmed.length : 0;
+  // Promo-code orders — organizer revenue net of the promo discount.
+  const promo = useMemo(() => promoSummary(confirmed), [confirmed]);
 
   const byEvent = useMemo(() => groupSum(confirmed, o => o.eventTitle, o => Number(o.grand_total)).sort((a, b) => b.value - a.value).slice(0, 10), [confirmed]);
   const byTier = useMemo(() => {
@@ -253,10 +257,11 @@ export default function ReportsPage() {
   }
   function resetFilters() { setRange("all"); setEventId("all"); setTier("all"); setStatus("all"); }
   function exportCsv() {
-    const headers = ["Order", "Date", "Buyer", "Email", "Event", "Tier", "Qty", "Unit Price", "Discount", "Total", "Status"];
+    const headers = ["Order", "Date", "Buyer", "Email", "Event", "Tier", "Qty", "Unit Price", "Discount", "Promo Code", "Promo Discount", "Total", "Status"];
     const rows = filtered.map(o => [
       "RM-" + o.id.replace(/-/g, "").slice(0, 10).toUpperCase(), new Date(o.created_at).toISOString(),
-      o.buyer_name, o.buyer_email, o.eventTitle, o.tierName, o.qty, o.unit_price, o.discount_amount, o.grand_total, o.status,
+      o.buyer_name, o.buyer_email, o.eventTitle, o.tierName, o.qty, o.unit_price, o.discount_amount,
+      o.promo_code ?? "", Number(o.promo_discount_amount) || 0, o.grand_total, o.status,
     ]);
     const esc = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
     const csv = [headers, ...rows].map(r => r.map(esc).join(",")).join("\n");
@@ -336,6 +341,30 @@ export default function ReportsPage() {
               </div>
             ))}
           </div>
+
+          {/* Promo code orders — revenue net of the discount given */}
+          {promo.orders > 0 && (
+            <div className="bg-white rounded-2xl border border-peacock/20 overflow-hidden">
+              <div className="px-4 py-2.5 bg-peacock/5 border-b border-peacock/15 flex items-center gap-2">
+                <span className="text-sm">🏷️</span>
+                <p className="font-mono text-[10px] uppercase tracking-widest text-peacock font-bold">Promo code orders</p>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 divide-x divide-y sm:divide-y-0 divide-ivory-200">
+                {[
+                  { label: "Net revenue", value: `$${money(promo.netRevenue)}`, hint: "face value − promo", strong: true },
+                  { label: "Orders", value: promo.orders.toLocaleString() },
+                  { label: "Tickets", value: promo.tickets.toLocaleString() },
+                  { label: "Discount given", value: `−$${money(promo.discountGiven)}` },
+                ].map(s => (
+                  <div key={s.label} className="px-4 py-3">
+                    <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">{s.label}</p>
+                    <p className={`font-display font-bold text-lg mt-0.5 ${s.strong ? "text-peacock" : "text-ink"}`} style={{ letterSpacing: "-0.02em" }}>{s.value}</p>
+                    {s.hint && <p className="font-mono text-[8px] text-ink-muted/70 mt-0.5">{s.hint}</p>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           <Card title="Revenue by Day" subtitle="Daily ticket revenue across the selected range">
             {byDay.length === 0 ? <Empty>No revenue in this range.</Empty> : (

@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { orderRevenue } from "@/lib/payouts";
+import { promoSummary, type PromoSummary } from "@/lib/promo-report";
 import { useOrg } from "./org-context";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -26,7 +27,7 @@ type RawEvent = {
 
 // Face value only — unit_price & discount_amount drive organizer revenue; the
 // 3% Rameelo fee and 5% card fee are charged to the buyer and never shown here.
-type OrderRow = { event_id: string; qty: number; unit_price: number; discount_amount: number; created_at: string; status: string; dispute_status: string };
+type OrderRow = { event_id: string; qty: number; unit_price: number; discount_amount: number; promo_code?: string | null; promo_discount_amount?: number | null; created_at: string; status: string; dispute_status: string };
 
 type EventCard = {
   id: string;
@@ -118,6 +119,7 @@ export default function OrganizerHubPage() {
   const [events, setEvents] = useState<EventCard[]>([]);
   const [recentOrders, setRecentOrders] = useState<(OrderRow & { event_title: string })[]>([]);
   const [totalRevenue, setTotalRevenue] = useState(0);
+  const [promo, setPromo] = useState<PromoSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -137,7 +139,7 @@ export default function OrganizerHubPage() {
 
       const eventIds = (rawEvents ?? []).map((e: { id: string }) => e.id);
       const { data: orders } = eventIds.length > 0
-        ? await supabase.from("orders").select("event_id, qty, unit_price, discount_amount, created_at, status, dispute_status, order_type").in("event_id", eventIds).eq("status", "confirmed").eq("is_test", false).order("created_at", { ascending: false })
+        ? await supabase.from("orders").select("event_id, qty, unit_price, discount_amount, promo_code, promo_discount_amount, created_at, status, dispute_status, order_type").in("event_id", eventIds).eq("status", "confirmed").eq("is_test", false).order("created_at", { ascending: false })
         : { data: [] };
 
       // Paid ONLINE orders: confirmed + non-test (already filtered above), not a
@@ -166,6 +168,7 @@ export default function OrganizerHubPage() {
 
       const revenue = allOrders.reduce((s, o) => s + orderRevenue(o), 0);
       setTotalRevenue(revenue);
+      setPromo(promoSummary(allOrders));
 
       // Enrich recent orders with event titles
       const titleMap = Object.fromEntries(cards.map((c) => [c.id, c.title]));
@@ -248,6 +251,33 @@ export default function OrganizerHubPage() {
         <KpiTile label="Live Events"       value={String(upcomingEvents.length)} sub={draftEvents.length > 0 ? `${draftEvents.length} in draft` : "all published"} accent="#1A6B7C" />
         <KpiTile label="Events Created"    value={String(events.length)} sub={pastEvents.length > 0 ? `${pastEvents.length} completed` : "keep going"} accent="#8B2252" />
       </div>
+
+      {/* ── Promo code orders — revenue net of the discount given ── */}
+      {promo && promo.orders > 0 && (
+        <div className="rounded-2xl border border-peacock/20 bg-white overflow-hidden flex items-center flex-wrap gap-y-3 px-5 py-4">
+          <div className="flex items-center gap-2.5 flex-1 min-w-[220px]">
+            <span className="text-lg">🏷️</span>
+            <div>
+              <p className="font-mono text-[9px] uppercase tracking-widest text-peacock font-bold">Promo code orders</p>
+              <p className="font-ui text-[11px] text-ink-muted mt-0.5">Net of discount · face value minus the code amount</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-6">
+            <div className="text-right">
+              <p className="font-display font-bold text-peacock text-lg" style={{ letterSpacing: "-0.02em" }}>{fmtMoney(promo.netRevenue)}</p>
+              <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Net revenue</p>
+            </div>
+            <div className="text-right">
+              <p className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>{promo.orders.toLocaleString()}</p>
+              <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Orders</p>
+            </div>
+            <div className="text-right">
+              <p className="font-display font-bold text-ink text-lg" style={{ letterSpacing: "-0.02em" }}>−{fmtMoney(promo.discountGiven)}</p>
+              <p className="font-mono text-[9px] uppercase tracking-widest text-ink-muted">Discount</p>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Two-col row ───────────────────────────────────────────── */}
       <div className="grid lg:grid-cols-5 gap-4">
