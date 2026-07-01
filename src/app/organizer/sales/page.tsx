@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { useOrg } from "../org-context";
+import { promoSummary, type PromoSummary } from "@/lib/promo-report";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -355,7 +356,7 @@ function TierLeaderboard({ events }: { events: EventStat[] }) {
 
 // ── Revenue Breakdown ─────────────────────────────────────────────────────────
 
-function RevenueBreakdown({ events }: { events: EventStat[] }) {
+function RevenueBreakdown({ events, promo }: { events: EventStat[]; promo: PromoSummary | null }) {
   const totalEarned = events.reduce((s, e) => s + e.earnedRevenue, 0);
   const totalMax = events.reduce((s, e) => s + e.maxRevenue, 0);
   const totalRemaining = totalMax - totalEarned;
@@ -394,6 +395,21 @@ function RevenueBreakdown({ events }: { events: EventStat[] }) {
             </div>
           </div>
         ))}
+
+        {promo && promo.orders > 0 && (
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-2.5">
+              <div className="w-2.5 h-2.5 rounded-full shrink-0 bg-peacock/60" />
+              <div>
+                <p className="font-ui text-sm text-ink-muted">From promo codes 🏷️</p>
+                <p className="font-mono text-[9px] text-ink-muted">{promo.orders} order{promo.orders !== 1 ? "s" : ""} · net of −{fmtCurrency(promo.discountGiven)} discount</p>
+              </div>
+            </div>
+            <p className="font-display font-bold text-base" style={{ color: "#0E8C7A", letterSpacing: "-0.02em" }}>
+              {fmtCurrency(promo.netRevenue)}
+            </p>
+          </div>
+        )}
 
         <div className="mt-4 pt-4 border-t border-ivory-200 rounded-xl bg-ivory p-3">
           <div className="flex items-center justify-between">
@@ -480,6 +496,7 @@ function VelocityInsight({ events }: { events: EventStat[] }) {
 export default function OrganizerSalesPage() {
   const { activeOrg } = useOrg();
   const [events, setEvents] = useState<EventStat[]>([]);
+  const [promo, setPromo] = useState<PromoSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -504,12 +521,12 @@ export default function OrganizerSalesPage() {
       // not a lost/open chargeback, never pending. Sold counts & revenue come from
       // these real orders. Tier orders aggregate by tier; combos (untiered, anchored
       // to an event) aggregate per event.
-      type PaidOrder = { event_id: string; tier_id: string | null; order_type: string; qty: number; unit_price: number; discount_amount: number; dispute_status: string | null };
+      type PaidOrder = { event_id: string; tier_id: string | null; order_type: string; qty: number; unit_price: number; discount_amount: number; promo_code: string | null; promo_discount_amount: number; dispute_status: string | null };
       let paidOrders: PaidOrder[] = [];
       if (eventIds.length > 0) {
         const { data: ordersRaw } = await supabase
           .from("orders")
-          .select("event_id, tier_id, order_type, qty, unit_price, discount_amount, dispute_status")
+          .select("event_id, tier_id, order_type, qty, unit_price, discount_amount, promo_code, promo_discount_amount, dispute_status")
           .in("event_id", eventIds)
           .eq("is_test", false)
           .eq("status", "confirmed")
@@ -556,6 +573,7 @@ export default function OrganizerSalesPage() {
         };
       });
       setEvents(computed);
+      setPromo(promoSummary(paidOrders));
       setLoading(false);
     }
     load();
@@ -626,7 +644,7 @@ export default function OrganizerSalesPage() {
           <div className="grid lg:grid-cols-2 gap-5">
             <div className="space-y-5">
               <RevenueScenarios events={events} />
-              <RevenueBreakdown events={events} />
+              <RevenueBreakdown events={events} promo={promo} />
             </div>
             <div className="space-y-5">
               <EventComparison events={events} />
