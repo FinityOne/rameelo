@@ -16,6 +16,7 @@ type OrderReceipt = {
   unit_price: number;
   discount_pct: number;
   discount_amount: number;
+  promo_code: string | null;
   service_fee: number;
   grand_total: number;
   status: string;
@@ -86,7 +87,7 @@ export default function ReceiptPage() {
         .from("orders")
         .select(`
           id, buyer_name, buyer_email, buyer_phone,
-          qty, unit_price, discount_pct, discount_amount, service_fee, grand_total,
+          qty, unit_price, discount_pct, discount_amount, promo_code, service_fee, grand_total,
           status, created_at, group_id,
           events (id, title, start_date, start_time, venue_name, city, state),
           ticket_tiers (name, price)
@@ -99,7 +100,7 @@ export default function ReceiptPage() {
 
       const raw = data as unknown as {
         id: string; buyer_name: string; buyer_email: string; buyer_phone: string | null;
-        qty: number; unit_price: number; discount_pct: number; discount_amount: number;
+        qty: number; unit_price: number; discount_pct: number; discount_amount: number; promo_code: string | null;
         service_fee: number; grand_total: number; status: string; created_at: string; group_id: string | null;
         events: { id: string; title: string; start_date: string; start_time: string | null; venue_name: string; city: string; state: string };
         ticket_tiers: { name: string; price: number };
@@ -278,8 +279,10 @@ export default function ReceiptPage() {
               {Number(order.discount_amount) > 0 && (
                 <div className="grid grid-cols-[1fr_auto_auto] gap-4 px-4 py-3 border-b border-ivory-200 bg-peacock/4">
                   <div>
-                    <p className="font-ui text-sm text-peacock">Group discount</p>
-                    <p className="font-mono text-[10px] text-peacock/70">{order.discount_pct}% off — applied at checkout</p>
+                    <p className="font-ui text-sm text-peacock">{order.promo_code ? "Promo code" : "Group discount"}</p>
+                    <p className="font-mono text-[10px] text-peacock/70">
+                      {order.promo_code ? `${order.promo_code} — applied at checkout` : `${order.discount_pct}% off — applied at checkout`}
+                    </p>
                   </div>
                   <p className="font-ui text-sm text-peacock text-right self-center">{order.qty}</p>
                   <p className="font-ui text-sm text-peacock text-right self-center font-medium">−${Number(order.discount_amount).toFixed(2)}</p>

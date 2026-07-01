@@ -62,6 +62,10 @@ type PaymentMethod = "card" | "ach";
 
 // Fee math is centralized in src/lib/fees.ts — 3% Rameelo fee always on FACE value.
 const CARD_FEE_PCT = 0.05; // kept for the "+5% processing fee" toggle label
+const round2 = (n: number) => Math.round(n * 100) / 100;
+
+// A validated promo code applied at checkout — a flat $ amount off per ticket.
+type AppliedPromo = { id: string; code: string; amountPerTicket: number };
 
 // Bank/ACH transfers take 2–5 business days to settle, so we cut them off this many
 // days before the event — close to the date it's card-only, keeping check-in clean.
@@ -209,6 +213,12 @@ export default function CheckoutPage() {
   // Payment method
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("card");
 
+  // Promo code (single-buyer flow only — never on group orders)
+  const [promoInput, setPromoInput]   = useState("");
+  const [appliedPromo, setAppliedPromo] = useState<AppliedPromo | null>(null);
+  const [promoChecking, setPromoChecking] = useState(false);
+  const [promoError, setPromoError]   = useState("");
+
   // Stripe: clientSecret for the current PaymentIntent (recreated per method/amount)
   const [clientSecret, setClientSecret] = useState<string | null>(null);
   const [paymentIntentId, setPaymentIntentId] = useState<string | null>(null);
@@ -272,11 +282,24 @@ export default function CheckoutPage() {
     });
   }, []);
 
-  const subtotal = payload?.subtotalAfterDiscount ?? payload?.grandTotal ?? 0;
-  // Face value (pre-discount) = discounted subtotal + the discount that was applied.
-  // The 3% Rameelo fee is charged on this face value regardless of the discount.
-  const faceSubtotal = subtotal + (payload?.discountAmount ?? 0);
-  const { rameeloFee, processingFee, grandTotal } = computeFees(faceSubtotal, subtotal, paymentMethod);
+  const qty = payload?.qty ?? 1;
+  // Ticket subtotal after any GROUP discount but BEFORE the promo code.
+  const groupSubtotal = payload?.subtotalAfterDiscount ?? payload?.grandTotal ?? 0;
+  // Face value (pre-any-discount) = group-discounted subtotal + the group discount.
+  // The 3% Rameelo fee is charged on this face value regardless of any discount.
+  const faceSubtotal = groupSubtotal + (payload?.discountAmount ?? 0);
+
+  // Promo code: a flat $ off EACH ticket, capped so the ticket subtotal can't go
+  // below zero. It reduces ONLY the ticket subtotal — the platform + card fees are
+  // computed on the pre-promo amounts below, so a promo never shrinks the fees.
+  const promoPerTicket  = appliedPromo?.amountPerTicket ?? 0;
+  const promoDiscount   = round2(Math.min(promoPerTicket * qty, groupSubtotal));
+
+  // Fees on the PRE-promo subtotal (unchanged from the no-promo case).
+  const { rameeloFee, processingFee, grandTotal: grandTotalPrePromo } = computeFees(faceSubtotal, groupSubtotal, paymentMethod);
+  // What the buyer actually pays for tickets, and the final total (fees intact).
+  const subtotal   = round2(groupSubtotal - promoDiscount);
+  const grandTotal = round2(Math.max(0, grandTotalPrePromo - promoDiscount));
   const isFree = grandTotal <= 0; // free tickets skip Stripe entirely
   // Bank transfers are cut off close to the event (card-only within the window).
   const achAllowed = achAvailable(payload?.eventStartDate);
@@ -316,6 +339,43 @@ export default function CheckoutPage() {
   function handleContactNext(e: React.FormEvent) {
     e.preventDefault();
     if (contactValid) setStep("payment");
+  }
+
+  // Promo codes apply to standard single-buyer orders only (group orders have
+  // their own group-discount mechanism, so the two never mix on one order).
+  const promoEligible = !!payload && !payload.groupId && faceSubtotal > 0;
+
+  // Validate the entered code against this event via a SECURITY DEFINER RPC — the
+  // promo_codes table itself is admin-only, so the RPC returns just the authoritative
+  // per-ticket amount for a valid, active, in-window code (or nothing).
+  async function applyPromo() {
+    const code = promoInput.trim();
+    if (!code || !payload || promoChecking) return;
+    setPromoChecking(true);
+    setPromoError("");
+    try {
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc("validate_promo_code", { p_event_id: payload.eventId, p_code: code });
+      const row = (Array.isArray(data) ? data[0] : data) as { id: string; code: string; amount_per_ticket: number } | undefined;
+      if (error || !row) {
+        setAppliedPromo(null);
+        setPromoError(error ? "Couldn't check that code — please try again." : "That promo code isn't valid for this event.");
+      } else {
+        setAppliedPromo({ id: row.id, code: row.code, amountPerTicket: Number(row.amount_per_ticket) });
+        setPromoInput(row.code);
+        setPromoError("");
+      }
+    } catch {
+      setPromoError("Couldn't check that code — please try again.");
+    } finally {
+      setPromoChecking(false);
+    }
+  }
+
+  function removePromo() {
+    setAppliedPromo(null);
+    setPromoInput("");
+    setPromoError("");
   }
 
   // Create / refresh the Stripe PaymentIntent whenever we're on the payment step
@@ -410,7 +470,13 @@ export default function CheckoutPage() {
       qty: payload.qty,
       unitPrice: payload.unitPrice,
       discountPct: payload.discount,
-      discountAmount: payload.discountAmount,
+      // Promo dollars are folded into the total discount so revenue/payout math
+      // (qty·unit_price − discount_amount) absorbs it; the code + promo share are
+      // recorded separately for tracking and display.
+      discountAmount: round2((payload.discountAmount ?? 0) + promoDiscount),
+      promoCodeId: appliedPromo?.id ?? null,
+      promoCode: appliedPromo?.code ?? null,
+      promoDiscountAmount: promoDiscount,
       serviceFee: rameeloFee + processingFee,
       rameeloFee,
       processingFee,
@@ -446,7 +512,9 @@ export default function CheckoutPage() {
     const { orderId, error } = await saveOrder({
       userId: authedUserId, eventId: payload.eventId, tierId: payload.tierId, comboTicketId: payload.comboTicketId ?? null, groupId: payload.groupId,
       buyerName: `${firstName} ${lastName}`.trim(), buyerEmail: email, buyerPhone: phoneDigits,
-      qty: payload.qty, unitPrice: payload.unitPrice, discountPct: payload.discount, discountAmount: payload.discountAmount,
+      qty: payload.qty, unitPrice: payload.unitPrice, discountPct: payload.discount,
+      discountAmount: round2((payload.discountAmount ?? 0) + promoDiscount),
+      promoCodeId: appliedPromo?.id ?? null, promoCode: appliedPromo?.code ?? null, promoDiscountAmount: promoDiscount,
       serviceFee: rameeloFee + processingFee, rameeloFee, processingFee, paymentMethod, grandTotal,
       isTest: STRIPE_TEST_MODE, purchaseIp: clientIp, termsVersion: TERMS_VERSION, termsAcceptedIp: clientIp,
       stripePaymentIntentId: null, paymentPending: false, // free → confirmed immediately
@@ -571,6 +639,63 @@ export default function CheckoutPage() {
                 >
                   Sign in
                 </Link>
+              </div>
+            )}
+
+            {/* Promo code — standard single-buyer orders only, shown at the top */}
+            {promoEligible && (
+              <div className="mb-6 rounded-2xl border border-ivory-200 bg-white p-4">
+                <label className={labelCls}>Promo code</label>
+                {appliedPromo ? (
+                  <div className="flex items-center justify-between gap-3 rounded-xl bg-peacock/8 border border-peacock/25 px-4 py-3">
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <svg className="w-5 h-5 text-peacock shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                      <div className="min-w-0">
+                        <p className="font-mono text-sm font-bold text-peacock truncate">{appliedPromo.code}</p>
+                        <p className="font-ui text-xs text-peacock/80">
+                          ${money(appliedPromo.amountPerTicket)} off each ticket · saving ${money(promoDiscount)}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={removePromo}
+                      className="shrink-0 font-mono text-[10px] uppercase tracking-widest text-ink-muted hover:text-durga transition-colors"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={promoInput}
+                        onChange={e => { setPromoInput(e.target.value.toUpperCase()); if (promoError) setPromoError(""); }}
+                        onKeyDown={e => { if (e.key === "Enter") { e.preventDefault(); applyPromo(); } }}
+                        placeholder="Enter code"
+                        className={`${inputCls} font-mono tracking-wider`}
+                        autoCapitalize="characters"
+                        autoCorrect="off"
+                        spellCheck={false}
+                      />
+                      <button
+                        type="button"
+                        onClick={applyPromo}
+                        disabled={!promoInput.trim() || promoChecking}
+                        className={`shrink-0 px-5 rounded-xl font-ui font-semibold text-sm transition-all ${promoInput.trim() && !promoChecking ? "bg-aubergine text-white hover:bg-aubergine-light" : "bg-ivory-200 text-ink-muted cursor-not-allowed"}`}
+                      >
+                        {promoChecking ? "Checking…" : "Apply"}
+                      </button>
+                    </div>
+                    {promoError && (
+                      <p className="font-ui text-xs text-durga mt-2 flex items-center gap-1.5">
+                        <svg className="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M5.07 19h13.86a2 2 0 001.74-3l-6.93-12a2 2 0 00-3.48 0l-6.93 12a2 2 0 001.74 3z" /></svg>
+                        {promoError}
+                      </p>
+                    )}
+                  </>
+                )}
               </div>
             )}
 
@@ -844,6 +969,12 @@ export default function CheckoutPage() {
                         <span className="font-ui text-peacock">−${money(payload.discountAmount)}</span>
                       </div>
                     )}
+                    {promoDiscount > 0 && appliedPromo && (
+                      <div className="flex justify-between text-xs">
+                        <span className="font-ui text-peacock truncate">Promo · <span className="font-mono font-semibold">{appliedPromo.code}</span></span>
+                        <span className="font-ui text-peacock shrink-0">−${money(promoDiscount)}</span>
+                      </div>
+                    )}
                     {subtotal !== payload.unitPrice * payload.qty && (
                       <div className="flex justify-between text-xs border-t border-ivory-200 pt-1.5">
                         <span className="font-ui text-ink-muted">Subtotal</span>
@@ -893,6 +1024,14 @@ export default function CheckoutPage() {
                   <div className="rounded-xl bg-marigold/10 border border-marigold/25 p-3">
                     <p className="font-ui text-xs font-semibold text-marigold-dark text-center">
                       Saving ${money((payload.discountAmount ?? 0))} with group pricing!
+                    </p>
+                  </div>
+                )}
+
+                {promoDiscount > 0 && appliedPromo && (
+                  <div className="rounded-xl bg-peacock/10 border border-peacock/25 p-3">
+                    <p className="font-ui text-xs font-semibold text-peacock text-center">
+                      Saving ${money(promoDiscount)} with code <span className="font-mono">{appliedPromo.code}</span>!
                     </p>
                   </div>
                 )}

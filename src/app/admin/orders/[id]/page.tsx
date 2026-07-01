@@ -17,6 +17,7 @@ type OrderFull = {
   unit_price: number;
   discount_pct: number;
   discount_amount: number;
+  promo_code: string | null;
   rameelo_fee: number;
   processing_fee: number;
   service_fee: number;
@@ -104,7 +105,7 @@ export default function AdminOrderDetailPage() {
         .from("orders")
         .select(`
           id, user_id, buyer_name, buyer_email, buyer_phone,
-          qty, unit_price, discount_pct, discount_amount,
+          qty, unit_price, discount_pct, discount_amount, promo_code,
           rameelo_fee, processing_fee, service_fee, grand_total,
           status, payment_method, payment_last4, payment_brand, is_test, order_type, group_id, created_at,
           cancellation_reason, cancelled_at,
@@ -372,7 +373,7 @@ export default function AdminOrderDetailPage() {
           </div>
           {order.discount_amount > 0 && (
             <div className="flex justify-between text-sm">
-              <span className="font-ui text-peacock">Group discount{order.discount_pct ? ` (${order.discount_pct}%)` : ""}</span>
+              <span className="font-ui text-peacock">{order.promo_code ? `Promo · ${order.promo_code}` : `Group discount${order.discount_pct ? ` (${order.discount_pct}%)` : ""}`}</span>
               <span className="font-mono text-peacock">−${money(order.discount_amount)}</span>
             </div>
           )}
