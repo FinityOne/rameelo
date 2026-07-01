@@ -341,9 +341,13 @@ export default function CheckoutPage() {
     if (contactValid) setStep("payment");
   }
 
-  // Promo codes apply to standard single-buyer orders only (group orders have
-  // their own group-discount mechanism, so the two never mix on one order).
-  const promoEligible = !!payload && !payload.groupId && faceSubtotal > 0;
+  // Promo codes apply to a standard single-event, single-buyer order only:
+  //  • not group orders (they have their own group-discount mechanism), and
+  //  • not combo tickets (those span multiple events, so a per-event code must
+  //    never touch them).
+  // Validation is always scoped to THIS checkout's event (payload.eventId) via
+  // the RPC, so a code created for another event can't be applied here.
+  const promoEligible = !!payload && !payload.groupId && !payload.comboTicketId && faceSubtotal > 0;
 
   // Validate the entered code against this event via a SECURITY DEFINER RPC — the
   // promo_codes table itself is admin-only, so the RPC returns just the authoritative
