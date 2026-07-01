@@ -9,7 +9,7 @@ import ImageUpload from "./ImageUpload";
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
-const REGIONS = ["Northeast", "Southeast", "Midwest", "Southwest", "West"];
+const REGIONS = ["Northeast", "Southeast", "South", "Midwest", "Southwest", "West"];
 
 export const MEMBER_ROLES = [
   "Captain",

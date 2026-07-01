@@ -4,7 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 
-const REGIONS = ["Northeast", "Southeast", "Midwest", "Southwest", "West"];
+const REGIONS = ["Northeast", "Southeast", "South", "Midwest", "Southwest", "West"];
 const CONTACT_ROLES = ["Captain", "Co-Captain", "Coach", "Team Manager", "Faculty Advisor", "Other"];
 
 type Step = "form" | "done";

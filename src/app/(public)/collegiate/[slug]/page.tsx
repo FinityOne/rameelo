@@ -41,6 +41,7 @@ function extractSoundCloudUrl(url: string) {
 const REGION_COLORS: Record<string, { bg: string; text: string; border: string }> = {
   Northeast: { bg: "bg-indigo-500/15", text: "text-indigo-300", border: "border-indigo-500/30" },
   Southeast: { bg: "bg-red-500/15",    text: "text-red-300",    border: "border-red-500/30" },
+  South:     { bg: "bg-amber-500/15",  text: "text-amber-300",  border: "border-amber-500/30" },
   Midwest:   { bg: "bg-emerald-500/15",text: "text-emerald-300",border: "border-emerald-500/30" },
   Southwest: { bg: "bg-orange-500/15", text: "text-orange-300", border: "border-orange-500/30" },
   West:      { bg: "bg-cyan-500/15",   text: "text-cyan-300",   border: "border-cyan-500/30" },
