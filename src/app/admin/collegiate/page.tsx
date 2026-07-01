@@ -1,32 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import TeamsTable, { type Team } from "./_components/TeamsTable";
 
 export const metadata: Metadata = { title: "Collegiate Teams — Admin | Rameelo" };
-
-type Team = {
-  id: string;
-  slug: string;
-  team_name: string;
-  university_name: string;
-  region: string;
-  state: string | null;
-  city: string | null;
-  cover_image_url: string | null;
-  is_active: boolean;
-  is_featured: boolean;
-  is_verified: boolean;
-  donate_enabled: boolean;
-  created_at: string;
-};
-
-const REGION_ACCENT: Record<string, { bar: string; badge: string; text: string }> = {
-  Northeast: { bar: "bg-indigo-500",  badge: "bg-indigo-50 border-indigo-200",   text: "text-indigo-700"  },
-  Southeast: { bar: "bg-red-500",     badge: "bg-red-50 border-red-200",         text: "text-red-700"     },
-  Midwest:   { bar: "bg-emerald-500", badge: "bg-emerald-50 border-emerald-200", text: "text-emerald-700" },
-  Southwest: { bar: "bg-orange-500",  badge: "bg-orange-50 border-orange-200",   text: "text-orange-700"  },
-  West:      { bar: "bg-cyan-600",    badge: "bg-cyan-50 border-cyan-200",       text: "text-cyan-700"    },
-};
 
 export default async function AdminCollegiatePage() {
   const supabase = await createClient();
@@ -158,117 +135,8 @@ export default async function AdminCollegiatePage() {
           </div>
         )}
 
-        {/* ── Team cards grid ──────────────────────────────────────────── */}
-        {allTeams.length > 0 && (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {allTeams.map(team => {
-              const accent   = REGION_ACCENT[team.region] ?? { bar: "bg-ink/20", badge: "bg-ink/5 border-ink/12", text: "text-ink/50" };
-              const location = [team.city, team.state].filter(Boolean).join(", ");
-
-              return (
-                <div
-                  key={team.id}
-                  className={`group relative bg-white border rounded-2xl overflow-hidden flex flex-col shadow-sm transition-all hover:shadow-md ${
-                    team.is_active ? "border-ink/8 hover:border-ink/15" : "border-ink/5 opacity-55 hover:opacity-75"
-                  }`}
-                >
-                  {/* Region color bar at top */}
-                  <div className={`h-1 w-full shrink-0 ${accent.bar}`} />
-
-                  {/* Cover photo */}
-                  <div className="relative h-32 overflow-hidden bg-gradient-to-br from-aubergine/8 to-peacock/5 shrink-0">
-                    {team.cover_image_url ? (
-                      <img
-                        src={team.cover_image_url}
-                        alt={team.team_name}
-                        className="absolute inset-0 w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                      />
-                    ) : (
-                      <div className="absolute inset-0 flex items-center justify-center">
-                        <span className="text-5xl opacity-8 select-none">🏆</span>
-                      </div>
-                    )}
-                    {/* Gradient overlay for readability */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/10 to-transparent" />
-
-                    {/* Status badge overlaid on image */}
-                    <div className="absolute top-2.5 right-2.5">
-                      <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full font-mono text-[9px] uppercase tracking-wider backdrop-blur-md ${
-                        team.is_active
-                          ? "bg-emerald-900/75 border border-emerald-400/40 text-emerald-200"
-                          : "bg-black/50 border border-white/15 text-white/40"
-                      }`}>
-                        <span className={`w-1 h-1 rounded-full ${team.is_active ? "bg-emerald-400" : "bg-white/30"}`} />
-                        {team.is_active ? "Active" : "Inactive"}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Card content */}
-                  <div className="px-4 pt-4 pb-4 flex flex-col flex-1">
-                    {/* Team name */}
-                    <p className="font-display font-bold text-ink text-base leading-tight mb-0.5 group-hover:text-aubergine transition-colors" style={{ letterSpacing: "-0.02em" }}>
-                      {team.team_name}
-                    </p>
-
-                    {/* University + location */}
-                    <p className="font-ui text-ink/50 text-xs leading-snug mb-3">
-                      {team.university_name}
-                      {location && <span className="text-ink/30"> · {location}</span>}
-                    </p>
-
-                    {/* Region + flags chips */}
-                    <div className="flex flex-wrap gap-1.5 mb-4">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded-md font-mono text-[9px] border ${accent.badge} ${accent.text}`}>
-                        {team.region}
-                      </span>
-                      {team.is_featured && (
-                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-amber-50 border border-amber-200 font-mono text-[9px] text-amber-700">
-                          ⭐ Featured
-                        </span>
-                      )}
-                      {team.is_verified && (
-                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-teal-50 border border-teal-200 font-mono text-[9px] text-teal-700">
-                          ✓ Verified
-                        </span>
-                      )}
-                      {team.donate_enabled && (
-                        <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-blue-50 border border-blue-200 font-mono text-[9px] text-blue-700">
-                          💙 Donations
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Actions footer */}
-                    <div className="mt-auto pt-3 border-t border-ink/6 flex items-center justify-between">
-                      <p className="font-mono text-[9px] text-ink/25">
-                        {new Date(team.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
-                      </p>
-                      <div className="flex items-center gap-1">
-                        <Link
-                          href={`/collegiate/${team.slug}`}
-                          target="_blank"
-                          className="flex items-center gap-1 px-2.5 py-1 rounded-lg font-mono text-[9px] uppercase tracking-wider text-ink/35 hover:text-ink/70 hover:bg-ink/5 transition-all"
-                        >
-                          View
-                          <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                        </Link>
-                        <Link
-                          href={`/admin/collegiate/${team.id}/edit`}
-                          className="px-3 py-1 rounded-lg bg-aubergine/8 border border-aubergine/15 font-mono text-[9px] uppercase tracking-wider text-aubergine hover:bg-aubergine/15 transition-all"
-                        >
-                          Edit
-                        </Link>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {/* ── Teams table (grouped by region, searchable) ──────────────── */}
+        {allTeams.length > 0 && <TeamsTable teams={allTeams} />}
       </div>
     </div>
   );
