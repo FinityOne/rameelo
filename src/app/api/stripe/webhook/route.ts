@@ -128,7 +128,7 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
     .eq("id", cand.id)
     .eq("status", cand.status)
     .select(`
-      id, user_id, group_id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_pct, discount_amount,
+      id, user_id, group_id, buyer_name, buyer_email, buyer_phone, qty, unit_price, discount_pct, discount_amount, promo_code,
       rameelo_fee, processing_fee, grand_total, payment_method, event_id, combo_ticket_id,
       events ( title, start_date, start_time, city, state, venue_name, cover_image_url, org_id, organizer_id, artists ( name ) ),
       ticket_tiers ( name ),
@@ -137,7 +137,7 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
 
   const order = rows?.[0] as {
     id: string; user_id: string | null; group_id: string | null; buyer_name: string | null; buyer_email: string; buyer_phone: string | null;
-    qty: number; unit_price: number; discount_pct: number; discount_amount: number;
+    qty: number; unit_price: number; discount_pct: number; discount_amount: number; promo_code: string | null;
     rameelo_fee: number; processing_fee: number; grand_total: number; payment_method: string; event_id: string; combo_ticket_id: string | null;
     events: FulfillEvent; ticket_tiers: { name: string } | null; combo_tickets: { name: string } | null;
   } | undefined;
@@ -209,7 +209,7 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
       const discountAmount = Number(order.discount_amount) || 0;
       const tn = orderTeamNotificationEmail({
         recipientFirstName: p.first_name, buyerFirstName: (order.buyer_name || "").trim().split(" ")[0] || "Someone",
-        qty: order.qty, tierName, unitPrice, discountAmount,
+        qty: order.qty, tierName, unitPrice, discountAmount, promoCode: order.promo_code,
         faceValue: Math.max(0, order.qty * unitPrice - discountAmount),
         eventTitle: ev?.title ?? "", artistName: artist, eventWhen, eventWhere: where,
         bannerUrl: ev?.cover_image_url ?? null, ordersUrl: `${EMAIL.site}/organizer/events/${order.event_id}/orders`,
@@ -233,6 +233,7 @@ async function fulfillPaidOrder(pi: Stripe.PaymentIntent) {
       const an = orderAdminNotificationEmail({
         buyerName: order.buyer_name, buyerEmail: order.buyer_email, buyerPhone: order.buyer_phone,
         qty: order.qty, tierName, unitPrice: Number(order.unit_price) || 0, discountAmount: Number(order.discount_amount) || 0,
+        promoCode: order.promo_code,
         rameeloFee: Number(order.rameelo_fee) || 0, processingFee: Number(order.processing_fee) || 0, grandTotal: Number(order.grand_total) || 0,
         paymentMethod: order.payment_method, eventTitle: ev?.title ?? "", artistName: artist, eventWhen, eventWhere: where,
         receiptNum: receiptNum(order.id), orderUrl: `${EMAIL.site}/admin/events/${order.event_id}`,
