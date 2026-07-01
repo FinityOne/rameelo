@@ -16,6 +16,7 @@ export function orderAdminNotificationEmail(p: {
   tierName: string;
   unitPrice: number;
   discountAmount?: number;
+  promoCode?: string | null; // when a promo code was used, its code (for labeling)
   rameeloFee: number;
   processingFee: number;
   grandTotal: number;
@@ -41,6 +42,8 @@ export function orderAdminNotificationEmail(p: {
 
   const unitPrice = Number(p.unitPrice) || 0;
   const discount = Math.max(0, Number(p.discountAmount) || 0);
+  const promoCode = (p.promoCode ?? "").trim();
+  const discountLabel = promoCode ? `Promo · ${promoCode}` : "Group discount";
   const faceValue = Math.max(0, p.qty * unitPrice - discount);
   const rameeloFee = Number(p.rameeloFee) || 0;
   const processingFee = Number(p.processingFee) || 0;
@@ -101,7 +104,7 @@ export function orderAdminNotificationEmail(p: {
     <tr><td style="padding:14px 18px;">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
         ${moneyRow(`Tickets (${p.qty} × $${money(unitPrice)})`, `$${money(p.qty * unitPrice)}`)}
-        ${discount > 0 ? moneyRow("Group discount", `−$${money(discount)}`, { color: C.peacock }) : ""}
+        ${discount > 0 ? moneyRow(discountLabel, `−$${money(discount)}`, { color: C.peacock }) : ""}
         ${moneyRow("Ticket face value (organizer)", `$${money(faceValue)}`, { strong: true })}
         <tr><td colspan="2" style="border-top:1px solid ${C.ivory200};padding-top:2px;"></td></tr>
         ${moneyRow("Rameelo platform fee (3%)", `$${money(rameeloFee)}`, { muted: true })}
@@ -177,7 +180,7 @@ export function orderAdminNotificationEmail(p: {
     "",
     "PRICE BREAKDOWN",
     `  Tickets (${p.qty} x $${money(unitPrice)}): $${money(p.qty * unitPrice)}`,
-    discount > 0 ? `  Group discount: -$${money(discount)}` : "",
+    discount > 0 ? `  ${discountLabel}: -$${money(discount)}` : "",
     `  Ticket face value (organizer): $${money(faceValue)}`,
     `  Rameelo platform fee (3%): $${money(rameeloFee)}`,
     processingFee > 0 ? `  Card processing fee (5%): $${money(processingFee)}` : `  Processing fee: $0.00 (${isManual ? "manual" : "ACH"})`,

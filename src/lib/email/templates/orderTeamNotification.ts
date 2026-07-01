@@ -18,6 +18,7 @@ export function orderTeamNotificationEmail(p: {
   tierName: string;
   unitPrice: number;       // per-ticket face price
   discountAmount?: number; // total discount applied (subtracted from face value)
+  promoCode?: string | null; // when a promo code was used, its code (for labeling)
   faceValue: number;       // qty × unitPrice − discountAmount — organizer revenue
   eventTitle: string;
   artistName?: string | null;
@@ -36,6 +37,8 @@ export function orderTeamNotificationEmail(p: {
   const isManual = method === "manual";
   const payLabel = isManual ? "Manual / offline" : isAch ? "Bank transfer (ACH)" : "Credit / Debit card";
   const discount = Math.max(0, Number(p.discountAmount) || 0);
+  const promoCode = (p.promoCode ?? "").trim();
+  const discountLabel = promoCode ? `Promo (${promoCode})` : "Discount";
   // Consistent, scannable subject: who · how many · which event.
   const subject = `🎟️ ${buyer} ordered ${p.qty} ${ticketWord} — ${p.eventTitle}`;
 
@@ -62,7 +65,7 @@ export function orderTeamNotificationEmail(p: {
         ${row("Buyer", buyer)}
         ${row("Tier", p.tierName || "Ticket")}
         ${row("Tickets", `${p.qty} ${ticketWord} × $${money(p.unitPrice)}`)}
-        ${discount > 0 ? row("Discount", `−$${money(discount)}`) : ""}
+        ${discount > 0 ? row(discountLabel, `−$${money(discount)}`) : ""}
         ${row("Payment", payLabel)}
         <tr><td colspan="2" style="border-top:1px solid ${C.ivory200};padding-top:2px;"></td></tr>
         ${row("Ticket revenue", `$${money(p.faceValue)}`, { strong: true })}
@@ -116,7 +119,7 @@ export function orderTeamNotificationEmail(p: {
     `  Buyer: ${buyer}`,
     `  Tier: ${p.tierName || "Ticket"}`,
     `  Tickets: ${p.qty} ${ticketWord} x $${money(p.unitPrice)}`,
-    discount > 0 ? `  Discount: -$${money(discount)}` : "",
+    discount > 0 ? `  ${discountLabel}: -$${money(discount)}` : "",
     `  Payment: ${payLabel}`,
     `  Ticket revenue (face value): $${money(p.faceValue)}`,
     isManual

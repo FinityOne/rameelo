@@ -29,6 +29,7 @@ type AdminPayload = {
   tier_name: string | null;
   unit_price: number;
   discount_amount: number;
+  promo_code: string | null;
   rameelo_fee: number;
   processing_fee: number;
   grand_total: number;
@@ -79,6 +80,7 @@ export async function POST(request: Request) {
     tierName: o.tier_name ?? "Ticket",
     unitPrice: Number(o.unit_price) || 0,
     discountAmount: Number(o.discount_amount) || 0,
+    promoCode: o.promo_code,
     rameeloFee: Number(o.rameelo_fee) || 0,
     processingFee: Number(o.processing_fee) || 0,
     grandTotal: Number(o.grand_total) || 0,

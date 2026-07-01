@@ -25,6 +25,7 @@ type TeamPayload = {
   tier_name: string | null;
   unit_price: number;
   discount_amount: number;
+  promo_code: string | null;
   grand_total: number;
   payment_method: string;
   event_id: string;
@@ -75,6 +76,7 @@ export async function POST(request: Request) {
       tierName: o.tier_name ?? "Ticket",
       unitPrice,
       discountAmount,
+      promoCode: o.promo_code,
       faceValue,
       eventTitle: o.event_title,
       artistName: o.artist_name,
