@@ -2,6 +2,8 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { breadcrumbSchema, itemListSchema, ld } from "@/lib/jsonld";
+import { resolveUSCoords } from "@/lib/us-geo";
+import TeamMap, { type MapTeam } from "./TeamMap";
 
 export const metadata: Metadata = {
   title: "Collegiate Raas Garba Teams | Rameelo",
@@ -21,12 +23,13 @@ export const metadata: Metadata = {
 const REGION_META: Record<string, { label: string; color: string; bg: string; border: string; emoji: string }> = {
   Northeast:  { label: "Northeast",  color: "text-indigo-300",  bg: "bg-indigo-500/10",  border: "border-indigo-500/25",  emoji: "🗽" },
   Southeast:  { label: "Southeast",  color: "text-red-300",     bg: "bg-red-500/10",     border: "border-red-500/25",     emoji: "🌴" },
+  South:      { label: "South",      color: "text-amber-300",   bg: "bg-amber-500/10",   border: "border-amber-500/25",   emoji: "🍑" },
   Midwest:    { label: "Midwest",    color: "text-emerald-300", bg: "bg-emerald-500/10", border: "border-emerald-500/25", emoji: "🌽" },
   Southwest:  { label: "Southwest",  color: "text-orange-300",  bg: "bg-orange-500/10",  border: "border-orange-500/25",  emoji: "🌵" },
   West:       { label: "West",       color: "text-cyan-300",    bg: "bg-cyan-500/10",    border: "border-cyan-500/25",    emoji: "🌊" },
 };
 
-const REGION_ORDER = ["Northeast", "Southeast", "Midwest", "Southwest", "West"];
+const REGION_ORDER = ["Northeast", "Southeast", "South", "Midwest", "Southwest", "West"];
 
 type Team = {
   id: string;
@@ -61,6 +64,20 @@ export default async function CollegiatePage() {
     if (!byRegion[t.region]) byRegion[t.region] = [];
     byRegion[t.region].push(t);
   }
+
+  // Teams we can place on the map (resolvable coordinates), with derived stats.
+  const mapTeams: MapTeam[] = allTeams.flatMap(t => {
+    const coords = resolveUSCoords(t.city, t.state);
+    if (!coords) return [];
+    const podiums = (t.achievements ?? []).length;
+    const wins = (t.achievements ?? []).filter(a => a.placement === "1st" || a.placement === "Champion").length;
+    return [{
+      id: t.id, slug: t.slug, team_name: t.team_name, university_name: t.university_name,
+      tagline: t.tagline, region: t.region, state: t.state, city: t.city,
+      cover_image_url: t.cover_image_url, is_featured: t.is_featured, is_verified: t.is_verified,
+      donate_enabled: t.donate_enabled, wins, podiums, coords,
+    }];
+  });
 
   const featured = allTeams.filter(t => t.is_featured);
   const totalTeams = allTeams.length;
@@ -127,6 +144,25 @@ export default async function CollegiatePage() {
           </div>
         </div>
       </section>
+
+      {/* Teams map */}
+      {mapTeams.length > 0 && (
+        <section className="relative overflow-hidden border-b border-white/5" style={{ background: "linear-gradient(180deg, #0d0010 0%, #12071a 55%, #0b0410 100%)" }}>
+          <div className="absolute top-0 right-1/4 w-[500px] h-[400px] rounded-full opacity-15 blur-[120px] pointer-events-none" style={{ background: "radial-gradient(circle, #6B3FA0 0%, transparent 70%)" }} />
+          <div className="relative max-w-6xl mx-auto px-4 py-16 sm:py-20">
+            <div className="text-center mb-10">
+              <p className="font-mono text-[10px] uppercase tracking-widest text-marigold font-bold mb-3">The Map</p>
+              <h2 className="font-display font-bold text-white text-3xl sm:text-4xl mb-3" style={{ letterSpacing: "-0.025em" }}>
+                Every team, coast to coast
+              </h2>
+              <p className="font-ui text-white/50 text-sm sm:text-base max-w-xl mx-auto">
+                {mapTeams.length} collegiate raas teams across the country. Click a pin to meet the team.
+              </p>
+            </div>
+            <TeamMap teams={mapTeams} />
+          </div>
+        </section>
+      )}
 
       {/* What is collegiate raas */}
       <section className="bg-ivory py-16 border-b border-ink/8">
