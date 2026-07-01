@@ -2,6 +2,11 @@ import { renderEmail, eyebrow, h1, lead, para, button, sectionTitle } from "../l
 import { EMAIL, C, FONT_HEAD, FONT_BODY } from "../theme";
 import { money } from "../../money";
 
+// Constant, filterable prefix on EVERY organizer order-notification subject line.
+// Organizers match this exact leading token ("subject starts with / contains") to
+// auto-apply an inbox label. Do not change it lightly — it breaks existing filters.
+export const ORDER_EMAIL_SUBJECT_PREFIX = "[Rameelo Order]";
+
 // New-order notification sent to an organization's team (owners/admins + the event
 // creator) every time an order is placed for one of their events. Keeps it light:
 // who bought, how many, which tier, the event summary, and a small event banner —
@@ -39,8 +44,12 @@ export function orderTeamNotificationEmail(p: {
   const discount = Math.max(0, Number(p.discountAmount) || 0);
   const promoCode = (p.promoCode ?? "").trim();
   const discountLabel = promoCode ? `Promo (${promoCode})` : "Discount";
-  // Consistent, scannable subject: who · how many · which event.
-  const subject = `🎟️ ${buyer} ordered ${p.qty} ${ticketWord} — ${p.eventTitle}`;
+  // Standardized subject line. Every organizer order email starts with the exact,
+  // constant prefix ORDER_EMAIL_SUBJECT_PREFIX ("[Rameelo Order]") so it can be
+  // matched with a "subject starts with / contains" rule to auto-apply an inbox
+  // label. Keep the prefix stable — changing it breaks existing filters. The
+  // human-readable summary (who · how many · which event) follows the prefix.
+  const subject = `${ORDER_EMAIL_SUBJECT_PREFIX} ${buyer} ordered ${p.qty} ${ticketWord} — ${p.eventTitle}`;
 
   // Small event banner (image when the event has a cover, otherwise a branded strip).
   const banner = p.bannerUrl
